@@ -5,6 +5,6 @@ import sys
 
 if __name__ == '__main__':
     try:
-        a = NvidiaDetection(printonly=True, verbose=True)
+        a = NvidiaDetection(printonly=True, verbose=False)
     except NoDatadirError, e:
         sys.exit(0)
