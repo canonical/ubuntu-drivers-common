@@ -1,0 +1,362 @@
+nvidia-common (0.2.26) natty; urgency=low
+
+  * NvidiaDetector/nvidiadetector.py: Fix __get_value_from_name() to only
+    convert the string to an int if we don't have an explicit override.
+    (LP: #692022)
+  * debian/nvidia-common.postinst: When calling nvidia-detector, only consider
+    the last line, to ignore other messages before the "None". (LP: #692096)
+  * debian/control: Add missing ${misc:Depends}.
+  * debian/control, debian/rules, debian/compat: Move to "dh", compat level 7,
+    and build with dh_python2, which greatly simplifies the build system.
+  * debian/control: Set Maintainer to standard "ubuntu developers".
+  * debian/nvidia-common.config: Add missing set -e, thanks lintian.
+  * debian/nvidia-common.postinst: Drop obsolete upgrade handling.
+  * Use "3.0 (quilt)" source package format.
+  * debian/control: Bump Standards-Version to 3.9.1.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Sun, 19 Dec 2010 11:29:51 +0100
+
+nvidia-common (0.2.25) natty; urgency=low
+
+  * NvidiaDetector/nvidiadetector.py: Drop code to read
+    /usr/share/jockey/modaliases, and scan for "Modaliases:" package headers
+    instead. Add dependency to python-apt.
+  * debian/control: Drop Vcs-Bzr:. That branch is ancient, and we should use
+    lp:ubuntu/nvidia-common now anyway.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Sat, 18 Dec 2010 20:27:26 +0100
+
+nvidia-common (0.2.24build1) natty; urgency=low
+
+  * Rebuild with python 2.7 as the python default.
+
+ -- Matthias Klose <doko@ubuntu.com>  Wed, 08 Dec 2010 13:08:06 +0000
+
+nvidia-common (0.2.24) maverick; urgency=low
+
+  * NvidiaDetector/alternatives.py:
+    - Call "dpkg --configure -a" after using dpkg-trigger so
+      that the cache is regenerated (LP: #548751).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 23 Sep 2010 15:37:27 +0200
+
+nvidia-common (0.2.23) lucid; urgency=low
+
+  * Drop unnecessary dependency on fglrx-modaliases.  It will be pulled in
+    from jockey's recommends (and be removable then).
+
+ -- Mario Limonciello <superm1@ubuntu.com>  Fri, 02 Apr 2010 10:34:06 -0500
+
+nvidia-common (0.2.22) lucid; urgency=low
+
+  * debian/control:
+    - Add dependency on fglrx-modaliases.
+  * debian/nvidia-common.config:
+    - Put back the config script with only one line to source
+      debconf so that the template file is loaded when
+      nvidia-common is triggered by kernel hooks (LP: #533970).
+      Thanks to Colin Watson for the advice.
+  * NvidiaDetector/alternatives.py:
+    - Add the update_gmenu method and call it in set_alternative
+      so that the gnome menu is updated when we switch between
+      drivers (LP: #548751).
+    - Add the resolve_module_alias method so as to retrieve the
+      module name from the alias (relevant to #547066).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 15 Mar 2010 16:44:17 +0100
+
+nvidia-common (0.2.21) lucid; urgency=low
+
+  * Make sure that /etc/modprobe.d/lrm-video is removed
+    so that it doesn't interfere with nvidia (LP: #467490).
+  * debian/nvidia-common.postinst:
+    - Remove db_stop as suggested by Colin Watson, as it
+      can do more harm than good there.
+    - Move the debconf part into the postinst and get rid
+      of the config script (which was run before
+      nvidia-common was configured, with unpredictable
+      results). Thanks to Colin Watson for the advice.
+    - Don't test the existence of nvidia-detector.
+  * share/obsolete:
+    - Add nvidia-glx-{190|195} so as to take care of
+      packages from PPAs.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 03 Mar 2010 13:13:51 +0100
+
+nvidia-common (0.2.20) lucid; urgency=low
+
+  * NvidiaDetector/alternatives.py:
+    - Make sure that the PATH environment variable is set
+      so that subprocess knows where to find binaries in
+      /sbin (LP: #518879).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 16 Feb 2010 16:35:35 +0100
+
+nvidia-common (0.2.19) lucid; urgency=low
+
+  * NvidiaDetector/alternatives.py:
+    - Call ldconfig after setting an alternative.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 04 Feb 2010 15:10:19 -0800
+
+nvidia-common (0.2.18) lucid; urgency=low
+
+  * NvidiaDetector/alternatives.py:
+    - Set self.__open_drivers_alternative to 'mesa/ld.so.conf' so as to
+      adapt to the fact that the alternative lives in mesa now.
+    - Do not pass arguments to the list_alternatives method.
+    - Use subprocess.check_call instead of .call so as to get the exit
+      status in addition to the return code. 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 19 Jan 2010 17:18:45 +0100
+
+nvidia-common (0.2.17) lucid; urgency=low
+
+  * setup.py:
+    - Add pre-inst hook for the NVIDIA installer as
+      the latter may interact badly with the Ubuntu
+      packages(LP: #317703).
+  * NvidiaDetector/nvidiadetector.py:
+    - Handle driver flavours which have strings (instead
+      of integers in their name).
+  * NvidiaDetector/alternatives.py:
+    - Alternatives class to get the list of alternatives
+      and to get and set the alternative in use.
+  * nvidia-common:
+    - ${LATEST} should have quotation marks (LP: #505855).
+
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 11 Jan 2010 18:13:11 +0100
+
+nvidia-common (0.2.16) lucid; urgency=low
+
+  * debian/control::
+    - Depends on nvidia-current-modaliases since 185 is no longer used.
+
+ -- Mario Limonciello <superm1@ubuntu.com>  Sun, 10 Jan 2010 14:45:14 -0800
+
+nvidia-common (0.2.15.1) karmic-proposed; urgency=low
+
+  * debian/postinst:
+    - remove leftover /etc/modprobe.d/lrm-video (LP: #459829)
+
+ -- Michael Vogt <michael.vogt@ubuntu.com>  Tue, 27 Oct 2009 17:09:34 +0100
+
+nvidia-common (0.2.15) karmic; urgency=low
+
+  * debian/control:
+    - Drop dependency on nvidia-180-modaliases.
+    - Add dependency on nvidia-185-modaliases.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 19 Aug 2009 19:25:51 +0200
+
+nvidia-common (0.2.14) karmic; urgency=low
+
+  * Revert previous change, -185 is still in NEW.
+
+ -- Steve Kowalik <stevenk@ubuntu.com>  Wed, 12 Aug 2009 15:37:12 +1000
+
+nvidia-common (0.2.13) karmic; urgency=low
+
+  * debian/control:
+    - Drop dependency on nvidia-180-modaliases.
+    - Add dependency on nvidia-185-modaliases.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Sat, 08 Aug 2009 19:23:16 +0200
+
+nvidia-common (0.2.12) karmic; urgency=low
+
+  * debian/control:
+    - Drop dependency on nvidia-71-modaliases.
+  * NvidiaDetector/nvidiadetector.py:
+    - Use a text file in /usr/share/nvidia-common/
+      instead of hardcoding the list of obsolete
+      packages in the program.
+    - Add "obsolete" optional argument to the ctor so
+      as to allow to change the default path to the
+      list of obsolete packages.
+    - Catch IOError if the path to the modalias files
+      does not exist.
+    - Flush stdout before printing (LP: #292606).
+  * nvidia-common:
+    - Prevent the script from failing when $LATEST is
+      null.
+  * setup.py:
+    - Install share/obsolete to /usr/share/nvidia-common.
+  * share/obsolete:
+    - Add nvidia-glx-71.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 24 Jul 2009 17:03:18 +0200
+
+nvidia-common (0.2.11) jaunty; urgency=low
+
+  * do not sys.exit(0) in NvidiaDetection.__init__()
+    but raise a exception instead (this code is imported
+    by update-manager and the exit(0) exits it)
+
+ -- Michael Vogt <michael.vogt@ubuntu.com>  Mon, 20 Apr 2009 10:50:40 +0200
+
+nvidia-common (0.2.10) jaunty; urgency=low
+
+  * NvidiaDetector/nvidiadetector.py:
+    - Exit without an error exit status in NvidiaDetection.__init__()
+      so as not to break dist-upgrades if the modaliases are not
+      installed (LP: #303825).
+  * debian/rules:
+    - Add "--install-layout=deb" to make sure that nvidia-detector
+      is installed in /usr/bin/ instead of /usr/local/bin.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 14 Apr 2009 15:54:28 +0200
+
+nvidia-common (0.2.9) jaunty; urgency=low
+
+  * Include the symlinks in the package.
+
+ -- Matthias Klose <doko@ubuntu.com>  Tue, 24 Feb 2009 22:41:02 +0100
+
+nvidia-common (0.2.8) jaunty; urgency=low
+
+  * debian/rules: add "export DH_PYCENTRAL=nomove" to avoid
+    problems with dist-upgrades.
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Thu, 19 Feb 2009 14:39:36 +0100
+
+nvidia-common (0.2.7) jaunty; urgency=low
+
+  * NvidiaDetector/nvidiadetector.py:
+    - add nvidia-glx-177 to
+      the "oldPackages" list since 177 is no longer available
+      in Jaunty.
+    - make sure that drivers which have the modaliases and
+      are in oldPackages are ignored.
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Wed, 04 Feb 2009 12:09:26 +0100
+
+nvidia-common (0.2.6) jaunty; urgency=low
+
+  * debian/control:
+    - Drop dependency on nvidia-177-modaliases since it's not 
+      compatible with Jaunty's X ABI.
+    - Add Vcs-Bzr
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Fri, 30 Jan 2009 18:14:19 +0100
+
+nvidia-common (0.2.5) jaunty; urgency=low
+
+  * debian/control:
+    - Now that the 180 series of drivers is stable, depend on the 180
+      modaliases.
+
+ -- Mario Limonciello <mario_limonciello@dell.com>  Thu, 08 Jan 2009 15:18:19 -0600
+
+nvidia-common (0.2.4) intrepid; urgency=low
+
+  * Do not raise an exception if self.drivers is empty (LP: #272196)
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Mon, 06 Oct 2008 14:51:17 +0200
+
+nvidia-common (0.2.3) intrepid; urgency=low
+
+  * Move the hard work in debian/rules to binary-arch now that we're
+    architecture-dependent.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Wed, 27 Aug 2008 15:37:20 +0100
+
+nvidia-common (0.2.2) intrepid; urgency=low
+
+  * Set Architecture to i386 amd64 in debian/control
+  * Move Build-Depends-Indep to Build-Depends in debian/control
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Wed, 27 Aug 2008 15:14:18 +0200
+
+nvidia-common (0.2.1) intrepid; urgency=low
+
+  * add missing depends on pciutils
+
+ -- Michael Vogt <michael.vogt@ubuntu.com>  Fri, 25 Jul 2008 11:12:47 +0200
+
+nvidia-common (0.2) intrepid; urgency=low
+
+  * Native version
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Tue, 22 Jul 2008 12:21:25 +0200
+
+nvidia-common (0.1-0ubuntu12) intrepid; urgency=low
+
+  * Bump for PPA
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Tue, 15 Jul 2008 15:11:51 +0200
+
+nvidia-common (0.1-0ubuntu11) intrepid; urgency=low
+
+  * Change the regex pattern so as to make use of the new pattern in the
+    modalias files
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Tue, 15 Jul 2008 11:48:03 +0200
+
+nvidia-common (0.1-0ubuntu10) intrepid; urgency=low
+
+  * Drop CDBS in favour of python-central due to a bug in CDBS
+  * Check the existence of /usr/share/jockey/modaliases
+  * See if the modaliases files contain something useful
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Mon, 14 Jul 2008 17:47:35 +0200
+
+nvidia-common (0.1-0ubuntu9) intrepid; urgency=low
+
+  * Switch to python-support
+  * nvdia-common and the config file should point to the executable file in
+    /usr/bin
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Sun, 13 Jul 2008 13:54:20 +0200
+
+nvidia-common (0.1-0ubuntu8) intrepid; urgency=low
+
+  * Add dependency on the nvidia-VER-modaliases packages
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Sun, 13 Jul 2008 12:29:53 +0200
+
+nvidia-common (0.1-0ubuntu7) intrepid; urgency=low
+
+  * Remove makefile
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Sat, 12 Jul 2008 16:35:06 +0200
+
+nvidia-common (0.1-0ubuntu6) intrepid; urgency=low
+
+  * Correct DOMAIN in makefile
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Sat, 12 Jul 2008 15:42:05 +0200
+
+nvidia-common (0.1-0ubuntu5) intrepid; urgency=low
+
+  * Add build dependency on python2.4
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Sat, 12 Jul 2008 15:18:05 +0200
+
+nvidia-common (0.1-0ubuntu4) intrepid; urgency=low
+
+  * Add missing build dependency on the Python versions
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Sat, 12 Jul 2008 13:46:14 +0200
+
+nvidia-common (0.1-0ubuntu3) intrepid; urgency=low
+
+  * Put nvidia-common also in /etc/kernel/postinst.d/ so that it's triggered
+    when a new kernel is installed too.
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Sat, 12 Jul 2008 13:21:08 +0200
+
+nvidia-common (0.1-0ubuntu2) hardy; urgency=low
+
+  * Switch to CDBS
+  * Make it possible for nvidiadetector to be imported by other Python
+    applications such as Update-Manager
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Sat, 12 Jul 2008 12:48:15 +0200
+
+nvidia-common (0.1-0ubuntu1) intrepid; urgency=low
+
+  * First release.
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Thu, 10 Jul 2008 15:13:50 +0200

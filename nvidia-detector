@@ -1,0 +1,10 @@
+#!/usr/bin/python
+import NvidiaDetector
+from NvidiaDetector.nvidiadetector import NvidiaDetection, NoDatadirError
+import sys
+
+if __name__ == '__main__':
+    try:
+        a = NvidiaDetection(printonly=True, verbose=True)
+    except NoDatadirError, e:
+        sys.exit(0)

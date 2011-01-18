@@ -1,0 +1,7 @@
+nvidia-common for Debian
+----------------------------
+
+These files are shared among multiple concurent kernel modules installations
+
+
+ -- Randall Donald <rdonald@debian.org>, Sat, 24 Aug 2002 23:20:00 -0700

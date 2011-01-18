@@ -1,0 +1,17 @@
+#!/bin/sh -e
+. /usr/share/debconf/confmodule
+
+db_fset nvidia-common/obsolete-driver seen false
+db_fget nvidia-common/obsolete-driver seen || true
+
+if [ "$RET" != "true" ]; then
+    LATEST=$(nvidia-detector | tail -n 1)
+    if [ "${LATEST}" != "none" ]; then 
+        db_subst nvidia-common/obsolete-driver latest "$LATEST"
+        db_input high nvidia-common/obsolete-driver || true
+        db_go || true
+    fi
+fi
+
+#DEBHELPER#
+

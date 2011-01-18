@@ -1,0 +1,6 @@
+Version 0.1:
+
+This package will find obsolete NVIDIA drivers in use,
+detect the hardware and recommend the most appropriate
+driver.
+

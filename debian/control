@@ -1,0 +1,23 @@
+Source: nvidia-common
+Section: contrib/x11
+Priority: optional
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Build-Depends: debhelper (>= 7.0.50~),
+ po-debconf,
+ python (>= 2.6),
+Standards-Version: 3.9.1
+XS-Python-Version: >= 2.6
+
+Package: nvidia-common
+Architecture: i386 amd64
+Depends: ${python:Depends}, 
+ ${misc:Depends},
+ debconf (>= 0.5.00) | debconf-2.0,
+ pciutils,
+ python-apt
+XB-Python-Version: ${python:Versions}
+Description: Find obsolete NVIDIA drivers
+ This package will find obsolete NVIDIA drivers in use,
+ detect the hardware and recommend the most appropriate
+ driver.
+ 
