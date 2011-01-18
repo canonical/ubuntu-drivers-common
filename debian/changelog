@@ -1,3 +1,9 @@
+nvidia-common (0.2.27) UNRELEASED; urgency=low
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 18 Jan 2011 17:58:44 +0100
+
 nvidia-common (0.2.26) natty; urgency=low
 
   * NvidiaDetector/nvidiadetector.py: Fix __get_value_from_name() to only
