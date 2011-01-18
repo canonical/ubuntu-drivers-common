@@ -1,10 +1,10 @@
-nvidia-common (0.2.27) UNRELEASED; urgency=low
+nvidia-common (0.2.27) natty; urgency=low
 
   * nvidia-detector:
     - Initialise NvidiaDetection() with verbose=False. This should avoid
       problems when dealing with debconf (LP: #698327). 
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 18 Jan 2011 18:14:35 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 18 Jan 2011 18:15:44 +0100
 
 nvidia-common (0.2.26) natty; urgency=low
 
