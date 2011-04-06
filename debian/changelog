@@ -1,8 +1,10 @@
-nvidia-common (0.2.30) UNRELEASED; urgency=low
+nvidia-common (0.2.30) natty; urgency=low
 
-  *
+  * debian/control:
+    - Set the section to "admin" so that vrms doesn't complain about
+      the package even though it contains only free software (LP: #745904).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 06 Apr 2011 17:11:19 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 06 Apr 2011 17:15:51 +0200
 
 nvidia-common (0.2.29) natty; urgency=low
 
