@@ -1,5 +1,5 @@
 Source: nvidia-common
-Section: contrib/x11
+Section: admin
 Priority: optional
 Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
 Build-Depends: debhelper (>= 7.0.50~),
