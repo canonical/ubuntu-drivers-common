@@ -1,3 +1,9 @@
+nvidia-common (0.2.29) UNRELEASED; urgency=low
+
+  *
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 06 Apr 2011 15:59:16 +0200
+
 nvidia-common (0.2.28) natty; urgency=low
 
   * debian/control: Add conflicts/replaces to the old -modalias packages, to
