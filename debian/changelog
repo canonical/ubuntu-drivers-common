@@ -1,3 +1,10 @@
+nvidia-common (1:0.2.30+1) oneiric; urgency=low
+
+  * Add epoch to override the sync. The packages in Debian and Ubuntu
+    have the same name but different code and scope (LP: #792576).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Sat, 04 Jun 2011 12:13:27 +0200
+
 nvidia-common (0.2.30) natty; urgency=low
 
   * debian/control:
