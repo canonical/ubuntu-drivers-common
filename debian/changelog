@@ -1,8 +1,12 @@
-nvidia-common (1:0.2.31) UNRELEASED; urgency=low
+nvidia-common (1:0.2.31) oneiric; urgency=low
 
-  *
+  * NvidiaDetector/alternatives.py:
+    - Replace __ with _ for private methods.
+    - Make Alternatives a new-style class.
+    - Add MultiArchUtils class so that Jockey can get the names of
+      multi-arch alternatives (LP: #798049).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 24 Jun 2011 14:40:41 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 24 Jun 2011 18:11:31 +0200
 
 nvidia-common (1:0.2.30+1) oneiric; urgency=low
 
