@@ -40,7 +40,8 @@ class MultiArchUtils(object):
 
     def _get_architecture(self):
         dev_null = open('/dev/null', 'w')
-        p1 = Popen(['dpkg', '--print-architecture'], stdout=PIPE, stderr=dev_null)
+        p1 = Popen(['dpkg', '--print-architecture'], stdout=PIPE,
+                   stderr=dev_null)
         p = p1.communicate()[0]
         dev_null.close()
         architecture = p.strip()
@@ -56,12 +57,12 @@ class MultiArchUtils(object):
     def get_other_alternative_name(self):
         return self._get_alternative_name_from_arch(self._other_arch)
 
-class Alternatives:
+class Alternatives(object):
 
     def __init__(self, master_link):
-        self.__open_drivers_alternative = 'mesa/ld.so.conf'
-        self.__command = 'update-alternatives'
-        self.__master_link = master_link
+        self._open_drivers_alternative = 'mesa/ld.so.conf'
+        self._command = 'update-alternatives'
+        self._master_link = master_link
         
         # Make sure that the PATH environment variable is set
         if not os.environ.get('PATH'):
@@ -71,7 +72,8 @@ class Alternatives:
         '''Get the list of alternatives for the master link'''
         dev_null = open('/dev/null', 'w')
         alternatives = []
-        p1 = Popen([self.__command, '--list', self.__master_link], stdout=PIPE, stderr=dev_null)
+        p1 = Popen([self._command, '--list', self._master_link],
+                   stdout=PIPE, stderr=dev_null)
         p = p1.communicate()[0]
         dev_null.close()
         c = p.split('\n')
@@ -84,7 +86,8 @@ class Alternatives:
         '''Get the alternative in use'''
         dev_null = open('/dev/null', 'w')
         current_alternative = None
-        p1 = Popen([self.__command, '--query', self.__master_link], stdout=PIPE, stderr=dev_null)
+        p1 = Popen([self._command, '--query', self._master_link],
+                   stdout=PIPE, stderr=dev_null)
         p = p1.communicate()[0]
         dev_null.close()
         c = p.split('\n')
@@ -105,12 +108,13 @@ class Alternatives:
 
     def get_open_drivers_alternative(self):
         '''Get the alternative link for open drivers'''
-        return self.get_alternative_by_name(self.__open_drivers_alternative)
+        return self.get_alternative_by_name(self._open_drivers_alternative)
 
     def update_gmenu(self):
         '''Trigger gmenu so that the icons will show up in the menu'''
         try:
-            subprocess.check_call(['dpkg-trigger', '--by-package=fakepackage', 'gmenucache'])
+            subprocess.check_call(['dpkg-trigger', '--by-package=fakepackage',
+                                   'gmenucache'])
             subprocess.check_call(['dpkg', '--configure', '-a'])
         except (OSError, CalledProcessError):
             pass
@@ -118,7 +122,8 @@ class Alternatives:
     def set_alternative(self, path):
         '''Tries to set an alternative and returns the boolean exit status'''
         try:
-            subprocess.check_call([self.__command, '--set', self.__master_link, path])
+            subprocess.check_call([self._command, '--set',
+                                   self._master_link, path])
             self.ldconfig()
         except CalledProcessError:
             return False
@@ -139,7 +144,8 @@ class Alternatives:
         '''Get the 1st kernel module name matching an alias'''
         dev_null = open('/dev/null', 'w')
         current_alternative = None
-        p1 = Popen(['modprobe', '--resolve-alias', alias], stdout=PIPE, stderr=dev_null)
+        p1 = Popen(['modprobe', '--resolve-alias', alias], stdout=PIPE,
+                   stderr=dev_null)
         p = p1.communicate()[0]
         dev_null.close()
         c = p.split('\n')
