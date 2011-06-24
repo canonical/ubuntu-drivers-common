@@ -15,6 +15,8 @@ Depends: ${python:Depends},
  debconf (>= 0.5.00) | debconf-2.0,
  pciutils,
  python-apt
+Replaces: nvidia-180-modaliases, nvidia-185-modaliases, nvidia-current-modaliases
+Conflicts: nvidia-180-modaliases, nvidia-185-modaliases, nvidia-current-modaliases
 XB-Python-Version: ${python:Versions}
 Description: Find obsolete NVIDIA drivers
  This package will find obsolete NVIDIA drivers in use,

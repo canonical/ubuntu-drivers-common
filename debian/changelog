@@ -1,3 +1,11 @@
+nvidia-common (0.2.28) natty; urgency=low
+
+  * debian/control: Add conflicts/replaces to the old -modalias packages, to
+    clean them up. They are causing unwanted and nonworking driver offerings.
+    (LP: #717776)
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 07 Mar 2011 18:59:10 +0100
+
 nvidia-common (0.2.27) natty; urgency=low
 
   * nvidia-detector:
