@@ -24,6 +24,38 @@ import re
 import subprocess
 from subprocess import Popen, PIPE, CalledProcessError
 
+class MultiArchUtils(object):
+
+    def __init__(self):
+        # We have 2 alternatives, one for each architecture
+        self._supported_architectures = {'i386': 'i386', 'amd64': 'x86_64'}
+        self._main_arch = self._get_architecture()
+        self._other_arch = self._supported_architectures.values()[
+                          int(not self._supported_architectures
+                          .values().index(self._main_arch))]
+
+        # Make sure that the PATH environment variable is set
+        if not os.environ.get('PATH'):
+            os.environ['PATH'] = '/sbin:/usr/sbin:/bin:/usr/bin'
+
+    def _get_architecture(self):
+        dev_null = open('/dev/null', 'w')
+        p1 = Popen(['dpkg', '--print-architecture'], stdout=PIPE, stderr=dev_null)
+        p = p1.communicate()[0]
+        dev_null.close()
+        architecture = p.strip()
+        return self._supported_architectures.get(architecture)
+
+    def _get_alternative_name_from_arch(self, architecture):
+        alternative = '%s-linux-gnu_gl_conf' % architecture
+        return alternative
+
+    def get_main_alternative_name(self):
+        return self._get_alternative_name_from_arch(self._main_arch)
+
+    def get_other_alternative_name(self):
+        return self._get_alternative_name_from_arch(self._other_arch)
+
 class Alternatives:
 
     def __init__(self, master_link):
