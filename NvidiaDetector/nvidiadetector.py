@@ -132,7 +132,8 @@ class NvidiaDetection(object):
         vendor_product_re = re.compile('pci:v0000(.+)d0000(.+)sv')
 
         for package in apt.Cache():
-            if not package.name.startswith('nvidia-'):
+            if (not package.name.startswith('nvidia-')
+                or 'updates' in package.name):
                 continue
             try:
                 m = package.candidate.record['Modaliases']
