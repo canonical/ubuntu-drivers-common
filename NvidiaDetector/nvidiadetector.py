@@ -1,18 +1,18 @@
 #
 #       nvidiadetector.py
-#       
+#
 #       Copyright 2008 Alberto Milone <albertomilone@alice.it>
-#       
+#
 #       This program is free software; you can redistribute it and/or modify
 #       it under the terms of the GNU General Public License as published by
 #       the Free Software Foundation; either version 2 of the License, or
 #       (at your option) any later version.
-#       
+#
 #       This program is distributed in the hope that it will be useful,
 #       but WITHOUT ANY WARRANTY; without even the implied warranty of
 #       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #       GNU General Public License for more details.
-#       
+#
 #       You should have received a copy of the GNU General Public License
 #       along with this program; if not, write to the Free Software
 #       Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -34,9 +34,9 @@ class NvidiaDetection(object):
     '''
     A simple class to:
       * Detect the available graphics cards
-      * See what drivers support them (If they are 
-        NVIDIA cards). If more than one card is 
-        available, try to find the highest common 
+      * See what drivers support them (If they are
+        NVIDIA cards). If more than one card is
+        available, try to find the highest common
         driver version which supports them all.
         (READ the comments in the code for further
         details)
@@ -51,16 +51,16 @@ class NvidiaDetection(object):
                     If set to True it won't return
                     anything. It will simply and print
                     the choice.
-                    
+
         verbose   = if set to True will make the methods
                     print what is happening.
         '''
-        
+
         # A simple look-up table for drivers whose name is not a digit
         # "current" is set to 1000 so as to make sure that it always has
         # the highest priority.
         self.__driver_aliases = {'current': 1000}
-        
+
         self.printonly = printonly
         self.verbose = verbose
         self.oldPackages = self.getObsoletePackages(obsolete)
@@ -79,7 +79,7 @@ class NvidiaDetection(object):
             if v == value:
                 return k
         return None
-        
+
     def __get_value_from_name(self, name):
         '''Get the integer associated to the name of a driver'''
         v = self.__driver_aliases.get(name)
@@ -174,7 +174,7 @@ class NvidiaDetection(object):
             sys.stdout.flush()
             print 'none'
             #raise ValueError, "modaliases have no useful information"
-    
+
     def getCards(self):
         '''
         See if the detected graphics cards are NVIDIA cards.
@@ -185,14 +185,14 @@ class NvidiaDetection(object):
         '''
         It is possible to override hardware detection (only for testing
         purposes) by setting self.cards to one of the following lists:
-        
+
         self.cards = ['10de:02e2', '10de:002d', '10de:0296', '10de:087f']
         self.cards = ['10de:02e2', '10de:087f']
         self.cards = ['10de:02e2', '10de:087f', '10de:fake']
         self.cards = ['10de:0288'] # -96 driver only
         self.cards = ['10de:fake']
         '''
-        
+
         for card in self.cards:
             if card[0: card.find(':')] == '10de':
                 if self.verbose:
@@ -205,7 +205,7 @@ class NvidiaDetection(object):
         '''
         See what drivers support each card and fill self.driversForCards
         so as to have something like the following:
-        
+
         self.driversForCards = {
                                  'id_of_card1': [driver1, driver2],
                                  'id_of_card2': [driver2, driver3],
@@ -248,7 +248,7 @@ class NvidiaDetection(object):
                 '''
                 occurrence stores the number of occurrences (the values of the
                 dictionary) of each driver version (the keys of the dictionary)
-                
+
                 Example:
                     occurrence = {177: 1, 173: 3}
                     This means that driver 177 supports only 1 card while 173
@@ -259,7 +259,7 @@ class NvidiaDetection(object):
                     for drv in self.driversForCards[card]:
                         occurrence.setdefault(drv, 0)
                         occurrence[drv] += 1
-                
+
                 occurrences = occurrence.keys()
                 occurrences.sort(reverse=True)
                 '''
@@ -274,13 +274,13 @@ class NvidiaDetection(object):
                     '''
                     If more than one driver version works for all the available
                     cards then the newest one is selected.
-                    
+
                     USE-CASE:
                         If a user has the following cards:
                         * GeForce 9300 (supported by driver 177 and 173)
                         * GeForce 7300 (supported by driver 177 and 173)
                         * GeForce 6200 (supported by driver 177 and 173)
-                    
+
                         Driver 177 is selected.
                     '''
                     candidates.sort(reverse=True)
@@ -289,17 +289,17 @@ class NvidiaDetection(object):
                         print 'Recommended NVIDIA driver:', choice
                 else:
                     '''
-                    Otherwise, if there is no single driver version which works 
+                    Otherwise, if there is no single driver version which works
                     for all the available cards, the newest one is selected.
-                    
+
                     USE-CASE:
                         If a user has the following cards:
                         * GeForce 9300 (supported by driver 177 and 173)
                         * GeForce 1 (supported by driver 71)
                         * GeForce 2 (supported by driver 71)
-                        
+
                         The most modern card has the highest priority since
-                        no common driver can be found. The other 2 cards 
+                        no common driver can be found. The other 2 cards
                         should use the open source driver
                     '''
                     choice = occurrences[0]
@@ -308,7 +308,7 @@ class NvidiaDetection(object):
             else:#just one card
                 '''
                 The choice is easy if only one card is available and/or supported.
-                
+
                 The newest driver which supports the card is chosen.
                 '''
                 choice = self.driversForCards[self.driversForCards.keys()[0]][0]
@@ -329,9 +329,9 @@ class NvidiaDetection(object):
             if self.verbose:
                 print 'No NVIDIA package to install'
             choice = None
-            
+
         return choice
-    
+
     def checkpkg(self, pkglist):
         '''
         USAGE:
@@ -367,13 +367,13 @@ class NvidiaDetection(object):
                     notinstalled.append(pkg)
 
         return notinstalled
-    
+
     def isstr(self, elem):
         return isinstance(elem, type('')) or isinstance(elem, type(u''))
-    
+
     def islst(self, elem):
         return isinstance(elem, type(())) or isinstance(elem, type([]))
-    
+
     def getDrivers(self):
         '''
         oldPackages = a list of the names of the obsolete drivers
@@ -386,7 +386,7 @@ class NvidiaDetection(object):
             if package not in notInstalled:
                 installedPackage = package
         return (len(notInstalled) != len(self.oldPackages))
-    
+
     def printSelection(self):
         '''
         Part for the kernel postinst.d/ hook
@@ -407,7 +407,7 @@ class NvidiaDetection(object):
 #def usage():
 #    instructionsList = ['The only accepted parameters are:'
 #    '\n  --printonly', '\tprint the suggested driver'
-#    
+#
 #    '\n  --verbose', '\t\teach step will be verbose'
 #    ]
 #    print ''.join(instructionsList)

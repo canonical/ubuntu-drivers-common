@@ -1,19 +1,19 @@
 #
 #       alternatives.py
-#       
+#
 #       Copyright 2010 Canonical Services Ltd
 #       Author: Alberto Milone <alberto.milone@canonical.com>
-#       
+#
 #       This program is free software; you can redistribute it and/or modify
 #       it under the terms of the GNU General Public License as published by
 #       the Free Software Foundation; either version 2 of the License, or
 #       (at your option) any later version.
-#       
+#
 #       This program is distributed in the hope that it will be useful,
 #       but WITHOUT ANY WARRANTY; without even the implied warranty of
 #       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #       GNU General Public License for more details.
-#       
+#
 #       You should have received a copy of the GNU General Public License
 #       along with this program; if not, write to the Free Software
 #       Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -63,7 +63,7 @@ class Alternatives(object):
         self._open_drivers_alternative = 'mesa/ld.so.conf'
         self._command = 'update-alternatives'
         self._master_link = master_link
-        
+
         # Make sure that the PATH environment variable is set
         if not os.environ.get('PATH'):
             os.environ['PATH'] = '/sbin:/usr/sbin:/bin:/usr/bin'
