@@ -1,8 +1,15 @@
-nvidia-common (1:0.2.32) UNRELEASED; urgency=low
+nvidia-common (1:0.2.32) oneiric; urgency=low
 
-  * 
+  * NvidiaDetector/alternatives.py:
+    - Remove trailing whitespace.
+  * NvidiaDetector/nvidiadetector.py:
+    - Remove trailing whitespace.
+    - Ignore "-updates" flavours and recommend only stable flavours.
+      This fixes a crash in the nvidia detector.
+  * setup.py:
+    - Disable kernel hooks.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 12 Aug 2011 16:28:49 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 12 Aug 2011 17:33:04 +0200
 
 nvidia-common (1:0.2.31) oneiric; urgency=low
 
