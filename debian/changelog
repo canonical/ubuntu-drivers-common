@@ -1,8 +1,11 @@
-nvidia-common (1:0.2.33) UNRELEASED; urgency=low
+nvidia-common (1:0.2.33) oneiric; urgency=low
 
-  * 
+  * debian/nvidia-common.preinst:
+    - Make sure to remove any leftover kernel hooks from nvidia-common.
+  * debian/nvidia-common.postinst:
+    - Disable the debconf interface.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 17 Aug 2011 16:49:59 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 17 Aug 2011 16:59:06 +0200
 
 nvidia-common (1:0.2.32) oneiric; urgency=low
 
