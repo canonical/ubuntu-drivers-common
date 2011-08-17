@@ -1,0 +1,40 @@
+#!/bin/sh
+# preinst script for nvidia-common
+#
+# see: dh_installdeb(1)
+#
+# Copyright (C) 2009 Canonical Ltd
+# Authors: Alberto Milone
+
+set -e
+
+# summary of how this script can be called:
+#        * <new-preinst> `install'
+#        * <new-preinst> `install' <old-version>
+#        * <new-preinst> `upgrade' <old-version>
+#        * <old-preinst> `abort-upgrade' <new-version>
+#
+# For details see /usr/share/doc/packaging-manual/
+
+
+case "$1" in
+    install|upgrade)
+        if [ -f /etc/kernel/postinst.d/nvidia-common ]; then
+            rm -f /etc/kernel/postinst.d/nvidia-common
+        fi
+        if [ -f /etc/kernel/header_postinst.d/nvidia-common ]; then
+            rm -f /etc/kernel/header_postinst.d/nvidia-common
+        fi
+    ;;
+
+    abort-upgrade)
+    ;;
+
+    *)
+        echo "preinst called with unknown argument \`$1'" >&2
+        exit 0
+    ;;
+esac
+
+#DEBHELPER#
+
