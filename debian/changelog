@@ -1,8 +1,9 @@
-nvidia-common (1:0.2.34) UNRELEASED; urgency=low
+nvidia-common (1:0.2.34) oneiric; urgency=low
 
-  * 
+  * debian/nvidia-common.preinst:
+    - Use dpkg-maintscript-helper to remove conffiles.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 25 Aug 2011 10:01:39 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 25 Aug 2011 12:36:19 +0200
 
 nvidia-common (1:0.2.33) oneiric; urgency=low
 
