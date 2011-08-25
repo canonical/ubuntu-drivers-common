@@ -19,12 +19,10 @@ set -e
 
 case "$1" in
     install|upgrade)
-        if [ -f /etc/kernel/postinst.d/nvidia-common ]; then
-            rm -f /etc/kernel/postinst.d/nvidia-common
-        fi
-        if [ -f /etc/kernel/header_postinst.d/nvidia-common ]; then
-            rm -f /etc/kernel/header_postinst.d/nvidia-common
-        fi
+        dpkg-maintscript-helper rm_conffile \
+           /etc/kernel/postinst.d/nvidia-common 1:0.2.32 -- "$@"
+        dpkg-maintscript-helper rm_conffile \
+           /etc/kernel/header_postinst.d/nvidia-common 1:0.2.32 -- "$@"
     ;;
 
     abort-upgrade)
