@@ -1,8 +1,17 @@
-nvidia-common (0.2.31~oneiric1) UNRELEASED; urgency=low
+nvidia-common (0.2.30.1) natty-proposed; urgency=low
 
-  * 
+  * debian/nvidia-common.preinst:
+    - Make sure to remove any leftover kernel hooks from nvidia-common.
+  * debian/nvidia-common.postinst:
+    - Disable the debconf interface.
+  * NvidiaDetector/nvidiadetector.py:
+    - Ignore "-updates" flavours and recommend only stable flavours.
+      This fixes a crash in the nvidia detector which can also be
+      reproduced on dist-upgrades when upgrading the kernel (LP: #825259).
+  * setup.py:
+    - Disable kernel hooks.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 25 Aug 2011 12:45:09 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 25 Aug 2011 14:34:46 +0200
 
 nvidia-common (0.2.30) natty; urgency=low
 
