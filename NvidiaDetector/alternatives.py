@@ -101,7 +101,7 @@ class Alternatives(object):
         alternatives = self.list_alternatives()
 
         for alternative in alternatives:
-            if alternative.__contains__(name):
+            if alternative.split('/')[-2] == name:
                 return alternative
 
         return None
