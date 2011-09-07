@@ -1,8 +1,12 @@
-nvidia-common (1:0.2.35) UNRELEASED; urgency=low
+nvidia-common (1:0.2.35) oneiric; urgency=low
 
-  * 
+  * NvidiaDetector/alternatives.py:
+    - Return the correct alternative when dealing with "updates"
+      driver flavours in get_alternative_by_name(). This allows
+      Jockey to correctly detect the alternatives provided by
+      different drivers (LP: #841462).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 07 Sep 2011 10:47:07 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 07 Sep 2011 10:59:20 +0200
 
 nvidia-common (1:0.2.34) oneiric; urgency=low
 
