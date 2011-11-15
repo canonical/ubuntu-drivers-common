@@ -1,3 +1,9 @@
+nvidia-common (1:0.2.36) UNRELEASED; urgency=low
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 15 Nov 2011 18:19:58 +0100
+
 nvidia-common (1:0.2.35) oneiric; urgency=low
 
   * NvidiaDetector/alternatives.py:
