@@ -96,8 +96,12 @@ class Alternatives(object):
                 return line.replace('Value:', '').strip()
         return None
 
-    def get_alternative_by_name(self, name):
-        '''Get the alternative link by providing the driver name'''
+    def get_alternative_by_name(self, name, ignore_pattern=None):
+        '''Get the alternative link by providing the driver name
+
+        ignore_pattern allows ignoring a substring in the name'''
+        if ignore_pattern:
+            name = name.replace(ignore_pattern, '')
         alternatives = self.list_alternatives()
 
         for alternative in alternatives:
