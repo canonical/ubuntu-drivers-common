@@ -1,0 +1,35 @@
+Section "Quirk"
+    Identifier "New Hybrid Graphics Quirk"
+    Handler "nvidia"
+    Match "board_name" "P6T SE"
+    Match "bios_version" "0106"
+    XorgSnippet
+        Section "Device"
+            Identifier "My Card"
+            Driver "nvidia"
+        EndSection
+
+        Section "Screen"
+            Identifier "My Screen"
+            Option "RegistryDwords" "EnableBrightnessControl=1"
+        EndSection
+    EndXorgSnippet
+EndSection
+
+Section "Quirk"
+    Identifier "New FGLRX Hybrid Graphics Quirk"
+    Handler "fglrx"
+    Match "board_name" "P6T SE"
+    Match "bios_version" "0106"
+    XorgSnippet
+        Section "Device"
+            Identifier "My Card"
+            Driver "fglrx"
+        EndSection
+
+        Section "Screen"
+            Identifier "My Screen"
+            Option "RegistryDwords" "EnableBrightnessControl=1"
+        EndSection
+    EndXorgSnippet
+EndSection

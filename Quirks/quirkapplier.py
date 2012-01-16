@@ -1,0 +1,170 @@
+# -*- coding: utf-8 -*-
+# (c) 2012 Canonical Ltd.
+#
+# Authors: Alberto Milone <alberto.milone@canonical.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+from glob import glob
+import os
+import sys
+import tempfile
+import logging
+
+import XKit.xutils
+import XKit.xorgparser
+
+import quirkreader
+import quirkinfo
+
+class QuirkChecker:
+    def __init__(self, handler, path='/usr/share/jockey/quirks'):
+        self._handler = handler
+        self.quirks_path = path
+        self._quirks = []
+        self.get_quirks_from_path()
+        self._system_info = self.get_system_info()
+        self._xorg_conf_d_path = '/usr/share/X11/xorg.conf.d'
+
+    def get_quirks_from_path(self):
+        '''check all the files in a directory looking for quirks'''
+        self._quirks = []
+        if os.path.isdir(self.quirks_path):
+            for f in glob(os.path.join(self.quirks_path, '*')):
+                if os.path.isfile(f):
+                    logging.debug('Parsing %s' % f)
+                    quirks = self.get_quirks_from_file(f)
+                    self._quirks += quirks
+        else:
+            logging.debug('%s does not exist' % self.quirks_path)
+        return self._quirks
+        
+
+    def get_quirks_from_file(self, quirk_file):
+        '''check all the files in a directory looking for quirks'''
+        # read other blacklist files (which we will not touch, but evaluate)
+        quirk_file = quirkreader.ReadQuirk(quirk_file)
+        return quirk_file.get_quirks()
+
+    def get_system_info(self):
+        '''Get system info for the quirk'''
+        quirk_info = quirkinfo.QuirkInfo()
+        return quirk_info.get_dmi_info()
+
+    def matches_tags(self, quirk):
+        '''See if tags match system info'''
+        result = True
+        for tag in quirk.match_tags.keys():
+            logging.debug('Matching "%s" with value "%s"...' % (tag, quirk.match_tags[tag]))
+            if (self._system_info.get(tag) != quirk.match_tags[tag]):
+                logging.debug('Failure')
+                return False
+            logging.debug('Success')
+        return result
+
+    def _check_quirks(self, enable=True):
+        '''Process quirks and do something with them'''
+        for quirk in self._quirks:
+            if quirk.handler.lower() == self._handler.lower():
+                logging.debug('Processing quirk %s' % quirk.id)
+                if self.matches_tags(quirk):
+                    # Do something here
+                    if enable:
+                        logging.info('Applying quirk %s' % quirk.id)
+                        self._apply_quirk(quirk)
+                    else:
+                        logging.info('Unapplying quirk %s' % quirk.id)
+                        self._unapply_quirk(quirk)
+                else:
+                    logging.debug('Quirk doesn\'t match')
+    
+    def enable_quirks(self):
+        '''Enable all quirks for a handler'''
+        self._check_quirks(True)
+
+    def disable_quirks(self):
+        '''Disable all quirks for a handler'''
+        self._check_quirks(False)
+
+    def _get_destination_path(self, quirk):
+        '''Return the path to the X config file'''
+        return '%s/10-%s-%s.conf' % (self._xorg_conf_d_path,
+                self._handler, quirk.id.lower().replace(' ', '-'))
+
+    def _apply_quirk(self, quirk):
+        '''Get the xorg snippet and apply it'''
+        # Get the relevant x_snippet
+        # Write conf file to /usr/share/X11/xorg.conf.d/file.conf
+        destination = self._get_destination_path(quirk)
+        tmp_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
+        tmp_file.write(quirk.x_snippet)
+        tmp_file.close()
+        tmp_xkit = XKit.xorgparser.Parser(tmp_file.name)
+        # TODO: REMOVE THIS
+        logging.debug(tmp_xkit.globaldict)
+        os.unlink(tmp_file.name)
+        try:
+            tmp_xkit.writeFile(destination)
+        except IOError, e:
+            print logging.error('Unable to write %s' % destination)
+        logging.debug('Destination is %s' % destination)
+
+    def _unapply_quirk(self, quirk):
+        '''Remove the file with the xorg snippet'''
+        # Get the relevant x_snippet
+        # Write conf file to /usr/share/X11/xorg.conf.d/file.conf
+        destination = self._get_destination_path(quirk)
+        logging.debug('Removing %s ...' % destination)
+        #TODO: put exception here!!!
+        try:
+            os.unlink(destination)
+        except OSError:
+            #TODO: handle IOError separately!!!
+            pass
+        except IOError, e:
+            logging.warnings('No permission to remove %', destination)
+            print e
+        
+        
+
+
+def main():
+
+    a = QuirkChecker('nvidia', path='/home/alberto/oem/jockey/quirks')
+    a.enable_quirks()
+    a.disable_quirks()
+    print os.path.abspath( __file__ )
+    #quirk_file = ReadQuirk("quirk_snippet.txt")
+    #quirks = quirk_file.get_quirks()
+    #for quirk in quirks:
+        #print 'Quirk id: "%s"' % quirk.id
+        #for tag in quirk.match_tags.keys():
+            #print 'Matching "%s" with value "%s"' % (tag, quirk.match_tags[tag])
+        #print quirk.x_snippet
+
+    #tmp_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
+    #tmp_file.write(quirk.x_snippet)
+    #tmp_file.close()
+
+    #tmp_xkit = XKit.xorgparser.Parser(tmp_file.name)
+    #print tmp_xkit.globaldict
+    #os.unlink(tmp_file.name)
+
+
+    return 0
+
+#if __name__ == '__main__':
+    #main()
+
