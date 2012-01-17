@@ -118,7 +118,7 @@ class QuirkChecker:
         try:
             tmp_xkit.writeFile(destination)
         except IOError, e:
-            print logging.error('Unable to write %s' % destination)
+            logging.error('Unable to write %s' % destination)
         logging.debug('Destination is %s' % destination)
 
     def _unapply_quirk(self, quirk):
@@ -132,10 +132,11 @@ class QuirkChecker:
             os.unlink(destination)
         except OSError:
             #TODO: handle IOError separately!!!
+            logging.error('%s doesn\'t exist' % destination)
             pass
         except IOError, e:
-            logging.warnings('No permission to remove %', destination)
-            print e
+            logging.error('No permission to remove %s' % destination)
+            #print e
         
         
 
