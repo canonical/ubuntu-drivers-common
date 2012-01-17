@@ -29,9 +29,14 @@ import Quirks.quirkapplier
 #TODO: use a proper path
 quirks_path = '/home/alberto/oem/jockey/quirks'
 
-
 def main(options):
-    
+    if options.verbose:
+        loglevel = logging.DEBUG
+    else:
+        loglevel = logging.INFO
+
+    logging.basicConfig(format='%(levelname)s:%(message)s', level=loglevel)
+
     if options.package_enable and options.package_disable:
         sys.exit(1)
     elif options.package_enable and not options.package_disable:
@@ -46,12 +51,14 @@ def main(options):
         print 'no args'
 
 if __name__ == '__main__':
-    logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
     parser = optparse.OptionParser()
     parser.add_option("-e", "--enable-quirks", dest="package_enable",
                       help="enable quirks for package", metavar="FILE")
     parser.add_option("-d", "--disable-quirks", dest="package_disable",
                       help="disable quirks for package", metavar="FILE")
+    parser.add_option("-v", "--verbose",
+                      action="store_true", dest="verbose", default=False,
+                      help="show debug messages")
 
     (options, args) = parser.parse_args()
     
