@@ -77,7 +77,7 @@ class QuirkChecker:
     def _check_quirks(self, enable=True):
         '''Process quirks and do something with them'''
         for quirk in self._quirks:
-            if quirk.handler.lower() == self._handler.lower():
+            if self._handler.lower() in [x.lower().strip() for x in quirk.handler]:
                 logging.debug('Processing quirk %s' % quirk.id)
                 if self.matches_tags(quirk):
                     # Do something here

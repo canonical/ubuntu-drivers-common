@@ -26,7 +26,7 @@ import os
 
 class Quirk:
 
-    def __init__(self, id=None, handler='', x_snippet="", match_tags={}):
+    def __init__(self, id=None, handler=[], x_snippet="", match_tags={}):
         self.id = id
         self.handler = handler
         self.x_snippet = x_snippet
@@ -82,7 +82,8 @@ class ReadQuirk:
                         temp_str = "handler"
                         handler = line[line.lower().rfind(temp_str) + len(
                              temp_str):].strip().replace('"', '')
-                        self._quirks[it].handler = handler
+                        handlers_list = handler.split('|')
+                        self._quirks[it].handler = handlers_list
                         del temp_str
                     elif line.lower().strip().startswith('match'):
                         temp_str = "match"
