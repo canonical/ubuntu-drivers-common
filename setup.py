@@ -26,9 +26,9 @@ setup(
     url="http://www.albertomilone.com",
     license="gpl",
     description="Find obsolete NVIDIA drivers",
-    packages=["NvidiaDetector"],
+    packages=["NvidiaDetector", "Quirks"],
     data_files=[("/usr/share/nvidia-common/", glob.glob("share/obsolete")),
                 ("/usr/lib/nvidia/", glob.glob("nvidia-installer-hooks/*")),
                ],# + mo_files,
-    scripts=["nvidia-detector"],
+    scripts=["nvidia-detector", "quirks-handler"],
 )
