@@ -26,8 +26,8 @@ import logging
 import Quirks.quirkapplier
 
 
-#TODO: use a proper path
-quirks_path = '/home/alberto/oem/jockey/quirks'
+# Here's where we look for quirks
+quirks_path = '/usr/share/nvidia-common/quirks'
 
 def main(options):
     if options.verbose:
