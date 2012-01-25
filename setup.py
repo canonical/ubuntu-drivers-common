@@ -28,6 +28,7 @@ setup(
     description="Find obsolete NVIDIA drivers",
     packages=["NvidiaDetector", "Quirks"],
     data_files=[("/usr/share/nvidia-common/", glob.glob("share/obsolete")),
+                ("/usr/share/nvidia-common/quirks", glob.glob("share/quirks/put_your_quirks_here")),
                 ("/usr/lib/nvidia/", glob.glob("nvidia-installer-hooks/*")),
                ],# + mo_files,
     scripts=["nvidia-detector", "quirks-handler"],
