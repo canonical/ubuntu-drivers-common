@@ -116,10 +116,12 @@ class QuirkChecker:
         logging.debug(tmp_xkit.globaldict)
         os.unlink(tmp_file.name)
         try:
+            logging.debug('Creating %s' % destination)
             tmp_xkit.writeFile(destination)
         except IOError, e:
-            logging.error('Unable to write %s' % destination)
-        logging.debug('Destination is %s' % destination)
+            logging.error('%s' % e)
+            return False
+        return True
 
     def _unapply_quirk(self, quirk):
         '''Remove the file with the xorg snippet'''
@@ -127,18 +129,12 @@ class QuirkChecker:
         # Write conf file to /usr/share/X11/xorg.conf.d/file.conf
         destination = self._get_destination_path(quirk)
         logging.debug('Removing %s ...' % destination)
-        #TODO: put exception here!!!
         try:
             os.unlink(destination)
-        except OSError:
-            #TODO: handle IOError separately!!!
-            logging.error('%s doesn\'t exist' % destination)
-            pass
-        except IOError, e:
-            logging.error('No permission to remove %s' % destination)
-            #print e
-        
-        
+        except (OSError, IOError), e:
+            logging.error('%s' % e)
+            return False
+        return True
 
 
 def main():
