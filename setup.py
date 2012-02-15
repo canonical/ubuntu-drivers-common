@@ -13,6 +13,9 @@ import os
 #    targetpath = os.path.dirname(os.path.join("share/locale",lang))
 #    mo_files.append((targetpath, [filepath]))
 
+# Build hybrid-detect
+subprocess.call(["make", "-C", "share/hybrid", "all"])
+
 # Make the nvidia-installer hooks executable
 for x in glob.glob("nvidia-installer-hooks/*"):
     os.chmod(x, 0755)
@@ -28,8 +31,10 @@ setup(
     description="Find obsolete NVIDIA drivers",
     packages=["NvidiaDetector", "Quirks"],
     data_files=[("/usr/share/nvidia-common/", glob.glob("share/obsolete")),
+                ("/usr/share/nvidia-common/", glob.glob("share/last_gfx_boot")),
+                #("/etc/init/", glob.glob("share/hybrid/hybrid-gfx.conf")),
                 ("/usr/share/nvidia-common/quirks", glob.glob("share/quirks/put_your_quirks_here")),
                 ("/usr/lib/nvidia/", glob.glob("nvidia-installer-hooks/*")),
                ],# + mo_files,
-    scripts=["nvidia-detector", "quirks-handler"],
+    scripts=["nvidia-detector", "quirks-handler", "share/hybrid/hybrid-detect"],
 )

@@ -2,3 +2,7 @@
 
 %:
 	dh "$@" --with python2
+
+override_dh_clean:
+	rm -f share/hybrid/hybrid-detect
+	dh_clean

@@ -5,6 +5,10 @@ Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
 Build-Depends: debhelper (>= 7.0.50~),
  po-debconf,
  python (>= 2.6),
+ libpciaccess-dev (>= 0.12.1-2),
+ lib32gcc1 [amd64], libc6-i386 [amd64],
+ linux-libc-dev,
+ pkg-config
 Standards-Version: 3.9.1
 XS-Python-Version: >= 2.6
 
