@@ -1,8 +1,8 @@
-nvidia-common (1:0.2.38) UNRELEASED; urgency=low
+nvidia-common (1:0.2.38) precise; urgency=low
 
-  * 
+  * Add support for Hybrid graphics, disabled by default for now.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 15 Feb 2012 11:28:15 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 15 Feb 2012 18:04:29 +0100
 
 nvidia-common (1:0.2.37) precise; urgency=low
 
