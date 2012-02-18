@@ -32,7 +32,7 @@ setup(
     packages=["NvidiaDetector", "Quirks"],
     data_files=[("/usr/share/nvidia-common/", glob.glob("share/obsolete")),
                 ("/usr/share/nvidia-common/", glob.glob("share/last_gfx_boot")),
-                #("/etc/init/", glob.glob("share/hybrid/hybrid-gfx.conf")),
+                ("/etc/init/", glob.glob("share/hybrid/hybrid-gfx.conf")),
                 ("/usr/share/nvidia-common/quirks", glob.glob("share/quirks/put_your_quirks_here")),
                 ("/usr/lib/nvidia/", glob.glob("nvidia-installer-hooks/*")),
                ],# + mo_files,
