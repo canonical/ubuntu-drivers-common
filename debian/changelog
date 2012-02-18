@@ -1,9 +1,9 @@
-nvidia-common (1:0.2.39) UNRELEASED; urgency=low
+nvidia-common (1:0.2.39) precise; urgency=low
 
   * Re-enable support for Hybrid Graphics now that the driver
     packages are fixed.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Sat, 18 Feb 2012 09:47:26 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Sat, 18 Feb 2012 09:48:35 +0100
 
 nvidia-common (1:0.2.38) precise; urgency=low
 
