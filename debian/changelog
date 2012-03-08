@@ -1,8 +1,10 @@
-nvidia-common (1:0.2.40) UNRELEASED; urgency=low
+nvidia-common (1:0.2.40) precise; urgency=low
 
-  * 
+  * Add quirks to get brightness keys to work on Lenovo T420s
+    (LP: #773710) and on Dell Latitude E6530 (LP: #914069)
+    when using NVIDIA's proprietary driver.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 08 Mar 2012 10:10:41 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 08 Mar 2012 11:30:56 +0100
 
 nvidia-common (1:0.2.39) precise; urgency=low
 
