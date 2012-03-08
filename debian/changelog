@@ -1,3 +1,9 @@
+nvidia-common (1:0.2.41) UNRELEASED; urgency=low
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 08 Mar 2012 11:51:12 +0100
+
 nvidia-common (1:0.2.40) precise; urgency=low
 
   * Add quirks to get brightness keys to work on Lenovo T420s
