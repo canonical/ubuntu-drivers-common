@@ -1,0 +1,78 @@
+#!/usr/bin/python
+# -*- coding: UTF-8 -*-
+
+'''Run self tests.'''
+
+# (c) 2008 Alberto Milone <albertomilone@alice.it>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+import unittest, os.path, sys, logging, os
+import getopt
+
+def usage():
+    instructionsList = ['The only accepted (optional) parameters are:'
+    '\n  -o, --output=<dirname>', '\tthe directory where the results \n\
+\t\t\t\tof the tests are saved.'
+    
+    '\n  -i, --input=<filename>', '\tthe xorg.conf used for the tests.'
+    
+    '\n  -h, --help', '\t\t\thelp page.'
+    ]
+    print ''.join(instructionsList)
+
+def main():
+    cwd = os.getcwd()
+    inputFile = os.path.join(cwd, 'xorg.conf')
+    outputDir = cwd
+    err = 'Error: parameters not recognised'
+    
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], 'h:o:i:', ['help', 'output=', 'input='])
+    except getopt.GetoptError, err:
+        # print help information and exit:
+        print str(err) # will print something like 'option -a not recognized'
+        usage()
+        sys.exit(2)
+    printonly = None
+    verbose = None
+    for o, a in opts:
+        if o in ('-i', '--input'):
+            inputFile = a
+        elif o in ('-o', '--output'):
+            outputDir = a
+        elif o in ('-h', '--help'):
+            usage()
+            sys.exit()
+        else:
+            assert False, 'unhandled option'
+    
+    
+    settingsFile = open('settings.py', 'w')
+    if inputFile == os.path.join(cwd, 'xorg.conf') and outputDir == cwd:
+        settingsFile.write('import os\ncwd = os.getcwd()\ninputFile = os.path.join(cwd, "xorg.conf")\noutputDir = cwd')
+    else:    
+        settingsFile.write('inputFile = "%s"\noutputDir = "%s"' % (inputFile, outputDir))
+    settingsFile.close()
+        
+    # run all tests in our directory
+    suite = unittest.TestLoader().loadTestsFromNames(
+        [t[:-3] for t in os.listdir(os.path.dirname(__file__)) 
+         if t.endswith('.py') and t not in ['settings.py', '__init__.py']])
+    res = unittest.TextTestRunner(verbosity=2).run(suite)
+    
+
+if __name__ == '__main__':
+    main()
