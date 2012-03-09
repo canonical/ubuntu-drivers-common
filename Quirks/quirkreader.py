@@ -97,9 +97,10 @@ class ReadQuirk:
                                     tag_match = elem.strip()
                                 else:
                                     tag_value = elem.strip()
+                                    tag_values = tag_value.split('|')
                                     break
                         del temp_bits
-                        self._quirks[it].match_tags[tag_match] = tag_value
+                        self._quirks[it].match_tags[tag_match] = tag_values
                         del temp_str
                     elif line.lower().strip().startswith('xorgsnippet'):
                         inside_x_snippet = True
