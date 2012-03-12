@@ -1,8 +1,11 @@
-nvidia-common (1:0.2.41) UNRELEASED; urgency=low
+nvidia-common (1:0.2.41) precise; urgency=low
 
-  * 
+  * Add a test suite and run it at build time with dh_auto_test.
+  * Work correctly when the pipe symbol is used in "Match" tags.
+    This symbol only worked when used in the "Handler" tag.
+    Both test cases are covered in the test suite.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 08 Mar 2012 11:51:12 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 12 Mar 2012 12:30:52 +0100
 
 nvidia-common (1:0.2.40) precise; urgency=low
 
