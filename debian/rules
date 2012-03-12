@@ -3,6 +3,10 @@
 %:
 	dh "$@" --with python2
 
+override_dh_auto_test:
+	(cd tests; PYTHONPATH=.. ./run)
+
 override_dh_clean:
 	rm -f share/hybrid/hybrid-detect
+	rm -f quirksreader_test*.txt
 	dh_clean

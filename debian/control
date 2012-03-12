@@ -8,7 +8,8 @@ Build-Depends: debhelper (>= 7.0.50~),
  libpciaccess-dev (>= 0.12.1-2),
  lib32gcc1 [amd64], libc6-i386 [amd64],
  linux-libc-dev,
- pkg-config
+ pkg-config,
+ python-xkit
 Standards-Version: 3.9.1
 XS-Python-Version: >= 2.6
 
@@ -19,7 +20,8 @@ Depends: ${python:Depends},
  ${misc:Depends},
  debconf (>= 0.5.00) | debconf-2.0,
  pciutils,
- python-apt
+ python-apt,
+ python-xkit
 Replaces: nvidia-180-modaliases, nvidia-185-modaliases, nvidia-current-modaliases
 Conflicts: nvidia-180-modaliases, nvidia-185-modaliases, nvidia-current-modaliases
 XB-Python-Version: ${python:Versions}
