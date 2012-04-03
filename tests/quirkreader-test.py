@@ -257,6 +257,78 @@ EndSection
         self.assert_(quirk_found)
         self.assert_(quirk_matches)
 
+
+    def test_read_quirk4(self):
+        '''3 Matching quirk aimed at multiple products only one should match'''
+        self.this_function_name = sys._getframe().f_code.co_name
+        section = 'Screen'
+        identifier = 'Display'
+        option = 'Depth'
+        
+        confFile = open(tempFile, 'w')
+        print >> confFile, '''
+Section "Quirk"
+    Identifier "Latitude E6530"
+    Handler "nvidia-current|nvidia-current-updates"
+    Match "sys_vendor" "Dell Inc."
+    Match "product_name" "Latitude E6530|Latitude E6535"
+    XorgSnippet
+        Section "Device"
+            Identifier "My Card"
+            Driver "nvidia"
+            Option "NoLogo" "True"
+        EndSection
+
+        Section "Screen"
+            Identifier "My Screen"
+            Option "RegistryDwords" "EnableBrightnessControl=1"
+        EndSection
+    EndXorgSnippet
+EndSection
+
+
+'''
+        confFile.close()
+        #os.system('cat %s' % tempFile)
+        #loglevel = logging.DEBUG
+    #else:
+        #loglevel = logging.INFO
+
+        #logging.basicConfig(format='%(levelname)s:%(message)s', level=loglevel)
+        a = quirkapplier.QuirkChecker('nvidia-current', path=destination)
+
+        # Override DMI
+        a._system_info = {'sys_vendor': 'Dell Inc.',
+                          'bios_vendor': 'American Megatrends Inc.',
+                          'product_version': 'System Version',
+                          'board_name': 'P6T SE',
+                          'bios_date': '01/19/2009',
+                          'bios_version': '0106',
+                          'product_name': 'Latitude E6535',
+                          'board_vendor': 'ASUSTeK Computer INC.'}
+        quirk_found = False
+        quirk_matches = False
+        matches_number = 0
+
+        for quirk in a._quirks:
+            if a._handler.lower() in [x.lower().strip() for x in quirk.handler]:
+                quirk_found = True
+
+                logging.debug('Processing quirk %s' % quirk.id)
+                self.assert_(a.matches_tags(quirk))
+                if a.matches_tags(quirk):
+                    # Do something here
+                    logging.debug('Quirk matches')
+                    quirk_matches = True
+                    matches_number += 1
+                else:
+                    logging.debug('Quirk doesn\'t match')
+
+        self.assert_(quirk_found)
+        self.assert_(quirk_matches)
+        self.assert_(matches_number == 1)
+
+
 def main():
     return 0
 
