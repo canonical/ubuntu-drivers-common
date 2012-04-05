@@ -110,9 +110,13 @@ class ReadQuirk:
                     elif line.lower().strip().startswith('endsection'):
                         #End Quirk
                         inside_quirk = False
-                        it += 1
+                        if not self._quirks[it].id:
+                            self._quirks.pop(it)
+                        else:
+                            it += 1
             else:
-                if line.lower().strip().startswith('section'):
+                if line.lower().strip().startswith('section') \
+                and "quirk" in line.lower():
                     #Begin Quirk
                     inside_quirk = True
                     temp_quirk = Quirk()
