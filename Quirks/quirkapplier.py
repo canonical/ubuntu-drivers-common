@@ -65,14 +65,15 @@ class QuirkChecker:
 
     def matches_tags(self, quirk):
         '''See if tags match system info'''
-        result = False
+        result = True
         for tag in quirk.match_tags.keys():
             for val in quirk.match_tags[tag]:
-                logging.debug('Matching "%s" with value "%s"...' % (tag, val))
-                if (self._system_info.get(tag) == val):
-                    logging.debug('Success')
-                    return True
-            logging.debug('Failure')
+                if (self._system_info.get(tag) and self._system_info.get(tag) != val
+                and len(quirk.match_tags[tag]) <= 1):
+                    logging.debug('Failure to match %s with %s' %
+                                  (self._system_info.get(tag), val))
+                    return False
+        logging.debug('Success')
         return result
 
     def _check_quirks(self, enable=True):

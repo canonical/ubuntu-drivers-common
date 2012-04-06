@@ -20,6 +20,7 @@
 
 import XKit.xutils
 import XKit.xorgparser
+import quirkinfo
 
 import tempfile
 import os
@@ -30,7 +31,7 @@ class Quirk:
         self.id = id
         self.handler = handler
         self.x_snippet = x_snippet
-        self.match_tags = match_tags
+        self.match_tags = {}.fromkeys(quirkinfo.dmi_keys, '')
 
 class ReadQuirk:
 
@@ -55,7 +56,7 @@ class ReadQuirk:
         has_handler = False
         inside_x_snippet = False
         self._quirks = []
-        
+
         it = 0
         for line in lines_list:
             if line.strip().startswith('#'):
@@ -91,17 +92,20 @@ class ReadQuirk:
                                     len(temp_str):].strip().split('"')
                         tag_match = ''
                         tag_value = ''
+                        tag_values = []
                         for elem in temp_bits:
                             if elem.strip():
                                 if not tag_match:
                                     tag_match = elem.strip()
+                                    #tag_values = []
                                 else:
                                     tag_value = elem.strip()
                                     tag_values = tag_value.split('|')
+                                    self._quirks[it].match_tags[tag_match] = tag_values
                                     break
                         del temp_bits
-                        self._quirks[it].match_tags[tag_match] = tag_values
                         del temp_str
+                        del tag_values
                     elif line.lower().strip().startswith('xorgsnippet'):
                         inside_x_snippet = True
                         self._quirks[it].x_snippet = ""

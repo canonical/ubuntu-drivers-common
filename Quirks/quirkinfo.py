@@ -22,14 +22,15 @@
 
 import os
 
+dmi_keys = ('product_name', 'product_version',
+             'sys_vendor', 'bios_version',
+             'bios_vendor', 'bios_date',
+             'board_name', 'board_vendor')
+
 class QuirkInfo:
     def __init__(self):
         self.sys_dir = '/sys'
-        self._dmi_keys = ('product_name', 'product_version',
-                         'sys_vendor', 'bios_version',
-                         'bios_vendor', 'bios_date',
-                         'board_name', 'board_vendor')
-        self._quirk_info = {}.fromkeys(self._dmi_keys)
+        self._quirk_info = {}.fromkeys(dmi_keys, '')
 
     def get_dmi_info(self):
         '''Return all the dmi info of the system hardware.
