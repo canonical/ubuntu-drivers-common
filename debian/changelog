@@ -1,3 +1,9 @@
+nvidia-common (1:0.2.42) precise; urgency=low
+
+  * Fix broken hybrid-gfx upstart job.
+
+ -- StÃ©phane Graber <stgraber@ubuntu.com>  Thu, 22 Mar 2012 16:38:16 -0400
+
 nvidia-common (1:0.2.41) precise; urgency=low
 
   * Add a test suite and run it at build time with dh_auto_test.
