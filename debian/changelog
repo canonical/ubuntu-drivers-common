@@ -1,8 +1,18 @@
-nvidia-common (1:0.2.43) UNRELEASED; urgency=low
+nvidia-common (1:0.2.43) precise; urgency=low
 
-  * 
+  * Do not apply multiple quirks when facing multiple values
+    for a tag. This was causing nvidia-common to apply quirks
+    that are not specific to the hardware in use.
+  * Make sure never to add quirks without an id.
+  * Improve test 3 and 4 of the test suite:
+    - Add testcase for matching multiple products at the same
+      time.
+    - Make sure to parse config files in the quirks directory.
+    - Change the name of the handlers used in the tests so
+      that they don't conflict with the ones in the quirks
+      files.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 06 Apr 2012 18:21:02 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 06 Apr 2012 18:22:23 +0200
 
 nvidia-common (1:0.2.42) precise; urgency=low
 
