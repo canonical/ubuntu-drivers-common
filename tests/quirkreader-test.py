@@ -31,7 +31,7 @@ import copy
 
 
 source = settings.inputFile
-destination = settings.outputDir
+destination = settings.inputDir
 destinationFile = os.path.join(settings.outputDir, 'quirksreader_test.txt')
 tempFile = os.path.join(destination, 'tmp')
 
@@ -65,7 +65,7 @@ class QuirkReaderTestCase(unittest.TestCase):
         confFile = open(tempFile, 'w')
         print >> confFile, '''
 Section "Quirk"
-    Identifier "Latitude E6530"
+    Identifier "Test Latitude E6530"
     Handler "nvidia-current|nvidia-current-updates"
     Match "sys_vendor" "Dell Inc."
     Match "product_name" "Latitude E6530"
@@ -132,7 +132,7 @@ EndSection
         confFile = open(tempFile, 'w')
         print >> confFile, '''
 Section "Quirk"
-    Identifier "Latitude E6530"
+    Identifier "Test Latitude E6530"
     Handler "nvidia-current|nvidia-current-updates"
     Match "sys_vendor" "Dell Inc."
     Match "product_name" "Latitude E6530"
@@ -200,7 +200,7 @@ EndSection
         confFile = open(tempFile, 'w')
         print >> confFile, '''
 Section "Quirk"
-    Identifier "Latitude E6530"
+    Identifier "Test Latitude E6530"
     Handler "nvidia-current|nvidia-current-updates"
     Match "sys_vendor" "Dell Inc."
     Match "product_name" "Latitude E6530|Latitude E6535"
@@ -246,13 +246,15 @@ EndSection
                 quirk_found = True
 
                 logging.debug('Processing quirk %s' % quirk.id)
-                self.assert_(a.matches_tags(quirk))
-                if a.matches_tags(quirk):
-                    # Do something here
-                    logging.debug('Quirk matches')
-                    quirk_matches = True
-                else:
-                    logging.debug('Quirk doesn\'t match')
+                # Let's test only the quirk that matters
+                if quirk.id == "Test Latitude E6530":
+                    self.assert_(a.matches_tags(quirk))
+                    if a.matches_tags(quirk):
+                        # Do something here
+                        logging.debug('Quirk matches')
+                        quirk_matches = True
+                    else:
+                        logging.debug('Quirk doesn\'t match')
 
         self.assert_(quirk_found)
         self.assert_(quirk_matches)
@@ -268,7 +270,7 @@ EndSection
         confFile = open(tempFile, 'w')
         print >> confFile, '''
 Section "Quirk"
-    Identifier "Latitude E6530"
+    Identifier "Test Latitude E6530"
     Handler "nvidia-current|nvidia-current-updates"
     Match "sys_vendor" "Dell Inc."
     Match "product_name" "Latitude E6530|Latitude E6535"
@@ -315,14 +317,16 @@ EndSection
                 quirk_found = True
 
                 logging.debug('Processing quirk %s' % quirk.id)
-                self.assert_(a.matches_tags(quirk))
-                if a.matches_tags(quirk):
-                    # Do something here
-                    logging.debug('Quirk matches')
-                    quirk_matches = True
-                    matches_number += 1
-                else:
-                    logging.debug('Quirk doesn\'t match')
+                # Let's test only the quirk that matters
+                if quirk.id == "Test Latitude E6530":
+                    self.assert_(a.matches_tags(quirk))
+                    if a.matches_tags(quirk):
+                        # Do something here
+                        logging.debug('Quirk matches')
+                        quirk_matches = True
+                        matches_number += 1
+                    else:
+                        logging.debug('Quirk doesn\'t match')
 
         self.assert_(quirk_found)
         self.assert_(quirk_matches)

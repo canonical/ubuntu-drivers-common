@@ -62,7 +62,7 @@ def main():
     
     settingsFile = open('settings.py', 'w')
     if inputFile == os.path.join(cwd, 'xorg.conf') and outputDir == cwd:
-        settingsFile.write('import os\ncwd = os.getcwd()\ninputFile = os.path.join(cwd, "xorg.conf")\noutputDir = cwd')
+        settingsFile.write('import os\ncwd = os.getcwd()\ninputFile = os.path.join(cwd, "xorg.conf")\noutputDir = cwd\ninputDir = cwd.replace("tests", "quirks")')
     else:    
         settingsFile.write('inputFile = "%s"\noutputDir = "%s"' % (inputFile, outputDir))
     settingsFile.close()
