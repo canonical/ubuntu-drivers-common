@@ -1,3 +1,9 @@
+nvidia-common (1:0.2.43) UNRELEASED; urgency=low
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 06 Apr 2012 18:21:02 +0200
+
 nvidia-common (1:0.2.42) precise; urgency=low
 
   * Fix broken hybrid-gfx upstart job.
