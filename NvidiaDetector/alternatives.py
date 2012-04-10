@@ -61,6 +61,7 @@ class Alternatives(object):
 
     def __init__(self, master_link):
         self._open_drivers_alternative = 'mesa/ld.so.conf'
+        self._open_egl_drivers_alternative = 'mesa-egl/ld.so.conf'
         self._command = 'update-alternatives'
         self._master_link = master_link
 
@@ -113,6 +114,10 @@ class Alternatives(object):
     def get_open_drivers_alternative(self):
         '''Get the alternative link for open drivers'''
         return self.get_alternative_by_name(self._open_drivers_alternative)
+
+    def get_open_egl_drivers_alternative(self):
+        '''Get the alternative link for open EGL/GLES drivers'''
+        return self.get_alternative_by_name(self._open_egl_drivers_alternative)
 
     def update_gmenu(self):
         '''Trigger gmenu so that the icons will show up in the menu'''
