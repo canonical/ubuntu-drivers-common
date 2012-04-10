@@ -1,8 +1,10 @@
-nvidia-common (1:0.2.44) UNRELEASED; urgency=low
+nvidia-common (1:0.2.44) precise; urgency=low
 
-  * 
+  [ Ricardo Salveti de Araujo ]
+  * Make it possible to use nvidia-common with arm/gles
+    drivers (LP: #977245).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 10 Apr 2012 10:52:23 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 10 Apr 2012 11:33:06 +0200
 
 nvidia-common (1:0.2.43) precise; urgency=low
 
