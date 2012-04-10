@@ -14,7 +14,7 @@ Standards-Version: 3.9.1
 XS-Python-Version: >= 2.6
 
 Package: nvidia-common
-Architecture: i386 amd64
+Architecture: i386 amd64 armel armhf
 Pre-Depends: dpkg (>= 1.15.7.2)
 Depends: ${python:Depends}, 
  ${misc:Depends},
