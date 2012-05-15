@@ -65,7 +65,7 @@
       || ((((c) & 0x00ffff00)                                           \
            == ((PCI_CLASS_PROCESSOR << 16) | (PCI_SUBCLASS_PROCESSOR_COPROC << 8)))) )
 
-#define FILENAME "/usr/share/nvidia-common/last_gfx_boot"
+#define FILENAME "/var/lib/nvidia-common/last_gfx_boot"
 
 static struct pci_slot_match match = {
     PCI_MATCH_ANY, PCI_MATCH_ANY, PCI_MATCH_ANY, PCI_MATCH_ANY, 0
