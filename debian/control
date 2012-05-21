@@ -11,6 +11,8 @@ Build-Depends: debhelper (>= 7.0.50~),
  pkg-config,
  python-xkit
 Standards-Version: 3.9.1
+Vcs-Git: git://github.com/tseliot/ubuntu-drivers-common.git
+Vcs-Browser: https://github.com/tseliot/ubuntu-drivers-common
 X-Python-Version: >= 2.6
 
 Package: ubuntu-drivers-common

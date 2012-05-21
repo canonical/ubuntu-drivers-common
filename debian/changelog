@@ -6,6 +6,7 @@ ubuntu-drivers-common (1:0.2.46) UNRELEASED; urgency=low
     obsolete debian/README.Debian and debian/nvidia-common.preinst.
   * debian/control: Fix for current python packaging policy (XS- → X-), and
     drop obsolete debian/pycompat.
+  * debian/control: Add Vcs-* tags.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 21 May 2012 11:15:01 +0200
 
