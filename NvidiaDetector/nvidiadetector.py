@@ -25,7 +25,7 @@ from subprocess import Popen, PIPE
 import sys, logging
 import apt
 
-obsoletePackagesPath = '/usr/share/nvidia-common/obsolete'
+obsoletePackagesPath = '/usr/share/ubuntu-drivers-common/obsolete'
 
 class NoDatadirError(Exception):
     "Exception thrown when no modaliases dir can be found"

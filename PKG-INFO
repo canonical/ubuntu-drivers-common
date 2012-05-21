@@ -1,10 +1,10 @@
 Metadata-Version: 1.0
-Name: nvidia-common
+Name: ubuntu-drivers-common
 Version: 0.1
-Summary: Find obsolete NVIDIA drivers
+Summary: Detect and install additional Ubuntu driver packages
 Home-page: http://pyserial.sourceforge.net/
 Author: Alberto Milone
 Author-email: albertomilone@alice.it
 License: GPLv2
-Description: Find obsolete NVIDIA drivers
+Description: Detect and install additional Ubuntu driver packages
 Platform: Linux

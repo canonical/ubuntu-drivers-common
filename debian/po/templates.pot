@@ -7,7 +7,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"Report-Msgid-Bugs-To: Source: nvidia-common@packages.debian.org\n"
+"Report-Msgid-Bugs-To: Source: ubuntu-drivers-common@packages.debian.org\n"
 "POT-Creation-Date: 2008-07-10 15:41+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
@@ -18,19 +18,19 @@ msgstr ""
 
 #. Type: error
 #. Description
-#: ../nvidia-common.templates:1001
+#: ../ubuntu-drivers-common.templates:1001
 msgid "Obsolete NVIDIA Driver version"
 msgstr ""
 
 #. Type: error
 #. Description
-#: ../nvidia-common.templates:1001
+#: ../ubuntu-drivers-common.templates:1001
 msgid "The system has detected an obsolete NVIDIA driver in your system."
 msgstr ""
 
 #. Type: error
 #. Description
-#: ../nvidia-common.templates:1001
+#: ../ubuntu-drivers-common.templates:1001
 msgid ""
 "Please install ${latest} at the end of the installation with the following "
 "command:"
@@ -38,12 +38,12 @@ msgstr ""
 
 #. Type: error
 #. Description
-#: ../nvidia-common.templates:1001
+#: ../ubuntu-drivers-common.templates:1001
 msgid "sudo apt-get install ${latest}"
 msgstr ""
 
 #. Type: error
 #. Description
-#: ../nvidia-common.templates:1001
+#: ../ubuntu-drivers-common.templates:1001
 msgid "The removal of other NVIDIA drivers will be dealt with automatically."
 msgstr ""

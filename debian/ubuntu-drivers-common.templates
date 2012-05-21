@@ -1,4 +1,4 @@
-Template: nvidia-common/obsolete-driver
+Template: ubuntu-drivers-common/obsolete-driver
 Type: error
 _Description: Obsolete NVIDIA Driver version
  The system has detected an obsolete NVIDIA driver in your system.
