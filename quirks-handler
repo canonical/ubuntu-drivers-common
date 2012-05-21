@@ -27,7 +27,7 @@ import Quirks.quirkapplier
 
 
 # Here's where we look for quirks
-quirks_path = '/usr/share/nvidia-common/quirks'
+quirks_path = '/usr/share/ubuntu-drivers-common/quirks'
 
 def main(options):
     if options.verbose:
