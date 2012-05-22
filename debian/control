@@ -10,7 +10,11 @@ Build-Depends: debhelper (>= 7.0.50~),
  lib32gcc1 [amd64], libc6-i386 [amd64],
  linux-libc-dev,
  pkg-config,
- python-xkit
+ python-xkit,
+ aptdaemon,
+ python-aptdaemon.pkcompat,
+ python-aptdaemon.test,
+ dbus
 Standards-Version: 3.9.1
 Vcs-Git: git://github.com/tseliot/ubuntu-drivers-common.git
 Vcs-Browser: https://github.com/tseliot/ubuntu-drivers-common
@@ -24,9 +28,10 @@ Depends: ${python:Depends},
  debconf (>= 0.5.00) | debconf-2.0,
  pciutils,
  python-apt,
- python-xkit
+ python-xkit,
+ python-aptdaemon.pkcompat | packagekit
 Replaces: nvidia-common (<< 1:0.2.46)
-Conflicts: nvidia-common (<< 1:0.2.46)
+Conflicts: nvidia-common (<< 1:0.2.46), packagekit-backend-aptcc
 Provides: nvidia-common
 XB-Python-Version: ${python:Versions}
 Description: Detect and install additional Ubuntu driver packages

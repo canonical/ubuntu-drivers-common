@@ -29,7 +29,7 @@ setup(
     url="http://www.albertomilone.com",
     license="gpl",
     description="Detect and install additional Ubuntu driver packages",
-    packages=["NvidiaDetector", "Quirks"],
+    packages=["NvidiaDetector", "Quirks", "UbuntuDrivers"],
     data_files=[("/usr/share/ubuntu-drivers-common/", glob.glob("share/obsolete")),
                 ("/var/lib/ubuntu-drivers-common/", glob.glob("share/last_gfx_boot")),
                 ("/etc/init/", glob.glob("share/hybrid/hybrid-gfx.conf")),
@@ -37,4 +37,7 @@ setup(
                 ("/usr/lib/nvidia/", glob.glob("nvidia-installer-hooks/*")),
                ],# + mo_files,
     scripts=["nvidia-detector", "quirks-handler", "share/hybrid/hybrid-detect"],
+    entry_points="""[packagekit.apt.plugins]
+what_provides=UbuntuDrivers.packagekit_plugin:what_provides_modalias
+""",
 )

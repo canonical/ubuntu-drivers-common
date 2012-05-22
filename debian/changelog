@@ -9,6 +9,25 @@ ubuntu-drivers-common (1:0.2.46) UNRELEASED; urgency=low
   * debian/control: Add Vcs-* tags.
   * setup.py: Move from distutils to setuptools, to get an egg info (needed to
     provide PackageKit plugins). Add python-setuptools build dependency.
+  * Add aptdaemon/PackageKit (apt backend) plugin for what-provides MODALIAS:
+    - Add UbuntuDrivers/packagekit_plugin.py: The actual plugin, which checks
+      the query against the patterns packages specify in their "Modaliases:"
+      header.
+    - setup.py: Install the new UbuntuDrivers Python package and register the
+      plugin entry point.
+    - Add test/archive/ with two dummy packages vanilla_1_all.deb and
+      chocolate_1_all.deb (each providing two modalias patterns) and a
+      corresponding Packages (generated with "apt-ftparchive packages .").
+    - Add tests/ubuntu_drivers.py: Various test cases for
+      UbuntuDrivers/packagekit_plugin.py, using a test aptdaemon instance on
+      a local session bus.
+    - debian/control: Add python-aptdaemon.pkcompat dependency. Also specify
+      packagekit as an alternative, but conflict to packagekit-backend-aptcc
+      for now, as this does not support the MODALIAS what-provides query, nor
+      plugins. This means that you cannot currently install this package
+      together with packagekit as long as the latter hard-depends on the aptcc
+      backend. Also add aptdaemon/dbus build dependencies to be able to run
+      the tests during build time.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 21 May 2012 11:15:01 +0200
 

@@ -1,0 +1,34 @@
+Package: vanilla
+Priority: extra
+Section: admin
+Installed-Size: 32
+Maintainer: Martin Pitt <martin.pitt@ubuntu.com>
+Architecture: all
+Source: vanilla	
+Version: 1
+Filename: ./vanilla_1_all.deb
+Size: 622
+MD5sum: b1073abe57095f2aee6d40273e014b8d
+SHA1: fb3a7a835ffbebfcf821ddce88b5dc548280478f
+SHA256: 20f016b14d8079a64e64fabb9330b33bf6503af8437936265716bd6e36ace160
+SHA512: 8bb4dcccf9c93bbbd4c20a8667e8572a44548093bb756a43010ad66d238c2864828014b90750d45ee75d44996d620242e23bf8743dac3644b77377911aaa01ca
+Description: vanilla
+Modaliases: vanilla(pci:v00001234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)
+
+Package: chocolate
+Priority: extra
+Section: admin
+Installed-Size: 32
+Maintainer: Martin Pitt <martin.pitt@ubuntu.com>
+Architecture: all
+Source: chocolate	
+Version: 1
+Filename: ./chocolate_1_all.deb
+Size: 636
+MD5sum: 73ba0b7f5beca89550f1570f9dc27cf2
+SHA1: 6de51ab64e003280eb5ff0accdfcfcdbefdcb98c
+SHA256: 7a476bb62126c5707e9e2585d3210b93c816dc6aaabac502b2c85d06173cb2a3
+SHA512: 369d81beb1b060d2eaa927ec82a260dc3f46263f94b385aa5a682212f5d30ae2131f1ae4ef3ad257f2aa866743bc30ff4efac1dc859e1d39d80e2e68d5855bef
+Description: chocolate
+Modaliases: chocolate(usb:v9876dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)
+
