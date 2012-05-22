@@ -14,6 +14,9 @@ Build-Depends: debhelper (>= 7.0.50~),
  aptdaemon,
  python-aptdaemon.pkcompat,
  python-aptdaemon.test,
+ python-gi,
+ gir1.2-glib-2.0,
+ gir1.2-packagekitglib-1.0,
  dbus
 Standards-Version: 3.9.1
 Vcs-Git: git://github.com/tseliot/ubuntu-drivers-common.git
@@ -29,6 +32,7 @@ Depends: ${python:Depends},
  pciutils,
  python-apt,
  python-xkit,
+ python-packagekit,
  python-aptdaemon.pkcompat | packagekit
 Replaces: nvidia-common (<< 1:0.2.46)
 Conflicts: nvidia-common (<< 1:0.2.46), packagekit-backend-aptcc
