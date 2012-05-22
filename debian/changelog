@@ -28,6 +28,7 @@ ubuntu-drivers-common (1:0.2.46) UNRELEASED; urgency=low
       together with packagekit as long as the latter hard-depends on the aptcc
       backend. Also add aptdaemon/dbus build dependencies to be able to run
       the tests during build time.
+  * tests/run: Exit with a nonzero code if there are failures or errors.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 21 May 2012 11:15:01 +0200
 
