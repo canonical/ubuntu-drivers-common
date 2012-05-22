@@ -2,6 +2,8 @@ import os
 import time
 import unittest
 import subprocess
+import resource
+import sys
 
 from gi.repository import GLib
 from gi.repository import PackageKitGlib
@@ -91,7 +93,7 @@ class PackageKitPluginTest(aptdaemon.test.AptDaemonTestCase):
                                     ['fake:DEADBEEF']),
                          [])
 
-    def test_query_multi(self):
+    def test_multi(self):
         '''multiple modalias queries in one call'''
 
         res = self._call(PackageKitGlib.ProvidesEnum.MODALIAS,
@@ -104,7 +106,7 @@ class PackageKitPluginTest(aptdaemon.test.AptDaemonTestCase):
                                      'usb:v9876d0000sv00sd00bc00sc01i01']),
                          ['vanilla'])
 
-    def test_query_othertype(self):
+    def test_othertype(self):
         '''does not break query for a different type'''
 
         try:
@@ -117,7 +119,7 @@ class PackageKitPluginTest(aptdaemon.test.AptDaemonTestCase):
         self.assertTrue('vanilla' not in res, res)
         self.assertTrue('chocolate' not in res, res)
 
-    def test_query_error(self):
+    def test_error(self):
         '''invalid modalias query'''
 
         # checks format for MODALIAS type
@@ -135,6 +137,21 @@ class PackageKitPluginTest(aptdaemon.test.AptDaemonTestCase):
 
         # for ANY it should just ignore invalid/unknown formats
         self.assertEqual(self._call(PackageKitGlib.ProvidesEnum.ANY, ['pci 1']), [])
+
+    def test_performance_single(self):
+        '''performance of 1000 lookups in a single query'''
+
+        query = []
+        for i in range(1000):
+            query.append('usb:v%04Xd0000sv00sd00bc00sc00i99' % i)
+
+        start = resource.getrusage(resource.RUSAGE_SELF)
+        self._call(PackageKitGlib.ProvidesEnum.MODALIAS, query)
+        stop = resource.getrusage(resource.RUSAGE_SELF)
+
+        sec = (stop.ru_utime + stop.ru_stime) - (start.ru_utime + start.ru_stime)
+        sys.stderr.write('[%i msec] ' % int(sec * 1000 + 0.5))
+        self.assertLess(sec, 1.0)
 
     def _call(self, provides_type,  query, expected_res=PackageKitGlib.ExitEnum.SUCCESS):
         '''Call what_provides() with given query.
