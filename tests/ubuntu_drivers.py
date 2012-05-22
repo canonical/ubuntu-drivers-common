@@ -18,6 +18,10 @@ from gi.repository import PackageKitGlib
 import aptdaemon.test
 import aptdaemon.pkcompat
 
+import UbuntuDrivers.detect
+
+import fakesysfs
+
 TEST_DIR = os.path.abspath(os.path.dirname(__file__))
 
 # show aptdaemon log in test output?
@@ -26,6 +30,20 @@ APTDAEMON_LOG = False
 APTDAEMON_DEBUG = False
 
 dbus_address = None
+
+
+def gen_fakesys():
+    '''Generate a fake SysFS object for testing'''
+    s = fakesysfs.SysFS()
+    # covered by vanilla.deb
+    s.add('pci', 'white', {'modalias': 'pci:v00001234d00sv00000001sd00bc00sc00i00'})
+    # covered by chocolate.deb
+    s.add('usb', 'black', {'modalias': 'usb:v9876dABCDsv01sd02bc00sc01i05'})
+    # not covered by any driver package
+    s.add('pci', 'grey', {'modalias': 'pci:vDEADBEEFd00'})
+    s.add('ssb', 'yellow', {}, {'MODALIAS': 'pci:vDEADBEEFd00'})
+
+    return s
 
 class PackageKitPluginTest(aptdaemon.test.AptDaemonTestCase):
     '''Test the PackageKit plugin'''
@@ -161,6 +179,28 @@ class PackageKitPluginTest(aptdaemon.test.AptDaemonTestCase):
         sys.stderr.write('[%i msec] ' % int(sec * 1000 + 0.5))
         self.assertLess(sec, 1.0)
 
+    @unittest.skipUnless(os.path.isdir('/sys'), 'no /sys dir on this system')
+    def test_system_driver_packages_system(self):
+        '''system_driver_packages() for current system'''
+
+        # nothing should match the fake vanilla/chocolate debs
+        self.assertEqual(UbuntuDrivers.detect.system_driver_packages(), [])
+
+    def test_system_driver_packages_fakesys(self):
+        '''system_driver_packages() for fake sysfs'''
+
+        s = gen_fakesys()
+        os.environ['SYSFS'] = s.sysfs
+
+        try:
+            res = UbuntuDrivers.detect.system_driver_packages()
+            self.assertEqual(set([p.get_id().split(';')[0] for p in res]),
+                             set(['vanilla', 'chocolate']))
+            for p in res:
+                self.assertEqual(p.props.info, PackageKitGlib.InfoEnum.AVAILABLE)
+        finally:
+            del os.environ['SYSFS']
+
     def _call(self, provides_type,  query, expected_res=PackageKitGlib.ExitEnum.SUCCESS):
         '''Call what_provides() with given query.
         
@@ -174,6 +214,37 @@ class PackageKitPluginTest(aptdaemon.test.AptDaemonTestCase):
             return [p.get_id().split(';')[0] for p in res.get_package_array()]
         else:
             return None
+
+class DetectTest(unittest.TestCase):
+    '''Test UbuntuDrivers.detect'''
+
+    def setUp(self):
+        '''Create a fake sysfs'''
+
+        self.sys = gen_fakesys()
+        os.environ['SYSFS'] = self.sys.sysfs
+
+    def tearDown(self):
+        try:
+            del os.environ['SYSFS']
+        except KeyError:
+            pass
+
+    @unittest.skipUnless(os.path.isdir('/sys'), 'no /sys dir on this system')
+    def test_system_modaliases_system(self):
+        '''system_modaliases() for current system'''
+
+        del os.environ['SYSFS']
+        res = UbuntuDrivers.detect.system_modaliases()
+        self.assertGreater(len(res), 5)
+        self.assertTrue(':' in res[0])
+
+    def test_system_modalises_fake(self):
+        '''system_modaliases() for fake sysfs'''
+
+        res = set(UbuntuDrivers.detect.system_modaliases())
+        self.assertEqual(res, set(['pci:v00001234d00sv00000001sd00bc00sc00i00',
+            'pci:vDEADBEEFd00', 'usb:v9876dABCDsv01sd02bc00sc01i05']))
 
 if __name__ == '__main__':
     unittest.main()

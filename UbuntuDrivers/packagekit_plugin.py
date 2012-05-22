@@ -27,7 +27,7 @@ import re
 from packagekit import enums
 import apt
 
-valid_modalias_re = re.compile('^[a-z0-9]+:\S+$')
+valid_modalias_re = re.compile('^[a-z0-9]+:')
 system_architecture = apt.apt_pkg.get_architectures()[0]
 
 def what_provides_modalias(apt_cache, provides_type, search):
