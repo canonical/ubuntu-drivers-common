@@ -1,9 +1,7 @@
 import os
 import time
-import shutil
 import unittest
 import subprocess
-import atexit
 
 from gi.repository import GLib
 from gi.repository import PackageKitGlib
