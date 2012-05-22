@@ -31,6 +31,7 @@ ubuntu-drivers-common (1:0.2.46) UNRELEASED; urgency=low
   * tests/run: Exit with a nonzero code if there are failures or errors.
   * debian/rules: Ensure that our egg-info is built before running the tests,
     and removed again on clean.
+  * debian/copyright: Rewrite using copyright 1.0 format.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 21 May 2012 11:15:01 +0200
 

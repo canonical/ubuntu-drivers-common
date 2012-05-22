@@ -1,10 +1,18 @@
-This package was written for Ubuntu by Alberto Milone <albertomilone@alice.it>.
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 
-Copyright (c) 2008 Alberto Milone 
+Files: *
+Copyright: Copyright (c) 2008 Alberto Milone 
+License: GPL-2+
 
-   This software is licensed under the GNU General Public Licence, version
-   2 or later (at the licensee's option).  A full copy of the license is
-   to be found at /usr/share/common-licenses/GPL-2 on any Debian system.
+Files: UbuntuDrivers/* tests/ubuntu_drivers.py
+Copyright: Copyright (c) 2012 Canonical Ltd.
+License: GPL-2+
 
-   In the event that this package is copied for use in a non-Debian system,
-   a copy of the licence must be included with it.
+License: GPL-2+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2 of the License, or
+ (at your option) any later version.
+ .
+ The full text of the GPL is distributed as in
+ /usr/share/common-licenses/GPL-2 on Debian systems.
