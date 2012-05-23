@@ -60,8 +60,10 @@ def system_modaliases():
     return list(aliases)
 
 def packages_for_modalias(apt_cache, modalias):
-    '''Search packages which match the given modalias'''
-
+    '''Search packages which match the given modalias.
+    
+    Return a list of apt.Package objects.
+    '''
     result = []
     for package in apt_cache:
         # skip foreign architectures, we usually only want native
@@ -95,3 +97,26 @@ def packages_for_modalias(apt_cache, modalias):
                 package.name, m))
 
     return result
+
+def system_driver_packages(apt_cache=None):
+    '''Get driver packages that are available for the system.
+    
+    This calls system_modaliases() to determine the system's hardware and then
+    queries apt about which packages provide drivers for those.
+
+    If you already have an apt.Cache() object, you should pass it as an
+    argument for efficiency. If not given, this function creates a temporary
+    one by itself.
+
+    Return a list of package names.
+    '''
+    modaliases = system_modaliases()
+
+    if not apt_cache:
+        apt_cache = apt.Cache()
+
+    packages = []
+    for alias in modaliases:
+        packages.extend([p.name for p in packages_for_modalias(apt_cache, alias)])
+    return packages
+

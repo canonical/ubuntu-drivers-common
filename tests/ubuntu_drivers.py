@@ -15,6 +15,7 @@ import sys
 
 from gi.repository import GLib
 from gi.repository import PackageKitGlib
+import apt
 import aptdaemon.test
 import aptdaemon.pkcompat
 
@@ -246,6 +247,26 @@ class DetectTest(unittest.TestCase):
         res = set(UbuntuDrivers.detect.system_modaliases())
         self.assertEqual(res, set(['pci:v00001234d00sv00000001sd00bc00sc00i00',
             'pci:vDEADBEEFd00', 'usb:v9876dABCDsv01sd02bc00sc01i05']))
+
+    def test_system_driver_packages_system(self):
+        '''system_driver_packages() for current system'''
+
+        # nothing should match the devices in our fake sysfs
+        self.assertEqual(UbuntuDrivers.detect.system_driver_packages(), [])
+
+    def test_system_driver_packages_chroot(self):
+        '''system_driver_packages() for test package repository'''
+
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            chroot.add_repository(os.path.join(TEST_DIR, 'archive'), True, False)
+            cache = apt.Cache(rootdir=chroot.path)
+            self.assertEqual(set(UbuntuDrivers.detect.system_driver_packages(cache)),
+                             set(['chocolate', 'vanilla']))
+        finally:
+            chroot.remove()
 
 if __name__ == '__main__':
     unittest.main()
