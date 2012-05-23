@@ -9,8 +9,14 @@
 # (at your option) any later version.
 
 import os
+import logging
+import fnmatch
+
+import apt
 
 from gi.repository import PackageKitGlib
+
+system_architecture = apt.apt_pkg.get_architectures()[0]
 
 def system_modaliases():
     '''Return list of modaliases present in the system.
@@ -75,3 +81,39 @@ def system_driver_packages():
         raise SystemError('PackageKit query failed with %s' % str(res.get_exit_code()))
     return res.get_package_array()
 
+def packages_for_modalias(apt_cache, modalias):
+    '''Search packages which match the given modalias'''
+
+    result = []
+    for package in apt_cache:
+        # skip foreign architectures, we usually only want native
+        # driver packages
+        if (not package.candidate or
+            package.candidate.architecture not in ('all', system_architecture)):
+            continue
+
+        try:
+            m = package.candidate.record['Modaliases']
+        except (KeyError, AttributeError):
+            continue
+
+        try:
+            pkg_matches = False
+            for part in m.split(')'):
+                part = part.strip(', ')
+                if not part:
+                    continue
+                module, lst = part.split('(')
+                for alias in lst.split(','):
+                    alias = alias.strip()
+                    if fnmatch.fnmatch(modalias, alias):
+                        result.append(package)
+                        pkg_matches = True
+                        break
+                if pkg_matches:
+                    break
+        except ValueError:
+            logging.error('Package %s has invalid modalias header: %s' % (
+                package.name, m))
+
+    return result
