@@ -284,5 +284,14 @@ class DetectTest(unittest.TestCase):
         finally:
             chroot.remove()
 
+    def test_auto_install_filter(self):
+        '''auto_install_filter()'''
+
+        self.assertEqual(UbuntuDrivers.detect.auto_install_filter([]), [])
+        self.assertEqual(set(UbuntuDrivers.detect.auto_install_filter([
+            'nvidia-current', 'bcmwl-kernel-source', 'fglrx-updates',
+            'pvr-omap4-egl'])), 
+            set(['bcmwl-kernel-source', 'pvr-omap4-egl']))
+
 if __name__ == '__main__':
     unittest.main()

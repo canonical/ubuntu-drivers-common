@@ -140,3 +140,18 @@ def system_driver_packages(apt_cache=None):
         packages.extend([p.name for p in packages_for_modalias(apt_cache, alias)])
     return packages
 
+def auto_install_filter(packages):
+    '''Get packages which are appropriate for automatic installation.
+
+    Return the subset of the given list of packages which are appropriate for
+    automatic installation by the installer. This applies to e. g. the Broadcom
+    Wifi driver (as there is no alternative), but not to the FGLRX proprietary
+    graphics driver (as the free driver works well and FGLRX does not provide
+    KMS).
+    '''
+    # any package which matches any of those globs will be accepted
+    whitelist = ['bcmwl*', 'pvr-omap*']
+    result = []
+    for pattern in whitelist:
+        result.extend(fnmatch.filter(packages, pattern))
+    return result
