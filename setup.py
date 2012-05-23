@@ -5,14 +5,6 @@ from setuptools import setup
 import subprocess, glob, os.path
 import os
 
-#mo_files = []
-## HACK: make sure that the mo files are generated and up-to-date
-#subprocess.call(["make", "-C", "po", "build-mo"])
-#for filepath in glob.glob("po/mo/*/LC_MESSAGES/*.mo"):
-#    lang = filepath[len("po/mo/"):]
-#    targetpath = os.path.dirname(os.path.join("share/locale",lang))
-#    mo_files.append((targetpath, [filepath]))
-
 # Build hybrid-detect
 subprocess.call(["make", "-C", "share/hybrid", "all"])
 
