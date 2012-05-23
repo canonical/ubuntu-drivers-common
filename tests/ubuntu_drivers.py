@@ -293,5 +293,101 @@ class DetectTest(unittest.TestCase):
             'pvr-omap4-egl'])), 
             set(['bcmwl-kernel-source', 'pvr-omap4-egl']))
 
+
+class ToolTest(unittest.TestCase):
+    '''Test ubuntu-drivers tool'''
+
+    @classmethod
+    def setUpClass(klass):
+        # set up a test chroot
+        klass.chroot = aptdaemon.test.Chroot()
+        klass.chroot.setup()
+        klass.chroot.add_test_repository()
+        klass.chroot.add_repository(os.path.join(TEST_DIR, 'archive'), True, False)
+
+        # prevent a warning from apt about this directory not existing; fixed
+        # in current aptdaemon trunk, but not yet in Ubuntu
+        os.makedirs(os.path.join(klass.chroot.path, 'etc/apt/preferences.d'))
+
+        klass.chroot_apt_conf = os.path.join(klass.chroot.path, 'aptconfig')
+        with open(klass.chroot_apt_conf, 'w') as f:
+            f.write('''Dir "%s";
+Debug::NoLocking "true";
+DPKG::options:: "--root=%s";
+APT::Get::AllowUnauthenticated "true";
+''' % (klass.chroot.path, klass.chroot.path))
+        os.environ['APT_CONFIG'] = klass.chroot_apt_conf
+
+        klass.tool_path = os.path.join(os.path.dirname(TEST_DIR), 'ubuntu-drivers')
+
+    @classmethod
+    def tearDownClass(klass):
+        klass.chroot.remove()
+
+    def setUp(self):
+        '''Create a fake sysfs'''
+
+        self.sys = gen_fakesys()
+        os.environ['SYSFS'] = self.sys.sysfs
+
+    def tearDown(self):
+        try:
+            del os.environ['SYSFS']
+        except KeyError:
+            pass
+
+    def test_list_chroot(self):
+        '''ubuntu-drivers list for fake sysfs and chroot'''
+
+        ud = subprocess.Popen([self.tool_path, 'list'],
+                universal_newlines=True, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE)
+        out, err = ud.communicate()
+        self.assertEqual(set(out.splitlines()), set(['vanilla', 'chocolate']))
+        self.assertEqual(err, '')
+        self.assertEqual(ud.returncode, 0)
+
+    def test_list_system(self):
+        '''ubuntu-drivers list for fake sysfs and system apt'''
+
+        env = os.environ.copy()
+        del env['APT_CONFIG']
+
+        ud = subprocess.Popen([self.tool_path, 'list'],
+                universal_newlines=True, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, env=env)
+        out, err = ud.communicate()
+        # real system packages should not match our fake modalises
+        self.assertEqual(out, '\n')
+        self.assertEqual(err, '')
+        self.assertEqual(ud.returncode, 0)
+
+    def test_auto_install_chroot(self):
+        '''ubuntu-drivers autoinstall for fake sysfs and chroot'''
+
+        ud = subprocess.Popen([self.tool_path, 'autoinstall'],
+                universal_newlines=True, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE)
+        out, err = ud.communicate()
+        self.assertTrue('vanilla' in out, out)
+        self.assertFalse('chocolate' in out, out)
+        self.assertEqual(err, '')
+        self.assertEqual(ud.returncode, 0)
+
+    def test_auto_install_system(self):
+        '''ubuntu-drivers autoinstall for fake sysfs and system apt'''
+
+        env = os.environ.copy()
+        del env['APT_CONFIG']
+
+        ud = subprocess.Popen([self.tool_path, 'autoinstall'],
+                universal_newlines=True, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, env=env)
+        out, err = ud.communicate()
+        # real system packages should not match our fake modalises
+        self.assertTrue('No drivers found' in out)
+        self.assertEqual(err, '')
+        self.assertEqual(ud.returncode, 0)
+
 if __name__ == '__main__':
     unittest.main()

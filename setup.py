@@ -36,7 +36,8 @@ setup(
                 ("/usr/share/ubuntu-drivers-common/quirks", glob.glob("quirks/*")),
                 ("/usr/lib/nvidia/", glob.glob("nvidia-installer-hooks/*")),
                ],# + mo_files,
-    scripts=["nvidia-detector", "quirks-handler", "share/hybrid/hybrid-detect"],
+    scripts=["nvidia-detector", "quirks-handler", "share/hybrid/hybrid-detect",
+             "ubuntu-drivers"],
     entry_points="""[packagekit.apt.plugins]
 what_provides=UbuntuDrivers.PackageKit:what_provides_modalias
 """,

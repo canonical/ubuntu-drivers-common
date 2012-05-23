@@ -1,0 +1,73 @@
+#!/usr/bin/python
+
+'''Driver package query/installation tool for Ubuntu'''
+
+# (C) 2012 Canonical Ltd.
+# Author: Martin Pitt <martin.pitt@ubuntu.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+
+import argparse
+import subprocess
+import sys
+import os
+
+import UbuntuDrivers.detect
+
+def parse_args():
+    '''Parse command line arguments.'''
+
+    commands = [c.split('_', 1)[1] for c in globals().keys() if c.startswith('command_')]
+
+    parser = argparse.ArgumentParser(description='List/install driver packages for Ubuntu.')
+    parser.add_argument('command', metavar='<command>', choices=commands, 
+            help='Available commands: ' + ' '.join(commands))
+
+    return parser.parse_args()
+
+def command_list(args):
+    '''Show all driver packages which apply to the current system.'''
+
+    packages = UbuntuDrivers.detect.system_driver_packages()
+    print('\n'.join(packages))
+
+    return 0
+
+def command_autoinstall(args):
+    '''Install drivers that are appropriate for automatic installation.'''
+
+    packages = UbuntuDrivers.detect.system_driver_packages()
+    packages = UbuntuDrivers.detect.auto_install_filter(packages)
+    if not packages:
+        print('No drivers found for automatic installation.')
+        return
+
+    env = os.environ.copy()
+    env['DEBIAN_FRONTEND'] = 'noninteractive'
+    try:
+        del os.environ['DEBIAN_HAS_FRONTEND']
+    except KeyError:
+        pass
+    try:
+        del os.environ['DEBCONF_USE_CDEBCONF']
+    except KeyError:
+        pass
+
+    ret = subprocess.call(['apt-get', 'install', '-o',
+        'DPkg::options::=--force-confnew', '-y'] + packages,
+        env=env)
+    return ret
+
+
+#
+# main
+#
+
+args = parse_args()
+
+# run the function corresponding to the specified command
+command = globals()['command_' + args.command]
+sys.exit(command(args))

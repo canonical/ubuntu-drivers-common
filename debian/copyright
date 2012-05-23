@@ -4,7 +4,7 @@ Files: *
 Copyright: Copyright (c) 2008 Alberto Milone 
 License: GPL-2+
 
-Files: UbuntuDrivers/* tests/ubuntu_drivers.py
+Files: UbuntuDrivers/* tests/ubuntu_drivers.py ubuntu-drivers
 Copyright: Copyright (c) 2012 Canonical Ltd.
 License: GPL-2+
 
