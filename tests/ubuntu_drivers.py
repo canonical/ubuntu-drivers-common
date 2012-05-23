@@ -258,8 +258,9 @@ class DetectTest(unittest.TestCase):
         '''system_driver_packages() performance for a lot of modaliases'''
 
         # add lots of fake devices/modalises
-        for i in range(50):
-            self.sys.add('usb', 'dev%i' % i, {'modalias': 'fake:s%04X' % i})
+        for i in range(30):
+            self.sys.add('pci', 'pcidev%i' % i, {'modalias': 'pci:s%04X' % i})
+            self.sys.add('usb', 'usbdev%i' % i, {'modalias': 'usb:s%04X' % i})
 
         start = resource.getrusage(resource.RUSAGE_SELF)
         UbuntuDrivers.detect.system_driver_packages()
@@ -267,7 +268,7 @@ class DetectTest(unittest.TestCase):
 
         sec = (stop.ru_utime + stop.ru_stime) - (start.ru_utime + start.ru_stime)
         sys.stderr.write('[%.2f s] ' % sec)
-        self.assertLess(sec, 60.0)
+        self.assertLess(sec, 30.0)
 
     def test_system_driver_packages_chroot(self):
         '''system_driver_packages() for test package repository'''

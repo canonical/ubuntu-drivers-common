@@ -59,25 +59,14 @@ def system_modaliases():
     # WhatProvides() call.
     return list(aliases)
 
-def packages_for_modalias(apt_cache, modalias):
-    '''Search packages which match the given modalias.
-    
-    Return a list of apt.Package objects.
+def _apt_cache_modalias_map(apt_cache):
+    '''Build a modalias map from an apt.Cache object.
+
+    Return a map bus -> modalias -> [package, ...], where "bus" is the prefix of
+    the modalias up to the first ':' (e. g. "pci" or "usb").
     '''
-    result = []
-
-    # build and use a cache of the packages from that particular apt_cache
-    # object which have a Modaliases: field; this avoids having to iterate over
-    # all available packages for each modalias (which takes some 5 seconds each)
-    apt_cache_hash = hash(apt_cache)
-    try:
-        packages = packages_for_modalias.cache[apt_cache_hash]
-        new_cache = None
-    except KeyError:
-        packages = apt_cache
-        new_cache = packages_for_modalias.cache.setdefault(apt_cache_hash, [])
-
-    for package in packages:
+    result = {}
+    for package in apt_cache:
         # skip foreign architectures, we usually only want native
         # driver packages
         if (not package.candidate or
@@ -89,12 +78,7 @@ def packages_for_modalias(apt_cache, modalias):
         except (KeyError, AttributeError):
             continue
 
-        # update cache if we don't have one yet
-        if new_cache is not None:
-            new_cache.append(package)
-
         try:
-            pkg_matches = False
             for part in m.split(')'):
                 part = part.strip(', ')
                 if not part:
@@ -102,19 +86,37 @@ def packages_for_modalias(apt_cache, modalias):
                 module, lst = part.split('(')
                 for alias in lst.split(','):
                     alias = alias.strip()
-                    if fnmatch.fnmatch(modalias, alias):
-                        result.append(package)
-                        pkg_matches = True
-                        break
-                if pkg_matches:
-                    break
+                    bus = alias.split(':', 1)[0]
+                    result.setdefault(bus, {}).setdefault(alias, []).append(package.name)
         except ValueError:
             logging.error('Package %s has invalid modalias header: %s' % (
                 package.name, m))
 
     return result
 
-packages_for_modalias.cache = {}
+def packages_for_modalias(apt_cache, modalias):
+    '''Search packages which match the given modalias.
+    
+    Return a list of apt.Package objects.
+    '''
+    result = []
+
+    apt_cache_hash = hash(apt_cache)
+    try:
+        cache_map = packages_for_modalias.cache_maps[apt_cache_hash]
+    except KeyError:
+        cache_map = _apt_cache_modalias_map(apt_cache)
+        packages_for_modalias.cache_maps[apt_cache_hash] = cache_map
+
+    bus_map = cache_map.get(modalias.split(':', 1)[0], {})
+    for alias in bus_map:
+        if fnmatch.fnmatch(modalias, alias):
+            for p in bus_map[alias]:
+                result.append(apt_cache[p])
+
+    return result
+
+packages_for_modalias.cache_maps = {}
 
 def system_driver_packages(apt_cache=None):
     '''Get driver packages that are available for the system.
