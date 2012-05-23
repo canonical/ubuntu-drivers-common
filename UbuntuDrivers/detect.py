@@ -65,7 +65,19 @@ def packages_for_modalias(apt_cache, modalias):
     Return a list of apt.Package objects.
     '''
     result = []
-    for package in apt_cache:
+
+    # build and use a cache of the packages from that particular apt_cache
+    # object which have a Modaliases: field; this avoids having to iterate over
+    # all available packages for each modalias (which takes some 5 seconds each)
+    apt_cache_hash = hash(apt_cache)
+    try:
+        packages = packages_for_modalias.cache[apt_cache_hash]
+        new_cache = None
+    except KeyError:
+        packages = apt_cache
+        new_cache = packages_for_modalias.cache.setdefault(apt_cache_hash, [])
+
+    for package in packages:
         # skip foreign architectures, we usually only want native
         # driver packages
         if (not package.candidate or
@@ -76,6 +88,10 @@ def packages_for_modalias(apt_cache, modalias):
             m = package.candidate.record['Modaliases']
         except (KeyError, AttributeError):
             continue
+
+        # update cache if we don't have one yet
+        if new_cache is not None:
+            new_cache.append(package)
 
         try:
             pkg_matches = False
@@ -97,6 +113,8 @@ def packages_for_modalias(apt_cache, modalias):
                 package.name, m))
 
     return result
+
+packages_for_modalias.cache = {}
 
 def system_driver_packages(apt_cache=None):
     '''Get driver packages that are available for the system.

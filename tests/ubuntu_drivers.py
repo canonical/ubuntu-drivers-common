@@ -178,7 +178,7 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
         stop = resource.getrusage(resource.RUSAGE_SELF)
 
         sec = (stop.ru_utime + stop.ru_stime) - (start.ru_utime + start.ru_stime)
-        sys.stderr.write('[%i msec] ' % int(sec * 1000 + 0.5))
+        sys.stderr.write('[%i ms] ' % int(sec * 1000 + 0.5))
         self.assertLess(sec, 1.0)
 
     @unittest.skipUnless(os.path.isdir('/sys'), 'no /sys dir on this system')
@@ -253,6 +253,21 @@ class DetectTest(unittest.TestCase):
 
         # nothing should match the devices in our fake sysfs
         self.assertEqual(UbuntuDrivers.detect.system_driver_packages(), [])
+
+    def test_system_driver_packages_performance(self):
+        '''system_driver_packages() performance for a lot of modaliases'''
+
+        # add lots of fake devices/modalises
+        for i in range(50):
+            self.sys.add('usb', 'dev%i' % i, {'modalias': 'fake:s%04X' % i})
+
+        start = resource.getrusage(resource.RUSAGE_SELF)
+        UbuntuDrivers.detect.system_driver_packages()
+        stop = resource.getrusage(resource.RUSAGE_SELF)
+
+        sec = (stop.ru_utime + stop.ru_stime) - (start.ru_utime + start.ru_stime)
+        sys.stderr.write('[%.2f s] ' % sec)
+        self.assertLess(sec, 60.0)
 
     def test_system_driver_packages_chroot(self):
         '''system_driver_packages() for test package repository'''
