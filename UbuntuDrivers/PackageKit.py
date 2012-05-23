@@ -23,11 +23,15 @@
 import re
 
 from packagekit import enums
+from gi.repository import PackageKitGlib
+
 import UbuntuDrivers.detect
 
 valid_modalias_re = re.compile('^[a-z0-9]+:')
 
 def what_provides_modalias(apt_cache, provides_type, search):
+    '''WhatProvides plugin for type MODALIAS.'''
+
     if provides_type not in (enums.PROVIDES_MODALIAS, enums.PROVIDES_ANY):
         raise NotImplementedError('cannot handle type ' + str(provides_type))
 
@@ -38,4 +42,24 @@ def what_provides_modalias(apt_cache, provides_type, search):
             return []
 
     return UbuntuDrivers.detect.packages_for_modalias(apt_cache, search)
+
+def system_driver_packages():
+    '''Get driver packages that are available for the system.
+    
+    This calls detect.system_modaliases() to determine the system's hardware
+    and then queries PackageKit about which packages provide drivers for those.
+
+    Raise a SystemError if the PackageKit query fails.
+
+    Return a list of PackageKitGLib.Package objects.
+    '''
+    modaliases = UbuntuDrivers.detect.system_modaliases()
+    packagekit = PackageKitGlib.Client()
+
+    res = packagekit.what_provides(PackageKitGlib.FilterEnum.NONE,
+            PackageKitGlib.ProvidesEnum.MODALIAS, modaliases, None,
+            lambda p, t, d: True, None)
+    if res.get_exit_code() != PackageKitGlib.ExitEnum.SUCCESS:
+        raise SystemError('PackageKit query failed with %s' % str(res.get_exit_code()))
+    return res.get_package_array()
 

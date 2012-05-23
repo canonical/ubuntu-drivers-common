@@ -19,6 +19,7 @@ import aptdaemon.test
 import aptdaemon.pkcompat
 
 import UbuntuDrivers.detect
+import UbuntuDrivers.PackageKit
 
 import fakesysfs
 
@@ -45,8 +46,8 @@ def gen_fakesys():
 
     return s
 
-class PackageKitPluginTest(aptdaemon.test.AptDaemonTestCase):
-    '''Test the PackageKit plugin'''
+class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
+    '''Test the PackageKit plugin and API'''
 
     @classmethod
     def setUpClass(klass):
@@ -184,7 +185,7 @@ class PackageKitPluginTest(aptdaemon.test.AptDaemonTestCase):
         '''system_driver_packages() for current system'''
 
         # nothing should match the fake vanilla/chocolate debs
-        self.assertEqual(UbuntuDrivers.detect.system_driver_packages(), [])
+        self.assertEqual(UbuntuDrivers.PackageKit.system_driver_packages(), [])
 
     def test_system_driver_packages_fakesys(self):
         '''system_driver_packages() for fake sysfs'''
@@ -193,7 +194,7 @@ class PackageKitPluginTest(aptdaemon.test.AptDaemonTestCase):
         os.environ['SYSFS'] = s.sysfs
 
         try:
-            res = UbuntuDrivers.detect.system_driver_packages()
+            res = UbuntuDrivers.PackageKit.system_driver_packages()
             self.assertEqual(set([p.get_id().split(';')[0] for p in res]),
                              set(['vanilla', 'chocolate']))
             for p in res:

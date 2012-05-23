@@ -14,8 +14,6 @@ import fnmatch
 
 import apt
 
-from gi.repository import PackageKitGlib
-
 system_architecture = apt.apt_pkg.get_architectures()[0]
 
 def system_modaliases():
@@ -60,26 +58,6 @@ def system_modaliases():
     # Convert result to a list, to make the result compatible with a PackageKit
     # WhatProvides() call.
     return list(aliases)
-
-def system_driver_packages():
-    '''Get driver packages that are available for the system.
-    
-    This calls system_modaliases() to determine the system's hardware and then
-    queries PackageKit about which packages provide drivers for those.
-
-    Raise a SystemError if the PackageKit query fails.
-
-    Return a list of PackageKitGLib.Package objects.
-    '''
-    modaliases = system_modaliases()
-    packagekit = PackageKitGlib.Client()
-
-    res = packagekit.what_provides(PackageKitGlib.FilterEnum.NONE,
-            PackageKitGlib.ProvidesEnum.MODALIAS, modaliases, None,
-            lambda p, t, d: True, None)
-    if res.get_exit_code() != PackageKitGlib.ExitEnum.SUCCESS:
-        raise SystemError('PackageKit query failed with %s' % str(res.get_exit_code()))
-    return res.get_package_array()
 
 def packages_for_modalias(apt_cache, modalias):
     '''Search packages which match the given modalias'''

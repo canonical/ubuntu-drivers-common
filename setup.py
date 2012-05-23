@@ -38,6 +38,6 @@ setup(
                ],# + mo_files,
     scripts=["nvidia-detector", "quirks-handler", "share/hybrid/hybrid-detect"],
     entry_points="""[packagekit.apt.plugins]
-what_provides=UbuntuDrivers.packagekit_plugin:what_provides_modalias
+what_provides=UbuntuDrivers.PackageKit:what_provides_modalias
 """,
 )
