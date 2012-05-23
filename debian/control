@@ -24,7 +24,7 @@ Vcs-Browser: https://github.com/tseliot/ubuntu-drivers-common
 X-Python-Version: >= 2.6
 
 Package: ubuntu-drivers-common
-Architecture: i386 amd64 armel armhf
+Architecture: any
 Pre-Depends: dpkg (>= 1.15.7.2)
 Depends: ${python:Depends}, 
  ${misc:Depends},
