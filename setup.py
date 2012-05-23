@@ -5,8 +5,11 @@ from setuptools import setup
 import subprocess, glob, os.path
 import os
 
-# Build hybrid-detect
-subprocess.call(["make", "-C", "share/hybrid", "all"])
+scripts = ["nvidia-detector", "quirks-handler", "ubuntu-drivers"]
+# Build hybrid-detect on x86
+if '86' in os.uname()[4]:
+    subprocess.check_call(["make", "-C", "share/hybrid", "all"])
+    scripts.append("share/hybrid/hybrid-detect")
 
 # Make the nvidia-installer hooks executable
 for x in glob.glob("nvidia-installer-hooks/*"):
@@ -27,9 +30,8 @@ setup(
                 ("/etc/init/", glob.glob("share/hybrid/hybrid-gfx.conf")),
                 ("/usr/share/ubuntu-drivers-common/quirks", glob.glob("quirks/*")),
                 ("/usr/lib/nvidia/", glob.glob("nvidia-installer-hooks/*")),
-               ],# + mo_files,
-    scripts=["nvidia-detector", "quirks-handler", "share/hybrid/hybrid-detect",
-             "ubuntu-drivers"],
+               ],
+    scripts=scripts,
     entry_points="""[packagekit.apt.plugins]
 what_provides=UbuntuDrivers.PackageKit:what_provides_modalias
 """,
