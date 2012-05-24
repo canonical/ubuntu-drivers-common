@@ -11,9 +11,8 @@ ubuntu-drivers-common (1:0.2.46) UNRELEASED; urgency=low
     provide PackageKit plugins). Add python-setuptools build dependency.
   * Add tests/fakesysfs.py: Provide a fake sysfs directory for testing.
     Adapted from upower's integration test suite.
-  * Add test/archive/ with two dummy packages vanilla_1_all.deb and
-    chocolate_1_all.deb (each providing two modalias patterns) and a
-    corresponding Packages (generated with "apt-ftparchive packages .").
+  * Add tests/testarchive.py: Class for building an apt archive with test
+    packages.
   * Add UbuntuDrivers/detect.py, tests/ubuntu_drivers.py: Hardware/driver
     detection functionality.  These are borrowed and streamlined from Jockey.
   * Add aptdaemon/PackageKit (apt backend) plugin for what-provides MODALIAS:

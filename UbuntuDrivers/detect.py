@@ -149,9 +149,8 @@ def auto_install_filter(packages):
     graphics driver (as the free driver works well and FGLRX does not provide
     KMS).
     '''
-    # any package which matches any of those globs will be accepted; "vanilla"
-    # is only for the test suite
-    whitelist = ['bcmwl*', 'pvr-omap*', 'vanilla']
+    # any package which matches any of those globs will be accepted
+    whitelist = ['bcmwl*', 'pvr-omap*']
     result = []
     for pattern in whitelist:
         result.extend(fnmatch.filter(packages, pattern))

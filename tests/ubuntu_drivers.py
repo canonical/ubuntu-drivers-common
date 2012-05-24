@@ -23,6 +23,7 @@ import UbuntuDrivers.detect
 import UbuntuDrivers.PackageKit
 
 import fakesysfs
+import testarchive
 
 TEST_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -36,6 +37,7 @@ dbus_address = None
 
 def gen_fakesys():
     '''Generate a fake SysFS object for testing'''
+
     s = fakesysfs.SysFS()
     # covered by vanilla.deb
     s.add('pci', 'white', {'modalias': 'pci:v00001234d00sv00000001sd00bc00sc00i00'})
@@ -46,6 +48,16 @@ def gen_fakesys():
     s.add('ssb', 'yellow', {}, {'MODALIAS': 'pci:vDEADBEEFd00'})
 
     return s
+
+def gen_fakearchive():
+    '''Generate a fake archive for testing'''
+
+    a = testarchive.Archive()
+    a.create_deb('vanilla', extra_tags={'Modaliases': 
+        'vanilla(pci:v00001234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)'}) 
+    a.create_deb('chocolate', extra_tags={'Modaliases': 
+        'chocolate(usb:v9876dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'}) 
+    return a
 
 class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
     '''Test the PackageKit plugin and API'''
@@ -63,11 +75,13 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
         klass.dbus_address = klass.dbus.stdout.readline().strip()
         os.environ['DBUS_SYSTEM_BUS_ADDRESS'] = klass.dbus_address
 
+        klass.archive = gen_fakearchive()
+
         # set up a test chroot
         klass.chroot = aptdaemon.test.Chroot()
         klass.chroot.setup()
         klass.chroot.add_test_repository()
-        klass.chroot.add_repository(os.path.join(TEST_DIR, 'archive'), True, False)
+        klass.chroot.add_repository(klass.archive.path, True, False)
 
         # start aptdaemon on fake system D-BUS; this works better than
         # self.start_session_aptd() as the latter starts/stops aptadaemon on
@@ -277,7 +291,8 @@ class DetectTest(unittest.TestCase):
         try:
             chroot.setup()
             chroot.add_test_repository()
-            chroot.add_repository(os.path.join(TEST_DIR, 'archive'), True, False)
+            archive = gen_fakearchive()
+            chroot.add_repository(archive.path, True, False)
             cache = apt.Cache(rootdir=chroot.path)
             self.assertEqual(set(UbuntuDrivers.detect.system_driver_packages(cache)),
                              set(['chocolate', 'vanilla']))
@@ -299,11 +314,18 @@ class ToolTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(klass):
+        klass.archive = testarchive.Archive()
+        klass.archive.create_deb('noalias')
+        klass.archive.create_deb('vanilla', extra_tags={'Modaliases': 
+            'vanilla(pci:v00001234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)'}) 
+        klass.archive.create_deb('bcmwl-kernel-source', extra_tags={'Modaliases': 
+            'wl(usb:v9876dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'}) 
+
         # set up a test chroot
         klass.chroot = aptdaemon.test.Chroot()
         klass.chroot.setup()
         klass.chroot.add_test_repository()
-        klass.chroot.add_repository(os.path.join(TEST_DIR, 'archive'), True, False)
+        klass.chroot.add_repository(klass.archive.path, True, False)
 
         # prevent a warning from apt about this directory not existing; fixed
         # in current aptdaemon trunk, but not yet in Ubuntu
@@ -343,7 +365,7 @@ APT::Get::AllowUnauthenticated "true";
                 universal_newlines=True, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE)
         out, err = ud.communicate()
-        self.assertEqual(set(out.splitlines()), set(['vanilla', 'chocolate']))
+        self.assertEqual(set(out.splitlines()), set(['vanilla', 'bcmwl-kernel-source']))
         self.assertEqual(err, '')
         self.assertEqual(ud.returncode, 0)
 
@@ -369,8 +391,9 @@ APT::Get::AllowUnauthenticated "true";
                 universal_newlines=True, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE)
         out, err = ud.communicate()
-        self.assertTrue('vanilla' in out, out)
-        self.assertFalse('chocolate' in out, out)
+        self.assertTrue('bcmwl-kernel-source' in out, out)
+        self.assertFalse('vanilla' in out, out)
+        self.assertFalse('noalias' in out, out)
         self.assertEqual(err, '')
         self.assertEqual(ud.returncode, 0)
 
