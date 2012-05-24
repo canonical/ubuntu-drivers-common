@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.46) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.46) quantal; urgency=low
 
   * Rename to ubuntu-drivers-common, as this package is already necessary for
     fglrx as well, and will soon get support for more drivers (replacing
@@ -47,7 +47,7 @@ ubuntu-drivers-common (1:0.2.46) UNRELEASED; urgency=low
   * setup.py: Only build hybrid-detect on x86 machines.
   * debian/control: Bump Standards-Version to 3.9.3.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 21 May 2012 11:15:01 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 24 May 2012 18:22:53 +0200
 
 nvidia-common (1:0.2.45) quantal; urgency=low
 
