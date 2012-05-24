@@ -222,7 +222,7 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
         sys.stderr.write('[%i ms] ' % int(sec * 1000 + 0.5))
         self.assertLess(sec, 1.0)
 
-    @unittest.skipUnless(os.path.isdir('/sys'), 'no /sys dir on this system')
+    @unittest.skipUnless(os.path.isdir('/sys/devices'), 'no /sys dir on this system')
     def test_system_driver_packages_system(self):
         '''system_driver_packages() for current system'''
 
@@ -298,7 +298,7 @@ class DetectTest(unittest.TestCase):
             pass
         shutil.rmtree(self.plugin_dir)
 
-    @unittest.skipUnless(os.path.isdir('/sys'), 'no /sys dir on this system')
+    @unittest.skipUnless(os.path.isdir('/sys/devices'), 'no /sys dir on this system')
     def test_system_modaliases_system(self):
         '''system_modaliases() for current system'''
 
