@@ -14,6 +14,8 @@ import argparse
 import subprocess
 import sys
 import os
+import logging
+import apt
 
 import UbuntuDrivers.detect
 
@@ -61,6 +63,37 @@ def command_autoinstall(args):
         env=env)
     return ret
 
+def command_debug(args):
+    '''Print all available information and debug data about drivers'''
+
+    logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
+
+    print('=== log messages from detection ===')
+    aliases = UbuntuDrivers.detect.system_modaliases()
+    cache = apt.Cache()
+    packages = UbuntuDrivers.detect.system_driver_packages(cache)
+    auto_packages = UbuntuDrivers.detect.auto_install_filter(packages)
+
+    print('=== modaliases in the system ===')
+    for alias in UbuntuDrivers.detect.system_modaliases():
+        print(alias)
+
+    print('=== matching driver packages ===')
+    for package in packages:
+        p = cache[package]
+        try:
+            inst = p.installed.version
+        except AttributeError:
+            inst = '<none>'
+        try:
+            cand = p.candidate.version
+        except AttributeError:
+            cand = '<none>'
+        if package in auto_packages:
+            auto = ' (auto-install)'
+        else:
+            auto = ''
+        print('%s: installed: %s   available: %s%s' % (package, inst, cand, auto))
 
 #
 # main

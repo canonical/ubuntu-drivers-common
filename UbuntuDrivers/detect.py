@@ -51,6 +51,7 @@ def system_modaliases():
         driverlink =  os.path.join(path, 'driver')
         modlink = os.path.join(driverlink, 'module')
         if os.path.islink(driverlink) and not os.path.islink(modlink):
+            logging.debug('system_modaliases(): ignoring device %s which has no module (built into kernel)', path)
             continue
 
         aliases.add(modalias)
@@ -89,8 +90,10 @@ def _apt_cache_modalias_map(apt_cache):
         for p in apt_cache['xserver-xorg-core'].candidate.provides:
             if p.startswith('xorg-video-abi-'):
                 xorg_video_abi = p
+                logging.debug('_apt_cache_modalias_map(): Current X.org video abi: %s', xorg_video_abi)
                 break
-    except KeyError:
+    except (AttributeError, KeyError):
+        logging.debug('_apt_cache_modalias_map(): xserver-xorg-core not available, cannot check ABI')
         xorg_video_abi = None
 
     result = {}
