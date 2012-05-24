@@ -22,11 +22,19 @@ import UbuntuDrivers.detect
 def parse_args():
     '''Parse command line arguments.'''
 
-    commands = [c.split('_', 1)[1] for c in globals().keys() if c.startswith('command_')]
+    # build help for commands
+    commands = []
+    command_help = 'Available commands:'
+    for c in globals():
+        if c.startswith('command_'):
+            name = c.split('_', 1)[1]
+            commands.append(name)
+            command_help += '\n   %s: %s' % (name, globals()[c].__doc__)
 
-    parser = argparse.ArgumentParser(description='List/install driver packages for Ubuntu.')
+    parser = argparse.ArgumentParser(description='List/install driver packages for Ubuntu.',
+            epilog=command_help, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('command', metavar='<command>', choices=commands, 
-            help='Available commands: ' + ' '.join(commands))
+            help='See below')
 
     return parser.parse_args()
 
@@ -64,7 +72,7 @@ def command_autoinstall(args):
     return ret
 
 def command_debug(args):
-    '''Print all available information and debug data about drivers'''
+    '''Print all available information and debug data about drivers.'''
 
     logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
 
