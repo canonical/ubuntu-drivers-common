@@ -97,6 +97,8 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
 
         klass.archive = gen_fakearchive()
 
+        klass.sys = gen_fakesys()
+
         # set up a test chroot
         klass.chroot = aptdaemon.test.Chroot()
         klass.chroot.setup()
@@ -132,6 +134,8 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
         klass.chroot.remove()
 
     def setUp(self):
+        os.environ['SYSFS'] = self.sys.sysfs
+
         self.start_fake_polkitd()
         time.sleep(0.5)
         self.pk = PackageKitGlib.Client()
@@ -226,14 +230,13 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
     def test_system_driver_packages_system(self):
         '''system_driver_packages() for current system'''
 
+        del os.environ['SYSFS']
+
         # nothing should match the fake vanilla/chocolate debs
         self.assertEqual(UbuntuDrivers.PackageKit.system_driver_packages(), [])
 
     def test_system_driver_packages_fakesys(self):
         '''system_driver_packages() for fake sysfs'''
-
-        s = gen_fakesys()
-        os.environ['SYSFS'] = s.sysfs
 
         try:
             res = UbuntuDrivers.PackageKit.system_driver_packages()
@@ -246,9 +249,6 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
 
     def test_system_driver_packages_detect_plugins(self):
         '''system_driver_packages() includes custom detection plugins'''
-
-        s = gen_fakesys()
-        os.environ['SYSFS'] = s.sysfs
 
         try:
             os.mkdir(self.plugin_dir)
