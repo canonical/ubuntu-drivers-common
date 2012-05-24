@@ -4,9 +4,11 @@
 	dh "$@" --with python2
 
 override_dh_auto_test:
+	./setup.py egg_info
 	(cd tests; PYTHONPATH=.. ./run)
 
 override_dh_clean:
 	rm -f share/hybrid/hybrid-detect
 	rm -f quirksreader_test*.txt
+	rm -rf *.egg-info
 	dh_clean

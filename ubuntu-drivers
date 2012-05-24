@@ -1,0 +1,114 @@
+#!/usr/bin/python
+
+'''Driver package query/installation tool for Ubuntu'''
+
+# (C) 2012 Canonical Ltd.
+# Author: Martin Pitt <martin.pitt@ubuntu.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+
+import argparse
+import subprocess
+import sys
+import os
+import logging
+import apt
+
+import UbuntuDrivers.detect
+
+def parse_args():
+    '''Parse command line arguments.'''
+
+    # build help for commands
+    commands = []
+    command_help = 'Available commands:'
+    for c in globals():
+        if c.startswith('command_'):
+            name = c.split('_', 1)[1]
+            commands.append(name)
+            command_help += '\n   %s: %s' % (name, globals()[c].__doc__)
+
+    parser = argparse.ArgumentParser(description='List/install driver packages for Ubuntu.',
+            epilog=command_help, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('command', metavar='<command>', choices=commands, 
+            help='See below')
+
+    return parser.parse_args()
+
+def command_list(args):
+    '''Show all driver packages which apply to the current system.'''
+
+    packages = UbuntuDrivers.detect.system_driver_packages()
+    print('\n'.join(packages))
+
+    return 0
+
+def command_autoinstall(args):
+    '''Install drivers that are appropriate for automatic installation.'''
+
+    packages = UbuntuDrivers.detect.system_driver_packages()
+    packages = UbuntuDrivers.detect.auto_install_filter(packages)
+    if not packages:
+        print('No drivers found for automatic installation.')
+        return
+
+    env = os.environ.copy()
+    env['DEBIAN_FRONTEND'] = 'noninteractive'
+    try:
+        del os.environ['DEBIAN_HAS_FRONTEND']
+    except KeyError:
+        pass
+    try:
+        del os.environ['DEBCONF_USE_CDEBCONF']
+    except KeyError:
+        pass
+
+    ret = subprocess.call(['apt-get', 'install', '-o',
+        'DPkg::options::=--force-confnew', '-y'] + packages,
+        env=env)
+    return ret
+
+def command_debug(args):
+    '''Print all available information and debug data about drivers.'''
+
+    logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
+
+    print('=== log messages from detection ===')
+    aliases = UbuntuDrivers.detect.system_modaliases()
+    cache = apt.Cache()
+    packages = UbuntuDrivers.detect.system_driver_packages(cache)
+    auto_packages = UbuntuDrivers.detect.auto_install_filter(packages)
+
+    print('=== modaliases in the system ===')
+    for alias in UbuntuDrivers.detect.system_modaliases():
+        print(alias)
+
+    print('=== matching driver packages ===')
+    for package in packages:
+        p = cache[package]
+        try:
+            inst = p.installed.version
+        except AttributeError:
+            inst = '<none>'
+        try:
+            cand = p.candidate.version
+        except AttributeError:
+            cand = '<none>'
+        if package in auto_packages:
+            auto = ' (auto-install)'
+        else:
+            auto = ''
+        print('%s: installed: %s   available: %s%s' % (package, inst, cand, auto))
+
+#
+# main
+#
+
+args = parse_args()
+
+# run the function corresponding to the specified command
+command = globals()['command_' + args.command]
+sys.exit(command(args))

@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.46) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.46) quantal; urgency=low
 
   * Rename to ubuntu-drivers-common, as this package is already necessary for
     fglrx as well, and will soon get support for more drivers (replacing
@@ -9,8 +9,45 @@ ubuntu-drivers-common (1:0.2.46) UNRELEASED; urgency=low
   * debian/control: Add Vcs-* tags.
   * setup.py: Move from distutils to setuptools, to get an egg info (needed to
     provide PackageKit plugins). Add python-setuptools build dependency.
+  * Add tests/fakesysfs.py: Provide a fake sysfs directory for testing.
+    Adapted from upower's integration test suite.
+  * Add tests/testarchive.py: Class for building an apt archive with test
+    packages.
+  * Add UbuntuDrivers/detect.py, tests/ubuntu_drivers.py: Hardware/driver
+    detection functionality.  These are borrowed and streamlined from Jockey.
+  * Add aptdaemon/PackageKit (apt backend) plugin for what-provides MODALIAS:
+    - Add UbuntuDrivers/PackageKit.py: The actual plugin, which checks the
+      query against the patterns packages specify in their "Modaliases:"
+      header. Also provides a system_driver_packages() function to get all
+      driver packages applicable for the system.
+    - setup.py: Install the new UbuntuDrivers Python package and register the
+      plugin entry point.
+    - tests/ubuntu_drivers.py: Add tests cases for UbuntuDrivers.PackageKit,
+      using a test aptdaemon instance on a local session bus.
+    - debian/control: Add python-aptdaemon.pkcompat dependency. Also specify
+      packagekit as an alternative, but conflict to packagekit-backend-aptcc
+      for now, as this does not support the MODALIAS what-provides query, nor
+      plugins. This means that you cannot currently install this package
+      together with packagekit as long as the latter hard-depends on the aptcc
+      backend. Also add aptdaemon/dbus build dependencies to be able to run
+      the tests during build time.
+  * tests/run: Exit with a nonzero code if there are failures or errors.
+  * debian/rules: Ensure that our egg-info is built before running the tests,
+    and removed again on clean.
+  * debian/copyright: Rewrite using copyright 1.0 format.
+  * Add ubuntu-drivers: Command line tool to list available driver packages
+    for this system and auto-install them. This replaces the functionality of
+    "jockey-text --auto-install". This does not use any D-BUS communication,
+    so is safe to run in chroots.
+  * debian/control: Switch to Architecture: any, we are already building this
+    package anywhere but powerpc.
+  * setup.py: Remove commented code for updating .mo files. This package is
+    not supposed to show user-visible strings, and if we ever get them it
+    should rather use python-distutils-extra.
+  * setup.py: Only build hybrid-detect on x86 machines.
+  * debian/control: Bump Standards-Version to 3.9.3.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 21 May 2012 11:15:01 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 24 May 2012 18:22:53 +0200
 
 nvidia-common (1:0.2.45) quantal; urgency=low
 
