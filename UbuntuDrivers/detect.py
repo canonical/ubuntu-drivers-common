@@ -60,9 +60,22 @@ def system_modaliases():
     # WhatProvides() call.
     return list(aliases)
 
-def _check_video_abi_compat(record, abi):
-    if not abi:
-        return
+def _check_video_abi_compat(apt_cache, record):
+    xorg_video_abi = None
+
+    # determine current X.org video driver ABI
+    try:
+        for p in apt_cache['xserver-xorg-core'].candidate.provides:
+            if p.startswith('xorg-video-abi-'):
+                xorg_video_abi = p
+                logging.debug('_check_video_abi_compat(): Current X.org video abi: %s', xorg_video_abi)
+                break
+    except (AttributeError, KeyError):
+        logging.debug('_check_video_abi_compat(): xserver-xorg-core not available, cannot check ABI')
+        return True
+    if not xorg_video_abi:
+        return False
+
     try:
         deps = record['Depends']
     except KeyError:
@@ -72,7 +85,9 @@ def _check_video_abi_compat(record, abi):
     except ValueError:
         # no video driver package
         return True
-    if not deps[i:].startswith(abi):
+    if not deps[i:].startswith(xorg_video_abi):
+        logging.debug('Driver package %s is incompatible with current X.org server ABI %s', 
+                record['Package'], xorg_video_abi)
         return False
     return True
 
@@ -85,17 +100,6 @@ def _apt_cache_modalias_map(apt_cache):
     Return a map bus -> modalias -> [package, ...], where "bus" is the prefix of
     the modalias up to the first ':' (e. g. "pci" or "usb").
     '''
-    # determine current X.org video driver ABI
-    try:
-        for p in apt_cache['xserver-xorg-core'].candidate.provides:
-            if p.startswith('xorg-video-abi-'):
-                xorg_video_abi = p
-                logging.debug('_apt_cache_modalias_map(): Current X.org video abi: %s', xorg_video_abi)
-                break
-    except (AttributeError, KeyError):
-        logging.debug('_apt_cache_modalias_map(): xserver-xorg-core not available, cannot check ABI')
-        xorg_video_abi = None
-
     result = {}
     for package in apt_cache:
         # skip foreign architectures, we usually only want native
@@ -111,9 +115,7 @@ def _apt_cache_modalias_map(apt_cache):
             continue
 
         # skip incompatible video drivers
-        if not _check_video_abi_compat(package.candidate.record, xorg_video_abi):
-            logging.debug('Driver package %s is incompatible with current X.org server ABI %s', 
-                    package.name, str(xorg_video_abi))
+        if not _check_video_abi_compat(apt_cache, package.candidate.record):
             continue
 
         try:
@@ -160,7 +162,8 @@ def system_driver_packages(apt_cache=None):
     '''Get driver packages that are available for the system.
     
     This calls system_modaliases() to determine the system's hardware and then
-    queries apt about which packages provide drivers for those.
+    queries apt about which packages provide drivers for those. It also adds
+    available packages from detect_plugin_packages().
 
     If you already have an apt.Cache() object, you should pass it as an
     argument for efficiency. If not given, this function creates a temporary
@@ -176,6 +179,10 @@ def system_driver_packages(apt_cache=None):
     packages = []
     for alias in modaliases:
         packages.extend([p.name for p in packages_for_modalias(apt_cache, alias)])
+    
+    # add available packages which need custom detection code
+    packages.extend(detect_plugin_packages(apt_cache))
+
     return packages
 
 def auto_install_filter(packages):
@@ -193,3 +200,59 @@ def auto_install_filter(packages):
     for pattern in whitelist:
         result.extend(fnmatch.filter(packages, pattern))
     return result
+
+def detect_plugin_packages(apt_cache=None):
+    '''Get driver packages from custom detection plugins.
+
+    Some driver packages cannot be identified by modaliases, but need some
+    custom code for determining whether they apply to the system. Read all *.py
+    files in /usr/share/ubuntu-drivers-common/detect/ or
+    $UBUNTU_DRIVERS_DETECT_DIR and call detect(apt_cache) on them. Filter the
+    returned lists for packages which are available for installation, and
+    return the joined results.
+
+    If you already have an existing apt.Cache() object, you can pass it as an
+    argument for efficiency.
+    '''
+    plugindir = os.environ.get('UBUNTU_DRIVERS_DETECT_DIR',
+            '/usr/share/ubuntu-drivers-common/detect/')
+    if not os.path.isdir(plugindir):
+        logging.debug('Custom detection plugin directory %s does not exist', plugindir)
+        return []
+
+    packages = []
+
+    if apt_cache is None:
+        apt_cache = apt.Cache()
+
+    for f in os.listdir(plugindir):
+        if not f.endswith('.py'):
+            continue
+        plugin = os.path.join(plugindir, f)
+        logging.debug('Loading custom detection plugin %s', plugin)
+
+        symb = {}
+        with open(plugin) as f:
+            try:
+                exec(compile(f.read(), plugin, 'exec'), symb)
+                result = symb['detect'](apt_cache)
+                logging.debug('plugin %s return value: %s', plugin, result)
+            except Exception as e:
+                logging.exception('plugin %s failed:', plugin)
+                continue
+
+            if result is None:
+                continue
+            if type(result) not in (list, set):
+                logging.error('plugin %s returned a bad type %s (must be list or set)', plugin, type(result))
+                continue
+
+            for pkg in result:
+                if pkg in apt_cache and apt_cache[pkg].candidate:
+                    if _check_video_abi_compat(apt_cache, apt_cache[pkg].candidate.record):
+                        packages.append(pkg)
+                else:
+                    logging.debug('Ignoring unavailable package %s from plugin %s', pkg, plugin)
+
+    return packages
+

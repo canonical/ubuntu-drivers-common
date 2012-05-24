@@ -48,6 +48,7 @@ def system_driver_packages():
     
     This calls detect.system_modaliases() to determine the system's hardware
     and then queries PackageKit about which packages provide drivers for those.
+    It also adds available packages from detect_plugin_packages().
 
     Raise a SystemError if the PackageKit query fails.
 
@@ -61,5 +62,15 @@ def system_driver_packages():
             lambda p, t, d: True, None)
     if res.get_exit_code() != PackageKitGlib.ExitEnum.SUCCESS:
         raise SystemError('PackageKit query failed with %s' % str(res.get_exit_code()))
-    return res.get_package_array()
+    packages = res.get_package_array()
 
+    # add available packages which need custom detection code
+    extra_pkgs = UbuntuDrivers.detect.detect_plugin_packages() 
+    if extra_pkgs:
+        res = packagekit.resolve(PackageKitGlib.FilterEnum.NONE, extra_pkgs, None,
+                lambda p, t, d: True, None)
+        if res.get_exit_code() != PackageKitGlib.ExitEnum.SUCCESS:
+            raise SystemError('PackageKit query failed with %s' % str(res.get_exit_code()))
+        packages.extend(res.get_package_array())
+
+    return packages

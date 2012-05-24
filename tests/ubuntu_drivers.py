@@ -12,6 +12,8 @@ import unittest
 import subprocess
 import resource
 import sys
+import tempfile
+import shutil
 
 from gi.repository import GLib
 from gi.repository import PackageKitGlib
@@ -24,6 +26,7 @@ import UbuntuDrivers.PackageKit
 
 import fakesysfs
 import testarchive
+import logging
 
 TEST_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -69,6 +72,11 @@ def gen_fakearchive():
     a.create_deb('nvidia-old', dependencies={'Depends': 'xorg-video-abi-3'},
             extra_tags={'Modaliases': 'nv(pci:nvidia)'})
 
+    # packages not covered by modalises, for testing detection plugins
+    a.create_deb('special')
+    a.create_deb('picky')
+    a.create_deb('special-uninst', dependencies={'Depends': 'xorg-video-abi-3'})
+
     return a
 
 class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
@@ -94,6 +102,13 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
         klass.chroot.setup()
         klass.chroot.add_test_repository()
         klass.chroot.add_repository(klass.archive.path, True, False)
+        # initialize apt to the chroot, so that functions which instantiate an
+        # apt.Cache() object get the chroot instead of the system
+        apt.Cache(rootdir=klass.chroot.path)
+
+        # no custom detection plugins by default
+        klass.plugin_dir = os.path.join(klass.chroot.path, 'detect')
+        os.environ['UBUNTU_DRIVERS_DETECT_DIR'] = klass.plugin_dir
 
         # start aptdaemon on fake system D-BUS; this works better than
         # self.start_session_aptd() as the latter starts/stops aptadaemon on
@@ -229,6 +244,26 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
         finally:
             del os.environ['SYSFS']
 
+    def test_system_driver_packages_detect_plugins(self):
+        '''system_driver_packages() includes custom detection plugins'''
+
+        s = gen_fakesys()
+        os.environ['SYSFS'] = s.sysfs
+
+        try:
+            os.mkdir(self.plugin_dir)
+            with open(os.path.join(self.plugin_dir, 'special.py'), 'w') as f:
+                f.write('def detect(apt): return ["special", "special-uninst", "special-unavail", "picky"]\n')
+
+            res = UbuntuDrivers.PackageKit.system_driver_packages()
+            self.assertEqual(set([p.get_id().split(';')[0] for p in res]),
+                             set(['vanilla', 'chocolate', 'nvidia-current', 'special', 'picky']))
+            for p in res:
+                self.assertEqual(p.props.info, PackageKitGlib.InfoEnum.AVAILABLE)
+        finally:
+            os.unlink(os.path.join(self.plugin_dir, 'special.py'))
+            del os.environ['SYSFS']
+
     def _call(self, provides_type,  query, expected_res=PackageKitGlib.ExitEnum.SUCCESS):
         '''Call what_provides() with given query.
         
@@ -252,11 +287,16 @@ class DetectTest(unittest.TestCase):
         self.sys = gen_fakesys()
         os.environ['SYSFS'] = self.sys.sysfs
 
+        # no custom detection plugins by default
+        self.plugin_dir = tempfile.mkdtemp()
+        os.environ['UBUNTU_DRIVERS_DETECT_DIR'] = self.plugin_dir
+
     def tearDown(self):
         try:
             del os.environ['SYSFS']
         except KeyError:
             pass
+        shutil.rmtree(self.plugin_dir)
 
     @unittest.skipUnless(os.path.isdir('/sys'), 'no /sys dir on this system')
     def test_system_modaliases_system(self):
@@ -312,6 +352,14 @@ class DetectTest(unittest.TestCase):
         finally:
             chroot.remove()
 
+    def test_system_driver_packages_detect_plugins(self):
+        '''system_driver_packages() includes custom detection plugins'''
+
+        with open(os.path.join(self.plugin_dir, 'extra.py'), 'w') as f:
+            f.write('def detect(apt): return ["coreutils", "no_such_package"]\n')
+
+        self.assertEqual(UbuntuDrivers.detect.system_driver_packages(), ['coreutils'])
+
     def test_auto_install_filter(self):
         '''auto_install_filter()'''
 
@@ -320,6 +368,61 @@ class DetectTest(unittest.TestCase):
             'nvidia-current', 'bcmwl-kernel-source', 'fglrx-updates',
             'pvr-omap4-egl'])), 
             set(['bcmwl-kernel-source', 'pvr-omap4-egl']))
+
+    def test_detect_plugin_packages(self):
+        '''detect_plugin_packages()'''
+
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            chroot.add_repository(archive.path, True, False)
+
+            cache = apt.Cache(rootdir=chroot.path)
+
+            self.assertEqual(UbuntuDrivers.detect.detect_plugin_packages(cache), [])
+
+            self._gen_detect_plugins()
+            # suppress logging the deliberatey errors in our test plugins to
+            # stderr
+            logging.basicConfig(level=logging.CRITICAL)
+            self.assertEqual(UbuntuDrivers.detect.detect_plugin_packages(cache), 
+                             ['special'])
+
+            os.mkdir(os.path.join(self.sys.sysfs, 'pickyon'))
+            self.assertEqual(set(UbuntuDrivers.detect.detect_plugin_packages(cache)), 
+                             set(['special', 'picky']))
+        finally:
+            logging.basicConfig(level=logging.INFO)
+            chroot.remove()
+
+    def _gen_detect_plugins(self):
+        '''Generate some custom detection plugins in self.plugin_dir.'''
+
+        with open(os.path.join(self.plugin_dir, 'special.py'), 'w') as f:
+            f.write('def detect(apt): return ["special", "special-uninst", "special-unavail"]\n')
+        with open(os.path.join(self.plugin_dir, 'syntax.py'), 'w') as f:
+            f.write('def detect(apt): a = =\n')
+        with open(os.path.join(self.plugin_dir, 'empty.py'), 'w') as f:
+            f.write('def detect(apt): return []\n')
+        with open(os.path.join(self.plugin_dir, 'badreturn.py'), 'w') as f:
+            f.write('def detect(apt): return "strawberry"\n')
+        with open(os.path.join(self.plugin_dir, 'badreturn2.py'), 'w') as f:
+            f.write('def detect(apt): return 1\n')
+        with open(os.path.join(self.plugin_dir, 'except.py'), 'w') as f:
+            f.write('def detect(apt): 1/0\n')
+        with open(os.path.join(self.plugin_dir, 'nodetect.py'), 'w') as f:
+            f.write('def foo(): assert False\n')
+        with open(os.path.join(self.plugin_dir, 'bogus'), 'w') as f:
+            f.write('I am not a plugin')
+        with open(os.path.join(self.plugin_dir, 'picky.py'), 'w') as f:
+            f.write('''import os, os.path
+            
+def detect(apt): 
+    if os.path.exists(os.path.join(os.environ.get("SYSFS", "/sys"), "pickyon")):
+        return ["picky"]
+''')
 
 
 class ToolTest(unittest.TestCase):
@@ -353,6 +456,10 @@ APT::Get::AllowUnauthenticated "true";
 
         klass.tool_path = os.path.join(os.path.dirname(TEST_DIR), 'ubuntu-drivers')
 
+        # no custom detection plugins by default
+        klass.plugin_dir = os.path.join(klass.chroot.path, 'detect')
+        os.environ['UBUNTU_DRIVERS_DETECT_DIR'] = klass.plugin_dir
+
     @classmethod
     def tearDownClass(klass):
         klass.chroot.remove()
@@ -376,9 +483,28 @@ APT::Get::AllowUnauthenticated "true";
                 universal_newlines=True, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE)
         out, err = ud.communicate()
+        self.assertEqual(err, '')
         self.assertEqual(set(out.splitlines()), 
                 set(['vanilla', 'chocolate', 'bcmwl-kernel-source', 'nvidia-current']))
+        self.assertEqual(ud.returncode, 0)
+
+    def test_list_detect_plugins(self):
+        '''ubuntu-drivers list includes custom detection plugins'''
+
+        os.mkdir(self.plugin_dir)
+        self.addCleanup(shutil.rmtree, self.plugin_dir)
+
+        with open(os.path.join(self.plugin_dir, 'special.py'), 'w') as f:
+            f.write('def detect(apt): return ["special", "special-uninst", "special-unavail", "picky"]\n')
+
+        ud = subprocess.Popen([self.tool_path, 'list'],
+                universal_newlines=True, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE)
+        out, err = ud.communicate()
         self.assertEqual(err, '')
+        self.assertEqual(set(out.splitlines()), 
+                set(['vanilla', 'chocolate', 'bcmwl-kernel-source',
+                     'nvidia-current', 'special', 'picky']))
         self.assertEqual(ud.returncode, 0)
 
     def test_list_system(self):
@@ -392,8 +518,8 @@ APT::Get::AllowUnauthenticated "true";
                 stderr=subprocess.PIPE, env=env)
         out, err = ud.communicate()
         # real system packages should not match our fake modalises
-        self.assertEqual(out, '\n')
         self.assertEqual(err, '')
+        self.assertEqual(out, '\n')
         self.assertEqual(ud.returncode, 0)
 
     def test_auto_install_chroot(self):
@@ -403,11 +529,11 @@ APT::Get::AllowUnauthenticated "true";
                 universal_newlines=True, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE)
         out, err = ud.communicate()
+        self.assertEqual(err, '')
         self.assertTrue('bcmwl-kernel-source' in out, out)
         self.assertFalse('vanilla' in out, out)
         self.assertFalse('noalias' in out, out)
         self.assertFalse('nvidia' in out, out)
-        self.assertEqual(err, '')
         self.assertEqual(ud.returncode, 0)
 
     def test_auto_install_system(self):
@@ -420,9 +546,9 @@ APT::Get::AllowUnauthenticated "true";
                 universal_newlines=True, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, env=env)
         out, err = ud.communicate()
+        self.assertEqual(err, '')
         # real system packages should not match our fake modalises
         self.assertTrue('No drivers found' in out)
-        self.assertEqual(err, '')
         self.assertEqual(ud.returncode, 0)
 
 if __name__ == '__main__':
