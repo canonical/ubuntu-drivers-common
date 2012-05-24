@@ -59,12 +59,40 @@ def system_modaliases():
     # WhatProvides() call.
     return list(aliases)
 
+def _check_video_abi_compat(record, abi):
+    if not abi:
+        return
+    try:
+        deps = record['Depends']
+    except KeyError:
+        return True
+    try:
+        i = deps.index('xorg-video-abi-')
+    except ValueError:
+        # no video driver package
+        return True
+    if not deps[i:].startswith(abi):
+        return False
+    return True
+
 def _apt_cache_modalias_map(apt_cache):
     '''Build a modalias map from an apt.Cache object.
+
+    This filters out uninstallable video drivers (i. e. which depend on a video
+    ABI that xserver-xorg-core does not provide).
 
     Return a map bus -> modalias -> [package, ...], where "bus" is the prefix of
     the modalias up to the first ':' (e. g. "pci" or "usb").
     '''
+    # determine current X.org video driver ABI
+    try:
+        for p in apt_cache['xserver-xorg-core'].candidate.provides:
+            if p.startswith('xorg-video-abi-'):
+                xorg_video_abi = p
+                break
+    except KeyError:
+        xorg_video_abi = None
+
     result = {}
     for package in apt_cache:
         # skip foreign architectures, we usually only want native
@@ -73,9 +101,16 @@ def _apt_cache_modalias_map(apt_cache):
             package.candidate.architecture not in ('all', system_architecture)):
             continue
 
+        # skip packages without a modalias field
         try:
             m = package.candidate.record['Modaliases']
         except (KeyError, AttributeError):
+            continue
+
+        # skip incompatible video drivers
+        if not _check_video_abi_compat(package.candidate.record, xorg_video_abi):
+            logging.debug('Driver package %s is incompatible with current X.org server ABI %s', 
+                    package.name, str(xorg_video_abi))
             continue
 
         try:

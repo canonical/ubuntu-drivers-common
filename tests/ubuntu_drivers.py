@@ -43,8 +43,10 @@ def gen_fakesys():
     s.add('pci', 'white', {'modalias': 'pci:v00001234d00sv00000001sd00bc00sc00i00'})
     # covered by chocolate.deb
     s.add('usb', 'black', {'modalias': 'usb:v9876dABCDsv01sd02bc00sc01i05'})
-    # not covered by any driver package
+    # covered by nvidia-{current,old}.deb
     s.add('pci', 'grey', {'modalias': 'pci:vDEADBEEFd00'})
+    # not covered by any driver package
+    s.add('pci', 'graphics', {'modalias': 'pci:nvidia'})
     s.add('ssb', 'yellow', {}, {'MODALIAS': 'pci:vDEADBEEFd00'})
 
     return s
@@ -55,8 +57,18 @@ def gen_fakearchive():
     a = testarchive.Archive()
     a.create_deb('vanilla', extra_tags={'Modaliases': 
         'vanilla(pci:v00001234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)'}) 
-    a.create_deb('chocolate', extra_tags={'Modaliases': 
-        'chocolate(usb:v9876dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'}) 
+    a.create_deb('chocolate', dependencies={'Depends': 'xserver-xorg-core'},
+        extra_tags={'Modaliases': 
+            'chocolate(usb:v9876dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'}) 
+
+    # packages for testing X.org driver ABI installability
+    a.create_deb('xserver-xorg-core', version='99:1',  # higher than system installed one
+            dependencies={'Provides': 'xorg-video-abi-4'})
+    a.create_deb('nvidia-current', dependencies={'Depends': 'xorg-video-abi-4'},
+            extra_tags={'Modaliases': 'nv(pci:nvidia)'})
+    a.create_deb('nvidia-old', dependencies={'Depends': 'xorg-video-abi-3'},
+            extra_tags={'Modaliases': 'nv(pci:nvidia)'})
+
     return a
 
 class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
@@ -211,7 +223,7 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
         try:
             res = UbuntuDrivers.PackageKit.system_driver_packages()
             self.assertEqual(set([p.get_id().split(';')[0] for p in res]),
-                             set(['vanilla', 'chocolate']))
+                             set(['vanilla', 'chocolate', 'nvidia-current']))
             for p in res:
                 self.assertEqual(p.props.info, PackageKitGlib.InfoEnum.AVAILABLE)
         finally:
@@ -260,7 +272,8 @@ class DetectTest(unittest.TestCase):
 
         res = set(UbuntuDrivers.detect.system_modaliases())
         self.assertEqual(res, set(['pci:v00001234d00sv00000001sd00bc00sc00i00',
-            'pci:vDEADBEEFd00', 'usb:v9876dABCDsv01sd02bc00sc01i05']))
+            'pci:vDEADBEEFd00', 'usb:v9876dABCDsv01sd02bc00sc01i05',
+            'pci:nvidia']))
 
     def test_system_driver_packages_system(self):
         '''system_driver_packages() for current system'''
@@ -295,7 +308,7 @@ class DetectTest(unittest.TestCase):
             chroot.add_repository(archive.path, True, False)
             cache = apt.Cache(rootdir=chroot.path)
             self.assertEqual(set(UbuntuDrivers.detect.system_driver_packages(cache)),
-                             set(['chocolate', 'vanilla']))
+                             set(['chocolate', 'vanilla', 'nvidia-current']))
         finally:
             chroot.remove()
 
@@ -314,10 +327,8 @@ class ToolTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(klass):
-        klass.archive = testarchive.Archive()
+        klass.archive = gen_fakearchive()
         klass.archive.create_deb('noalias')
-        klass.archive.create_deb('vanilla', extra_tags={'Modaliases': 
-            'vanilla(pci:v00001234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)'}) 
         klass.archive.create_deb('bcmwl-kernel-source', extra_tags={'Modaliases': 
             'wl(usb:v9876dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'}) 
 
@@ -365,7 +376,8 @@ APT::Get::AllowUnauthenticated "true";
                 universal_newlines=True, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE)
         out, err = ud.communicate()
-        self.assertEqual(set(out.splitlines()), set(['vanilla', 'bcmwl-kernel-source']))
+        self.assertEqual(set(out.splitlines()), 
+                set(['vanilla', 'chocolate', 'bcmwl-kernel-source', 'nvidia-current']))
         self.assertEqual(err, '')
         self.assertEqual(ud.returncode, 0)
 
@@ -394,6 +406,7 @@ APT::Get::AllowUnauthenticated "true";
         self.assertTrue('bcmwl-kernel-source' in out, out)
         self.assertFalse('vanilla' in out, out)
         self.assertFalse('noalias' in out, out)
+        self.assertFalse('nvidia' in out, out)
         self.assertEqual(err, '')
         self.assertEqual(ud.returncode, 0)
 
