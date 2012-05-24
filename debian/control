@@ -18,7 +18,7 @@ Build-Depends: debhelper (>= 7.0.50~),
  gir1.2-glib-2.0,
  gir1.2-packagekitglib-1.0,
  dbus
-Standards-Version: 3.9.1
+Standards-Version: 3.9.3
 Vcs-Git: git://github.com/tseliot/ubuntu-drivers-common.git
 Vcs-Browser: https://github.com/tseliot/ubuntu-drivers-common
 X-Python-Version: >= 2.6
