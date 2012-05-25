@@ -29,6 +29,7 @@ import testarchive
 import logging
 
 TEST_DIR = os.path.abspath(os.path.dirname(__file__))
+ROOT_DIR = os.path.dirname(TEST_DIR)
 
 # show aptdaemon log in test output?
 APTDAEMON_LOG = False
@@ -455,7 +456,7 @@ APT::Get::AllowUnauthenticated "true";
 ''' % {'root': klass.chroot.path})
         os.environ['APT_CONFIG'] = klass.chroot_apt_conf
 
-        klass.tool_path = os.path.join(os.path.dirname(TEST_DIR), 'ubuntu-drivers')
+        klass.tool_path = os.path.join(ROOT_DIR, 'ubuntu-drivers')
 
         # no custom detection plugins by default
         klass.plugin_dir = os.path.join(klass.chroot.path, 'detect')
@@ -560,6 +561,25 @@ APT::Get::AllowUnauthenticated "true";
         self.assertEqual(err, '')
         # real system packages should not match our fake modalises
         self.assertTrue('No drivers found' in out)
+        self.assertEqual(ud.returncode, 0)
+
+class PluginsTest(unittest.TestCase):
+    '''Test detect-plugins/*'''
+
+    def test_plugin_errors(self):
+        '''shipped plugins work without errors or crashes'''
+
+        env = os.environ.copy()
+        env['UBUNTU_DRIVERS_DETECT_DIR'] = os.path.join(ROOT_DIR, 'detect-plugins')
+
+        ud = subprocess.Popen([os.path.join(ROOT_DIR, 'ubuntu-drivers'), 'debug'],
+                universal_newlines=True, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, env=env)
+        out, err = ud.communicate()
+        self.assertEqual(err, '')
+        # real system packages should not match our fake modalises
+        self.assertFalse('ERROR' in out, out)
+        self.assertFalse('Traceback' in out, out)
         self.assertEqual(ud.returncode, 0)
 
 if __name__ == '__main__':
