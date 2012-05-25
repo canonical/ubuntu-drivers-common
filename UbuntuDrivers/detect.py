@@ -32,8 +32,14 @@ def system_modaliases():
 
         # most devices have modalias files
         if 'modalias' in files:
-            with open(os.path.join(path, 'modalias')) as f:
-                modalias = f.read().strip()
+            try:
+                with open(os.path.join(path, 'modalias')) as f:
+                    modalias = f.read().strip()
+            except IOError as e:
+                logging.warning('system_modaliases(): Cannot read %s/modalias: %s',
+                        path, e)
+                continue
+
         # devices on SSB bus only mention the modalias in the uevent file (as
         # of 2.6.24)
         elif 'ssb' in path and 'uevent' in files:
