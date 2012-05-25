@@ -447,11 +447,12 @@ class ToolTest(unittest.TestCase):
 
         klass.chroot_apt_conf = os.path.join(klass.chroot.path, 'aptconfig')
         with open(klass.chroot_apt_conf, 'w') as f:
-            f.write('''Dir "%s";
+            f.write('''Dir "%(root)s";
+Dir::State::status "%(root)s/var/lib/dpkg/status";
 Debug::NoLocking "true";
-DPKG::options:: "--root=%s --log=%s/var/log/dpkg.log";
+DPKG::options:: "--root=%(root)s --log=%(root)s/var/log/dpkg.log";
 APT::Get::AllowUnauthenticated "true";
-''' % (klass.chroot.path, klass.chroot.path, klass.chroot.path))
+''' % {'root': klass.chroot.path})
         os.environ['APT_CONFIG'] = klass.chroot_apt_conf
 
         klass.tool_path = os.path.join(os.path.dirname(TEST_DIR), 'ubuntu-drivers')
@@ -534,6 +535,16 @@ APT::Get::AllowUnauthenticated "true";
         self.assertFalse('vanilla' in out, out)
         self.assertFalse('noalias' in out, out)
         self.assertFalse('nvidia' in out, out)
+        self.assertEqual(ud.returncode, 0)
+
+        # now all packages should be installed, so it should not do anything
+        ud = subprocess.Popen([self.tool_path, 'autoinstall'],
+                universal_newlines=True, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE)
+        out, err = ud.communicate()
+        self.assertEqual(err, '')
+        self.assertFalse('bcmwl-kernel-source' in out, out)
+        self.assertTrue('already installed' in out, out)
         self.assertEqual(ud.returncode, 0)
 
     def test_auto_install_system(self):

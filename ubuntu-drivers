@@ -49,10 +49,21 @@ def command_list(args):
 def command_autoinstall(args):
     '''Install drivers that are appropriate for automatic installation.'''
 
-    packages = UbuntuDrivers.detect.system_driver_packages()
+    cache = apt.Cache()
+
+    packages = UbuntuDrivers.detect.system_driver_packages(cache)
     packages = UbuntuDrivers.detect.auto_install_filter(packages)
     if not packages:
         print('No drivers found for automatic installation.')
+        return
+
+    # remove packages which are already installed
+    for p in packages[:]:  # make a copy, as we modify the list
+        if cache[p].installed:
+            packages.remove(p)
+
+    if not packages:
+        print('All drivers for automatic installation are already installed.')
         return
 
     env = os.environ.copy()
