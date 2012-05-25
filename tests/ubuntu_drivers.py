@@ -449,9 +449,9 @@ class ToolTest(unittest.TestCase):
         with open(klass.chroot_apt_conf, 'w') as f:
             f.write('''Dir "%s";
 Debug::NoLocking "true";
-DPKG::options:: "--root=%s";
+DPKG::options:: "--root=%s --log=%s/var/log/dpkg.log";
 APT::Get::AllowUnauthenticated "true";
-''' % (klass.chroot.path, klass.chroot.path))
+''' % (klass.chroot.path, klass.chroot.path, klass.chroot.path))
         os.environ['APT_CONFIG'] = klass.chroot_apt_conf
 
         klass.tool_path = os.path.join(os.path.dirname(TEST_DIR), 'ubuntu-drivers')

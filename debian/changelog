@@ -3,6 +3,9 @@ ubuntu-drivers-common (1:0.2.47) UNRELEASED; urgency=low
   * UbuntuDrivers/detect.py, system_modaliases(): Catch/log IOErrors when
     trying to open "modalias" files in /sys. On powerpc we get a "No such
     device" error on some files, causing test failures.
+  * tests/ubuntu_drivers.py, ToolTest: Explicitly set --log in the chroot's
+    DPKG::options::. The buildds seem to have a dpkg configuration which needs
+    that, otherwise it's trying to write into the system log file.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 25 May 2012 06:24:37 +0200
 
