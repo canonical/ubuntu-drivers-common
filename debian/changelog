@@ -14,6 +14,8 @@ ubuntu-drivers-common (1:0.2.48) UNRELEASED; urgency=low
     if X.org's log shows that the Intel driver is loaded. This prevents
     breaking hybrid systems as long as the NVidia driver and X.org do not work
     on those.
+  * debian/ubuntu-drivers-common.templates: Drop trailing whitespace, to stop
+    lintian from complaining.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 25 May 2012 08:34:38 +0200
 

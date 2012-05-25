@@ -8,5 +8,3 @@ _Description: Obsolete NVIDIA Driver version
  sudo apt-get install ${latest} 
  .
  The removal of other NVIDIA drivers will be dealt with automatically.
- 
- 
