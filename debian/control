@@ -46,7 +46,7 @@ Description: Detect and install additional Ubuntu driver packages
 Package: nvidia-common
 Section: oldlibs
 Architecture: i386 amd64 armel armhf
-Depends: ubuntu-drivers-common
+Depends: ubuntu-drivers-common, ${misc:Depends}
 Description: transitional package for ubuntu-drivers-common
  This is a transitional package for ubuntu-drivers-common. You can remove it
  after upgrading.
