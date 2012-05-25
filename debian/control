@@ -28,6 +28,7 @@ Architecture: any
 Pre-Depends: dpkg (>= 1.15.7.2)
 Depends: ${python:Depends}, 
  ${misc:Depends},
+ ${shlibs:Depends},
  debconf (>= 0.5.00) | debconf-2.0,
  pciutils,
  python-apt,
