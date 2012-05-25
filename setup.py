@@ -29,6 +29,7 @@ setup(
                 ("/var/lib/ubuntu-drivers-common/", glob.glob("share/last_gfx_boot")),
                 ("/etc/init/", glob.glob("share/hybrid/hybrid-gfx.conf")),
                 ("/usr/share/ubuntu-drivers-common/quirks", glob.glob("quirks/*")),
+                ("/usr/share/ubuntu-drivers-common/detect", glob.glob("detect-plugins/*")),
                 ("/usr/lib/nvidia/", glob.glob("nvidia-installer-hooks/*")),
                ],
     scripts=scripts,
