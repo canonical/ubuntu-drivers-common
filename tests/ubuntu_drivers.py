@@ -38,6 +38,8 @@ APTDAEMON_DEBUG = False
 
 dbus_address = None
 
+# Do not look at /var/log/Xorg.0.log for the hybrid checks
+os.environ['UBUNTU_DRIVERS_XORG_LOG'] = '/nonexisting'
 
 def gen_fakesys():
     '''Generate a fake SysFS object for testing'''
@@ -360,6 +362,29 @@ class DetectTest(unittest.TestCase):
             f.write('def detect(apt): return ["coreutils", "no_such_package"]\n')
 
         self.assertEqual(UbuntuDrivers.detect.system_driver_packages(), ['coreutils'])
+
+    def test_system_driver_packages_hybrid(self):
+        '''system_driver_packages() on hybrid Intel/NVidia systems'''
+
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            chroot.add_repository(archive.path, True, False)
+            cache = apt.Cache(rootdir=chroot.path)
+
+            xorg_log = os.path.join(chroot.path, 'Xorg.0.log')
+            os.environ['UBUNTU_DRIVERS_XORG_LOG'] = xorg_log
+
+            with open(xorg_log, 'w') as f:
+                f.write('X.Org X Server 1.11.3\n[     5.547] (II) LoadModule: "extmod"\n[     5.560] (II) Loading /usr/lib/xorg/modules/drivers/intel_drv.so\n')
+
+            self.assertEqual(set(UbuntuDrivers.detect.system_driver_packages(cache)),
+                             set(['chocolate', 'vanilla']))
+        finally:
+            os.environ['UBUNTU_DRIVERS_XORG_LOG'] = '/nonexisting'
+            chroot.remove()
 
     def test_auto_install_filter(self):
         '''auto_install_filter()'''
