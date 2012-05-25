@@ -83,7 +83,7 @@ def command_debug(args):
     auto_packages = UbuntuDrivers.detect.auto_install_filter(packages)
 
     print('=== modaliases in the system ===')
-    for alias in UbuntuDrivers.detect.system_modaliases():
+    for alias in aliases:
         print(alias)
 
     print('=== matching driver packages ===')
