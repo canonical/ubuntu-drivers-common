@@ -13,7 +13,7 @@ if '86' in os.uname()[4]:
 
 # Make the nvidia-installer hooks executable
 for x in glob.glob("nvidia-installer-hooks/*"):
-    os.chmod(x, 0755)
+    os.chmod(x, 0o755)
 
 setup(
     name="ubuntu-drivers-common",

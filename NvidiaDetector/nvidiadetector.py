@@ -75,7 +75,7 @@ class NvidiaDetection(object):
 
     def __get_name_from_value(self, value):
         '''Get the name of a driver from its corresponding integer'''
-        for k, v in self.__driver_aliases.iteritems():
+        for k, v in self.__driver_aliases.items():
             if v == value:
                 return k
         return None
@@ -91,8 +91,8 @@ class NvidiaDetection(object):
         '''Read the list of obsolete packages from a file'''
         tempList = []
         try:
-            tempList = [ x.strip() for x in open(obsolete).readlines() ]
-            tempList = filter(lambda x: x != '', tempList)
+            tempList = [x.strip() for x in open(obsolete).readlines()]
+            tempList = [x for x in tempList if x != '']
         except IOError:
             pass
         return tempList
