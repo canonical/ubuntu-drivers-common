@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.49) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.49) quantal; urgency=low
 
   * Fix exception, print, and assert syntax to be Python 3 compatible.
   * Fix octal number and iteration syntax to be Python 3 compatible.
@@ -10,7 +10,7 @@ ubuntu-drivers-common (1:0.2.49) UNRELEASED; urgency=low
   * debian/rules: Simplify running the tests.
   * tests/ubuntu_drivers.py: Fix temporary log level changing.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 29 May 2012 06:25:43 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 29 May 2012 08:36:29 +0200
 
 ubuntu-drivers-common (1:0.2.48) quantal; urgency=low
 
