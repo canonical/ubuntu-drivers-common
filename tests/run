@@ -19,7 +19,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import unittest, os.path, sys, logging, os
+import unittest, os.path, sys, logging, os, atexit
 import getopt
 
 def usage():
@@ -61,6 +61,7 @@ def main():
     
     
     settingsFile = open('settings.py', 'w')
+    atexit.register(os.unlink, 'settings.py')
     if inputFile == os.path.join(cwd, 'xorg.conf') and outputDir == cwd:
         settingsFile.write('import os\ncwd = os.getcwd()\ninputFile = os.path.join(cwd, "xorg.conf")\noutputDir = cwd\ninputDir = cwd.replace("tests", "quirks")')
     else:    
