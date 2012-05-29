@@ -68,20 +68,8 @@ def command_autoinstall(args):
         print('All drivers for automatic installation are already installed.')
         return
 
-    env = os.environ.copy()
-    env['DEBIAN_FRONTEND'] = 'noninteractive'
-    try:
-        del os.environ['DEBIAN_HAS_FRONTEND']
-    except KeyError:
-        pass
-    try:
-        del os.environ['DEBCONF_USE_CDEBCONF']
-    except KeyError:
-        pass
-
     ret = subprocess.call(['apt-get', 'install', '-o',
-        'DPkg::options::=--force-confnew', '-y'] + packages,
-        env=env)
+        'DPkg::options::=--force-confnew', '-y'] + packages)
 
     # create package list
     if ret == 0 and args.package_list:
