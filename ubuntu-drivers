@@ -35,6 +35,8 @@ def parse_args():
             epilog=command_help, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('command', metavar='<command>', choices=commands, 
             help='See below')
+    parser.add_argument('--package-list', metavar='PATH', 
+            help='Create file with list of installed packages (in autoinstall mode)')
 
     return parser.parse_args()
 
@@ -80,6 +82,13 @@ def command_autoinstall(args):
     ret = subprocess.call(['apt-get', 'install', '-o',
         'DPkg::options::=--force-confnew', '-y'] + packages,
         env=env)
+
+    # create package list
+    if ret == 0 and args.package_list:
+        with open(args.package_list, 'a') as f:
+            f.write('\n'.join(packages))
+            f.write('\n')
+
     return ret
 
 def command_debug(args):

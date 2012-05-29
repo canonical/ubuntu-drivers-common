@@ -503,6 +503,10 @@ APT::Get::AllowUnauthenticated "true";
         except KeyError:
             pass
 
+        # some tests install this package
+        subprocess.check_call(['apt-get', 'purge', '-y', 'bcmwl-kernel-source'],
+                stdout=subprocess.PIPE)
+
     def test_list_chroot(self):
         '''ubuntu-drivers list for fake sysfs and chroot'''
 
@@ -572,6 +576,22 @@ APT::Get::AllowUnauthenticated "true";
         self.assertFalse('bcmwl-kernel-source' in out, out)
         self.assertTrue('already installed' in out, out)
         self.assertEqual(ud.returncode, 0)
+
+    def test_auto_install_packagelist(self):
+        '''ubuntu-drivers autoinstall package list creation'''
+
+        listfile = os.path.join(self.chroot.path, 'pkgs')
+        self.addCleanup(os.unlink, listfile)
+
+        ud = subprocess.Popen([self.tool_path, 'autoinstall', '--package-list', listfile],
+                universal_newlines=True, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE)
+        out, err = ud.communicate()
+        self.assertEqual(err, '')
+        self.assertEqual(ud.returncode, 0)
+
+        with open(listfile) as f:
+            self.assertEqual(f.read(), 'bcmwl-kernel-source\n')
 
     def test_auto_install_system(self):
         '''ubuntu-drivers autoinstall for fake sysfs and system apt'''
