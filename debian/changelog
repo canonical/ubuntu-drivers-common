@@ -1,9 +1,9 @@
-ubuntu-drivers-common (1:0.2.50) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.50) quantal; urgency=low
 
   * debian/control: Add alsa-utils build and binary dependency, so that the
     sl-modem handler can call aplay.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 29 May 2012 09:48:24 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 29 May 2012 09:49:10 +0200
 
 ubuntu-drivers-common (1:0.2.49) quantal; urgency=low
 
