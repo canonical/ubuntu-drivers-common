@@ -412,7 +412,7 @@ class DetectTest(unittest.TestCase):
             self._gen_detect_plugins()
             # suppress logging the deliberatey errors in our test plugins to
             # stderr
-            logging.basicConfig(level=logging.CRITICAL)
+            logging.getLogger().setLevel(logging.CRITICAL)
             self.assertEqual(UbuntuDrivers.detect.detect_plugin_packages(cache), 
                              ['special'])
 
@@ -420,7 +420,7 @@ class DetectTest(unittest.TestCase):
             self.assertEqual(set(UbuntuDrivers.detect.detect_plugin_packages(cache)), 
                              set(['special', 'picky']))
         finally:
-            logging.basicConfig(level=logging.INFO)
+            logging.getLogger().setLevel(logging.INFO)
             chroot.remove()
 
     def _gen_detect_plugins(self):

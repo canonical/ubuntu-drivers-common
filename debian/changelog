@@ -8,6 +8,7 @@ ubuntu-drivers-common (1:0.2.49) UNRELEASED; urgency=low
     sl-modem-daemon special case (formerly handled by Jockey's sl_modem.py
     handler).
   * debian/rules: Simplify running the tests.
+  * tests/ubuntu_drivers.py: Fix temporary log level changing.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 29 May 2012 06:25:43 +0200
 
