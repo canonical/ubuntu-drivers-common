@@ -4,6 +4,9 @@ ubuntu-drivers-common (1:0.2.49) UNRELEASED; urgency=low
   * Fix octal number and iteration syntax to be Python 3 compatible.
   * Add .gitignore to ignore built stuff.
   * tests/run: Clean up generated settings.py file on exit.
+  * Add detect-plugins/sl-modem.py: Custom detect plugin for the
+    sl-modem-daemon special case (formerly handled by Jockey's sl_modem.py
+    handler).
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 29 May 2012 06:25:43 +0200
 
