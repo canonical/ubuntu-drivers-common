@@ -1,3 +1,11 @@
+ubuntu-drivers-common (1:0.2.51) UNRELEASED; urgency=low
+
+  * detect-plugins/sl-modem.py: Do not log an exception when
+    /proc/asound/cards does not exist (such as in the buildds), as it causes
+    the test_plugin_errors test to fail.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 29 May 2012 10:23:52 +0200
+
 ubuntu-drivers-common (1:0.2.50) quantal; urgency=low
 
   * debian/control: Add alsa-utils build and binary dependency, so that the

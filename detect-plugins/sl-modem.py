@@ -19,8 +19,8 @@ def detect(apt_cache):
             for l in f:
                 if modem_re.match(l):
                     return [pkg]
-    except IOError:
-        logging.exception('could not open /proc/asound/cards')
+    except IOError as e:
+        logging.debug('could not open /proc/asound/cards: %s', e)
 
     # Check aplay -l
     try:
