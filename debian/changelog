@@ -7,6 +7,7 @@ ubuntu-drivers-common (1:0.2.49) UNRELEASED; urgency=low
   * Add detect-plugins/sl-modem.py: Custom detect plugin for the
     sl-modem-daemon special case (formerly handled by Jockey's sl_modem.py
     handler).
+  * debian/rules: Simplify running the tests.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 29 May 2012 06:25:43 +0200
 
