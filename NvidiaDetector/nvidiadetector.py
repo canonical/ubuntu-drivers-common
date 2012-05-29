@@ -173,7 +173,7 @@ class NvidiaDetection(object):
         # to trigger debconf.
         if len(self.drivers.keys()) == 0:
             sys.stdout.flush()
-            print 'none'
+            print('none')
             #raise ValueError, "modaliases have no useful information"
 
     def getCards(self):
@@ -197,7 +197,7 @@ class NvidiaDetection(object):
         for card in self.cards:
             if card[0: card.find(':')] == '10de':
                 if self.verbose:
-                    print 'NVIDIA card found (' + card + ')'
+                    print('NVIDIA card found (' + card + ')')
                 self.nvidiaCards.append(card)
 
         self.orderedList = self.drivers.keys()
@@ -218,7 +218,7 @@ class NvidiaDetection(object):
                 if card in self.drivers[driver]:
                     supported = True
                     if self.verbose:
-                        print 'Card', card, 'supported by driver', driver
+                        print('Card %s supported by driver %s' % (card, driver))
                     self.driversForCards.setdefault(card, []).append(driver)
             if supported == False:
                 self.driversForCards.setdefault(card, []).append(None)
@@ -235,7 +235,7 @@ class NvidiaDetection(object):
 
         for unsupported in unsupportedCards:
             if self.verbose:
-                print 'Removing unsupported card', unsupported
+                print('Removing unsupported card ' + unsupported)
             self.nvidiaCards.remove(unsupported)
             del self.driversForCards[unsupported]
 
@@ -287,7 +287,7 @@ class NvidiaDetection(object):
                     candidates.sort(reverse=True)
                     choice = candidates[0]
                     if self.verbose and not self.printonly:
-                        print 'Recommended NVIDIA driver:', choice
+                        print('Recommended NVIDIA driver: ' + choice)
                 else:
                     '''
                     Otherwise, if there is no single driver version which works
@@ -305,7 +305,7 @@ class NvidiaDetection(object):
                     '''
                     choice = occurrences[0]
                     if self.verbose and not self.printonly:
-                        print 'Recommended NVIDIA driver:', choice
+                        print('Recommended NVIDIA driver: ' + choice)
             else:#just one card
                 '''
                 The choice is easy if only one card is available and/or supported.
@@ -314,7 +314,7 @@ class NvidiaDetection(object):
                 '''
                 choice = self.driversForCards[self.driversForCards.keys()[0]][0]
                 if self.verbose and not self.printonly:
-                    print 'Recommended NVIDIA driver:', choice
+                    print('Recommended NVIDIA driver: ' + choice)
             '''
             FIXME: we should use a metapackage for this
             '''
@@ -328,7 +328,7 @@ class NvidiaDetection(object):
             If no card is supported
             '''
             if self.verbose:
-                print 'No NVIDIA package to install'
+                print('No NVIDIA package to install')
             choice = None
 
         return choice
@@ -396,14 +396,14 @@ class NvidiaDetection(object):
         if self.getDrivers():#if an old driver is installed
             if driver:#if an appropriate driver is found
                 sys.stdout.flush()
-                print driver
+                print(driver)
             else:
                 sys.stdout.flush()
-                print 'none'
+                print('none')
         else:
             #print driver
             sys.stdout.flush()
-            print 'none'
+            print('none')
 
 #def usage():
 #    instructionsList = ['The only accepted parameters are:'
@@ -411,13 +411,13 @@ class NvidiaDetection(object):
 #
 #    '\n  --verbose', '\t\teach step will be verbose'
 #    ]
-#    print ''.join(instructionsList)
+#    print(''.join(instructionsList))
 
 #def main():
 #    err = 'Error: parameters not recognised'
 #    try:
 #        opts, args = getopt.getopt(sys.argv[1:], 'hp:v', ['help', 'printonly', 'verbose'])
-#    except getopt.GetoptError, err:
+#    except getopt.GetoptError as err:
 #        # print help information and exit:
 #        print str(err) # will print something like 'option -a not recognized'
 #        usage()

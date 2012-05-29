@@ -53,7 +53,7 @@ class QuirkInfo:
 
 def main():
     a = QuirkInfo()
-    print a.get_dmi_info()
+    print(a.get_dmi_info())
     
     return 0
 

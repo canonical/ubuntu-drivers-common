@@ -48,7 +48,7 @@ def main(options):
         quirks = Quirks.quirkapplier.QuirkChecker(options.package_disable, path=quirks_path)
         quirks.disable_quirks()
     else:
-        print 'no args'
+        print('no args')
 
 if __name__ == '__main__':
     parser = optparse.OptionParser()

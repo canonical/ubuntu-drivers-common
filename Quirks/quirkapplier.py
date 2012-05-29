@@ -120,8 +120,8 @@ class QuirkChecker:
         try:
             logging.debug('Creating %s' % destination)
             tmp_xkit.writeFile(destination)
-        except IOError, e:
-            logging.error('%s' % e)
+        except IOError:
+            logging.exception('Error during writeFile()')
             return False
         return True
 
@@ -133,8 +133,8 @@ class QuirkChecker:
         logging.debug('Removing %s ...' % destination)
         try:
             os.unlink(destination)
-        except (OSError, IOError), e:
-            logging.error('%s' % e)
+        except (OSError, IOError):
+            logging.exception('Cannot unlink destination')
             return False
         return True
 
@@ -144,7 +144,7 @@ def main():
     a = QuirkChecker('nvidia', path='/home/alberto/oem/jockey/quirks')
     a.enable_quirks()
     a.disable_quirks()
-    print os.path.abspath( __file__ )
+    print(os.path.abspath( __file__ ))
     #quirk_file = ReadQuirk("quirk_snippet.txt")
     #quirks = quirk_file.get_quirks()
     #for quirk in quirks:

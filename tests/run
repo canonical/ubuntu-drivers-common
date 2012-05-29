@@ -31,7 +31,7 @@ def usage():
     
     '\n  -h, --help', '\t\t\thelp page.'
     ]
-    print ''.join(instructionsList)
+    print(''.join(instructionsList))
 
 def main():
     cwd = os.getcwd()
@@ -41,9 +41,9 @@ def main():
     
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'h:o:i:', ['help', 'output=', 'input='])
-    except getopt.GetoptError, err:
+    except getopt.GetoptError as err:
         # print help information and exit:
-        print str(err) # will print something like 'option -a not recognized'
+        print(err) # will print something like 'option -a not recognized'
         usage()
         sys.exit(2)
     printonly = None
