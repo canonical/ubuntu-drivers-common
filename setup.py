@@ -31,6 +31,7 @@ setup(
                 ("/usr/share/ubuntu-drivers-common/quirks", glob.glob("quirks/*")),
                 ("/usr/share/ubuntu-drivers-common/detect", glob.glob("detect-plugins/*")),
                 ("/usr/lib/nvidia/", glob.glob("nvidia-installer-hooks/*")),
+                ("/usr/lib/ubiquity/target-config", glob.glob("ubiquity/target-config/*")),
                ],
     scripts=scripts,
     entry_points="""[packagekit.apt.plugins]
