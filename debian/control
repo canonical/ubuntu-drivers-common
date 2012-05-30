@@ -34,12 +34,13 @@ Depends: ${python:Depends},
  pciutils,
  python-apt,
  python-xkit,
- python-packagekit,
- python-aptdaemon.pkcompat | packagekit,
  alsa-utils
+Suggests: python-packagekit
 Replaces: nvidia-common (<< 1:0.2.46)
-Conflicts: nvidia-common (<< 1:0.2.46), packagekit-backend-aptcc
+Conflicts: nvidia-common (<< 1:0.2.46)
+Breaks: packagekit-backend-aptcc
 Provides: nvidia-common
+Enhances: python-aptdaemon.pkcompat, packagekit
 XB-Python-Version: ${python:Versions}
 Description: Detect and install additional Ubuntu driver packages
  This package will find obsolete NVIDIA drivers in use,

@@ -1,3 +1,11 @@
+ubuntu-drivers-common (1:0.2.53) UNRELEASED; urgency=low
+
+  * debian/control: Drop hard packagekit/aptdeamon dependencies, and move them
+    to Suggests/Enhances. We do not need them for the core code, just for the
+    PackageKit plugin.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 30 May 2012 15:13:13 +0200
+
 ubuntu-drivers-common (1:0.2.52) quantal; urgency=low
 
   * ubuntu-drivers: Add --package-list option to create a file with the list
