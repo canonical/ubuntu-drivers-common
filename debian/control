@@ -43,9 +43,23 @@ Provides: nvidia-common
 Enhances: python-aptdaemon.pkcompat, packagekit
 XB-Python-Version: ${python:Versions}
 Description: Detect and install additional Ubuntu driver packages
- This package will find obsolete NVIDIA drivers in use,
- detect the hardware and recommend the most appropriate
- driver.
+ This package aggregates and abstracts Ubuntu specific logic and knowledge
+ about third-party driver packages. It provides:
+ .
+  - a Python API for detecting driver packages for a particular piece of
+    hardware or the whole system.
+ .
+  - an "ubuntu-drivers" command line tool to list or install driver packages
+    (mostly for integration in installers).
+ .
+  - a PackageKit plugin for WhatProvides() for types MODALIAS and
+    HARDWARE_DRIVER, to do the same queries as above through the PackageKit API
+    (for using in non-distro specific GUIs). This also works with aptdaemon's
+    PackageKit compatibility layer (python-aptdaemon.pkcompat).
+ .
+  - some NVidia specific support code to find the most appropriate driver
+    version, as well as setting up the alternatives symlinks that the
+    proprietary NVidia and FGLRX packages use.
  
 Package: nvidia-common
 Section: oldlibs
