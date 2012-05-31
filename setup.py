@@ -30,6 +30,7 @@ setup(
                 ("/etc/init/", glob.glob("share/hybrid/hybrid-gfx.conf")),
                 ("/usr/share/ubuntu-drivers-common/quirks", glob.glob("quirks/*")),
                 ("/usr/share/ubuntu-drivers-common/detect", glob.glob("detect-plugins/*")),
+                ("/usr/share/doc/ubuntu-drivers-common", ['README']),
                 ("/usr/lib/nvidia/", glob.glob("nvidia-installer-hooks/*")),
                 ("/usr/lib/ubiquity/target-config", glob.glob("ubiquity/target-config/*")),
                ],

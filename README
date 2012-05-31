@@ -1,0 +1,140 @@
+ubuntu-drivers-common
+=====================
+
+This package aggregates and abstracts Ubuntu specific logic and knowledge
+about third-party driver packages, and provides APIs for installers and driver
+configuration GUIs. It also contains some NVidia specific support code to find
+the most appropriate driver version (as we usually ship several), as well as
+setting up the alternatives symlinks that the proprietary NVidia and FGLRX
+packages use.
+
+Command line interface
+----------------------
+The simplest frontend is the "ubuntu-drivers" command line tool. You can use
+it to show the available driver packages which apply to the current system
+(ubuntu-drivers list), or to install all drivers which are appropriate for
+automatic installation (sudo ubuntu-drivers autoinstall), which is mostly
+useful for integration into installers.
+
+Please see "ubuntu-drivers --help" for details.
+
+
+Python API
+----------
+The UbuntuDrivers.detect Python module provides some functions to detect the
+system's hardware, matching driver packages, and packages which are eligible
+for automatic installation.
+
+The two main functions are:
+
+  "Which driver packages apply to this system?"
+
+  packages = UbuntuDrivers.detect.system_driver_packages()
+
+  "Which driver package(s) applies to this piece of hardware?"
+
+  import apt
+  apt_cache = apt.Cache
+  apt_packages = UbuntuDrivers.detect.packages_for_modalias(apt_cache, modalias)
+
+These functions only use python-apt. They do not need any other dependencies,
+root privileges, D-BUS calls, etc.
+
+
+PackageKit API
+--------------
+If you want to integrate driver lookups in software which should not be
+distribution specific, or is not written in Python, you should use the
+PackageKit API instead of the UbuntuDrivers.detect Python module. In
+particular, ubuntu-drivers-common ships PackageKit plugins for the
+"WhatProvides" PackageKit query for the types "MODALIAS" (corresponding to
+UbuntuDrivers.detect.packages_for_modalias()), and "HARDWARE_DRIVER"
+(corresponding to UbuntuDrivers.detect.system_driver_packages()).
+This also works with aptdaemon's PackageKit compatibility layer
+(python-aptdaemon.pkcompat), which is the preferred PackageKit API
+implementation in Ubuntu.
+
+Please see
+
+ http://www.packagekit.org/gtk-doc/PackageKit-pk-client-sync.html#pk-client-what-provides
+
+about the WhatProvides() API, and
+
+ https://gitorious.org/packagekit/packagekit/blobs/master/docs/provides-component-naming.txt
+
+for details about the various WhatProvides types.
+
+Examples:
+
+From Python:
+
+>>> from gi.repository import PackageKitGlib
+>>> pk = PackageKitGlib.Client()
+
+>>> res = pk.what_provides(PackageKitGlib.FilterEnum.NONE, PackageKitGlib.ProvidesEnum.MODALIAS, ["pci:v000010DEd000007E3sv00sd00bc03sc00i00"], None, lambda p, t, d: True, None)
+>>> res.get_exit_code()
+<enum PK_EXIT_ENUM_SUCCESS of type PkExitEnum>
+>>> for p in res.get_package_array(): print p.get_id()
+nvidia-current;295.53-0ubuntu1;amd64;Ubuntu
+nvidia-current-updates;295.53-0ubuntu1;amd64;Ubuntu
+ 
+>>> res = pk.what_provides(PackageKitGlib.FilterEnum.NONE, PackageKitGlib.ProvidesEnum.HARDWARE_DRIVER, ["drivers_for_attached_hardware"], None, lambda p, t, d: True, None)
+>>> res.get_exit_code()
+<enum PK_EXIT_ENUM_SUCCESS of type PkExitEnum>
+>>> for p in res.get_package_array(): print p.get_id()
+open-vm-dkms;2011.12.20-562307-0ubuntu1;all;Ubuntu
+
+Using the pkcon command line tool:
+
+ $ pkcon what-provides "pci:v000010DEd000007E3sv00sd00bc03sc00i00"
+ Available     nvidia-current-295.49-0ubuntu1.amd64        NVIDIA binary Xorg driver, kernel module and VDPAU library
+ Available     nvidia-current-updates-295.49-0ubuntu1.amd64    NVIDIA binary Xorg driver, kernel module and VDPAU library
+
+ $ pkcon what-provides "drivers_for_attached_hardware"
+ Available      open-vm-dkms-2011.12.20-562307-0ubuntu1.all     Source for VMware guest systems driver (DKMS)
+  
+
+Detection logic
+---------------
+The principal method of mapping hardware to driver packages is to use modalias
+patterns. Hardware devices export a "modalias" sysfs attribute, for example
+
+  $ cat /sys/devices/pci0000:00/0000:00:1b.0/modalias
+  pci:v00008086d00003B56sv000017AAsd0000215Ebc04sc03i00
+
+Kernel modules declare which hardware they can handle with modalias patterns
+(globs), e. g.:
+
+  $ modinfo snd_hda_intel
+  [...]
+  alias:          pci:v00008086d*sv*sd*bc04sc03i00*
+
+Driver packages which are not installed by default (e. g. backports of drivers
+from newer Linux packages, or the proprietary NVidia driver package
+"nvidia-current") have a "Modaliases:" package header which includes all
+modalias patterns from all kernel modules that they ship. It is recommended to
+add these headers to the package with dh_modaliases(1).
+
+ubuntu-drivers-common uses these package headers to map a particular piece of
+hardware (identified by a modalias) to the driver packages which cover that
+hardware.
+
+
+Custom detection plugins
+------------------------
+For some kinds of drivers the modalias detection approach does not work. For
+example, the "sl-modem-daemon" driver requires some checks in
+/proc/asound/cards and "aplay -l" to decide whether or not it applies to the
+system. These special cases can be put into a "detection plugin", by adding a
+small piece of Python code to /usr/share/ubuntu-drivers-common/detect/NAME.py
+(shipped in ./detect-plugins/ in the ubuntu-drivers-common source). They need
+to export a method
+
+   def detect(apt_cache):
+      # do detection logic here
+      return ['driver_package', ...]
+
+which can do any kind of detection and then return the resulting set of
+packages that apply to the current system. Please note that this cannot rely on
+having root privileges.
+
