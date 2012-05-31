@@ -1,0 +1,74 @@
+#!/bin/sh
+# test dh_modaliases
+set -e
+
+fail() 
+{
+    /bin/echo -e "$1"
+    exit 1
+}
+
+dh=$(dirname `readlink -f $0`)/dh_modaliases
+module=`modinfo snd_hda_intel | grep ^filename: | awk '{print $2}'`
+
+# build sandbox
+D=`mktemp -d`
+trap "rm -r $D" 0 HUP INT QUIT ILL ABRT FPE SEGV PIPE TERM
+cd $D
+
+# create test package
+mkdir -p src/debian
+cd src
+
+cat <<EOF > debian/control
+Source: foo
+Build-Depends: debhelper (>= 7)
+Maintainer: Joe Tester <joe@example.com>
+
+Package: foo
+Architecture: any
+Description: test
+Depends: \${shlibs:Depends}
+XB-Modaliases: \${modaliases}
+EOF
+cat <<EOF > debian/rules
+#!/usr/bin/make -f
+%:
+	dh \$@
+
+override_dh_install:
+	dh_install
+	install -m 644 -D $module debian/foo/lib/modules/extra/`basename $module`
+	$dh -v
+EOF
+cat <<EOF > debian/changelog
+foo (1) test; urgency=low
+
+  * Test
+
+ -- Joe Tester <joe@example.com>  Thu, 18 Nov 2010 16:15:29 +0100
+EOF
+echo 7 > debian/compat
+
+# build it and check the generated headers from the .ko
+dpkg-buildpackage -us -uc
+
+header=`dpkg -I ../foo_1_*.deb`
+echo "$header" | grep -q '^[[:space:]]*Package: foo$' || fail "No proper Package: header in\n$header"
+echo "$header" | grep -q '^[[:space:]]*Modaliases: snd_hda_intel(pci:v00001022d\*sv\*sd\*bc04sc03i00\*, pci:.*i\*.*)$' || fail "No proper modalises in\n$header"
+
+# now add a manual modalias file
+cat <<EOF > debian/foo.modaliases
+alias ssb:v1234id0000 `basename $module .ko`
+alias pci:DEADBEEF `basename $module .ko` ignorethispackagename
+alias pci:98765 testmod
+EOF
+
+# build it and check the generated headers from the .ko
+dpkg-buildpackage -us -uc
+
+header=`dpkg -I ../foo_1_*.deb`
+echo "$header" | grep -q '^[[:space:]]*Package: foo$' || fail "No proper Package: header in\n$header"
+echo "$header" | grep -q "^[[:space:]]*Modaliases: `basename $module .ko`(ssb:v1234id0000, pci:DEADBEEF), testmod(pci:98765)$" || fail "No proper modalises in\n$header"
+
+echo "PASSED"

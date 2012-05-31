@@ -29,6 +29,10 @@ ubuntu-drivers-common (1:0.2.53) UNRELEASED; urgency=low
     - Add debian/dh-modaliases.install: Install above files.
     - debian/control: Add dh-modaliases package.
     - debian/rules: Create manpage from dh_modaliases POD.
+  * Add debhelper/test_dh_modaliases: Old test script for dh_modaliases from
+    Jockey. This is not integrated into "make check" and uses the
+    snd_hda_intel kernel module from the system; this needs to be run manually
+    for now.
   * debian/rules: Respect "nocheck" in $DEB_BUILD_OPTIONS.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 30 May 2012 15:13:13 +0200
