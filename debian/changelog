@@ -21,6 +21,14 @@ ubuntu-drivers-common (1:0.2.53) UNRELEASED; urgency=low
   * Add debian/ubuntu-drivers-common.apport: Apport hook to include the output
     of "ubutu-drivers debug". Add dh-apport build dependency and enable in
     debian/rules.
+  * Add dh-modaliases, moved from the obsolete Jockey package:
+    - Add debhelper/dh_modaliases: Debhelper program to produce a
+      ${modaliases} substvar from scanning .ko files or
+      debian/packagename.modaliases.
+    - Add debhelper/modaliases.pm: dh_auto sequencer for dh_modaliases.
+    - Add debian/dh-modaliases.install: Install above files.
+    - debian/control: Add dh-modaliases package.
+    - debian/rules: Create manpage from dh_modaliases POD.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 30 May 2012 15:13:13 +0200
 

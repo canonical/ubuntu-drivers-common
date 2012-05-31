@@ -1,0 +1,149 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+dh_modaliases - scan kmod modaliases and provide a substvar for them
+
+=cut
+
+use strict;
+use File::Find;
+use Debian::Debhelper::Dh_Lib;
+
+=head1 SYNOPSIS
+
+B<dh_modaliases> [S<I<debhelper options>>]
+
+=head1 DESCRIPTION
+
+B<dh_modaliases> is useful for packages that ship third-party kernel modules,
+either in binary form, or as sources (with e. g. DKMS). It extracts the
+modules' modaliases from either the compile .ko files themselves (for packages
+which ship them in compiled form, using B<modinfo>), or from a package file
+B<debian/>I<package>B<.modaliases> (see below).
+
+I creates a package substitution variable C<${modaliases}> which you should add
+to C<debian/control> as
+
+=over 4
+
+XB-Modaliases: ${modaliases}
+
+=back
+
+This enables software which is looking for missing driver packages (such as
+Jockey or the operating system installer) to identify which package(s) will
+provide a driver for a piece of hardware, identified by its modalias.
+
+=head1 PACKAGE MODALIAS FILES
+
+If a package ships source code (using DKMS, module-assistant, etc.) instead of
+compiled binary kernel modules, then B<dh_modaliases> can't figure out the
+modaliases by scanning the *.ko files, and you have to provide the modalias
+list manually as a package file B<debian/>I<package>B<.modaliases>.
+
+The format matches the /lib/modules/`uname -r`/modules.alias file from the
+Linux kernel. Examples:
+
+=over 4
+
+alias ssb:v1234id5678 snd_super_booster 
+alias pci:v000010DEd0000004Esv*sd*bc03sc*i* nvidia_current
+
+=back
+
+You can generate such a list if you locally build and install this module, and
+then run
+
+=over 4
+
+modinfo mymodname | perl -nae 'print "alias $1 mymodname\n" if /^alias:\s+(.*)$/'
+
+=back
+
+(replacing "mymodname" with the actual module name).
+
+=head1 OPTIONS
+
+The standard debhelper options are supported.
+
+=cut
+
+init();
+
+my $aliases;
+
+sub modalises_from_ko {
+    my $name = $_;
+    return unless /\.ko$/;
+    return if -l $_ or -d $_; # Skip directories and symlinks
+
+    # See if we were asked to exclude this file.
+    foreach my $f (@{$dh{EXCLUDE}}) {
+            return if ($File::Find::name =~ m/\Q$f\E/);
+    }
+
+    my ($modname) = ($name =~ /^(.*)\.ko$/);
+    $modname =~ s/-/_/g; # canonical names are with underscores
+    my @a;
+    open M, '-|', 'modinfo', $name or die "open: $!";
+    while (<M>) {
+	if (/^alias:\s*(.*)$/) {
+	    verbose_print("$File::Find::name: module $modname has alias $1");
+	    push @a, $1;
+	}
+    }
+    if ($aliases) {
+	$aliases .= ', ';
+    }
+    $aliases .= $modname . '(' . (join ', ', @a) . ')';
+}
+
+sub modalises_from_pkgfile {
+    my %module_alias_map = ();
+    open F, $_[0];
+    while (<F>) {
+	next if /^#/;
+
+	if (/^alias\s*([^[:space:]]+)\s*([^[:space:]]+)/) {
+	    verbose_print("package file $_[0]: module $2 has alias $1");
+	    push @{$module_alias_map{$2}}, $1;
+	} else {
+	    warning("$_[0]: cannot translate line into modalias: $_");
+	}
+    }
+
+    foreach my $m (sort keys %module_alias_map) {
+	if ($aliases) {
+	    $aliases .= ', ';
+	}
+	$aliases .= $m . '(' . (join ', ', @{$module_alias_map{$m}}) . ')';
+    }
+}
+
+foreach my $package (@{$dh{DOPACKAGES}}) 
+{
+    my $tmp = tmpdir($package);
+
+    delsubstvar($package, 'modaliases');
+    $aliases = '';
+    my $manual_list = pkgfile($package, 'modaliases');
+    if ($manual_list) {
+	modalises_from_pkgfile $manual_list;
+    } else {
+	find(\&modalises_from_ko, tmpdir($package));
+    }
+    addsubstvar($package, 'modaliases', $aliases);
+}
+
+=head1 SEE ALSO
+
+L<debhelper(1)>, L<dkms(8)>
+
+This program is an extension to debhelper.
+
+=head1 AUTHOR
+
+Martin Pitt <martin.pitt@ubuntu.com>
+
+=cut

@@ -59,6 +59,22 @@ Description: Detect and install additional Ubuntu driver packages
   - some NVidia specific support code to find the most appropriate driver
     version, as well as setting up the alternatives symlinks that the
     proprietary NVidia and FGLRX packages use.
+
+Package: dh-modaliases
+Architecture: all
+Depends: ${perl:Depends},
+ ${misc:Depends}
+Enhances: debhelper
+Description: debhelper extension for scanning kernel module aliases
+ dh_modaliases is useful for packages that ship third-party kernel modules,
+ either in binary form, or as sources (with e. g. DKMS). It extracts the
+ modules' modaliases from either the compile .ko files themselves (for packages
+ which ship them in compiled form, using modinfo), or from a package file
+ debian/packagename.modaliases.
+ .
+ This enables software which is looking for missing driver packages (such as
+ Jockey or the operating system installer) to identify which package(s) will
+ provide a driver for a piece of hardware, identified by its modalias.
  
 Package: nvidia-common
 Section: oldlibs

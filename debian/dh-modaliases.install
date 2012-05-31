@@ -1,0 +1,2 @@
+debhelper/dh_modaliases usr/bin
+debhelper/modaliases.pm usr/share/perl5/Debian/Debhelper/Sequence
