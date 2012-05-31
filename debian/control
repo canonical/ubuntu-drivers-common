@@ -37,8 +37,7 @@ Depends: ${python:Depends},
  alsa-utils
 Suggests: python-packagekit
 Replaces: nvidia-common (<< 1:0.2.46)
-Conflicts: nvidia-common (<< 1:0.2.46)
-Breaks: packagekit-backend-aptcc
+Conflicts: nvidia-common (<< 1:0.2.46), packagekit-backend-aptcc
 Provides: nvidia-common
 Enhances: python-aptdaemon.pkcompat, packagekit
 Description: Detect and install additional Ubuntu driver packages
