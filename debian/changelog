@@ -29,6 +29,7 @@ ubuntu-drivers-common (1:0.2.53) UNRELEASED; urgency=low
     - Add debian/dh-modaliases.install: Install above files.
     - debian/control: Add dh-modaliases package.
     - debian/rules: Create manpage from dh_modaliases POD.
+  * debian/rules: Respect "nocheck" in $DEB_BUILD_OPTIONS.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 30 May 2012 15:13:13 +0200
 

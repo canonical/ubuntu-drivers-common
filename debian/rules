@@ -5,8 +5,10 @@ DEB_VERSION=$(shell dpkg-parsechangelog | grep ^Version | cut -f2 -d\ |cut -f1 -
 	dh "$@" --with python2,apport
 
 override_dh_auto_test:
+ifeq (, $(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 	./setup.py egg_info
 	PYTHONPATH=. tests/run
+endif
 
 override_dh_install:
 	dh_install --fail-missing
