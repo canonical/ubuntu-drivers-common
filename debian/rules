@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 
 %:
-	dh "$@" --with python2
+	dh "$@" --with python2,apport
 
 override_dh_auto_test:
 	./setup.py egg_info

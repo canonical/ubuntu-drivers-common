@@ -18,6 +18,9 @@ ubuntu-drivers-common (1:0.2.53) UNRELEASED; urgency=low
   * UbuntuDrivers/detect.py, packages_for_modalias(): Avoid returning the same
     package multiple times.
   * Add README: Document purpose, interfaces, and detection logic.
+  * Add debian/ubuntu-drivers-common.apport: Apport hook to include the output
+    of "ubutu-drivers debug". Add dh-apport build dependency and enable in
+    debian/rules.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 30 May 2012 15:13:13 +0200
 
