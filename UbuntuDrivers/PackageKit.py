@@ -7,6 +7,9 @@ driver packages apply to the current system?" (HARDWARE_DRIVER), for example:
  $ pkcon what-provides "pci:v000010DEd000007E3sv00sd00bc03sc00i00"
  Available     nvidia-current-295.49-0ubuntu1.amd64        NVIDIA binary Xorg driver, kernel module and VDPAU library
  Available     nvidia-current-updates-295.49-0ubuntu1.amd64    NVIDIA binary Xorg driver, kernel module and VDPAU library
+
+ $ pkcon what-provides "drivers_for_attached_hardware"
+ Available      open-vm-dkms-2011.12.20-562307-0ubuntu1.all     Source for VMware guest systems driver (DKMS)
 '''
 
 # Note that this does not work with PackageKit's "aptcc" backend as that does
