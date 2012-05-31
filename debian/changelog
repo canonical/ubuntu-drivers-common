@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.53) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.53) quantal; urgency=low
 
   * debian/control: Drop hard packagekit/aptdeamon dependencies, and move them
     to Suggests/Enhances. We do not need them for the core code, just for the
@@ -35,7 +35,7 @@ ubuntu-drivers-common (1:0.2.53) UNRELEASED; urgency=low
     for now.
   * debian/rules: Respect "nocheck" in $DEB_BUILD_OPTIONS.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 30 May 2012 15:13:13 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 31 May 2012 10:35:26 +0200
 
 ubuntu-drivers-common (1:0.2.52) quantal; urgency=low
 
