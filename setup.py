@@ -35,6 +35,6 @@ setup(
                ],
     scripts=scripts,
     entry_points="""[packagekit.apt.plugins]
-what_provides=UbuntuDrivers.PackageKit:what_provides_modalias
+what_provides=UbuntuDrivers.PackageKit:what_provides
 """,
 )

@@ -87,6 +87,9 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
 
     @classmethod
     def setUpClass(klass):
+        klass.sys = gen_fakesys()
+        os.environ['SYSFS'] = klass.sys.sysfs
+
         # find plugin in our source tree
         os.environ['PYTHONPATH'] = '%s:%s' % (os.getcwd(), os.environ.get('PYTHONPATH', ''))
 
@@ -99,8 +102,6 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
         os.environ['DBUS_SYSTEM_BUS_ADDRESS'] = klass.dbus_address
 
         klass.archive = gen_fakearchive()
-
-        klass.sys = gen_fakesys()
 
         # set up a test chroot
         klass.chroot = aptdaemon.test.Chroot()
@@ -137,14 +138,12 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
         klass.chroot.remove()
 
     def setUp(self):
-        os.environ['SYSFS'] = self.sys.sysfs
-
         self.start_fake_polkitd()
         time.sleep(0.5)
         self.pk = PackageKitGlib.Client()
 
-    def test_query(self):
-        '''modalias query'''
+    def test_modalias(self):
+        '''what-provides MODALIAS'''
 
         # type ANY
         self.assertEqual(self._call(PackageKitGlib.ProvidesEnum.ANY,
@@ -169,13 +168,13 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
                                     ['fake:DEADBEEF']),
                          [])
 
-    def test_multi(self):
-        '''multiple modalias queries in one call'''
+    def test_modalias_multi(self):
+        '''multiple MODALIAS queries in one what-provides call'''
 
         res = self._call(PackageKitGlib.ProvidesEnum.MODALIAS,
                          ['pci:v00001234d00000001sv00sd01bc02sc03i04',
                           'usb:v9876dABCDsv00sd00bc00sc01i01'])
-        self.assertEqual(set(res), set(['vanilla', 'chocolate']))
+        self.assertEqual(res, ['chocolate', 'vanilla'])
 
         self.assertEqual(self._call(PackageKitGlib.ProvidesEnum.MODALIAS,
                                     ['pci:v00001234d00000001sv00sd01bc02sc03i04',
@@ -195,7 +194,7 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
         self.assertTrue('vanilla' not in res, res)
         self.assertTrue('chocolate' not in res, res)
 
-    def test_error(self):
+    def test_modalias_error(self):
         '''invalid modalias query'''
 
         # checks format for MODALIAS type
@@ -214,7 +213,7 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
         # for ANY it should just ignore invalid/unknown formats
         self.assertEqual(self._call(PackageKitGlib.ProvidesEnum.ANY, ['pci 1']), [])
 
-    def test_performance_single(self):
+    def test_modalias_performance_single(self):
         '''performance of 1000 lookups in a single query'''
 
         query = []
@@ -229,43 +228,43 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
         sys.stderr.write('[%i ms] ' % int(sec * 1000 + 0.5))
         self.assertLess(sec, 1.0)
 
-    @unittest.skipUnless(os.path.isdir('/sys/devices'), 'no /sys dir on this system')
-    def test_system_driver_packages_system(self):
-        '''system_driver_packages() for current system'''
+    def test_hardware_driver(self):
+        '''what-provides HARDWARE_DRIVER'''
 
-        del os.environ['SYSFS']
+        self.assertEqual(self._call(PackageKitGlib.ProvidesEnum.HARDWARE_DRIVER,
+                                    ['drivers_for_attached_hardware']),
+            ['chocolate', 'nvidia-current', 'vanilla'])
 
-        # nothing should match the fake vanilla/chocolate debs
-        self.assertEqual(UbuntuDrivers.PackageKit.system_driver_packages(), [])
+        self.assertEqual(self._call(PackageKitGlib.ProvidesEnum.ANY,
+                                    ['drivers_for_attached_hardware']),
+            ['chocolate', 'nvidia-current', 'vanilla'])
 
-    def test_system_driver_packages_fakesys(self):
-        '''system_driver_packages() for fake sysfs'''
-
-        try:
-            res = UbuntuDrivers.PackageKit.system_driver_packages()
-            self.assertEqual(set([p.get_id().split(';')[0] for p in res]),
-                             set(['vanilla', 'chocolate', 'nvidia-current']))
-            for p in res:
-                self.assertEqual(p.props.info, PackageKitGlib.InfoEnum.AVAILABLE)
-        finally:
-            del os.environ['SYSFS']
-
-    def test_system_driver_packages_detect_plugins(self):
-        '''system_driver_packages() includes custom detection plugins'''
+    def test_hardware_driver_detect_plugins(self):
+        '''what-provides HARDWARE_DRIVER includes custom detection plugins'''
 
         try:
             os.mkdir(self.plugin_dir)
             with open(os.path.join(self.plugin_dir, 'special.py'), 'w') as f:
                 f.write('def detect(apt): return ["special", "special-uninst", "special-unavail", "picky"]\n')
 
-            res = UbuntuDrivers.PackageKit.system_driver_packages()
-            self.assertEqual(set([p.get_id().split(';')[0] for p in res]),
-                             set(['vanilla', 'chocolate', 'nvidia-current', 'special', 'picky']))
-            for p in res:
-                self.assertEqual(p.props.info, PackageKitGlib.InfoEnum.AVAILABLE)
+            self.assertEqual(self._call(PackageKitGlib.ProvidesEnum.HARDWARE_DRIVER,
+                                        ['drivers_for_attached_hardware']),
+                ['chocolate', 'nvidia-current', 'picky', 'special', 'vanilla'])
         finally:
-            os.unlink(os.path.join(self.plugin_dir, 'special.py'))
-            del os.environ['SYSFS']
+            shutil.rmtree(self.plugin_dir)
+
+    def test_hardware_driver_error(self):
+        '''invalid what-provides HARDWARE_DRIVER query'''
+
+        # checks format for HARDWARE_DRIVER type
+        try:
+            self._call(PackageKitGlib.ProvidesEnum.HARDWARE_DRIVER, ['?'])
+            self.fail('unexpectedly succeeded with invalid query format')
+        except GLib.GError as e:
+            self.assertTrue('search term is invalid' in e.message, e.message)
+
+        # for ANY it should just ignore invalid/unknown formats
+        self.assertEqual(self._call(PackageKitGlib.ProvidesEnum.ANY, ['?']), [])
 
     def _call(self, provides_type,  query, expected_res=PackageKitGlib.ExitEnum.SUCCESS):
         '''Call what_provides() with given query.
@@ -277,9 +276,10 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
                 None, lambda p, t, d: True, None)
         self.assertEqual(res.get_exit_code(), expected_res)
         if res.get_exit_code() == PackageKitGlib.ExitEnum.SUCCESS:
-            return [p.get_id().split(';')[0] for p in res.get_package_array()]
+            return sorted([p.get_id().split(';')[0] for p in res.get_package_array()])
         else:
             return None
+
 
 class DetectTest(unittest.TestCase):
     '''Test UbuntuDrivers.detect'''
