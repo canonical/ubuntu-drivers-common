@@ -10,6 +10,7 @@ ubuntu-drivers-common (1:0.2.53) UNRELEASED; urgency=low
     WhatProvides(HARDWARE_DRIVER, "drivers_for_attached_hardware") call, which
     is defined in PackageKit. Adjust tests accordingly.
   * debian/control: Update description.
+  * debian/control: Drop obsolete XB-Python-Version.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 30 May 2012 15:13:13 +0200
 

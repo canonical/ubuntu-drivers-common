@@ -41,7 +41,6 @@ Conflicts: nvidia-common (<< 1:0.2.46)
 Breaks: packagekit-backend-aptcc
 Provides: nvidia-common
 Enhances: python-aptdaemon.pkcompat, packagekit
-XB-Python-Version: ${python:Versions}
 Description: Detect and install additional Ubuntu driver packages
  This package aggregates and abstracts Ubuntu specific logic and knowledge
  about third-party driver packages. It provides:
