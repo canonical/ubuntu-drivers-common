@@ -1,5 +1,6 @@
 ubuntu-drivers-common (1:0.2.54) UNRELEASED; urgency=low
 
+  * debian/control: depend on python-xkit (>= 0.5.0).
   * Quirks/quirkapplier.py, Quirks/quirkreader.py
     tests/quirkreader-test.py:
     - Add support for the new python-xkit API.
