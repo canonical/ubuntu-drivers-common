@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.2.54) UNRELEASED; urgency=low
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 05 Jun 2012 13:51:46 +0200
+
 ubuntu-drivers-common (1:0.2.53) quantal; urgency=low
 
   * debian/control: Drop hard packagekit/aptdeamon dependencies, and move them
