@@ -18,8 +18,8 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import XKit.xutils
-import XKit.xorgparser
+import xkit.xutils
+import xkit.xorgparser
 import quirkinfo
 
 import tempfile
@@ -145,6 +145,6 @@ class ReadQuirk:
     #tmp_file.write(quirk.x_snippet)
     #tmp_file.close()
 
-    #tmp_xkit = XKit.xorgparser.Parser(tmp_file.name)
+    #tmp_xkit = xkit.xorgparser.Parser(tmp_file.name)
     #print tmp_xkit.globaldict
     #os.unlink(tmp_file.name)

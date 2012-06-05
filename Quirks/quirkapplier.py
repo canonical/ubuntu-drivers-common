@@ -23,8 +23,8 @@ import sys
 import tempfile
 import logging
 
-import XKit.xutils
-import XKit.xorgparser
+import xkit.xutils
+import xkit.xorgparser
 
 import quirkreader
 import quirkinfo
@@ -113,7 +113,7 @@ class QuirkChecker:
         tmp_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
         tmp_file.write(quirk.x_snippet)
         tmp_file.close()
-        tmp_xkit = XKit.xorgparser.Parser(tmp_file.name)
+        tmp_xkit = xkit.xorgparser.Parser(tmp_file.name)
         # TODO: REMOVE THIS
         logging.debug(tmp_xkit.globaldict)
         os.unlink(tmp_file.name)
@@ -157,7 +157,7 @@ def main():
     #tmp_file.write(quirk.x_snippet)
     #tmp_file.close()
 
-    #tmp_xkit = XKit.xorgparser.Parser(tmp_file.name)
+    #tmp_xkit = xkit.xorgparser.Parser(tmp_file.name)
     #print tmp_xkit.globaldict
     #os.unlink(tmp_file.name)
 
