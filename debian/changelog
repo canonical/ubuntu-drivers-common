@@ -1,8 +1,10 @@
 ubuntu-drivers-common (1:0.2.54) UNRELEASED; urgency=low
 
-  * 
+  * Quirks/quirkapplier.py, Quirks/quirkreader.py
+    tests/quirkreader-test.py:
+    - Add support for the new python-xkit API.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 05 Jun 2012 13:51:46 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 05 Jun 2012 16:23:41 +0200
 
 ubuntu-drivers-common (1:0.2.53) quantal; urgency=low
 
