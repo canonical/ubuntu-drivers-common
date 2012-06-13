@@ -2,6 +2,9 @@ ubuntu-drivers-common (1:0.2.55) UNRELEASED; urgency=low
 
   [ Martin Pitt ]
   * UbuntuDrivers/detect.py: Auto-install virtualbox-guest-dkms.
+  * UbuntuDrivers/PackageKit.py: If packagekit.enums is not available, fall
+    back to aptdaemon.pkenums. This will allow us to move to Python3 without
+    waiting for PackageKit.
 
   [ Dmitrijs Ledkovs ]
   * NvidiaDetector/nvidiadetector.py: Use python3 compatible syntax.

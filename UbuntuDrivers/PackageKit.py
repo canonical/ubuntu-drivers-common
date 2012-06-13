@@ -26,7 +26,11 @@ driver packages apply to the current system?" (HARDWARE_DRIVER), for example:
 
 import re
 
-from packagekit import enums
+try:
+    from packagekit import enums
+except ImportError:
+    # try the one from aptdaemon
+    import aptdaemon.pkenums as enums
 from gi.repository import PackageKitGlib
 
 import UbuntuDrivers.detect
