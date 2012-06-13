@@ -17,8 +17,6 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-from __future__ import absolute_import
-
 from glob import glob
 import os
 import sys
@@ -28,8 +26,8 @@ import logging
 import xkit.xutils
 import xkit.xorgparser
 
-from . import quirkreader
-from . import quirkinfo
+import Quirks.quirkreader
+import Quirks.quirkinfo
 
 class QuirkChecker:
     def __init__(self, handler, path='/usr/share/jockey/quirks'):
@@ -57,12 +55,12 @@ class QuirkChecker:
     def get_quirks_from_file(self, quirk_file):
         '''check all the files in a directory looking for quirks'''
         # read other blacklist files (which we will not touch, but evaluate)
-        quirk_file = quirkreader.ReadQuirk(quirk_file)
+        quirk_file = Quirks.quirkreader.ReadQuirk(quirk_file)
         return quirk_file.get_quirks()
 
     def get_system_info(self):
         '''Get system info for the quirk'''
-        quirk_info = quirkinfo.QuirkInfo()
+        quirk_info = Quirks.quirkinfo.QuirkInfo()
         return quirk_info.get_dmi_info()
 
     def matches_tags(self, quirk):

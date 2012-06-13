@@ -6,8 +6,6 @@
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 
-from __future__ import absolute_import
-
 import os
 import time
 import unittest
@@ -26,8 +24,8 @@ import aptdaemon.pkcompat
 import UbuntuDrivers.detect
 import UbuntuDrivers.PackageKit
 
-from . import fakesysfs
-from . import testarchive
+import fakesysfs
+import testarchive
 import logging
 
 TEST_DIR = os.path.abspath(os.path.dirname(__file__))

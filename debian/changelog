@@ -5,6 +5,8 @@ ubuntu-drivers-common (1:0.2.55) UNRELEASED; urgency=low
   * UbuntuDrivers/PackageKit.py: If packagekit.enums is not available, fall
     back to aptdaemon.pkenums. This will allow us to move to Python3 without
     waiting for PackageKit.
+  * Revert Dmitrijs' relative imports and move back to Python3 compatible
+    absolute imports.
 
   [ Dmitrijs Ledkovs ]
   * NvidiaDetector/nvidiadetector.py: Use python3 compatible syntax.

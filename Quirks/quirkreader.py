@@ -18,11 +18,9 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-from __future__ import absolute_import
-
 import xkit.xutils
 import xkit.xorgparser
-from . import quirkinfo
+import Quirks.quirkinfo
 
 import tempfile
 import os
@@ -33,7 +31,7 @@ class Quirk:
         self.id = id
         self.handler = handler
         self.x_snippet = x_snippet
-        self.match_tags = {}.fromkeys(quirkinfo.dmi_keys, '')
+        self.match_tags = {}.fromkeys(Quirks.quirkinfo.dmi_keys, '')
 
 class ReadQuirk:
 

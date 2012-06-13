@@ -18,8 +18,6 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-from __future__ import absolute_import
-
 from Quirks import quirkreader, quirkapplier
 from xkit import xorgparser
 from xkit.xorgparser import *
@@ -27,7 +25,7 @@ import sys
 import unittest
 import os
 import logging
-from . import settings
+import settings
 import tempfile
 import copy
 
