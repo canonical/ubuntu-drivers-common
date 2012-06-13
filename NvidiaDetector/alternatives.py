@@ -41,7 +41,7 @@ class MultiArchUtils(object):
     def _get_architecture(self):
         dev_null = open('/dev/null', 'w')
         p1 = Popen(['dpkg', '--print-architecture'], stdout=PIPE,
-                   stderr=dev_null)
+                   stderr=dev_null, universal_newlines=True)
         p = p1.communicate()[0]
         dev_null.close()
         architecture = p.strip()
@@ -74,7 +74,7 @@ class Alternatives(object):
         dev_null = open('/dev/null', 'w')
         alternatives = []
         p1 = Popen([self._command, '--list', self._master_link],
-                   stdout=PIPE, stderr=dev_null)
+                   stdout=PIPE, stderr=dev_null, universal_newlines=True)
         p = p1.communicate()[0]
         dev_null.close()
         c = p.split('\n')
@@ -88,7 +88,7 @@ class Alternatives(object):
         dev_null = open('/dev/null', 'w')
         current_alternative = None
         p1 = Popen([self._command, '--query', self._master_link],
-                   stdout=PIPE, stderr=dev_null)
+                   stdout=PIPE, stderr=dev_null, universal_newlines=True)
         p = p1.communicate()[0]
         dev_null.close()
         c = p.split('\n')
@@ -154,7 +154,7 @@ class Alternatives(object):
         dev_null = open('/dev/null', 'w')
         current_alternative = None
         p1 = Popen(['modprobe', '--resolve-alias', alias], stdout=PIPE,
-                   stderr=dev_null)
+                   stderr=dev_null, universal_newlines=True)
         p = p1.communicate()[0]
         dev_null.close()
         c = p.split('\n')
