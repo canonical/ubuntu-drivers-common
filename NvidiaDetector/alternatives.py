@@ -30,9 +30,8 @@ class MultiArchUtils(object):
         # We have 2 alternatives, one for each architecture
         self._supported_architectures = {'i386': 'i386', 'amd64': 'x86_64'}
         self._main_arch = self._get_architecture()
-        self._other_arch = self._supported_architectures.values()[
-                          int(not self._supported_architectures
-                          .values().index(self._main_arch))]
+        self._other_arch = list(self._supported_architectures.values())[
+                          int(not list(self._supported_architectures.values()).index(self._main_arch))]
 
         # Make sure that the PATH environment variable is set
         if not os.environ.get('PATH'):
