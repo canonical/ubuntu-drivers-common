@@ -99,7 +99,7 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
         klass.dbus = subprocess.Popen(['dbus-daemon', '--nofork', '--print-address',
             '--config-file', 
             os.path.join(aptdaemon.test.get_tests_dir(), 'dbus.conf')],
-            stdout=subprocess.PIPE)
+            stdout=subprocess.PIPE, universal_newlines=True)
         klass.dbus_address = klass.dbus.stdout.readline().strip()
         os.environ['DBUS_SYSTEM_BUS_ADDRESS'] = klass.dbus_address
 
@@ -128,7 +128,7 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
         argv = ['aptd', '--disable-plugins', '--chroot', klass.chroot.path]
         if APTDAEMON_DEBUG:
             argv.insert(1, '--debug')
-        klass.aptdaemon = subprocess.Popen(argv, stderr=out)
+        klass.aptdaemon = subprocess.Popen(argv, stderr=out, universal_newlines=True)
         time.sleep(0.5)
 
     @classmethod
