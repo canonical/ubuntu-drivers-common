@@ -103,7 +103,7 @@ class NvidiaDetection(object):
         and store them in self.cards
         '''
         self.cards = []
-        p1 = Popen(['lspci', '-n'], stdout=PIPE)
+        p1 = Popen(['lspci', '-n'], stdout=PIPE, universal_newlines=True)
         p = p1.communicate()[0].split('\n')
         # if you don't have an nvidia card, fake one for debugging
         #p = ['00:02.0 0300: 10DE:03DE (rev 02)']
@@ -200,8 +200,7 @@ class NvidiaDetection(object):
                     print('NVIDIA card found (' + card + ')')
                 self.nvidiaCards.append(card)
 
-        self.orderedList = self.drivers.keys()
-        self.orderedList.sort(reverse=True)
+        self.orderedList = sorted(self.drivers, reverse=True)
 
         '''
         See what drivers support each card and fill self.driversForCards
@@ -261,8 +260,7 @@ class NvidiaDetection(object):
                         occurrence.setdefault(drv, 0)
                         occurrence[drv] += 1
 
-                occurrences = occurrence.keys()
-                occurrences.sort(reverse=True)
+                occurrences = sorted(occurrence, reverse=True)
                 '''
                 candidates is the list of the likely candidates for the
                 installation
@@ -347,7 +345,7 @@ class NvidiaDetection(object):
         '''
         lines = []
         notinstalled = []
-        p1 = Popen(['dpkg', '--get-selections'], stdout=PIPE)
+        p1 = Popen(['dpkg', '--get-selections'], stdout=PIPE, universal_newlines=True)
         p = p1.communicate()[0]
         c = p.split('\n')
         for line in c:
@@ -370,10 +368,16 @@ class NvidiaDetection(object):
         return notinstalled
 
     def isstr(self, elem):
-        return isinstance(elem, type('')) or isinstance(elem, type(u''))
+        if bytes is str:
+            #Python 2
+            string_types = basestring
+        else:
+            #Python 3
+            string_types = str
+        return isinstance(elem, string_types)
 
     def islst(self, elem):
-        return isinstance(elem, type(())) or isinstance(elem, type([]))
+        return isinstance(elem, (tuple, list))
 
     def getDrivers(self):
         '''
