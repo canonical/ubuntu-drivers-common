@@ -17,6 +17,8 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+from __future__ import absolute_import
+
 from glob import glob
 import os
 import sys
@@ -26,8 +28,8 @@ import logging
 import xkit.xutils
 import xkit.xorgparser
 
-import quirkreader
-import quirkinfo
+from . import quirkreader
+from . import quirkinfo
 
 class QuirkChecker:
     def __init__(self, handler, path='/usr/share/jockey/quirks'):
@@ -66,13 +68,12 @@ class QuirkChecker:
     def matches_tags(self, quirk):
         '''See if tags match system info'''
         result = True
-        for tag in quirk.match_tags.keys():
-            for val in quirk.match_tags[tag]:
-                if (self._system_info.get(tag) and self._system_info.get(tag) != val
-                and len(quirk.match_tags[tag]) <= 1):
-                    logging.debug('Failure to match %s with %s' %
+        for tag, val in quirk.match_tags.items():
+            if (self._system_info.get(tag) and self._system_info.get(tag) != val
+                and len(val) <= 1):
+                logging.debug('Failure to match %s with %s' %
                                   (self._system_info.get(tag), val))
-                    return False
+                return False
         logging.debug('Success')
         return result
 

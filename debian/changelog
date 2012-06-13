@@ -1,8 +1,12 @@
 ubuntu-drivers-common (1:0.2.55) UNRELEASED; urgency=low
 
+  [ Martin Pitt ]
   * UbuntuDrivers/detect.py: Auto-install virtualbox-guest-dkms.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 13 Jun 2012 09:04:39 +0200
+  [ Dmitrijs Ledkovs ]
+  * NvidiaDetector/nvidiadetector.py: Use python3 compatible syntax.
+
+ -- Dmitrijs Ledkovs <dmitrij.ledkov@ubuntu.com>  Wed, 13 Jun 2012 10:57:45 +0100
 
 ubuntu-drivers-common (1:0.2.54) quantal; urgency=low
 
