@@ -17,6 +17,8 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+from __future__ import absolute_import
+
 from glob import glob
 import os
 import sys
@@ -26,8 +28,8 @@ import logging
 import xkit.xutils
 import xkit.xorgparser
 
-import quirkreader
-import quirkinfo
+from . import quirkreader
+from . import quirkinfo
 
 class QuirkChecker:
     def __init__(self, handler, path='/usr/share/jockey/quirks'):
