@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.2.55) UNRELEASED; urgency=low
+
+  * UbuntuDrivers/detect.py: Auto-install virtualbox-guest-dkms.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 13 Jun 2012 09:04:39 +0200
+
 ubuntu-drivers-common (1:0.2.54) quantal; urgency=low
 
   * debian/control: depend on python-xkit (>= 0.5.0).
