@@ -7,6 +7,7 @@ ubuntu-drivers-common (1:0.2.55) UNRELEASED; urgency=low
     waiting for PackageKit.
   * Revert Dmitrijs' relative imports and move back to Python3 compatible
     absolute imports.
+  * quirks-handler, setup.py: Move to Python 3 as well.
 
   [ Dmitrijs Ledkovs ]
   * NvidiaDetector/nvidiadetector.py: Use python3 compatible syntax.
