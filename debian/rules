@@ -1,14 +1,24 @@
 #!/usr/bin/make -f
 DEB_VERSION=$(shell dpkg-parsechangelog | grep ^Version | cut -f2 -d\ |cut -f1 -d-)
+py3sdo=set -e; $(foreach py, $(shell py3versions -r), $(py) $(1);)
 
 %:
-	dh "$@" --with python2,apport
+	dh "$@" --with python3,apport
+
+override_dh_auto_build:
+	$(call py3sdo, setup.py build)
+
+override_dh_auto_install:
+	$(call py3sdo, setup.py install --root=$(CURDIR)/debian/tmp --install-layout=deb)
 
 override_dh_auto_test:
 ifeq (, $(findstring nocheck, $(DEB_BUILD_OPTIONS)))
-	./setup.py egg_info
-	PYTHONPATH=. tests/run
+	$(call py3sdo, setup.py egg_info)
+	set -e; $(foreach py, $(shell py3versions -r), PYTHONPATH=. $(py) -B tests/run;)
 endif
+
+override_dh_auto_clean:
+	$(call py3sdo, setup.py clean)
 
 override_dh_install:
 	dh_install --fail-missing
@@ -20,5 +30,6 @@ override_dh_install:
 override_dh_clean:
 	rm -f share/hybrid/hybrid-detect
 	rm -f quirksreader_test*.txt
+	rm -rf build
 	rm -rf *.egg-info
 	dh_clean

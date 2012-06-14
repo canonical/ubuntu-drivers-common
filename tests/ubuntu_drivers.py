@@ -466,11 +466,6 @@ class ToolTest(unittest.TestCase):
         klass.chroot.setup()
         klass.chroot.add_test_repository()
         klass.chroot.add_repository(klass.archive.path, True, False)
-
-        # prevent a warning from apt about this directory not existing; fixed
-        # in current aptdaemon trunk, but not yet in Ubuntu
-        os.makedirs(os.path.join(klass.chroot.path, 'etc/apt/preferences.d'))
-
         klass.chroot_apt_conf = os.path.join(klass.chroot.path, 'aptconfig')
         with open(klass.chroot_apt_conf, 'w') as f:
             f.write('''Dir "%(root)s";

@@ -2,45 +2,47 @@ Source: ubuntu-drivers-common
 Section: admin
 Priority: optional
 Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
-Build-Depends: debhelper (>= 7.0.50~),
+Build-Depends: debhelper (>= 9),
  po-debconf,
  dh-apport,
- python (>= 2.6),
- python-setuptools,
+ python3 (>= 3.2),
+ python3-setuptools,
  libpciaccess-dev (>= 0.12.1-2),
  lib32gcc1 [amd64], libc6-i386 [amd64],
  linux-libc-dev,
  pkg-config,
- python-xkit (>= 0.5.0),
+ python3-xkit (>= 0.5.0),
  aptdaemon,
- python-aptdaemon.pkcompat,
- python-aptdaemon.test (>= 0.43+bzr810-0ubuntu2~),
- python-gi,
+ python3-aptdaemon.pkcompat,
+ python3-aptdaemon.test (>= 0.43+bzr810-0ubuntu2~),
+ python3-gi,
  gir1.2-glib-2.0,
  gir1.2-packagekitglib-1.0,
  alsa-utils,
- dbus
+ apt-utils,
+ dbus,
+ python3-dbus
 Standards-Version: 3.9.3
 Vcs-Git: git://github.com/tseliot/ubuntu-drivers-common.git
 Vcs-Browser: https://github.com/tseliot/ubuntu-drivers-common
-X-Python-Version: >= 2.6
+X-Python3-Version: >= 3.2
 
 Package: ubuntu-drivers-common
 Architecture: any
 Pre-Depends: dpkg (>= 1.15.7.2)
-Depends: ${python:Depends}, 
+Depends: ${python3:Depends},
  ${misc:Depends},
  ${shlibs:Depends},
  debconf (>= 0.5.00) | debconf-2.0,
  pciutils,
- python-apt,
- python-xkit,
+ python3-apt,
+ python3-xkit,
  alsa-utils
-Suggests: python-packagekit
+Suggests: packagekit-system-interface
 Replaces: nvidia-common (<< 1:0.2.46)
 Conflicts: nvidia-common (<< 1:0.2.46), packagekit-backend-aptcc
 Provides: nvidia-common
-Enhances: python-aptdaemon.pkcompat, packagekit
+Enhances: packagekit-system-interface
 Description: Detect and install additional Ubuntu driver packages
  This package aggregates and abstracts Ubuntu specific logic and knowledge
  about third-party driver packages. It provides:
@@ -59,6 +61,7 @@ Description: Detect and install additional Ubuntu driver packages
   - some NVidia specific support code to find the most appropriate driver
     version, as well as setting up the alternatives symlinks that the
     proprietary NVidia and FGLRX packages use.
+
 
 Package: dh-modaliases
 Architecture: all
