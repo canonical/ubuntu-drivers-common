@@ -10,8 +10,9 @@ ubuntu-drivers-common (1:0.2.55) UNRELEASED; urgency=low
 
   [ Dmitrijs Ledkovs ]
   * NvidiaDetector/nvidiadetector.py: Use python3 compatible syntax.
+  * Convert package to python3 only.
 
- -- Dmitrijs Ledkovs <dmitrij.ledkov@ubuntu.com>  Wed, 13 Jun 2012 10:57:45 +0100
+ -- Dmitrijs Ledkovs <dmitrij.ledkov@ubuntu.com>  Thu, 14 Jun 2012 00:46:04 +0100
 
 ubuntu-drivers-common (1:0.2.54) quantal; urgency=low
 
