@@ -559,7 +559,6 @@ APT::Get::AllowUnauthenticated "true";
         self.assertTrue('bcmwl-kernel-source' in out, out)
         self.assertFalse('vanilla' in out, out)
         self.assertFalse('noalias' in out, out)
-        self.assertFalse('nvidia' in out, out)
         self.assertEqual(ud.returncode, 0)
 
         # now all packages should be installed, so it should not do anything

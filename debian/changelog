@@ -4,6 +4,8 @@ ubuntu-drivers-common (1:0.2.56) UNRELEASED; urgency=low
     discussion with Chris. The proprietary driver is still the better choice
     (if you click "proprietary 3rd party drivers" in Ubiquity) until Nouveau
     enables power management.
+  * tests/ubuntu_drivers.py: Update test_auto_install_chroot() for above
+    change, as nvidia now does get installed automatically.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 19 Jun 2012 09:56:55 +0200
 
