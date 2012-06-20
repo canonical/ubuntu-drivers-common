@@ -15,6 +15,7 @@ ubuntu-drivers-common (1:0.2.56) UNRELEASED; urgency=low
     info to show which device requested a driver, whether it is free or
     proprietary, and whether it is a distro or third-party package.
     (LP: #1013665)
+  * Fix fd leaks from subprocess in the test suite.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 19 Jun 2012 09:56:55 +0200
 

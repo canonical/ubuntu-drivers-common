@@ -82,8 +82,10 @@ Architecture: %s
                 f.write(contents)
 
         debpath = os.path.join(self.path, '%s_%s_%s.deb' % (name, version, architecture))
-        subprocess.check_call(['dpkg', '-b', d, debpath],
+        dpkg = subprocess.Popen(['dpkg', '-b', d, debpath],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        dpkg.communicate()
+        assert dpkg.returncode == 0
 
         shutil.rmtree(d)
         assert os.path.exists(debpath)

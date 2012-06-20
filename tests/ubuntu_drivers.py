@@ -508,8 +508,10 @@ APT::Get::AllowUnauthenticated "true";
             pass
 
         # some tests install this package
-        subprocess.check_call(['apt-get', 'purge', '-y', 'bcmwl-kernel-source'],
+        apt = subprocess.Popen(['apt-get', 'purge', '-y', 'bcmwl-kernel-source'],
                 stdout=subprocess.PIPE)
+        apt.communicate()
+        self.assertEqual(apt.returncode, 0)
 
     def test_list_chroot(self):
         '''ubuntu-drivers list for fake sysfs and chroot'''
