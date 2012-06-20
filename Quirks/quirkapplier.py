@@ -119,9 +119,9 @@ class QuirkChecker:
         os.unlink(tmp_file.name)
         try:
             logging.debug('Creating %s' % destination)
-            tmp_xkit.writeFile(destination)
+            tmp_xkit.write(destination)
         except IOError:
-            logging.exception('Error during writeFile()')
+            logging.exception('Error during write()')
             return False
         return True
 

@@ -49,7 +49,7 @@ class QuirkReaderTestCase(unittest.TestCase):
     
     def tearDown(self):
         #self.parser.comments.insert(0, '\n-----' + self.this_function_name + '-----\n')
-        #self.parser.writeFile(destinationFile, test=True)
+        #self.parser.write(destinationFile, test=True)
         try:
             os.remove(tempFile)
         except(OSError, IOError):

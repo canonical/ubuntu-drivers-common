@@ -6,6 +6,8 @@ ubuntu-drivers-common (1:0.2.56) UNRELEASED; urgency=low
     enables power management.
   * tests/ubuntu_drivers.py: Update test_auto_install_chroot() for above
     change, as nvidia now does get installed automatically.
+  * Quirks/quirkapplier.py: Update to current xkit API: Call write(), not
+    writeFile(). (LP: #1014728)
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 19 Jun 2012 09:56:55 +0200
 
