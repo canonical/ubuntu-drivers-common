@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.56) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.56) quantal; urgency=low
 
   * UbuntuDrivers/detect.py: Add nvidia-* for automatic installation after
     discussion with Chris. The proprietary driver is still the better choice
@@ -22,7 +22,7 @@ ubuntu-drivers-common (1:0.2.56) UNRELEASED; urgency=low
     depend on matching kernel headers/API, they are inherently a bit brittle
     and thus we should spot regressions immediately.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 19 Jun 2012 09:56:55 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 20 Jun 2012 16:54:23 +0200
 
 ubuntu-drivers-common (1:0.2.55) quantal; urgency=low
 
