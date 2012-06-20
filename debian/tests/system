@@ -1,0 +1,134 @@
+#!/usr/bin/python3
+
+import sys
+import os.path
+import unittest
+import subprocess
+
+srcdir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+testsdir = os.path.join(srcdir, 'tests')
+sys.path.append(testsdir)
+import fakesysfs
+
+def program_out(argv):
+    '''Return (exitcode, out, err) from a program call.'''
+
+    prog = subprocess.Popen(argv, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, universal_newlines=True)
+    (out, err) = prog.communicate()
+    return (prog.returncode, out, err)
+
+def program_out_success(argv, self):
+    '''Return out from a successful program call.'''
+
+    (code, out, err) = program_out(argv)
+    self.assertEqual(err, '', err)
+    self.assertEqual(code, 0)
+    return out
+
+class TestSystem(unittest.TestCase):
+    '''Run ubuntu-drivers on the current system.
+
+    We cannot assume anything about the output here, we just ensure that the
+    program is found and works.
+    '''
+    def test_list(self):
+        '''ubuntu-drivers list succeeds'''
+
+        program_out_success(['ubuntu-drivers', 'list'], self)
+
+    def test_debug(self):
+        '''ubuntu-drivers debug succeeds'''
+
+        o = program_out_success(['ubuntu-drivers', 'debug'], self)
+
+        # let's assume we have at least one pci device
+        self.assertTrue('\npci:' in o)
+
+        # finds detection plugins
+        self.assertTrue('Loading custom detection plugin' in o, o)
+        self.assertTrue('sl-modem' in o, o)
+        self.assertTrue('=== matching driver packages ===' in o, o)
+
+class TestUbuntuDrivers(unittest.TestCase):
+    '''Check that we can detect and install the most common drivers'''
+
+    def setUp(self):
+        self.sys = fakesysfs.SysFS()
+        os.environ['SYSFS'] = self.sys.sysfs
+
+        # disable hybrid detection
+        os.environ['UBUNTU_DRIVERS_XORG_LOG'] = '/nonexisting'
+
+    def tearDown(self):
+        del os.environ['SYSFS']
+
+    def test_bcmwl(self):
+        '''bcmwl-kernel-source'''
+
+        self.do_test_driver('pci:v000014E4d00004353sv00sd01bc00sc00i01',
+                'bcmwl-kernel-source', 'wl', auto_install=True)
+
+    def test_nvidia_current(self):
+        '''nvidia-current'''
+
+        # we have two matches here, only install nvidia-current, not -updates
+        self.do_test_driver('pci:v000010DEd000010C3sv00sd01bc03sc00i00',
+                'nvidia-current', 'nvidia_current', auto_install=False)
+
+    def test_nvidia_current_updates(self):
+        '''nvidia-current-updates'''
+
+        self.do_test_driver('pci:v000010DEd000010C3sv00sd01bc03sc00i00',
+                'nvidia-current-updates', 'nvidia_current_updates', auto_install=False)
+
+    def test_fglrx(self):
+        '''fglrx'''
+
+        # we have two matches here, only install fglrx, not -updates
+        self.do_test_driver('pci:v00001002d0000990Fsv00sd00bc03sc00i00',
+                'fglrx', 'fglrx', auto_install=False)
+
+    def test_fglrx_updates(self):
+        '''fglrx-updates'''
+
+        self.do_test_driver('pci:v00001002d0000990Fsv00sd00bc03sc00i00',
+                'fglrx-updates', 'fglrx_updates', auto_install=False)
+
+    def do_test_driver(self, alias, package, module, auto_install=True):
+        self.sys.add('pci', 'mydev', {'modalias': alias})
+
+        # detection works
+        o = program_out_success(['ubuntu-drivers', 'list'], self)
+        self.assertTrue(package + '\n' in o)
+
+        try:
+            if auto_install:
+                # autoinstall works
+                o = program_out_success(['ubuntu-drivers', 'autoinstall'], self)
+            else:
+                o = program_out_success(['apt-get', 'install', '-y', package], self)
+            self.assertTrue(package in o, o)
+
+            # package is installed
+            o = program_out_success(['dpkg', '-s', package], self)
+            self.assertTrue('Status: install ok installed' in o)
+
+            # module is available
+            if module:
+                o = program_out_success(['modinfo', module], self)
+                self.assertTrue('filename:' in o)
+        finally:
+            # clean up
+            program_out(['apt-get', 'purge', '--auto-remove', '-y', package])
+
+            if module:
+                (c, o, e) = program_out(['modinfo', module])
+                self.assertNotEqual(c, 0)
+                self.assertTrue(e.startswith('ERROR'), e)
+                self.assertEqual(o, '', o)
+
+# for autopkgtest we must write to stdout, not stderr, and have an appropriate
+# exit code
+unittest.main(testRunner=unittest.TextTestRunner(stream=sys.stdout, verbosity=2))
+

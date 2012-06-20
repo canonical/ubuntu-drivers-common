@@ -16,6 +16,11 @@ ubuntu-drivers-common (1:0.2.56) UNRELEASED; urgency=low
     proprietary, and whether it is a distro or third-party package.
     (LP: #1013665)
   * Fix fd leaks from subprocess in the test suite.
+  * Add debian/tests/system and debian/tests/control: Add autopkg test to
+    check that we can detect, install, and remove the nvidia, fglrx, and bcmwl
+    drivers. Due to their nature of being compiled on the client side and
+    depend on matching kernel headers/API, they are inherently a bit brittle
+    and thus we should spot regressions immediately.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 19 Jun 2012 09:56:55 +0200
 
