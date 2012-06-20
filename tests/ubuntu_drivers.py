@@ -395,7 +395,7 @@ class DetectTest(unittest.TestCase):
         self.assertEqual(set(UbuntuDrivers.detect.auto_install_filter([
             'nvidia-current', 'bcmwl-kernel-source', 'fglrx-updates',
             'pvr-omap4-egl'])), 
-            set(['bcmwl-kernel-source', 'pvr-omap4-egl']))
+            set(['bcmwl-kernel-source', 'pvr-omap4-egl', 'nvidia-current']))
 
     def test_detect_plugin_packages(self):
         '''detect_plugin_packages()'''
