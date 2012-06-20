@@ -308,15 +308,17 @@ class DetectTest(unittest.TestCase):
         del os.environ['SYSFS']
         res = UbuntuDrivers.detect.system_modaliases()
         self.assertGreater(len(res), 5)
-        self.assertTrue(':' in res[0])
+        self.assertTrue(':' in list(res)[0])
 
     def test_system_modalises_fake(self):
         '''system_modaliases() for fake sysfs'''
 
-        res = set(UbuntuDrivers.detect.system_modaliases())
-        self.assertEqual(res, set(['pci:v00001234d00sv00000001sd00bc00sc00i00',
+        res = UbuntuDrivers.detect.system_modaliases()
+        self.assertEqual(set(res), set(['pci:v00001234d00sv00000001sd00bc00sc00i00',
             'pci:vDEADBEEFd00', 'usb:v9876dABCDsv01sd02bc00sc01i05',
             'pci:nvidia']))
+        self.assertEqual(res['pci:vDEADBEEFd00'], 
+                os.path.join(self.sys.sysfs, 'devices/grey'))
 
     def test_system_driver_packages_system(self):
         '''system_driver_packages() for current system'''

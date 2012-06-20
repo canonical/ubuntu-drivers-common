@@ -8,6 +8,8 @@ ubuntu-drivers-common (1:0.2.56) UNRELEASED; urgency=low
     change, as nvidia now does get installed automatically.
   * Quirks/quirkapplier.py: Update to current xkit API: Call write(), not
     writeFile(). (LP: #1014728)
+  * UbuntuDrivers/detect.py: Change system_modaliases() to return an alias →
+    sysfs_path map, instead of just a list of aliases.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 19 Jun 2012 09:56:55 +0200
 

@@ -17,14 +17,15 @@ import apt
 system_architecture = apt.apt_pkg.get_architectures()[0]
 
 def system_modaliases():
-    '''Return list of modaliases present in the system.
+    '''Get modaliases present in the system.
 
     This ignores devices whose drivers are statically built into the kernel, as
     you cannot replace them with other driver packages anyway.
 
-    The returned list is suitable for a PackageKit WhatProvides(MODALIAS) call.
+    Return a modalias → sysfs path map. The keys of the returned map are
+    suitable for a PackageKit WhatProvides(MODALIAS) call.
     '''
-    aliases = set()
+    aliases = {}
     # $SYSFS is compatible with libudev
     sysfs_dir = os.environ.get('SYSFS', '/sys')
     for path, dirs, files in os.walk(os.path.join(sysfs_dir, 'devices')):
@@ -60,11 +61,9 @@ def system_modaliases():
             #logging.debug('system_modaliases(): ignoring device %s which has no module (built into kernel)', path)
             continue
 
-        aliases.add(modalias)
+        aliases[modalias] = path
 
-    # Convert result to a list, to make the result compatible with a PackageKit
-    # WhatProvides() call.
-    return list(aliases)
+    return aliases
 
 def _check_video_abi_compat(apt_cache, record):
     xorg_video_abi = None
