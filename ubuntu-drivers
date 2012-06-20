@@ -95,7 +95,7 @@ def command_debug(args):
         print(alias)
 
     print('=== matching driver packages ===')
-    for package in packages:
+    for package, info in packages.items():
         p = cache[package]
         try:
             inst = p.installed.version
@@ -109,7 +109,22 @@ def command_debug(args):
             auto = ' (auto-install)'
         else:
             auto = ''
-        print('%s: installed: %s   available: %s%s' % (package, inst, cand, auto))
+
+        info_str = ''
+        if info['from_distro']:
+            info_str += '  [distro]'
+        else:
+            info_str += '  [third party]'
+        if info['free']:
+            info_str += '  free'
+        else:
+            info_str += '  non-free'
+        if 'modalias' in info:
+            info_str += '  modalias: ' + info['modalias']
+        if 'syspath' in info:
+            info_str += '  path: ' + info['syspath']
+
+        print('%s: installed: %s   available: %s%s%s ' % (package, inst, cand, auto,  info_str))
 
 #
 # main

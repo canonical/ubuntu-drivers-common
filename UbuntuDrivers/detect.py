@@ -177,6 +177,25 @@ def packages_for_modalias(apt_cache, modalias):
 
 packages_for_modalias.cache_maps = {}
 
+def _is_package_free(pkg):
+    assert pkg.candidate is not None
+    # it would be better to check the actual license, as we do not have
+    # the component for third-party packages; but this is the best we can do
+    # at the moment
+    if pkg.candidate.section.startswith('restricted') or \
+            pkg.candidate.section.startswith('multiverse'):
+        return False
+    return True
+
+def _is_package_from_distro(pkg):
+    if pkg.candidate is None:
+        return False
+
+    for o in pkg.candidate.origins:
+        if o.origin == 'Ubuntu':
+            return True
+    return False
+
 def system_driver_packages(apt_cache=None):
     '''Get driver packages that are available for the system.
     
@@ -188,19 +207,43 @@ def system_driver_packages(apt_cache=None):
     argument for efficiency. If not given, this function creates a temporary
     one by itself.
 
-    Return a list of package names.
+    Return a dictionary which maps package names to information about them:
+
+      driver_package → {'modalias': 'pci:...', ...}
+
+    Available information keys are:
+      'modalias':    Modalias for the device that needs this driver (not for
+                     drivers from detect plugins)
+      'syspath':     sysfs directory for the device that needs this driver
+                     (not for drivers from detect plugins)
+      'free':        Boolean flag whether driver is free, i. e. in the "main"
+                     or "universe" component.
+      'from_distro': Boolean flag whether the driver is shipped by the distro;
+                     if not, it comes from a (potentially less tested/trusted)
+                     third party source.
     '''
     modaliases = system_modaliases()
 
     if not apt_cache:
         apt_cache = apt.Cache()
 
-    packages = []
-    for alias in modaliases:
-        packages.extend([p.name for p in packages_for_modalias(apt_cache, alias)])
+    packages = {}
+    for alias, syspath in modaliases.items():
+        for p in packages_for_modalias(apt_cache, alias):
+            packages[p.name] = {
+                    'modalias': alias,
+                    'syspath': syspath,
+                    'free': _is_package_free(p),
+                    'from_distro': _is_package_from_distro(p),
+                }
     
     # add available packages which need custom detection code
-    packages.extend(detect_plugin_packages(apt_cache))
+    for p in detect_plugin_packages(apt_cache):
+        apt_p = apt_cache[p]
+        packages[p] = {
+                'free': _is_package_free(apt_p),
+                'from_distro': _is_package_from_distro(apt_p),
+            }
 
     return packages
 

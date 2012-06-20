@@ -10,6 +10,11 @@ ubuntu-drivers-common (1:0.2.56) UNRELEASED; urgency=low
     writeFile(). (LP: #1014728)
   * UbuntuDrivers/detect.py: Change system_modaliases() to return an alias →
     sysfs_path map, instead of just a list of aliases.
+  * UbuntuDrivers/detect.py: Change system_driver_packages() to return a
+    package → info map, instead of just a list of packages. UI can use the
+    info to show which device requested a driver, whether it is free or
+    proprietary, and whether it is a distro or third-party package.
+    (LP: #1013665)
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 19 Jun 2012 09:56:55 +0200
 
