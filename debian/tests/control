@@ -1,4 +1,2 @@
 Tests: system
 Restrictions: needs-root
-Features: no-build-needed
-
