@@ -107,7 +107,10 @@ class TestUbuntuDrivers(unittest.TestCase):
                 # autoinstall works
                 o = program_out_success(['ubuntu-drivers', 'autoinstall'], self)
             else:
-                o = program_out_success(['apt-get', 'install', '-y', package], self)
+                (c, o, e) = program_out(['apt-get', 'install', '-y', package])
+                self.assertEqual(c, 0, e)
+                if e:
+                    print('\n--- Error output from package installation ---\n%s\n------' % e)
             self.assertTrue(package in o, o)
 
             # package is installed

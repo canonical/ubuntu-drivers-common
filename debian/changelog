@@ -1,6 +1,9 @@
 ubuntu-drivers-common (1:0.2.57) UNRELEASED; urgency=low
 
   * debian/tests/control: Drop undefined "no-build-needed" feature.
+  * debian/tests/system: NVidia and FGLRX drivers produce some stderr output
+    when installing the packages. Don't fail on them, but do show the output
+    in the test suite.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 21 Jun 2012 07:53:27 +0200
 
