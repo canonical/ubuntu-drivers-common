@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.2.58) UNRELEASED; urgency=low
+
+  * Add detect-plugins/arm-gles.py, thanks Oliver Grawert! (LP: #1016006)
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 21 Jun 2012 13:57:08 +0200
+
 ubuntu-drivers-common (1:0.2.57) quantal; urgency=low
 
   * debian/tests/control: Drop undefined "no-build-needed" feature.
