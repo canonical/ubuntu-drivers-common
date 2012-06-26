@@ -95,12 +95,18 @@ class TestUbuntuDrivers(unittest.TestCase):
         self.do_test_driver('pci:v00001002d0000990Fsv00sd00bc03sc00i00',
                 'fglrx-updates', 'fglrx_updates', auto_install=False)
 
-    def do_test_driver(self, alias, package, module, auto_install=True):
-        self.sys.add('pci', 'mydev', {'modalias': alias})
+    def test_virtualbox(self):
+        '''virtualbox-dkms'''
 
-        # detection works
-        o = program_out_success(['ubuntu-drivers', 'list'], self)
-        self.assertTrue(package + '\n' in o)
+        self.do_test_driver(None, 'virtualbox-dkms', 'vboxdrv', auto_install=False)
+
+    def do_test_driver(self, alias, package, module, auto_install=True):
+        if alias:
+            self.sys.add('pci', 'mydev', {'modalias': alias})
+
+            # detection works
+            o = program_out_success(['ubuntu-drivers', 'list'], self)
+            self.assertTrue(package + '\n' in o)
 
         try:
             if auto_install:
