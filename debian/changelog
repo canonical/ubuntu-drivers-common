@@ -1,9 +1,9 @@
-ubuntu-drivers-common (1:0.2.59) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.59) quantal; urgency=low
 
   * UbuntuDrivers/detect.py: Fix crash on non-ASCII characters in Xorg log.
     Adjust test case to reproduce this. (LP: #1020329).
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 03 Jul 2012 12:26:31 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 03 Jul 2012 12:38:39 +0200
 
 ubuntu-drivers-common (1:0.2.58) quantal; urgency=low
 
