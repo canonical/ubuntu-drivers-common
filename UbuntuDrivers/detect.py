@@ -100,8 +100,8 @@ def _check_video_abi_compat(apt_cache, record):
     if 'nvidia' in record['Package']:
         xorg_log = os.environ.get('UBUNTU_DRIVERS_XORG_LOG', '/var/log/Xorg.0.log')
         try:
-            with open(xorg_log) as f:
-                if 'drivers/intel_drv.so' in f.read():
+            with open(xorg_log, 'rb') as f:
+                if b'drivers/intel_drv.so' in f.read():
                     logging.debug('X.org log reports loaded intel driver, disabling driver %s for hybrid system', 
                             record['Package'])
                     return False

@@ -386,8 +386,8 @@ class DetectTest(unittest.TestCase):
             xorg_log = os.path.join(chroot.path, 'Xorg.0.log')
             os.environ['UBUNTU_DRIVERS_XORG_LOG'] = xorg_log
 
-            with open(xorg_log, 'w') as f:
-                f.write('X.Org X Server 1.11.3\n[     5.547] (II) LoadModule: "extmod"\n[     5.560] (II) Loading /usr/lib/xorg/modules/drivers/intel_drv.so\n')
+            with open(xorg_log, 'wb') as f:
+                f.write(b'X.Org X Server 1.11.3\xe2\x99\xa5\n[     5.547] (II) LoadModule: "extmod"\n[     5.560] (II) Loading /usr/lib/xorg/modules/drivers/intel_drv.so\n')
 
             self.assertEqual(set(UbuntuDrivers.detect.system_driver_packages(cache)),
                              set(['chocolate', 'vanilla']))
