@@ -22,8 +22,8 @@ class SysFS:
         It is kept in a temporary directory which gets removed when the SysFS
         object gets deleted.
 
-        To use this with e. g. libudev, export the SYSFS environment variable
-        to self.sysfs.
+        To use this with e. g. libudev, export the SYSFS_PATH environment
+        variable to self.sysfs.
         '''
         self.sysfs = tempfile.mkdtemp()
 

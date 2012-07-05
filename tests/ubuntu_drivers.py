@@ -88,7 +88,7 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
     @classmethod
     def setUpClass(klass):
         klass.sys = gen_fakesys()
-        os.environ['SYSFS'] = klass.sys.sysfs
+        os.environ['SYSFS_PATH'] = klass.sys.sysfs
 
         # find plugin in our source tree
         os.environ['PYTHONPATH'] = '%s:%s' % (os.getcwd(), os.environ.get('PYTHONPATH', ''))
@@ -288,7 +288,7 @@ class DetectTest(unittest.TestCase):
         '''Create a fake sysfs'''
 
         self.sys = gen_fakesys()
-        os.environ['SYSFS'] = self.sys.sysfs
+        os.environ['SYSFS_PATH'] = self.sys.sysfs
 
         # no custom detection plugins by default
         self.plugin_dir = tempfile.mkdtemp()
@@ -296,7 +296,7 @@ class DetectTest(unittest.TestCase):
 
     def tearDown(self):
         try:
-            del os.environ['SYSFS']
+            del os.environ['SYSFS_PATH']
         except KeyError:
             pass
         shutil.rmtree(self.plugin_dir)
@@ -305,7 +305,7 @@ class DetectTest(unittest.TestCase):
     def test_system_modaliases_system(self):
         '''system_modaliases() for current system'''
 
-        del os.environ['SYSFS']
+        del os.environ['SYSFS_PATH']
         res = UbuntuDrivers.detect.system_modaliases()
         self.assertGreater(len(res), 5)
         self.assertTrue(':' in list(res)[0])
@@ -455,7 +455,7 @@ class DetectTest(unittest.TestCase):
             f.write('''import os, os.path
             
 def detect(apt): 
-    if os.path.exists(os.path.join(os.environ.get("SYSFS", "/sys"), "pickyon")):
+    if os.path.exists(os.path.join(os.environ.get("SYSFS_PATH", "/sys"), "pickyon")):
         return ["picky"]
 ''')
 
@@ -499,11 +499,11 @@ APT::Get::AllowUnauthenticated "true";
         '''Create a fake sysfs'''
 
         self.sys = gen_fakesys()
-        os.environ['SYSFS'] = self.sys.sysfs
+        os.environ['SYSFS_PATH'] = self.sys.sysfs
 
     def tearDown(self):
         try:
-            del os.environ['SYSFS']
+            del os.environ['SYSFS_PATH']
         except KeyError:
             pass
 

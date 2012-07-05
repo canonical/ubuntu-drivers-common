@@ -55,13 +55,13 @@ class TestUbuntuDrivers(unittest.TestCase):
 
     def setUp(self):
         self.sys = fakesysfs.SysFS()
-        os.environ['SYSFS'] = self.sys.sysfs
+        os.environ['SYSFS_PATH'] = self.sys.sysfs
 
         # disable hybrid detection
         os.environ['UBUNTU_DRIVERS_XORG_LOG'] = '/nonexisting'
 
     def tearDown(self):
-        del os.environ['SYSFS']
+        del os.environ['SYSFS_PATH']
 
     def test_bcmwl(self):
         '''bcmwl-kernel-source'''
