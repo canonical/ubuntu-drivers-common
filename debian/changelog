@@ -1,6 +1,9 @@
 ubuntu-drivers-common (1:0.2.60) UNRELEASED; urgency=low
 
   * libudev uses $SYSFS_PATH, not $SYSFS. Fix test suite accordingly.
+  * debian/tests/system: Raise a more specific exception if headers for
+    the running kernel are not installed. Thanks to Jean-Baptiste Lallement
+    for the intial patch! (LP: #1021386)
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 05 Jul 2012 10:55:41 +0200
 

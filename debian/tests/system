@@ -53,6 +53,16 @@ class TestSystem(unittest.TestCase):
 class TestUbuntuDrivers(unittest.TestCase):
     '''Check that we can detect and install the most common drivers'''
 
+    @classmethod
+    def setUpClass(cls):
+        '''Raise an exception if kernel headers are not installed.
+
+        It could be a @unittest.skip class method but we want a failure
+        because missing headers would mean a broken test environment.
+        '''
+        assert os.path.exists('/usr/src/linux-headers-' + os.uname()[2]), \
+               'Headers not installed for running kernel (%s)' % os.uname()[2]
+
     def setUp(self):
         self.sys = fakesysfs.SysFS()
         os.environ['SYSFS_PATH'] = self.sys.sysfs
