@@ -2,6 +2,10 @@ ubuntu-drivers-common (1:0.2.61) UNRELEASED; urgency=low
 
   * NvidiaDetector/nvidiadetector.py: Fix crash if there is only one card.
     (LP: #1021305)
+  * Add share/fake-devices-wrapper: Wrapper script to run a command under a
+    mock sysfs tree which pretends to have an NVidia and ATI graphics card,
+    and a Broadcom wifi card. This can be used for testing the new
+    software-properties or other driver management software.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 12 Jul 2012 15:48:26 +0200
 

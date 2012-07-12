@@ -1,0 +1,36 @@
+#!/usr/bin/python3
+import sys
+import os
+import os.path
+import subprocess
+
+sys.path.append(os.path.dirname(__file__))
+import fakesysfs
+
+if len(sys.argv) < 2:
+    print('Usage: %s <command> [args...]' % sys.argv[0], file=sys.stderr)
+    sys.exit(1)
+
+sysfs = fakesysfs.SysFS()
+os.environ['SYSFS_PATH'] = sysfs.sysfs
+# skip hybrid system detection
+os.environ['UBUNTU_DRIVERS_XORG_LOG'] = '/dev/null'
+
+sysfs.add('pci', 'nvidiacard', 
+          {'modalias': 'pci:v000010DEd000010C3sv00sd01bc03sc00i00',
+           'vendor': '0x10DE',
+           'device': '0x10C3',
+          })
+sysfs.add('pci', 'aticard', 
+          {'modalias': 'pci:v00001002d00009611sv00sd00bc03sc00i00',
+           'vendor': '0x1002',
+           'device': '0x9611',
+          })
+sysfs.add('pci', 'bcmwifi',
+          {'modalias': 'pci:v000014E4d00004353sv00sd01bc00sc00i01',
+           'vendor': '0x14E4',
+           'device': '0x4353',
+          })
+
+# run wrapped program
+subprocess.call(sys.argv[1:])
