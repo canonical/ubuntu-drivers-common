@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.61) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.61) quantal; urgency=low
 
   * NvidiaDetector/nvidiadetector.py: Fix crash if there is only one card.
     (LP: #1021305)
@@ -7,7 +7,7 @@ ubuntu-drivers-common (1:0.2.61) UNRELEASED; urgency=low
     and a Broadcom wifi card. This can be used for testing the new
     software-properties or other driver management software.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 12 Jul 2012 15:48:26 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 12 Jul 2012 16:49:08 +0200
 
 ubuntu-drivers-common (1:0.2.60) quantal; urgency=low
 
