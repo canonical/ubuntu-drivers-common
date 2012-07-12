@@ -310,7 +310,7 @@ class NvidiaDetection(object):
 
                 The newest driver which supports the card is chosen.
                 '''
-                choice = self.driversForCards[self.driversForCards.keys()[0]][0]
+                choice = self.driversForCards[list(self.driversForCards.keys())[0]][0]
                 if self.verbose and not self.printonly:
                     print('Recommended NVIDIA driver: ' + choice)
             '''
