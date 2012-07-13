@@ -1,3 +1,13 @@
+ubuntu-drivers-common (1:0.2.62) UNRELEASED; urgency=low
+
+  * debian/control: As the PackageKit apt backend is going away, drop the
+    Conflicts to packagekit-backend-aptcc. Instead, recommend
+    python3-aptdaemon.pkcompat and update the description to point out that
+    the PackageKit API does not work with the aptcc backend.
+    (LP: #1023953)
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 13 Jul 2012 08:10:14 +0200
+
 ubuntu-drivers-common (1:0.2.61) quantal; urgency=low
 
   * NvidiaDetector/nvidiadetector.py: Fix crash if there is only one card.

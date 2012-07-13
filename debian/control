@@ -39,9 +39,9 @@ Depends: ${python3:Depends},
  python3-apt,
  python3-xkit,
  alsa-utils
-Suggests: packagekit-system-interface
+Recommends: python3-aptdaemon.pkcompat
 Replaces: nvidia-common (<< 1:0.2.46)
-Conflicts: nvidia-common (<< 1:0.2.46), packagekit-backend-aptcc
+Conflicts: nvidia-common (<< 1:0.2.46)
 Provides: nvidia-common
 Enhances: packagekit-system-interface
 Description: Detect and install additional Ubuntu driver packages
@@ -56,8 +56,9 @@ Description: Detect and install additional Ubuntu driver packages
  .
   - a PackageKit plugin for WhatProvides() for types MODALIAS and
     HARDWARE_DRIVER, to do the same queries as above through the PackageKit API
-    (for using in non-distro specific GUIs). This also works with aptdaemon's
-    PackageKit compatibility layer (python-aptdaemon.pkcompat).
+    (for using in non-distro specific GUIs). This works with aptdaemon's
+    PackageKit compatibility layer (python3-aptdaemon.pkcompat) and with
+    PackageKit's apt backend, but _not_ with the PackageKit aptcc backend.
  .
   - some NVidia specific support code to find the most appropriate driver
     version, as well as setting up the alternatives symlinks that the
