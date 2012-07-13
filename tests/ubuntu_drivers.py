@@ -50,9 +50,9 @@ def gen_fakesys():
     # covered by chocolate.deb
     s.add('usb', 'black', {'modalias': 'usb:v9876dABCDsv01sd02bc00sc01i05'})
     # covered by nvidia-{current,old}.deb
-    s.add('pci', 'grey', {'modalias': 'pci:vDEADBEEFd00'})
-    # not covered by any driver package
     s.add('pci', 'graphics', {'modalias': 'pci:nvidia'})
+    # not covered by any driver package
+    s.add('pci', 'grey', {'modalias': 'pci:vDEADBEEFd00'})
     s.add('ssb', 'yellow', {}, {'MODALIAS': 'pci:vDEADBEEFd00'})
 
     return s
