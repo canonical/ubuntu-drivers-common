@@ -1,9 +1,9 @@
-ubuntu-drivers-common (1:0.2.63) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.63) quantal; urgency=low
 
   * debian/control: Add udev build/binary dependency, to ensure we have pci-db
     and usb-db.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 13 Jul 2012 10:52:29 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 13 Jul 2012 10:52:46 +0200
 
 ubuntu-drivers-common (1:0.2.62) quantal; urgency=low
 
