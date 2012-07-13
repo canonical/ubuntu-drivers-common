@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.62) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.62) quantal; urgency=low
 
   * debian/control: As the PackageKit apt backend is going away, drop the
     Conflicts to packagekit-backend-aptcc. Instead, recommend
@@ -8,7 +8,7 @@ ubuntu-drivers-common (1:0.2.62) UNRELEASED; urgency=low
   * UbuntuDrivers.detect.py, system_driver_packages(): Add 'vendor' and
     'model' fields for the human readable names from pci/usb databases.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 13 Jul 2012 08:10:14 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 13 Jul 2012 10:41:12 +0200
 
 ubuntu-drivers-common (1:0.2.61) quantal; urgency=low
 
