@@ -22,6 +22,7 @@ Build-Depends: debhelper (>= 9),
  apt-utils,
  dbus,
  udev,
+ pciutils,
  python3-dbus
 Standards-Version: 3.9.3
 Vcs-Git: git://github.com/tseliot/ubuntu-drivers-common.git
@@ -40,6 +41,8 @@ Depends: ${python3:Depends},
  python3-apt,
  python3-xkit,
  udev,
+ pciutils,
+ usbutils,
  alsa-utils
 Recommends: python3-aptdaemon.pkcompat
 Replaces: nvidia-common (<< 1:0.2.46)
