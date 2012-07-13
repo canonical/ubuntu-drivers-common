@@ -123,6 +123,10 @@ def command_debug(args):
             info_str += '  modalias: ' + info['modalias']
         if 'syspath' in info:
             info_str += '  path: ' + info['syspath']
+        if 'vendor' in info:
+            info_str += '  vendor: ' + info['vendor']
+        if 'model' in info:
+            info_str += '  model: ' + info['model']
 
         print('%s: installed: %s   available: %s%s%s ' % (package, inst, cand, auto,  info_str))
 

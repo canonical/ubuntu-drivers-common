@@ -50,7 +50,10 @@ def gen_fakesys():
     # covered by chocolate.deb
     s.add('usb', 'black', {'modalias': 'usb:v9876dABCDsv01sd02bc00sc01i05'})
     # covered by nvidia-{current,old}.deb
-    s.add('pci', 'graphics', {'modalias': 'pci:nvidia'})
+    s.add('pci', 'graphics', {'modalias': 'pci:nvidia',
+                              'vendor': '0x10DE',
+                              'device': '0x10C3',
+                             })
     # not covered by any driver package
     s.add('pci', 'grey', {'modalias': 'pci:vDEADBEEFd00'})
     s.add('ssb', 'yellow', {}, {'MODALIAS': 'pci:vDEADBEEFd00'})
@@ -71,9 +74,9 @@ def gen_fakearchive():
     a.create_deb('xserver-xorg-core', version='99:1',  # higher than system installed one
             dependencies={'Provides': 'xorg-video-abi-4'})
     a.create_deb('nvidia-current', dependencies={'Depends': 'xorg-video-abi-4'},
-            extra_tags={'Modaliases': 'nv(pci:nvidia)'})
+                 extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
     a.create_deb('nvidia-old', dependencies={'Depends': 'xorg-video-abi-3'},
-            extra_tags={'Modaliases': 'nv(pci:nvidia)'})
+                 extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
 
     # packages not covered by modalises, for testing detection plugins
     a.create_deb('special')
@@ -360,8 +363,16 @@ class DetectTest(unittest.TestCase):
         self.assertTrue(res['vanilla']['syspath'].endswith('/devices/white'))
         self.assertFalse(res['vanilla']['from_distro'])
         self.assertTrue(res['vanilla']['free'])
+        self.assertFalse('vendor' in res['vanilla'])
+        self.assertFalse('model' in res['vanilla'])
         self.assertTrue(res['chocolate']['syspath'].endswith('/devices/black'))
+        self.assertFalse('vendor' in res['chocolate'])
+        self.assertFalse('model' in res['chocolate'])
         self.assertEqual(res['nvidia-current']['modalias'], 'pci:nvidia')
+        self.assertTrue('nvidia' in res['nvidia-current']['vendor'].lower(),
+                        res['nvidia-current']['vendor'])
+        self.assertTrue('GeForce' in res['nvidia-current']['model'],
+                        res['nvidia-current']['model'])
 
     def test_system_driver_packages_detect_plugins(self):
         '''system_driver_packages() includes custom detection plugins'''

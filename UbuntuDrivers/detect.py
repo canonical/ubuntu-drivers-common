@@ -11,6 +11,7 @@
 import os
 import logging
 import fnmatch
+import subprocess
 
 import apt
 
@@ -196,6 +197,43 @@ def _is_package_from_distro(pkg):
             return True
     return False
 
+def _get_db_name(syspath, alias):
+    '''Return (vendor, model) names for given device.
+
+    Values are None if unknown.
+    '''
+    # ensure syspath is a device name relative to the sysfs dir
+    syspath = syspath[syspath.index('/devices/'):]
+
+    # check if we have an udev helper for this
+    command = '/lib/udev/%s-db' % alias.split(':')[0]
+    if not os.path.exists(command):
+        logging.debug('_get_db_name(%s, %s): No program %s, cannot identify',
+                      syspath, alias, command)
+        return (None, None)
+
+    # call udev ID helper
+    udev_db = subprocess.Popen([command, syspath], stdout=subprocess.PIPE,
+                               stderr = subprocess.PIPE, universal_newlines=True)
+    (out, err) = udev_db.communicate()
+    if udev_db.returncode != 0:
+        logging.debug('_get_db_name(%s, %s): %s failed with %i:\n%s', syspath,
+                      alias, command, udev_db.returncode, err)
+        return (None, None)
+
+    vendor = None
+    model = None
+    for line in out.splitlines():
+        (k, v) = line.split('=', 1)
+        if k == 'ID_VENDOR_FROM_DATABASE':
+            vendor = v
+        if k == 'ID_MODEL_FROM_DATABASE':
+            model = v
+
+    logging.debug('_get_db_name(%s, %s): vendor "%s", model "%s"', syspath,
+                  alias, vendor, model)
+    return (vendor, model)
+
 def system_driver_packages(apt_cache=None):
     '''Get driver packages that are available for the system.
     
@@ -221,6 +259,8 @@ def system_driver_packages(apt_cache=None):
       'from_distro': Boolean flag whether the driver is shipped by the distro;
                      if not, it comes from a (potentially less tested/trusted)
                      third party source.
+      'vendor':      Human readable vendor name, if available.
+      'model':       Human readable product name, if available.
     '''
     modaliases = system_modaliases()
 
@@ -236,6 +276,11 @@ def system_driver_packages(apt_cache=None):
                     'free': _is_package_free(p),
                     'from_distro': _is_package_from_distro(p),
                 }
+            (vendor, model) = _get_db_name(syspath, alias)
+            if vendor is not None:
+                packages[p.name]['vendor'] = vendor
+            if model is not None:
+                packages[p.name]['model'] = model
     
     # add available packages which need custom detection code
     for p in detect_plugin_packages(apt_cache):
