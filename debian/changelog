@@ -1,9 +1,9 @@
-ubuntu-drivers-common (1:0.2.64) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.64) quantal; urgency=low
 
   * debian/control: Add pciutils and usbutilsl build/binary dependencies, so
     that pci-db and usb-db actually have some data files to work with.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 13 Jul 2012 11:02:02 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 13 Jul 2012 11:08:02 +0200
 
 ubuntu-drivers-common (1:0.2.63) quantal; urgency=low
 
