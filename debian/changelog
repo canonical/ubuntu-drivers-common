@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.65) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.65) quantal; urgency=low
 
   * UbuntuDrivers/detect.py, system_driver_packages(): Add 'recommended' flag
     to the nvidia-* and fglrx-* packages, which usually provide more than one
@@ -14,7 +14,7 @@ ubuntu-drivers-common (1:0.2.65) UNRELEASED; urgency=low
   * ubuntu-drivers: Add "device" command to show by-device drivers as reported
     by system_device_drivers().
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 17 Jul 2012 09:35:51 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 17 Jul 2012 15:48:44 +0200
 
 ubuntu-drivers-common (1:0.2.64) quantal; urgency=low
 
