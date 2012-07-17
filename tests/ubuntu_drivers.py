@@ -353,26 +353,48 @@ class DetectTest(unittest.TestCase):
             chroot.setup()
             chroot.add_test_repository()
             archive = gen_fakearchive()
+            # older applicable driver which is not the recommended one
+            archive.create_deb('nvidia-123', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
+            # -updates driver which also should not be recommended
+            archive.create_deb('nvidia-current-updates', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
             chroot.add_repository(archive.path, True, False)
             cache = apt.Cache(rootdir=chroot.path)
             res = UbuntuDrivers.detect.system_driver_packages(cache)
         finally:
             chroot.remove()
-        self.assertEqual(set(res), set(['chocolate', 'vanilla', 'nvidia-current']))
+        self.assertEqual(set(res), set(['chocolate', 'vanilla', 'nvidia-current',
+                                        'nvidia-current-updates', 'nvidia-123']))
         self.assertEqual(res['vanilla']['modalias'], 'pci:v00001234d00sv00000001sd00bc00sc00i00')
         self.assertTrue(res['vanilla']['syspath'].endswith('/devices/white'))
         self.assertFalse(res['vanilla']['from_distro'])
         self.assertTrue(res['vanilla']['free'])
         self.assertFalse('vendor' in res['vanilla'])
         self.assertFalse('model' in res['vanilla'])
+        self.assertFalse('recommended' in res['vanilla'])
+
         self.assertTrue(res['chocolate']['syspath'].endswith('/devices/black'))
         self.assertFalse('vendor' in res['chocolate'])
         self.assertFalse('model' in res['chocolate'])
+        self.assertFalse('recommended' in res['chocolate'])
+
         self.assertEqual(res['nvidia-current']['modalias'], 'pci:nvidia')
         self.assertTrue('nvidia' in res['nvidia-current']['vendor'].lower(),
                         res['nvidia-current']['vendor'])
         self.assertTrue('GeForce' in res['nvidia-current']['model'],
                         res['nvidia-current']['model'])
+        self.assertEqual(res['nvidia-current']['recommended'], True)
+
+        self.assertEqual(res['nvidia-123']['modalias'], 'pci:nvidia')
+        self.assertTrue('nvidia' in res['nvidia-123']['vendor'].lower(),
+                        res['nvidia-123']['vendor'])
+        self.assertTrue('GeForce' in res['nvidia-123']['model'],
+                        res['nvidia-123']['model'])
+        self.assertEqual(res['nvidia-123']['recommended'], False)
+
+        self.assertEqual(res['nvidia-current-updates']['modalias'], 'pci:nvidia')
+        self.assertEqual(res['nvidia-current-updates']['recommended'], False)
 
     def test_system_driver_packages_detect_plugins(self):
         '''system_driver_packages() includes custom detection plugins'''

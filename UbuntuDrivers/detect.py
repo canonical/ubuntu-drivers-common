@@ -12,6 +12,7 @@ import os
 import logging
 import fnmatch
 import subprocess
+import functools
 
 import apt
 
@@ -261,6 +262,9 @@ def system_driver_packages(apt_cache=None):
                      third party source.
       'vendor':      Human readable vendor name, if available.
       'model':       Human readable product name, if available.
+      'recommended': Some drivers (nvidia, fglrx) come in multiple variants and
+                     versions; these have this flag, where exactly one has
+                     recommended == True, and all others False.
     '''
     modaliases = system_modaliases()
 
@@ -281,7 +285,23 @@ def system_driver_packages(apt_cache=None):
                 packages[p.name]['vendor'] = vendor
             if model is not None:
                 packages[p.name]['model'] = model
-    
+
+    # Add "recommended" flags for NVidia alternatives
+    nvidia_packages = [p for p in packages if p.startswith('nvidia-')]
+    if nvidia_packages:
+        nvidia_packages.sort(key=functools.cmp_to_key(_cmp_gfx_alternatives))
+        recommended = nvidia_packages[-1]
+        for p in nvidia_packages:
+            packages[p]['recommended'] = (p == recommended)
+
+    # Add "recommended" flags for fglrx alternatives
+    fglrx_packages = [p for p in packages if p.startswith('fglrx-')]
+    if fglrx_packages:
+        fglrx_packages.sort(key=functools.cmp_to_key(_cmp_gfx_alternatives))
+        recommended = fglrx_packages[-1]
+        for p in fglrx_packages:
+            packages[p]['recommended'] = (p == recommended)
+
     # add available packages which need custom detection code
     for p in detect_plugin_packages(apt_cache):
         apt_p = apt_cache[p]
@@ -363,3 +383,20 @@ def detect_plugin_packages(apt_cache=None):
 
     return packages
 
+def _cmp_gfx_alternatives(x, y):
+    '''Compare two graphics driver names in terms of preference.
+
+    -updates always sort after non-updates, as we prefer the stable driver and
+    only want to offer -updates when the one from release does not support the
+    card.
+    '''
+    if x.endswith('-updates') and not y.endswith('-updates'):
+        return -1
+    if not x.endswith('-updates') and y.endswith('-updates'):
+        return 1
+    if x < y:
+        return -1
+    if x > y:
+        return 1
+    assert x == y
+    return 0
