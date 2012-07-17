@@ -403,7 +403,7 @@ class DetectTest(unittest.TestCase):
             f.write('def detect(apt): return ["coreutils", "no_such_package"]\n')
 
         self.assertEqual(UbuntuDrivers.detect.system_driver_packages(), 
-                {'coreutils': {'free': True, 'from_distro': True}})
+                         {'coreutils': {'free': True, 'from_distro': True, 'plugin': 'extra.py'}})
 
     def test_system_driver_packages_hybrid(self):
         '''system_driver_packages() on hybrid Intel/NVidia systems'''
@@ -427,6 +427,73 @@ class DetectTest(unittest.TestCase):
         finally:
             os.environ['UBUNTU_DRIVERS_XORG_LOG'] = '/nonexisting'
             chroot.remove()
+
+    def test_system_device_drivers_system(self):
+        '''system_device_drivers() for current system'''
+
+        # nothing should match the devices in our fake sysfs
+        self.assertEqual(UbuntuDrivers.detect.system_device_drivers(), {})
+
+    def test_system_device_drivers_chroot(self):
+        '''system_device_drivers() for test package repository'''
+
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            # older applicable driver which is not the recommended one
+            archive.create_deb('nvidia-123', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
+            # -updates driver which also should not be recommended
+            archive.create_deb('nvidia-current-updates', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
+            chroot.add_repository(archive.path, True, False)
+            cache = apt.Cache(rootdir=chroot.path)
+            res = UbuntuDrivers.detect.system_device_drivers(cache)
+        finally:
+            chroot.remove()
+
+        white = '%s/devices/white' % self.sys.sysfs
+        black = '%s/devices/black' % self.sys.sysfs
+        graphics = '%s/devices/graphics' % self.sys.sysfs
+        self.assertEqual(len(res), 3)  # the three devices above
+
+        self.assertEqual(res[white], 
+                         {'modalias': 'pci:v00001234d00sv00000001sd00bc00sc00i00',
+                          'drivers': {'vanilla': {'free': True, 'from_distro': False}}
+                         })
+
+        self.assertEqual(res[black], 
+                         {'modalias': 'usb:v9876dABCDsv01sd02bc00sc01i05',
+                          'drivers': {'chocolate': {'free': True, 'from_distro': False}}
+                         })
+
+        self.assertEqual(res[graphics]['modalias'], 'pci:nvidia')
+        self.assertTrue('nvidia' in res[graphics]['vendor'].lower())
+        self.assertTrue('GeForce' in res[graphics]['model'])
+
+        # should contain nouveau driver; note that free is True here because
+        # these come from the fake archive
+        self.assertEqual(res[graphics]['drivers']['nvidia-current'],
+                         {'free': True, 'from_distro': False, 'recommended': True})
+        self.assertEqual(res[graphics]['drivers']['nvidia-current-updates'],
+                         {'free': True, 'from_distro': False, 'recommended': False})
+        self.assertEqual(res[graphics]['drivers']['nvidia-123'],
+                          {'free': True, 'from_distro': False, 'recommended': False})
+        self.assertEqual(res[graphics]['drivers']['xserver-xorg-video-nouveau'],
+                         {'free': True, 'from_distro': True, 'recommended': False, 'builtin': True})
+        self.assertEqual(len(res[graphics]['drivers']), 4, list(res[graphics]['drivers'].keys()))
+
+    def test_system_device_drivers_detect_plugins(self):
+        '''system_device_drivers() includes custom detection plugins'''
+
+        with open(os.path.join(self.plugin_dir, 'extra.py'), 'w') as f:
+            f.write('def detect(apt): return ["coreutils", "no_such_package"]\n')
+
+        res = UbuntuDrivers.detect.system_device_drivers()
+        self.assertEqual(res, {'extra.py': {
+            'drivers': {'coreutils': {'free': True, 'from_distro': True}}}})
 
     def test_auto_install_filter(self):
         '''auto_install_filter()'''

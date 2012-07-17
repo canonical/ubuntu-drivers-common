@@ -25,11 +25,15 @@ The UbuntuDrivers.detect Python module provides some functions to detect the
 system's hardware, matching driver packages, and packages which are eligible
 for automatic installation.
 
-The two main functions are:
+The three main functions are:
 
   "Which driver packages apply to this system?"
 
   packages = UbuntuDrivers.detect.system_driver_packages()
+
+  "Which devices need drivers, and which packages do they need?"
+
+  driver_info = UbuntuDrivers.detect.system_device_drivers()
 
   "Which driver package(s) applies to this piece of hardware?"
 
