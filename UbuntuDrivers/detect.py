@@ -324,9 +324,14 @@ def auto_install_filter(packages):
     '''
     # any package which matches any of those globs will be accepted
     whitelist = ['bcmwl*', 'pvr-omap*', 'virtualbox-guest*', 'nvidia-*']
-    result = []
+    allow = []
     for pattern in whitelist:
-        result.extend(fnmatch.filter(packages, pattern))
+        allow.extend(fnmatch.filter(packages, pattern))
+
+    result = {}
+    for p in allow:
+        if 'recommended' not in packages[p] or packages[p]['recommended']:
+            result[p] = packages[p]
     return result
 
 def detect_plugin_packages(apt_cache=None):

@@ -59,22 +59,23 @@ def command_autoinstall(args):
         print('No drivers found for automatic installation.')
         return
 
-    # remove packages which are already installed
-    for p in packages[:]:  # make a copy, as we modify the list
-        if cache[p].installed:
-            packages.remove(p)
+    # ignore packages which are already installed
+    to_install = []
+    for p in packages:
+        if not cache[p].installed:
+            to_install.append(p)
 
     if not packages:
         print('All drivers for automatic installation are already installed.')
         return
 
     ret = subprocess.call(['apt-get', 'install', '-o',
-        'DPkg::options::=--force-confnew', '-y'] + packages)
+        'DPkg::options::=--force-confnew', '-y'] + to_install)
 
     # create package list
     if ret == 0 and args.package_list:
         with open(args.package_list, 'a') as f:
-            f.write('\n'.join(packages))
+            f.write('\n'.join(to_install))
             f.write('\n')
 
     return ret

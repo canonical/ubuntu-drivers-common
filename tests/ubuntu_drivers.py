@@ -431,11 +431,22 @@ class DetectTest(unittest.TestCase):
     def test_auto_install_filter(self):
         '''auto_install_filter()'''
 
-        self.assertEqual(UbuntuDrivers.detect.auto_install_filter([]), [])
-        self.assertEqual(set(UbuntuDrivers.detect.auto_install_filter([
-            'nvidia-current', 'bcmwl-kernel-source', 'fglrx-updates',
-            'pvr-omap4-egl'])), 
+        self.assertEqual(UbuntuDrivers.detect.auto_install_filter({}), {})
+
+        pkgs = {'bcmwl-kernel-source': {}, 
+                'nvidia-current': {},
+                'fglrx-updates': {},
+                'pvr-omap4-egl': {}}
+
+        self.assertEqual(set(UbuntuDrivers.detect.auto_install_filter(pkgs)),
             set(['bcmwl-kernel-source', 'pvr-omap4-egl', 'nvidia-current']))
+
+        # should not include non-recommended variants
+        pkgs = {'bcmwl-kernel-source': {}, 
+                'nvidia-current': {'recommended': False},
+                'nvidia-173': {'recommended': True}}
+        self.assertEqual(set(UbuntuDrivers.detect.auto_install_filter(pkgs)),
+                         set(['bcmwl-kernel-source', 'nvidia-173']))
 
     def test_detect_plugin_packages(self):
         '''detect_plugin_packages()'''
@@ -612,7 +623,6 @@ APT::Get::AllowUnauthenticated "true";
         out, err = ud.communicate()
         self.assertEqual(err, '')
         self.assertFalse('bcmwl-kernel-source' in out, out)
-        self.assertTrue('already installed' in out, out)
         self.assertEqual(ud.returncode, 0)
 
     def test_auto_install_packagelist(self):
