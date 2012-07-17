@@ -670,6 +670,61 @@ APT::Get::AllowUnauthenticated "true";
         self.assertEqual(out, '\n')
         self.assertEqual(ud.returncode, 0)
 
+    def test_devices_chroot(self):
+        '''ubuntu-drivers devices for fake sysfs and chroot'''
+
+        ud = subprocess.Popen([self.tool_path, 'devices'],
+                universal_newlines=True, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE)
+        out, err = ud.communicate()
+        self.assertEqual(err, '')
+        self.assertTrue('/devices/white ==' in out)
+        self.assertTrue('modalias : pci:v00001234d00sv00000001sd00bc00sc00i00' in out)
+        self.assertTrue('driver   : vanilla - third-party free' in out)
+        self.assertTrue('/devices/black ==' in out)
+        self.assertTrue('/devices/graphics ==' in out)
+        self.assertTrue('xserver-xorg-video-nouveau - distro free builtin' in out)
+        self.assertTrue('nvidia-current - third-party free recommended' in out)
+        self.assertEqual(ud.returncode, 0)
+
+    def test_devices_detect_plugins(self):
+        '''ubuntu-drivers devices includes custom detection plugins'''
+
+        os.mkdir(self.plugin_dir)
+        self.addCleanup(shutil.rmtree, self.plugin_dir)
+
+        with open(os.path.join(self.plugin_dir, 'special.py'), 'w') as f:
+            f.write('def detect(apt): return ["special", "special-uninst", "special-unavail", "picky"]\n')
+
+        ud = subprocess.Popen([self.tool_path, 'devices'],
+                universal_newlines=True, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE)
+        out, err = ud.communicate()
+        self.assertEqual(err, '')
+
+        # only look at the part after special.py
+        special_off = out.find('== special.py ==')
+        self.assertGreater(special_off, 0, out)
+        out = out[special_off:]
+        self.assertTrue('picky - third-party free' in out, out)
+        self.assertTrue('special - third-party free' in out, out)
+        self.assertEqual(ud.returncode, 0)
+
+    def test_devices_system(self):
+        '''ubuntu-drivers devices for fake sysfs and system apt'''
+
+        env = os.environ.copy()
+        del env['APT_CONFIG']
+
+        ud = subprocess.Popen([self.tool_path, 'devices'],
+                universal_newlines=True, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, env=env)
+        out, err = ud.communicate()
+        # real system packages should not match our fake modalises
+        self.assertEqual(err, '')
+        self.assertEqual(out, '')
+        self.assertEqual(ud.returncode, 0)
+
     def test_auto_install_chroot(self):
         '''ubuntu-drivers autoinstall for fake sysfs and chroot'''
 

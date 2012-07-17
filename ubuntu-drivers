@@ -48,6 +48,34 @@ def command_list(args):
 
     return 0
 
+def command_devices(args):
+    '''Show all devices which need drivers, and which packages apply to them.'''
+
+    drivers = UbuntuDrivers.detect.system_device_drivers()
+    for device, info in drivers.items():
+        print('== %s ==' % device)
+        for k, v in info.items():
+            if k == 'drivers':
+                continue
+            print('%-9s: %s' % (k, v))
+
+        for pkg, pkginfo in info['drivers'].items():
+            info_str = ''
+            if pkginfo['from_distro']:
+                info_str += ' distro'
+            else:
+                info_str += ' third-party'
+            if pkginfo['free']:
+                info_str += ' free'
+            else:
+                info_str += ' non-free'
+            if pkginfo.get('builtin'):
+                info_str += ' builtin'
+            if pkginfo.get('recommended'):
+                info_str += ' recommended'
+            print('%-9s: %s -%s' % ('driver', pkg, info_str))
+        print('')
+
 def command_autoinstall(args):
     '''Install drivers that are appropriate for automatic installation.'''
 
