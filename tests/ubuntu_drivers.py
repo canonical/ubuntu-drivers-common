@@ -449,18 +449,18 @@ class DetectTest(unittest.TestCase):
 
             cache = apt.Cache(rootdir=chroot.path)
 
-            self.assertEqual(UbuntuDrivers.detect.detect_plugin_packages(cache), [])
+            self.assertEqual(UbuntuDrivers.detect.detect_plugin_packages(cache), {})
 
             self._gen_detect_plugins()
             # suppress logging the deliberatey errors in our test plugins to
             # stderr
             logging.getLogger().setLevel(logging.CRITICAL)
             self.assertEqual(UbuntuDrivers.detect.detect_plugin_packages(cache), 
-                             ['special'])
+                             {'special.py': ['special']})
 
             os.mkdir(os.path.join(self.sys.sysfs, 'pickyon'))
-            self.assertEqual(set(UbuntuDrivers.detect.detect_plugin_packages(cache)), 
-                             set(['special', 'picky']))
+            self.assertEqual(UbuntuDrivers.detect.detect_plugin_packages(cache), 
+                             {'special.py': ['special'], 'picky.py': ['picky']})
         finally:
             logging.getLogger().setLevel(logging.INFO)
             chroot.remove()

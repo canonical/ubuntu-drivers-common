@@ -3,6 +3,8 @@ ubuntu-drivers-common (1:0.2.65) UNRELEASED; urgency=low
   * UbuntuDrivers/detect.py, system_driver_packages(): Add 'recommended' flag
     to the nvidia-* and fglrx-* packages, which usually provide more than one
     package for a particular device. (LP: #1025315)
+  * UbuntuDrivers/detect.py: Change return value of detect_plugin_packages()
+    to a plugin_name → [package, ...] map, so that we retain the plugin names.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 17 Jul 2012 09:35:51 +0200
 

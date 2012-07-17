@@ -303,12 +303,13 @@ def system_driver_packages(apt_cache=None):
             packages[p]['recommended'] = (p == recommended)
 
     # add available packages which need custom detection code
-    for p in detect_plugin_packages(apt_cache):
-        apt_p = apt_cache[p]
-        packages[p] = {
-                'free': _is_package_free(apt_p),
-                'from_distro': _is_package_from_distro(apt_p),
-            }
+    for pkgs in detect_plugin_packages(apt_cache).values():
+        for p in pkgs:
+            apt_p = apt_cache[p]
+            packages[p] = {
+                    'free': _is_package_free(apt_p),
+                    'from_distro': _is_package_from_distro(apt_p),
+                }
 
     return packages
 
@@ -340,22 +341,23 @@ def detect_plugin_packages(apt_cache=None):
 
     If you already have an existing apt.Cache() object, you can pass it as an
     argument for efficiency.
+
+    Return pluginname -> [package, ...] map.
     '''
+    packages = {}
     plugindir = os.environ.get('UBUNTU_DRIVERS_DETECT_DIR',
             '/usr/share/ubuntu-drivers-common/detect/')
     if not os.path.isdir(plugindir):
         logging.debug('Custom detection plugin directory %s does not exist', plugindir)
-        return []
-
-    packages = []
+        return packages
 
     if apt_cache is None:
         apt_cache = apt.Cache()
 
-    for f in os.listdir(plugindir):
-        if not f.endswith('.py'):
+    for fname in os.listdir(plugindir):
+        if not fname.endswith('.py'):
             continue
-        plugin = os.path.join(plugindir, f)
+        plugin = os.path.join(plugindir, fname)
         logging.debug('Loading custom detection plugin %s', plugin)
 
         symb = {}
@@ -377,7 +379,7 @@ def detect_plugin_packages(apt_cache=None):
             for pkg in result:
                 if pkg in apt_cache and apt_cache[pkg].candidate:
                     if _check_video_abi_compat(apt_cache, apt_cache[pkg].candidate.record):
-                        packages.append(pkg)
+                        packages.setdefault(fname, []).append(pkg)
                 else:
                     logging.debug('Ignoring unavailable package %s from plugin %s', pkg, plugin)
 
