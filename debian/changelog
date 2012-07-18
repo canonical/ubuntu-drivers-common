@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.66) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.66) quantal; urgency=low
 
   * UbuntuDrivers/detect.py, system_device_drivers(): Add driver flag
     "manual_installed" if none of the driver packages are installed, but the
@@ -9,7 +9,7 @@ ubuntu-drivers-common (1:0.2.66) UNRELEASED; urgency=low
     given kernel module name is available. This can be used to test the
     "manually installed driver" case.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 18 Jul 2012 09:12:37 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 18 Jul 2012 09:29:59 +0200
 
 ubuntu-drivers-common (1:0.2.65) quantal; urgency=low
 
