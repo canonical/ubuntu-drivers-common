@@ -198,6 +198,52 @@ def _is_package_from_distro(pkg):
             return True
     return False
 
+def _pkg_get_module(pkg):
+    '''Determine module name from apt Package object'''
+
+    try:
+        m = pkg.candidate.record['Modaliases']
+    except (KeyError, AttributeError):
+        logging.debug('_pkg_get_module %s: package has no Modaliases header, cannot determine module', pkg.name)
+        return None
+
+    paren = m.find('(')
+    if paren <= 0:
+        logging.warning('_pkg_get_module %s: package has invalid Modaliases header, cannot determine module', pkg.name)
+        return None
+
+    module = m[:paren]
+    return module
+
+def _is_manual_install(pkg):
+    '''Determine if the kernel module from an apt.Package is manually installed.'''
+
+    if pkg.installed:
+        return False
+
+    # special case, as our packages suffix the kmod with _version
+    if pkg.name.startswith('nvidia'):
+        module = 'nvidia'
+    elif pkg.name.startswith('fglrx'):
+        module = 'fglrx'
+    else:
+        module = _pkg_get_module(pkg)
+
+    if not module:
+        return False
+
+    modinfo = subprocess.Popen(['modinfo', module], stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+    modinfo.communicate()
+    if modinfo.returncode == 0:
+        logging.debug('_is_manual_install %s: builds module %s which is available, manual install',
+                      pkg.name, module)
+        return True
+
+    logging.debug('_is_manual_install %s: builds module %s which is not available, no manual install',
+                  pkg.name, module)
+    return False
+
 def _get_db_name(syspath, alias):
     '''Return (vendor, model) names for given device.
 
@@ -348,6 +394,10 @@ def system_device_drivers(apt_cache=None):
                      default package such as xserver-xorg-video-nouveau which
                      provides a free alternative to the proprietary NVidia
                      driver; these will have the 'builtin' flag set.
+      'manual_install':
+                     None of the driver packages are installed, but the kernel
+                     module that it provides is available; this usually means
+                     that the user manually installed the driver from upstream.
 
     Aavailable keys in <driver package info>:
       'builtin':     The package is shipped by default in Ubuntu and MUST
@@ -363,6 +413,8 @@ def system_device_drivers(apt_cache=None):
                      recommended == True, and all others False.
     '''
     result = {}
+    if not apt_cache:
+        apt_cache = apt.Cache()
 
     # copy the system_driver_packages() structure into the by-device structure
     for pkg, pkginfo in system_driver_packages(apt_cache).items():
@@ -375,10 +427,20 @@ def system_device_drivers(apt_cache=None):
             if opt_key in pkginfo:
                 result[device_name][opt_key] = pkginfo[opt_key]
         drivers = result[device_name].setdefault('drivers', {})
-        drivers[pkg] ={'free': pkginfo['free'], 'from_distro': pkginfo['from_distro']}
+        drivers[pkg] = {'free': pkginfo['free'], 'from_distro': pkginfo['from_distro']}
         if 'recommended' in pkginfo:
             drivers[pkg]['recommended'] = pkginfo['recommended']
+
+    # now determine the manual_install device flag: this is true iff all driver
+    # packages are "manually installed"
+    for driver, info in result.items():
+        for pkg in info['drivers']:
+            if not _is_manual_install(apt_cache[pkg]):
+                break
+        else:
+            info['manual_install'] = True
  
+    # add OS builtin free alternatives to proprietary drivers
     _add_builtins(result)
  
     return result

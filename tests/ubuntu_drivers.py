@@ -14,6 +14,7 @@ import resource
 import sys
 import tempfile
 import shutil
+import logging
 
 from gi.repository import GLib
 from gi.repository import PackageKitGlib
@@ -26,7 +27,6 @@ import UbuntuDrivers.PackageKit
 
 import fakesysfs
 import testarchive
-import logging
 
 TEST_DIR = os.path.abspath(os.path.dirname(__file__))
 ROOT_DIR = os.path.dirname(TEST_DIR)
@@ -494,6 +494,42 @@ class DetectTest(unittest.TestCase):
         res = UbuntuDrivers.detect.system_device_drivers()
         self.assertEqual(res, {'extra.py': {
             'drivers': {'coreutils': {'free': True, 'from_distro': True}}}})
+
+    def test_system_device_drivers_manual_install(self):
+        '''system_device_drivers() for a manually installed nvidia driver'''
+
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            chroot.add_repository(archive.path, True, False)
+            cache = apt.Cache(rootdir=chroot.path)
+
+            # add a wrapper modinfo binary
+            with open(os.path.join(chroot.path, 'modinfo'), 'w') as f:
+                f.write('''#!/bin/sh -e
+if [ "$1" = nvidia ]; then
+    echo "filename:  /some/path/nvidia.ko"
+    exit 0
+fi
+exec /sbin/modinfo "$@"
+''')
+            os.chmod(os.path.join(chroot.path, 'modinfo'), 0o755)
+            orig_path = os.environ['PATH']
+            os.environ['PATH'] = '%s:%s' % (chroot.path, os.environ['PATH'])
+
+            res = UbuntuDrivers.detect.system_device_drivers(cache)
+        finally:
+            chroot.remove()
+            os.environ['PATH'] = orig_path
+
+        graphics = '%s/devices/graphics' % self.sys.sysfs
+        self.assertEqual(res[graphics]['modalias'], 'pci:nvidia')
+        self.assertTrue(res[graphics]['manual_install'])
+
+        # should still show the drivers
+        self.assertGreater(len(res[graphics]['drivers']), 1)
 
     def test_auto_install_filter(self):
         '''auto_install_filter()'''

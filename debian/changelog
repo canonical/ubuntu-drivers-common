@@ -1,3 +1,12 @@
+ubuntu-drivers-common (1:0.2.66) UNRELEASED; urgency=low
+
+  * UbuntuDrivers/detect.py, system_device_drivers(): Add driver flag
+    "manual_installed" if none of the driver packages are installed, but the
+    corresponding kernel module is available. This usually means that the user
+    installed the driver manually from upstream. (LP: #1025632)
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 18 Jul 2012 09:12:37 +0200
+
 ubuntu-drivers-common (1:0.2.65) quantal; urgency=low
 
   * UbuntuDrivers/detect.py, system_driver_packages(): Add 'recommended' flag
