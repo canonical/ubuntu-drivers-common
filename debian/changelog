@@ -4,6 +4,10 @@ ubuntu-drivers-common (1:0.2.66) UNRELEASED; urgency=low
     "manual_installed" if none of the driver packages are installed, but the
     corresponding kernel module is available. This usually means that the user
     installed the driver manually from upstream. (LP: #1025632)
+  * share/fake-devices-wrapper: If $FAKE_INSTALLED_KMOD is set, run the
+    wrapped program with a "modinfo" wrapper in $PATH which claims that the
+    given kernel module name is available. This can be used to test the
+    "manually installed driver" case.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 18 Jul 2012 09:12:37 +0200
 

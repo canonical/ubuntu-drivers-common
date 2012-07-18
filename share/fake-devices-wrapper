@@ -16,6 +16,19 @@ os.environ['SYSFS_PATH'] = sysfs.sysfs
 # skip hybrid system detection
 os.environ['UBUNTU_DRIVERS_XORG_LOG'] = '/dev/null'
 
+# fake an installed kmod?
+if 'FAKE_INSTALLED_KMOD' in os.environ:
+    with open(os.path.join(sysfs.sysfs, 'modinfo'), 'w') as f:
+        f.write('''#!/bin/sh -e
+if [ "$1" = %(mod)s ]; then
+    echo "filename:  /some/path/%(mod)s.ko"
+    exit 0
+fi
+exec /sbin/modinfo "$@"
+''' % {'mod': os.environ['FAKE_INSTALLED_KMOD']})
+        os.chmod(os.path.join(sysfs.sysfs, 'modinfo'), 0o755)
+        os.environ['PATH'] = '%s:%s' % (sysfs.sysfs, os.environ['PATH'])
+
 sysfs.add('pci', 'nvidiacard', 
           {'modalias': 'pci:v000010DEd000010C3sv00sd01bc03sc00i00',
            'vendor': '0x10DE',
