@@ -1,3 +1,10 @@
+ubuntu-drivers-common (1:0.2.67) UNRELEASED; urgency=low
+
+  * setup.py: Install hybrid-detect through data_files instead of scripts, as
+    the later stopped working with python 3.2.3-3 (see LP #1026016)
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 18 Jul 2012 10:08:45 +0200
+
 ubuntu-drivers-common (1:0.2.66) quantal; urgency=low
 
   * UbuntuDrivers/detect.py, system_device_drivers(): Add driver flag
