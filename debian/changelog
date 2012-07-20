@@ -1,8 +1,8 @@
-ubuntu-drivers-common (1:0.2.68) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.68) quantal; urgency=low
 
   * setup.py: Fix hybrid_detect installation. (LP: #1026787)
 
- -- Jason Conti <jason.conti@gmail.com>  Fri, 20 Jul 2012 05:40:57 +0200
+ -- Jason Conti <jason.conti@gmail.com>  Fri, 20 Jul 2012 05:45:14 +0200
 
 ubuntu-drivers-common (1:0.2.67) quantal; urgency=low
 
