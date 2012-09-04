@@ -3,6 +3,8 @@ ubuntu-drivers-common (1:0.2.69) UNRELEASED; urgency=low
   * Drop share/last_gfx_boot, and stop installing it in setup.py. This file is
     created and updated at runtime and should not be shipped in the package.
     (LP: #1045629)
+  * setup.py: Only install the upstart job on platforms where we build
+    hybrid-detect. (LP: #1045193)
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 04 Sep 2012 08:34:58 +0200
 
