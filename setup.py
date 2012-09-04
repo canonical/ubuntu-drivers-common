@@ -26,7 +26,7 @@ setup(
     description="Detect and install additional Ubuntu driver packages",
     packages=["NvidiaDetector", "Quirks", "UbuntuDrivers"],
     data_files=[("/usr/share/ubuntu-drivers-common/", ["share/obsolete", "share/fake-devices-wrapper"]),
-                ("/var/lib/ubuntu-drivers-common/", glob.glob("share/last_gfx_boot")),
+                ("/var/lib/ubuntu-drivers-common/", []),
                 ("/etc/init/", glob.glob("share/hybrid/hybrid-gfx.conf")),
                 ("/usr/share/ubuntu-drivers-common/quirks", glob.glob("quirks/*")),
                 ("/usr/share/ubuntu-drivers-common/detect", glob.glob("detect-plugins/*")),
