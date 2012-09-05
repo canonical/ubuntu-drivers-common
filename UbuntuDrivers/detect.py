@@ -87,12 +87,7 @@ def _check_video_abi_compat(apt_cache, record):
         deps = record['Depends']
     except KeyError:
         return True
-    try:
-        i = deps.index('xorg-video-abi-')
-    except ValueError:
-        # no video driver package
-        return True
-    if not deps[i:].startswith(xorg_video_abi):
+    if 'xorg-video-abi-' in deps and xorg_video_abi not in deps:
         logging.debug('Driver package %s is incompatible with current X.org server ABI %s', 
                 record['Package'], xorg_video_abi)
         return False

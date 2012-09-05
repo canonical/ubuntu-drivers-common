@@ -359,13 +359,18 @@ class DetectTest(unittest.TestCase):
             # -updates driver which also should not be recommended
             archive.create_deb('nvidia-current-updates', dependencies={'Depends': 'xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
+            # driver package which supports multiple ABIs
+            archive.create_deb('nvidia-34',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
             chroot.add_repository(archive.path, True, False)
             cache = apt.Cache(rootdir=chroot.path)
             res = UbuntuDrivers.detect.system_driver_packages(cache)
         finally:
             chroot.remove()
         self.assertEqual(set(res), set(['chocolate', 'vanilla', 'nvidia-current',
-                                        'nvidia-current-updates', 'nvidia-123']))
+                                        'nvidia-current-updates', 'nvidia-123',
+                                        'nvidia-34']))
         self.assertEqual(res['vanilla']['modalias'], 'pci:v00001234d00sv00000001sd00bc00sc00i00')
         self.assertTrue(res['vanilla']['syspath'].endswith('/devices/white'))
         self.assertFalse(res['vanilla']['from_distro'])
@@ -395,6 +400,9 @@ class DetectTest(unittest.TestCase):
 
         self.assertEqual(res['nvidia-current-updates']['modalias'], 'pci:nvidia')
         self.assertEqual(res['nvidia-current-updates']['recommended'], False)
+
+        self.assertEqual(res['nvidia-34']['modalias'], 'pci:nvidia')
+        self.assertEqual(res['nvidia-34']['recommended'], False)
 
     def test_system_driver_packages_detect_plugins(self):
         '''system_driver_packages() includes custom detection plugins'''

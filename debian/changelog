@@ -8,6 +8,10 @@ ubuntu-drivers-common (1:0.2.69) UNRELEASED; urgency=low
   * debian/rules: On architectures which do not ship hybrid-detect, generate a 
     .maintscript helper to clean up the /etc/init/hybrid-gfx.conf upstart job
     conffile on upgrade.
+  * tests/ubuntu_drivers.py: Add test for a video driver which supports
+    multiple X.org video ABIs. Reproduces LP #1033222.
+  * UbuntuDrivers/detect.py, _check_video_abi_compat(): Do not only consider
+    the first xorg-video-abi-* dependency, but all of them. (LP: #1033222)
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 04 Sep 2012 08:34:58 +0200
 
