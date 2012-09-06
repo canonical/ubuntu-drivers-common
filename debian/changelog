@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.69) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.69) quantal; urgency=low
 
   * Drop share/last_gfx_boot, and stop installing it in setup.py. This file is
     created and updated at runtime and should not be shipped in the package.
@@ -13,7 +13,7 @@ ubuntu-drivers-common (1:0.2.69) UNRELEASED; urgency=low
   * UbuntuDrivers/detect.py, _check_video_abi_compat(): Do not only consider
     the first xorg-video-abi-* dependency, but all of them. (LP: #1033222)
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 04 Sep 2012 08:34:58 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 06 Sep 2012 15:18:26 +0200
 
 ubuntu-drivers-common (1:0.2.68) quantal; urgency=low
 
