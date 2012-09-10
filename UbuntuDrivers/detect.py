@@ -522,11 +522,16 @@ def _cmp_gfx_alternatives(x, y):
 
     -updates always sort after non-updates, as we prefer the stable driver and
     only want to offer -updates when the one from release does not support the
-    card.
+    card. We never want to recommend -experimental unless it's the only one
+    available, so sort this last.
     '''
     if x.endswith('-updates') and not y.endswith('-updates'):
         return -1
     if not x.endswith('-updates') and y.endswith('-updates'):
+        return 1
+    if 'experiment' in x and 'experiment' not in y:
+        return -1
+    if 'experiment' not in x and 'experiment' in y:
         return 1
     if x < y:
         return -1

@@ -1,3 +1,10 @@
+ubuntu-drivers-common (1:0.2.69ubuntu1) UNRELEASED; urgency=low
+
+  * UbuntuDrivers/detect.py: Never recommend a driver which has "experiment"
+    in the name, unless no other driver is available.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 10 Sep 2012 13:58:52 +0200
+
 ubuntu-drivers-common (1:0.2.69) quantal; urgency=low
 
   * Drop share/last_gfx_boot, and stop installing it in setup.py. This file is

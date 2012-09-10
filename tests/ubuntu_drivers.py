@@ -456,6 +456,10 @@ class DetectTest(unittest.TestCase):
             # -updates driver which also should not be recommended
             archive.create_deb('nvidia-current-updates', dependencies={'Depends': 'xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
+
+            # -experimental driver which also should not be recommended
+            archive.create_deb('nvidia-experimental', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
             chroot.add_repository(archive.path, True, False)
             cache = apt.Cache(rootdir=chroot.path)
             res = UbuntuDrivers.detect.system_device_drivers(cache)
@@ -489,9 +493,11 @@ class DetectTest(unittest.TestCase):
                          {'free': True, 'from_distro': False, 'recommended': False})
         self.assertEqual(res[graphics]['drivers']['nvidia-123'],
                           {'free': True, 'from_distro': False, 'recommended': False})
+        self.assertEqual(res[graphics]['drivers']['nvidia-experimental'],
+                         {'free': True, 'from_distro': False, 'recommended': False})
         self.assertEqual(res[graphics]['drivers']['xserver-xorg-video-nouveau'],
                          {'free': True, 'from_distro': True, 'recommended': False, 'builtin': True})
-        self.assertEqual(len(res[graphics]['drivers']), 4, list(res[graphics]['drivers'].keys()))
+        self.assertEqual(len(res[graphics]['drivers']), 5, list(res[graphics]['drivers'].keys()))
 
     def test_system_device_drivers_detect_plugins(self):
         '''system_device_drivers() includes custom detection plugins'''
