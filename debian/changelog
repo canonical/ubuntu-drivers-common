@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.69ubuntu1) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.70) UNRELEASED; urgency=low
 
   * UbuntuDrivers/detect.py: Never recommend a driver which has "experiment"
     in the name, unless no other driver is available.
