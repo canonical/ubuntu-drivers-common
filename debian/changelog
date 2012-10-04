@@ -1,9 +1,9 @@
-ubuntu-drivers-common (1:0.2.70) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.70) quantal; urgency=low
 
   * UbuntuDrivers/detect.py: Never recommend a driver which has "experiment"
     in the name, unless no other driver is available.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 10 Sep 2012 13:58:52 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 04 Oct 2012 22:59:33 +0200
 
 ubuntu-drivers-common (1:0.2.69) quantal; urgency=low
 
