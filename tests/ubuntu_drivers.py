@@ -274,9 +274,25 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
         
         Return the resulting package list.
         '''
-        res = self.pk.what_provides(PackageKitGlib.FilterEnum.NONE,
-                provides_type, query,
-                None, lambda p, t, d: True, None)
+        # PackageKitGlib has a very low activation timeout, which
+        # is too short for slow architectures; loop for a bit until service is
+        # activated.
+        tries = 5
+        while tries > 0:
+            try:
+                res = self.pk.what_provides(PackageKitGlib.FilterEnum.NONE,
+                        provides_type, query,
+                        None, lambda p, t, d: True, None)
+                break
+            except GLib.GError as e:
+                if 'org.freedesktop.DBus.Error.ServiceUnknown' in str(e):
+                    tries -= 1
+                    time.sleep(1)
+                else:
+                    raise
+        else:
+            self.fail('timed out waiting for PackageKit')
+
         self.assertEqual(res.get_exit_code(), expected_res)
         if res.get_exit_code() == PackageKitGlib.ExitEnum.SUCCESS:
             return sorted([p.get_id().split(';')[0] for p in res.get_package_array()])
