@@ -5,7 +5,7 @@ Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
 Build-Depends: debhelper (>= 9),
  po-debconf,
  dh-apport,
- python3 (>= 3.2),
+ python3-all (>= 3.2),
  python3-setuptools,
  libpciaccess-dev (>= 0.12.1-2),
  lib32gcc1 [amd64], libc6-i386 [amd64],

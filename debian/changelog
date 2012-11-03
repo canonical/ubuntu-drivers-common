@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.2.72) UNRELEASED; urgency=low
+
+  * Build-depend on python3-all.
+
+ -- Matthias Klose <doko@ubuntu.com>  Sat, 27 Oct 2012 02:54:56 +0200
+
 ubuntu-drivers-common (1:0.2.71.1) quantal-proposed; urgency=low
 
   * NvidiaDetector/nvidiadetector.py:
