@@ -127,7 +127,7 @@ def _apt_cache_modalias_map(apt_cache):
         # skip packages without a modalias field
         try:
             m = package.candidate.record['Modaliases']
-        except (KeyError, AttributeError):
+        except (KeyError, AttributeError, UnicodeDecodeError):
             continue
 
         # skip incompatible video drivers
