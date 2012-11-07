@@ -26,12 +26,15 @@ override_dh_install:
 	# build dh_modaliases manpage
 	mkdir -p debian/dh-modaliases/usr/share/man/man1
 	pod2man -c Debhelper -r "$(DEB_VERSION)" debhelper/dh_modaliases debian/dh-modaliases/usr/share/man/man1/dh_modaliases.1
-	
+
 	# clean up upstart conffile on upgrade on architectures which do not
 	# ship hybrid-detect
 	if [ ! -e debian/ubuntu-drivers-common/usr/bin/hybrid-detect ]; then \
 	    echo "rm_conffile /etc/init/hybrid-gfx.conf 1:0.2.69~" > debian/ubuntu-drivers-common.maintscript; \
 	fi
+
+override_dh_python3:
+	dh_python3 --shebang=/usr/bin/python3
 
 override_dh_clean:
 	rm -f share/hybrid/hybrid-detect

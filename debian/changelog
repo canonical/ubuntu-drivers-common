@@ -1,6 +1,10 @@
 ubuntu-drivers-common (1:0.2.72) UNRELEASED; urgency=low
 
+  [ Matthias Klose ]
   * Build-depend on python3-all.
+
+  [ Dmitrijs Ledkovs ]
+  * Use /usr/bin/python3 shebang.
 
  -- Matthias Klose <doko@ubuntu.com>  Sat, 27 Oct 2012 02:54:56 +0200
 
