@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.72) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.72) raring; urgency=low
 
   [ Matthias Klose ]
   * Build-depend on python3-all.
@@ -16,7 +16,7 @@ ubuntu-drivers-common (1:0.2.72) UNRELEASED; urgency=low
     package with invalid UTF-8 encoding. Just skip those packages instead. Add
     test to tests/ubuntu_drivers.py.
 
- -- Matthias Klose <doko@ubuntu.com>  Sat, 27 Oct 2012 02:54:56 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 07 Nov 2012 15:47:19 +0100
 
 ubuntu-drivers-common (1:0.2.71.1) quantal-proposed; urgency=low
 
