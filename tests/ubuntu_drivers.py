@@ -770,7 +770,7 @@ APT::Get::AllowUnauthenticated "true";
 
         # only look at the part after special.py
         special_off = out.find('== special.py ==')
-        self.assertGreater(special_off, 0, out)
+        self.assertGreaterEqual(special_off, 0, out)
         out = out[special_off:]
         self.assertTrue('picky - third-party free' in out, out)
         self.assertTrue('special - third-party free' in out, out)

@@ -9,6 +9,9 @@ ubuntu-drivers-common (1:0.2.72) UNRELEASED; urgency=low
   [ Martin Pitt ]
   * debian/tests/system: Fix duplicate output of error message for test
     failures.
+  * tests/ubuntu_drivers.py, test_devices_detect_plugins(): Fix failure if
+    special.py occurs first in the output. This bug was triggered by Python
+    3.3's new hash randomization behaviour. (LP: #1071997)
 
  -- Matthias Klose <doko@ubuntu.com>  Sat, 27 Oct 2012 02:54:56 +0200
 
