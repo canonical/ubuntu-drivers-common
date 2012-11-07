@@ -22,7 +22,7 @@ def program_out_success(argv, self):
     '''Return out from a successful program call.'''
 
     (code, out, err) = program_out(argv)
-    self.assertEqual(err, '', err)
+    self.assertEqual(err, '')
     self.assertEqual(code, 0)
     return out
 
