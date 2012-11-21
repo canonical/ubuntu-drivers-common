@@ -1,2 +1,3 @@
 Tests: system
+Depends: ubuntu-drivers-common, apport
 Restrictions: needs-root
