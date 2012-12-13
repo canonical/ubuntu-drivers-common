@@ -1,11 +1,11 @@
-ubuntu-drivers-common (1:0.2.73) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.73) raring; urgency=low
 
   * debian/tests/control: Add apport to test dependencies, so that the DKMS
     hook can generate proper crash files which will help with debugging.
   * debian/tests/system: In the Broadcom wifi test, use a proper device class
     and subclass, as the current driver matches on those now.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 21 Nov 2012 07:26:45 +0100
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 13 Dec 2012 16:02:42 +0100
 
 ubuntu-drivers-common (1:0.2.72) raring; urgency=low
 
