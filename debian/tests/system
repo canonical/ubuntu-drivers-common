@@ -76,7 +76,7 @@ class TestUbuntuDrivers(unittest.TestCase):
     def test_bcmwl(self):
         '''bcmwl-kernel-source'''
 
-        self.do_test_driver('pci:v000014E4d00004353sv00sd01bc00sc00i01',
+        self.do_test_driver('pci:v000014E4d00004353sv00sd01bc02sc80i00',
                 'bcmwl-kernel-source', 'wl', auto_install=True)
 
     def test_nvidia_current(self):
