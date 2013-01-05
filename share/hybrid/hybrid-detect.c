@@ -189,7 +189,7 @@ int main(int argc, char *argv[]) {
                 if (strcmp(arch, "amd64") == 0) {
                     arch_path = "x86_64-linux-gnu";
                 }
-                else if (strcmp(arch, "amd64") == 0) {
+                else if (strcmp(arch, "i386") == 0) {
                     arch_path = "i386-linux-gnu";
                 }
                 else {
