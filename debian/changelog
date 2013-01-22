@@ -1,9 +1,15 @@
 ubuntu-drivers-common (1:0.2.74) UNRELEASED; urgency=low
 
+  [ Martin Pitt ]
   * hybrid-detect.c: Fix detection of i386 architecture. Thanks Dennis
     Baurichter! (LP: #1096354)
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Sat, 05 Jan 2013 16:31:35 +0100
+  [ Alberto Milone ]
+  * NvidiaDetector/nvidiadetector.py: Exclude -current from the
+    recommended flavours. The -current flavour is now a transitional
+    package therefore we should not recommend it any more.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 29 Jan 2013 12:56:43 +0100
 
 ubuntu-drivers-common (1:0.2.73) raring; urgency=low
 
