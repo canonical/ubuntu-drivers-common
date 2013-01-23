@@ -24,6 +24,7 @@ import aptdaemon.pkcompat
 
 import UbuntuDrivers.detect
 import UbuntuDrivers.PackageKit
+import UbuntuDrivers.kerneldetection
 
 import fakesysfs
 import testarchive
@@ -913,6 +914,72 @@ class PluginsTest(unittest.TestCase):
         self.assertFalse('ERROR' in out, out)
         self.assertFalse('Traceback' in out, out)
         self.assertEqual(ud.returncode, 0)
+
+class KernelDectionTest(unittest.TestCase):
+    '''Test UbuntuDrivers.kerneldetection'''
+
+    def setUp(self):
+        '''Create a fake sysfs'''
+
+        self.sys = gen_fakesys()
+        os.environ['SYSFS_PATH'] = self.sys.sysfs
+
+        # no custom detection plugins by default
+        self.plugin_dir = tempfile.mkdtemp()
+        os.environ['UBUNTU_DRIVERS_DETECT_DIR'] = self.plugin_dir
+
+    def tearDown(self):
+        try:
+            del os.environ['SYSFS_PATH']
+        except KeyError:
+            pass
+        shutil.rmtree(self.plugin_dir)
+
+    def test_linux_headers_detection_chroot(self):
+        '''get_linux_headers_metapackage() for test package repository'''
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            archive.create_deb('linux-image-3.2.0-23-generic',
+                                extra_tags={'Source': 'linux'})
+            archive.create_deb('linux-image-3.2.0-33-generic',
+                                extra_tags={'Source': 'linux'})
+            archive.create_deb('linux-image-3.5.0-18-generic',
+                                extra_tags={'Source':
+                                            'linux-lts-quantal'})
+            archive.create_deb('linux-image-3.5.0-19-generic',
+                                extra_tags={'Source':
+                                             'linux-lts-quantal'})
+            archive.create_deb('linux-image-generic',
+                                extra_tags={'Source':
+                                            'linux-meta'})
+            archive.create_deb('linux-image-generic-lts-quantal',
+                                extra_tags={'Source':
+                                            'linux-meta-lts-quantal'})
+            chroot.add_repository(archive.path, True, False)
+
+            cache = apt.Cache(rootdir=chroot.path)
+
+            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
+            linux_headers = kernel_detection.get_linux_headers_metapackage()
+            self.assertEqual(linux_headers, '')
+
+            # Install kernel packages
+            for pkg in ('linux-image-3.2.0-23-generic',
+                        'linux-image-3.2.0-33-generic',
+                        'linux-image-3.5.0-18-generic',
+                        'linux-image-3.5.0-19-generic',
+                        'linux-image-generic',
+                        'linux-image-generic-lts-quantal'):
+                cache[pkg].mark_install()
+
+            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
+            linux_headers = kernel_detection.get_linux_headers_metapackage()
+            self.assertEqual(linux_headers, 'linux-headers-generic-lts-quantal')
+        finally:
+            chroot.remove()
 
 if __name__ == '__main__':
     unittest.main()

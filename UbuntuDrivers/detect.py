@@ -16,6 +16,8 @@ import functools
 
 import apt
 
+from UbuntuDrivers import kerneldetection
+
 system_architecture = apt.apt_pkg.get_architectures()[0]
 
 def system_modaliases():
@@ -561,3 +563,7 @@ def _add_builtins(drivers):
                     'free': True, 'builtin': True, 'from_distro': True, 'recommended': True}
                 break
 
+def get_linux_headers(apt_cache):
+    '''Return the linux headers for the system's kernel'''
+    kernel_detection = kerneldetection.KernelDetection(apt_cache)
+    return kernel_detection.get_linux_headers_metapackage()

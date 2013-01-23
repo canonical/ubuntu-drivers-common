@@ -8,8 +8,11 @@ ubuntu-drivers-common (1:0.2.74) UNRELEASED; urgency=low
   * NvidiaDetector/nvidiadetector.py: Exclude -current from the
     recommended flavours. The -current flavour is now a transitional
     package therefore we should not recommend it any more.
+  * UbuntuDrivers/kerneldetection.py, UbuntuDrivers/detect.py,
+    tests/ubuntu_drivers.py: Add support for checking and suggesting
+    the required linux headers.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 29 Jan 2013 12:56:43 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 29 Jan 2013 13:01:10 +0100
 
 ubuntu-drivers-common (1:0.2.73) raring; urgency=low
 
