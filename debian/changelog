@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.2.75) UNRELEASED; urgency=low
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 29 Jan 2013 16:18:46 +0100
+
 ubuntu-drivers-common (1:0.2.74) raring; urgency=low
 
   [ Martin Pitt ]
