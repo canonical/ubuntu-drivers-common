@@ -81,7 +81,7 @@ class KernelDetection(object):
                         version = current_version
                         match_source = source_pattern.match(source)
                         # Set the linux-headers metapackage
-                        if match_source:
+                        if '-lts-' in source and match_source:
                             # This is the case of packages such as
                             # linux-image-3.5.0-18-generic which
                             # comes from linux-lts-quantal.
