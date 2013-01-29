@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.74) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.74) raring; urgency=low
 
   [ Martin Pitt ]
   * hybrid-detect.c: Fix detection of i386 architecture. Thanks Dennis
@@ -12,7 +12,7 @@ ubuntu-drivers-common (1:0.2.74) UNRELEASED; urgency=low
     tests/ubuntu_drivers.py: Add support for checking and suggesting
     the required linux headers.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 29 Jan 2013 13:01:10 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 29 Jan 2013 13:30:50 +0100
 
 ubuntu-drivers-common (1:0.2.73) raring; urgency=low
 
