@@ -665,6 +665,93 @@ def detect(apt):
         return ["picky"]
 ''')
 
+    def test_get_linux_headers_chroot(self):
+        '''get_linux_headers() for test package repository'''
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            archive.create_deb('linux-image-3.2.0-23-generic',
+                                extra_tags={'Source': 'linux'})
+            archive.create_deb('linux-image-3.2.0-33-generic',
+                                extra_tags={'Source': 'linux'})
+            archive.create_deb('linux-image-3.5.0-18-generic',
+                                extra_tags={'Source':
+                                            'linux-lts-quantal'})
+            archive.create_deb('linux-image-3.5.0-19-generic',
+                                extra_tags={'Source':
+                                             'linux-lts-quantal'})
+            archive.create_deb('linux-image-generic',
+                                extra_tags={'Source':
+                                            'linux-meta'})
+            archive.create_deb('linux-image-generic-lts-quantal',
+                                extra_tags={'Source':
+                                            'linux-meta-lts-quantal'})
+            chroot.add_repository(archive.path, True, False)
+
+            cache = apt.Cache(rootdir=chroot.path)
+
+            linux_headers = UbuntuDrivers.detect.get_linux_headers(cache)
+            self.assertEqual(linux_headers, '')
+
+            # Install kernel packages
+            for pkg in ('linux-image-3.2.0-23-generic',
+                        'linux-image-3.2.0-33-generic',
+                        'linux-image-3.5.0-18-generic',
+                        'linux-image-3.5.0-19-generic',
+                        'linux-image-generic',
+                        'linux-image-generic-lts-quantal'):
+                cache[pkg].mark_install()
+
+            linux_headers = UbuntuDrivers.detect.get_linux_headers(cache)
+            self.assertEqual(linux_headers, 'linux-headers-generic-lts-quantal')
+        finally:
+            chroot.remove()
+
+    def test_get_linux_chroot(self):
+        '''get_linux() for test package repository'''
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            archive.create_deb('linux-image-3.2.0-23-generic',
+                                extra_tags={'Source': 'linux'})
+            archive.create_deb('linux-image-3.2.0-33-generic',
+                                extra_tags={'Source': 'linux'})
+            archive.create_deb('linux-image-3.5.0-18-generic',
+                                extra_tags={'Source':
+                                            'linux-lts-quantal'})
+            archive.create_deb('linux-image-3.5.0-19-generic',
+                                extra_tags={'Source':
+                                             'linux-lts-quantal'})
+            archive.create_deb('linux-image-generic',
+                                extra_tags={'Source':
+                                            'linux-meta'})
+            archive.create_deb('linux-image-generic-lts-quantal',
+                                extra_tags={'Source':
+                                            'linux-meta-lts-quantal'})
+            chroot.add_repository(archive.path, True, False)
+
+            cache = apt.Cache(rootdir=chroot.path)
+
+            linux = UbuntuDrivers.detect.get_linux(cache)
+            self.assertEqual(linux, '')
+
+            # Install kernel packages
+            for pkg in ('linux-image-3.2.0-23-generic',
+                        'linux-image-3.2.0-33-generic',
+                        'linux-image-3.5.0-18-generic',
+                        'linux-image-3.5.0-19-generic',
+                        'linux-image-generic',
+                        'linux-image-generic-lts-quantal'):
+                cache[pkg].mark_install()
+
+            linux = UbuntuDrivers.detect.get_linux(cache)
+            self.assertEqual(linux, 'linux-generic-lts-quantal')
+        finally:
+            chroot.remove()
 
 class ToolTest(unittest.TestCase):
     '''Test ubuntu-drivers tool'''

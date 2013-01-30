@@ -567,3 +567,8 @@ def get_linux_headers(apt_cache):
     '''Return the linux headers for the system's kernel'''
     kernel_detection = kerneldetection.KernelDetection(apt_cache)
     return kernel_detection.get_linux_headers_metapackage()
+
+def get_linux(apt_cache):
+    '''Return the linux metapackage for the system's kernel'''
+    kernel_detection = kerneldetection.KernelDetection(apt_cache)
+    return kernel_detection.get_linux_metapackage()
