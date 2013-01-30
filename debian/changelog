@@ -1,8 +1,16 @@
-ubuntu-drivers-common (1:0.2.75) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.75) raring; urgency=low
 
-  * 
+  * UbuntuDrivers/detect.py:
+    - Add get_linux() which returns the linux metapackage name.
+  * UbuntuDrivers/kerneldetection.py:
+    - Rely on the source name only for "-lts" packages (a special case).
+    - Add KernelDetection.get_linux_metapackage().
+  * tests/ubuntu_drivers.py:
+    - Add more tests with different kernel names.
+    - Extend test coverage to both get_linux() and get_linux_headers()
+      from UbuntuDrivers/detect.py.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 29 Jan 2013 16:18:46 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 30 Jan 2013 12:08:59 +0100
 
 ubuntu-drivers-common (1:0.2.74) raring; urgency=low
 
