@@ -3,6 +3,9 @@ ubuntu-drivers-common (1:0.2.76) UNRELEASED; urgency=low
   * debian/tests/system: nvidia-current is now a transitional package, so
     change tests to test -304.
   * debian/tests/system: Add tests for nvidia-310 and -313-updates.
+  * debian/tests/system: Drop sl-modem test case. We don't officially support
+    it, and it's broken at the moment. The package build test should move into
+    sl-modem itself if anyone is interested in keeping it alive.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 18 Mar 2013 12:50:05 +0100
 
