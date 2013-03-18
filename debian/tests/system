@@ -79,18 +79,18 @@ class TestUbuntuDrivers(unittest.TestCase):
         self.do_test_driver('pci:v000014E4d00004353sv00sd01bc02sc80i00',
                 'bcmwl-kernel-source', 'wl', auto_install=True)
 
-    def test_nvidia_current(self):
-        '''nvidia-current'''
+    def test_nvidia_304(self):
+        '''nvidia-304'''
 
         # we have two matches here, only install nvidia-current, not -updates
         self.do_test_driver('pci:v000010DEd000010C3sv00sd01bc03sc00i00',
-                'nvidia-current', 'nvidia_current', auto_install=False)
+                'nvidia-304', 'nvidia_304', auto_install=False)
 
-    def test_nvidia_current_updates(self):
-        '''nvidia-current-updates'''
+    def test_nvidia_304_updates(self):
+        '''nvidia-304-updates'''
 
         self.do_test_driver('pci:v000010DEd000010C3sv00sd01bc03sc00i00',
-                'nvidia-current-updates', 'nvidia_current_updates', auto_install=False)
+                'nvidia-304-updates', 'nvidia_304_updates', auto_install=False)
 
     def test_fglrx(self):
         '''fglrx'''
@@ -121,7 +121,7 @@ class TestUbuntuDrivers(unittest.TestCase):
 
             # detection works
             o = program_out_success(['ubuntu-drivers', 'list'], self)
-            self.assertTrue(package + '\n' in o)
+            self.assertTrue(package + '\n' in o, o)
 
         try:
             if auto_install:
