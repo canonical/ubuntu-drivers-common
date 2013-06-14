@@ -76,4 +76,8 @@ def main():
     return len(res.errors) + len(res.failures)
 
 if __name__ == '__main__':
+    # run ourselves through umockdev-wrapper
+    if 'umockdev' not in os.environ.get('LD_PRELOAD', ''):
+        os.execvp('umockdev-wrapper', ['umockdev-wrapper'] + sys.argv)
+
     sys.exit(main())

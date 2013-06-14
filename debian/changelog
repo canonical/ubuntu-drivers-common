@@ -5,6 +5,8 @@ ubuntu-drivers-common (1:0.2.77) UNRELEASED; urgency=low
     vendor/product names. (LP: #1186777)
   * share/fake-devices-wrapper: Rewrite using umockdev, our fakesys.py does
     not work any more with current libudev.
+  * Port test suite from fakesys.py to umockdev. Add umockdev build-dependency
+    for this (see MIR LP #1190926)
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 14 Jun 2013 08:29:22 +0200
 

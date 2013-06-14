@@ -18,6 +18,7 @@ import logging
 
 from gi.repository import GLib
 from gi.repository import PackageKitGlib
+from gi.repository import UMockdev
 import apt
 import aptdaemon.test
 import aptdaemon.pkcompat
@@ -26,7 +27,6 @@ import UbuntuDrivers.detect
 import UbuntuDrivers.PackageKit
 import UbuntuDrivers.kerneldetection
 
-import fakesysfs
 import testarchive
 
 TEST_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -42,24 +42,22 @@ dbus_address = None
 # Do not look at /var/log/Xorg.0.log for the hybrid checks
 os.environ['UBUNTU_DRIVERS_XORG_LOG'] = '/nonexisting'
 
-def gen_fakesys():
-    '''Generate a fake SysFS object for testing'''
+def gen_fakehw():
+    '''Generate an UMockdev.Testbed object for testing'''
 
-    s = fakesysfs.SysFS()
+    t = UMockdev.Testbed.new()
     # covered by vanilla.deb
-    s.add('pci', 'white', {'modalias': 'pci:v00001234d00sv00000001sd00bc00sc00i00'})
+    t.add_device('pci', 'white', None, ['modalias', 'pci:v00001234d00sv00000001sd00bc00sc00i00'], [])
     # covered by chocolate.deb
-    s.add('usb', 'black', {'modalias': 'usb:v9876dABCDsv01sd02bc00sc01i05'})
+    t.add_device('usb', 'black', None, ['modalias', 'usb:v9876dABCDsv01sd02bc00sc01i05'], [])
     # covered by nvidia-{current,old}.deb
-    s.add('pci', 'graphics', {'modalias': 'pci:nvidia',
-                              'vendor': '0x10DE',
-                              'device': '0x10C3',
-                             })
+    t.add_device('pci', 'graphics', None,
+                 ['modalias', 'pci:nvidia', 'vendor', '0x10DE', 'device', '0x10C3'], [])
     # not covered by any driver package
-    s.add('pci', 'grey', {'modalias': 'pci:vDEADBEEFd00'})
-    s.add('ssb', 'yellow', {}, {'MODALIAS': 'pci:vDEADBEEFd00'})
+    t.add_device('pci', 'grey', None, ['modalias', 'pci:vDEADBEEFd00'], [])
+    t.add_device('ssb', 'yellow', None, [], ['MODALIAS', 'pci:vDEADBEEFd00'])
 
-    return s
+    return t
 
 def gen_fakearchive():
     '''Generate a fake archive for testing'''
@@ -91,8 +89,7 @@ class PackageKitTest(aptdaemon.test.AptDaemonTestCase):
 
     @classmethod
     def setUpClass(klass):
-        klass.sys = gen_fakesys()
-        os.environ['SYSFS_PATH'] = klass.sys.sysfs
+        klass.umockdev = gen_fakehw()
 
         # find plugin in our source tree
         os.environ['PYTHONPATH'] = '%s:%s' % (os.getcwd(), os.environ.get('PYTHONPATH', ''))
@@ -307,25 +304,20 @@ class DetectTest(unittest.TestCase):
     def setUp(self):
         '''Create a fake sysfs'''
 
-        self.sys = gen_fakesys()
-        os.environ['SYSFS_PATH'] = self.sys.sysfs
+        self.umockdev = gen_fakehw()
 
         # no custom detection plugins by default
         self.plugin_dir = tempfile.mkdtemp()
         os.environ['UBUNTU_DRIVERS_DETECT_DIR'] = self.plugin_dir
 
     def tearDown(self):
-        try:
-            del os.environ['SYSFS_PATH']
-        except KeyError:
-            pass
         shutil.rmtree(self.plugin_dir)
 
     @unittest.skipUnless(os.path.isdir('/sys/devices'), 'no /sys dir on this system')
     def test_system_modaliases_system(self):
         '''system_modaliases() for current system'''
 
-        del os.environ['SYSFS_PATH']
+        del self.umockdev
         res = UbuntuDrivers.detect.system_modaliases()
         self.assertGreater(len(res), 5)
         self.assertTrue(':' in list(res)[0])
@@ -337,8 +329,7 @@ class DetectTest(unittest.TestCase):
         self.assertEqual(set(res), set(['pci:v00001234d00sv00000001sd00bc00sc00i00',
             'pci:vDEADBEEFd00', 'usb:v9876dABCDsv01sd02bc00sc01i05',
             'pci:nvidia']))
-        self.assertEqual(res['pci:vDEADBEEFd00'], 
-                os.path.join(self.sys.sysfs, 'devices/grey'))
+        self.assertEqual(res['pci:vDEADBEEFd00'], '/sys/devices/grey')
 
     def test_system_driver_packages_system(self):
         '''system_driver_packages() for current system'''
@@ -351,8 +342,8 @@ class DetectTest(unittest.TestCase):
 
         # add lots of fake devices/modalises
         for i in range(30):
-            self.sys.add('pci', 'pcidev%i' % i, {'modalias': 'pci:s%04X' % i})
-            self.sys.add('usb', 'usbdev%i' % i, {'modalias': 'usb:s%04X' % i})
+            self.umockdev.add_device('pci', 'pcidev%i' % i, None, ['modalias', 'pci:s%04X' % i], [])
+            self.umockdev.add_device('usb', 'usbdev%i' % i, None, ['modalias', 'usb:s%04X' % i], [])
 
         start = resource.getrusage(resource.RUSAGE_SELF)
         UbuntuDrivers.detect.system_driver_packages()
@@ -511,9 +502,9 @@ Description: broken \xEB encoding
         finally:
             chroot.remove()
 
-        white = '%s/devices/white' % self.sys.sysfs
-        black = '%s/devices/black' % self.sys.sysfs
-        graphics = '%s/devices/graphics' % self.sys.sysfs
+        white = '/sys/devices/white'
+        black = '/sys/devices/black'
+        graphics = '/sys/devices/graphics'
         self.assertEqual(len(res), 3)  # the three devices above
 
         self.assertEqual(res[white], 
@@ -583,7 +574,7 @@ exec /sbin/modinfo "$@"
             chroot.remove()
             os.environ['PATH'] = orig_path
 
-        graphics = '%s/devices/graphics' % self.sys.sysfs
+        graphics = '/sys/devices/graphics'
         self.assertEqual(res[graphics]['modalias'], 'pci:nvidia')
         self.assertTrue(res[graphics]['manual_install'])
 
@@ -625,13 +616,13 @@ exec /sbin/modinfo "$@"
             self.assertEqual(UbuntuDrivers.detect.detect_plugin_packages(cache), {})
 
             self._gen_detect_plugins()
-            # suppress logging the deliberatey errors in our test plugins to
+            # suppress logging the deliberate errors in our test plugins to
             # stderr
             logging.getLogger().setLevel(logging.CRITICAL)
             self.assertEqual(UbuntuDrivers.detect.detect_plugin_packages(cache), 
                              {'special.py': ['special']})
 
-            os.mkdir(os.path.join(self.sys.sysfs, 'pickyon'))
+            os.mkdir(os.path.join(self.umockdev.get_sys_dir(), 'pickyon'))
             self.assertEqual(UbuntuDrivers.detect.detect_plugin_packages(cache), 
                              {'special.py': ['special'], 'picky.py': ['picky']})
         finally:
@@ -661,7 +652,7 @@ exec /sbin/modinfo "$@"
             f.write('''import os, os.path
             
 def detect(apt): 
-    if os.path.exists(os.path.join(os.environ.get("SYSFS_PATH", "/sys"), "pickyon")):
+    if os.path.exists("/sys/pickyon"):
         return ["picky"]
 ''')
 
@@ -791,15 +782,9 @@ APT::Get::AllowUnauthenticated "true";
     def setUp(self):
         '''Create a fake sysfs'''
 
-        self.sys = gen_fakesys()
-        os.environ['SYSFS_PATH'] = self.sys.sysfs
+        self.umockdev = gen_fakehw()
 
     def tearDown(self):
-        try:
-            del os.environ['SYSFS_PATH']
-        except KeyError:
-            pass
-
         # some tests install this package
         apt = subprocess.Popen(['apt-get', 'purge', '-y', 'bcmwl-kernel-source'],
                 stdout=subprocess.PIPE)
@@ -1008,18 +993,13 @@ class KernelDectionTest(unittest.TestCase):
     def setUp(self):
         '''Create a fake sysfs'''
 
-        self.sys = gen_fakesys()
-        os.environ['SYSFS_PATH'] = self.sys.sysfs
+        self.umockdev = gen_fakehw()
 
         # no custom detection plugins by default
         self.plugin_dir = tempfile.mkdtemp()
         os.environ['UBUNTU_DRIVERS_DETECT_DIR'] = self.plugin_dir
 
     def tearDown(self):
-        try:
-            del os.environ['SYSFS_PATH']
-        except KeyError:
-            pass
         shutil.rmtree(self.plugin_dir)
 
     def test_linux_headers_detection_chroot(self):
@@ -1721,4 +1701,8 @@ class KernelDectionTest(unittest.TestCase):
             chroot.remove()
 
 if __name__ == '__main__':
+    if 'umockdev' not in os.environ.get('LD_PRELOAD', ''):
+        sys.stderr.write('This test suite needs to be run under umockdev-wrapper\n')
+        sys.exit(1)
+
     unittest.main()

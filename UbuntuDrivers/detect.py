@@ -30,9 +30,7 @@ def system_modaliases():
     suitable for a PackageKit WhatProvides(MODALIAS) call.
     '''
     aliases = {}
-    # $SYSFS_PATH is compatible with libudev
-    sysfs_dir = os.environ.get('SYSFS_PATH', '/sys')
-    for path, dirs, files in os.walk(os.path.join(sysfs_dir, 'devices')):
+    for path, dirs, files in os.walk('/sys/devices'):
         modalias = None
 
         # most devices have modalias files
