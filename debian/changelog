@@ -3,6 +3,8 @@ ubuntu-drivers-common (1:0.2.77) UNRELEASED; urgency=low
   * detect.py, _get_db_name(): Call "udevadm info" instead of the old
     /lib/udev/*-db helpers; the latter don't exist any more. This brings back
     vendor/product names. (LP: #1186777)
+  * share/fake-devices-wrapper: Rewrite using umockdev, our fakesys.py does
+    not work any more with current libudev.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 14 Jun 2013 08:29:22 +0200
 
