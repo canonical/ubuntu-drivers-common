@@ -239,41 +239,28 @@ def _is_manual_install(pkg):
                   pkg.name, module)
     return False
 
-def _unquote(s):
-    '''Unquote \\xNN sequences in s'''
-
-    parts = s.split('\\x')
-    result = parts.pop(0)
-    for part in parts:
-        result += chr(int(part[:2], 16)) + part[2:]
-    return result
-
 def _get_db_name(syspath, alias):
     '''Return (vendor, model) names for given device.
 
     Values are None if unknown.
     '''
-    # ensure syspath is a device name relative to the sysfs dir
-    syspath = syspath[syspath.index('/devices/'):]
-
     try:
-        out = subprocess.check_output(['udevadm', 'info', '--query=all', '--path=' + syspath],
+        out = subprocess.check_output(['udevadm', 'hwdb', '--test=' + alias],
                                       universal_newlines=True)
     except (OSError, subprocess.CalledProcessError) as e:
-        logging.debug('_get_db_name(%s, %s): udevadm failed: %s', syspath, alias, str(e))
+        logging.debug('_get_db_name(%s, %s): udevadm hwdb failed: %s', syspath, alias, str(e))
         return (None, None)
+
+    logging.debug('_get_db_name: output\n%s\n', out)
 
     vendor = None
     model = None
     for line in out.splitlines():
-        if not line.startswith('E: '):
-            continue
-        line = line[3:]  # chop off 'E: '
         (k, v) = line.split('=', 1)
-        if k == 'ID_VENDOR_ENC':
-            vendor = _unquote(v)
-        if k == 'ID_MODEL_ENC':
-            model = _unquote(v)
+        if '_VENDOR' in k:
+            vendor = v
+        if '_MODEL' in k:
+            model = v
 
     logging.debug('_get_db_name(%s, %s): vendor "%s", model "%s"', syspath,
                   alias, vendor, model)

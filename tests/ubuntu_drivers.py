@@ -42,6 +42,9 @@ dbus_address = None
 # Do not look at /var/log/Xorg.0.log for the hybrid checks
 os.environ['UBUNTU_DRIVERS_XORG_LOG'] = '/nonexisting'
 
+# modalias of an nvidia card covered by our nvidia-* packages
+modalias_nv = 'pci:v000010DEd000010C3sv00003842sd00002670bc03sc03i00'
+
 def gen_fakehw():
     '''Generate an UMockdev.Testbed object for testing'''
 
@@ -50,9 +53,8 @@ def gen_fakehw():
     t.add_device('pci', 'white', None, ['modalias', 'pci:v00001234d00sv00000001sd00bc00sc00i00'], [])
     # covered by chocolate.deb
     t.add_device('usb', 'black', None, ['modalias', 'usb:v9876dABCDsv01sd02bc00sc01i05'], [])
-    # covered by nvidia-{current,old}.deb
-    t.add_device('pci', 'graphics', None,
-                 ['modalias', 'pci:nvidia', 'vendor', '0x10DE', 'device', '0x10C3'], [])
+    # covered by nvidia-*.deb
+    t.add_device('pci', 'graphics', None, ['modalias', modalias_nv], [])
     # not covered by any driver package
     t.add_device('pci', 'grey', None, ['modalias', 'pci:vDEADBEEFd00'], [])
     t.add_device('ssb', 'yellow', None, [], ['MODALIAS', 'pci:vDEADBEEFd00'])
@@ -73,9 +75,9 @@ def gen_fakearchive():
     a.create_deb('xserver-xorg-core', version='99:1',  # higher than system installed one
             dependencies={'Provides': 'xorg-video-abi-4'})
     a.create_deb('nvidia-current', dependencies={'Depends': 'xorg-video-abi-4'},
-                 extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
+                 extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*, pci:v000010DEd000010C4sv*sd*bc03sc*i*,)'})
     a.create_deb('nvidia-old', dependencies={'Depends': 'xorg-video-abi-3'},
-                 extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
+                 extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*, pci:v000010DEd000010C2sv*sd*bc03sc*i*,)'})
 
     # packages not covered by modalises, for testing detection plugins
     a.create_deb('special')
@@ -328,14 +330,8 @@ class DetectTest(unittest.TestCase):
         res = UbuntuDrivers.detect.system_modaliases()
         self.assertEqual(set(res), set(['pci:v00001234d00sv00000001sd00bc00sc00i00',
             'pci:vDEADBEEFd00', 'usb:v9876dABCDsv01sd02bc00sc01i05',
-            'pci:nvidia']))
+            modalias_nv]))
         self.assertEqual(res['pci:vDEADBEEFd00'], '/sys/devices/grey')
-
-    def test_system_driver_packages_system(self):
-        '''system_driver_packages() for current system'''
-
-        # nothing should match the devices in our fake sysfs
-        self.assertEqual(UbuntuDrivers.detect.system_driver_packages(), {})
 
     def test_system_driver_packages_performance(self):
         '''system_driver_packages() performance for a lot of modaliases'''
@@ -363,14 +359,14 @@ class DetectTest(unittest.TestCase):
             archive = gen_fakearchive()
             # older applicable driver which is not the recommended one
             archive.create_deb('nvidia-123', dependencies={'Depends': 'xorg-video-abi-4'},
-                               extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             # -updates driver which also should not be recommended
             archive.create_deb('nvidia-current-updates', dependencies={'Depends': 'xorg-video-abi-4'},
-                               extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             # driver package which supports multiple ABIs
             archive.create_deb('nvidia-34',
                                dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
-                               extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             chroot.add_repository(archive.path, True, False)
             cache = apt.Cache(rootdir=chroot.path)
             res = UbuntuDrivers.detect.system_driver_packages(cache)
@@ -392,24 +388,24 @@ class DetectTest(unittest.TestCase):
         self.assertFalse('model' in res['chocolate'])
         self.assertFalse('recommended' in res['chocolate'])
 
-        self.assertEqual(res['nvidia-current']['modalias'], 'pci:nvidia')
+        self.assertEqual(res['nvidia-current']['modalias'], modalias_nv)
         self.assertTrue('nvidia' in res['nvidia-current']['vendor'].lower(),
                         res['nvidia-current']['vendor'])
         self.assertTrue('GeForce' in res['nvidia-current']['model'],
                         res['nvidia-current']['model'])
         self.assertEqual(res['nvidia-current']['recommended'], True)
 
-        self.assertEqual(res['nvidia-123']['modalias'], 'pci:nvidia')
+        self.assertEqual(res['nvidia-123']['modalias'], modalias_nv)
         self.assertTrue('nvidia' in res['nvidia-123']['vendor'].lower(),
                         res['nvidia-123']['vendor'])
         self.assertTrue('GeForce' in res['nvidia-123']['model'],
                         res['nvidia-123']['model'])
         self.assertEqual(res['nvidia-123']['recommended'], False)
 
-        self.assertEqual(res['nvidia-current-updates']['modalias'], 'pci:nvidia')
+        self.assertEqual(res['nvidia-current-updates']['modalias'], modalias_nv)
         self.assertEqual(res['nvidia-current-updates']['recommended'], False)
 
-        self.assertEqual(res['nvidia-34']['modalias'], 'pci:nvidia')
+        self.assertEqual(res['nvidia-34']['modalias'], modalias_nv)
         self.assertEqual(res['nvidia-34']['recommended'], False)
 
     def test_system_driver_packages_bad_encoding(self):
@@ -446,8 +442,9 @@ Description: broken \xEB encoding
         with open(os.path.join(self.plugin_dir, 'extra.py'), 'w') as f:
             f.write('def detect(apt): return ["coreutils", "no_such_package"]\n')
 
-        self.assertEqual(UbuntuDrivers.detect.system_driver_packages(), 
-                         {'coreutils': {'free': True, 'from_distro': True, 'plugin': 'extra.py'}})
+        res = UbuntuDrivers.detect.system_driver_packages() 
+        self.assertTrue('coreutils' in res, list(res.keys()))
+        self.assertEqual(res['coreutils'], {'free': True, 'from_distro': True, 'plugin': 'extra.py'})
 
     def test_system_driver_packages_hybrid(self):
         '''system_driver_packages() on hybrid Intel/NVidia systems'''
@@ -472,12 +469,6 @@ Description: broken \xEB encoding
             os.environ['UBUNTU_DRIVERS_XORG_LOG'] = '/nonexisting'
             chroot.remove()
 
-    def test_system_device_drivers_system(self):
-        '''system_device_drivers() for current system'''
-
-        # nothing should match the devices in our fake sysfs
-        self.assertEqual(UbuntuDrivers.detect.system_device_drivers(), {})
-
     def test_system_device_drivers_chroot(self):
         '''system_device_drivers() for test package repository'''
 
@@ -488,14 +479,14 @@ Description: broken \xEB encoding
             archive = gen_fakearchive()
             # older applicable driver which is not the recommended one
             archive.create_deb('nvidia-123', dependencies={'Depends': 'xorg-video-abi-4'},
-                               extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             # -updates driver which also should not be recommended
             archive.create_deb('nvidia-current-updates', dependencies={'Depends': 'xorg-video-abi-4'},
-                               extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
 
             # -experimental driver which also should not be recommended
             archive.create_deb('nvidia-experimental', dependencies={'Depends': 'xorg-video-abi-4'},
-                               extra_tags={'Modaliases': 'nv(pci:nvidia, pci:v000010DEd000010C3sv00sd01bc03sc00i00)'})
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             chroot.add_repository(archive.path, True, False)
             cache = apt.Cache(rootdir=chroot.path)
             res = UbuntuDrivers.detect.system_device_drivers(cache)
@@ -517,7 +508,7 @@ Description: broken \xEB encoding
                           'drivers': {'chocolate': {'free': True, 'from_distro': False}}
                          })
 
-        self.assertEqual(res[graphics]['modalias'], 'pci:nvidia')
+        self.assertEqual(res[graphics]['modalias'], modalias_nv)
         self.assertTrue('nvidia' in res[graphics]['vendor'].lower())
         self.assertTrue('GeForce' in res[graphics]['model'])
 
@@ -542,8 +533,9 @@ Description: broken \xEB encoding
             f.write('def detect(apt): return ["coreutils", "no_such_package"]\n')
 
         res = UbuntuDrivers.detect.system_device_drivers()
-        self.assertEqual(res, {'extra.py': {
-            'drivers': {'coreutils': {'free': True, 'from_distro': True}}}})
+        self.assertTrue('extra.py' in res, list(res.keys()))
+        self.assertEqual(res['extra.py'],
+                         {'drivers': {'coreutils': {'free': True, 'from_distro': True}}})
 
     def test_system_device_drivers_manual_install(self):
         '''system_device_drivers() for a manually installed nvidia driver'''
@@ -575,7 +567,7 @@ exec /sbin/modinfo "$@"
             os.environ['PATH'] = orig_path
 
         graphics = '/sys/devices/graphics'
-        self.assertEqual(res[graphics]['modalias'], 'pci:nvidia')
+        self.assertEqual(res[graphics]['modalias'], modalias_nv)
         self.assertTrue(res[graphics]['manual_install'])
 
         # should still show the drivers
@@ -964,7 +956,7 @@ APT::Get::AllowUnauthenticated "true";
         self.assertTrue('special-uninst is incompatible' in out, out)
         self.assertTrue('unavailable package special-unavail' in out, out)
         # shows modaliases
-        self.assertTrue('pci:nvidia' in out, out)
+        self.assertTrue(modalias_nv in out, out)
         # driver packages
         self.assertTrue('available: 1 (auto-install)  [third party]  free  modalias:' in out, out)
 

@@ -42,7 +42,7 @@ Depends: ${python3:Depends},
  pciutils,
  python3-apt,
  python3-xkit,
- udev,
+ udev (>= 204-0ubuntu4~),
  pciutils,
  usbutils,
  alsa-utils

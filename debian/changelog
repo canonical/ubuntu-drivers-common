@@ -1,8 +1,8 @@
 ubuntu-drivers-common (1:0.2.77) UNRELEASED; urgency=low
 
-  * detect.py, _get_db_name(): Call "udevadm info" instead of the old
+  * detect.py, _get_db_name(): Call "udevadm hwdb" instead of the old
     /lib/udev/*-db helpers; the latter don't exist any more. This brings back
-    vendor/product names. (LP: #1186777)
+    vendor/product names. Bump udev dependency accordingly. (LP: #1186777)
   * share/fake-devices-wrapper: Rewrite using umockdev, our fakesys.py does
     not work any more with current libudev.
   * Port test suite from fakesys.py to umockdev. Add umockdev build-dependency
