@@ -1,4 +1,3 @@
 etc
 usr
 var
-tests/fakesysfs.py /usr/share/ubuntu-drivers-common

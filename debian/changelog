@@ -2,6 +2,7 @@ ubuntu-drivers-common (1:0.2.78) UNRELEASED; urgency=low
 
   * debian/tests/system: Drop usage of fakesys.py, should not actually be
     necessary.
+  * Drop tests/fakesysfs.py, not used any more and obsolete.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 14 Jun 2013 14:31:47 +0200
 

@@ -8,10 +8,6 @@ Files: UbuntuDrivers/* tests/ubuntu_drivers.py ubuntu-drivers
 Copyright: Copyright (c) 2012 Canonical Ltd.
 License: GPL-2+
 
-Files: tests/fakesysfs.py
-Copyright: (C) 2011, 2012 Martin Pitt <martin.pitt@ubuntu.com>
-License: GPL-2+
-
 License: GPL-2+
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
