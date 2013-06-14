@@ -241,6 +241,15 @@ def _is_manual_install(pkg):
                   pkg.name, module)
     return False
 
+def _unquote(s):
+    '''Unquote \\xNN sequences in s'''
+
+    parts = s.split('\\x')
+    result = parts.pop(0)
+    for part in parts:
+        result += chr(int(part[:2], 16)) + part[2:]
+    return result
+
 def _get_db_name(syspath, alias):
     '''Return (vendor, model) names for given device.
 
@@ -249,30 +258,24 @@ def _get_db_name(syspath, alias):
     # ensure syspath is a device name relative to the sysfs dir
     syspath = syspath[syspath.index('/devices/'):]
 
-    # check if we have an udev helper for this
-    command = '/lib/udev/%s-db' % alias.split(':')[0]
-    if not os.path.exists(command):
-        logging.debug('_get_db_name(%s, %s): No program %s, cannot identify',
-                      syspath, alias, command)
-        return (None, None)
-
-    # call udev ID helper
-    udev_db = subprocess.Popen([command, syspath], stdout=subprocess.PIPE,
-                               stderr = subprocess.PIPE, universal_newlines=True)
-    (out, err) = udev_db.communicate()
-    if udev_db.returncode != 0:
-        logging.debug('_get_db_name(%s, %s): %s failed with %i:\n%s', syspath,
-                      alias, command, udev_db.returncode, err)
+    try:
+        out = subprocess.check_output(['udevadm', 'info', '--query=all', '--path=' + syspath],
+                                      universal_newlines=True)
+    except (OSError, subprocess.CalledProcessError) as e:
+        logging.debug('_get_db_name(%s, %s): udevadm failed: %s', syspath, alias, str(e))
         return (None, None)
 
     vendor = None
     model = None
     for line in out.splitlines():
+        if not line.startswith('E: '):
+            continue
+        line = line[3:]  # chop off 'E: '
         (k, v) = line.split('=', 1)
-        if k == 'ID_VENDOR_FROM_DATABASE':
-            vendor = v
-        if k == 'ID_MODEL_FROM_DATABASE':
-            model = v
+        if k == 'ID_VENDOR_ENC':
+            vendor = _unquote(v)
+        if k == 'ID_MODEL_ENC':
+            model = _unquote(v)
 
     logging.debug('_get_db_name(%s, %s): vendor "%s", model "%s"', syspath,
                   alias, vendor, model)
