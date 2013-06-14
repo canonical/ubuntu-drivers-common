@@ -8,7 +8,6 @@ import subprocess
 srcdir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 testsdir = os.path.join(srcdir, 'tests')
 sys.path.append(testsdir)
-import fakesysfs
 
 def program_out(argv):
     '''Return (exitcode, out, err) from a program call.'''
@@ -63,15 +62,8 @@ class TestUbuntuDrivers(unittest.TestCase):
         assert os.path.exists('/usr/src/linux-headers-' + os.uname()[2]), \
                'Headers not installed for running kernel (%s)' % os.uname()[2]
 
-    def setUp(self):
-        self.sys = fakesysfs.SysFS()
-        os.environ['SYSFS_PATH'] = self.sys.sysfs
-
         # disable hybrid detection
         os.environ['UBUNTU_DRIVERS_XORG_LOG'] = '/nonexisting'
-
-    def tearDown(self):
-        del os.environ['SYSFS_PATH']
 
     def test_bcmwl(self):
         '''bcmwl-kernel-source'''
