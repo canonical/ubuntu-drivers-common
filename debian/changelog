@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.2.80) UNRELEASED; urgency=low
+
+  * Make test failures non-fatal on powerpc.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 18 Jun 2013 17:13:16 +0200
+
 ubuntu-drivers-common (1:0.2.79) saucy; urgency=low
 
   * Skip test_system_driver_packages_bad_encoding() on powerpc. It's not
