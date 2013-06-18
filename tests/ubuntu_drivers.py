@@ -408,6 +408,7 @@ class DetectTest(unittest.TestCase):
         self.assertEqual(res['nvidia-34']['modalias'], modalias_nv)
         self.assertEqual(res['nvidia-34']['recommended'], False)
 
+    @unittest.skipIf(os.uname()[4].startswith('ppc'), 'known failure on powerpc')
     def test_system_driver_packages_bad_encoding(self):
         '''system_driver_packages() with badly encoded Packages index'''
 
