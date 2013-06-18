@@ -1,6 +1,7 @@
 ubuntu-drivers-common (1:0.2.81) UNRELEASED; urgency=low
 
   * debian/tests/system: Port to umockdev.
+  * share/fake-devices-wrapper: Fix fake bcmwl modalias.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 18 Jun 2013 22:06:58 +0200
 

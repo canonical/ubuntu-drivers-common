@@ -40,7 +40,7 @@ testbed.add_device('pci', 'aticard', None,
                     'device', '0x9611',
                    ], [])
 testbed.add_device('pci', 'bcmwifi', None,
-                   ['modalias', 'pci:v000014E4d00004353sv00sd01bc00sc00i01',
+                   ['modalias', 'pci:v000014E4d00004353sv00sd01bc02sc80i00',
                     'vendor', '0x14E4',
                     'device', '0x4353',
                    ], [])
