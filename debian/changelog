@@ -4,6 +4,10 @@ ubuntu-drivers-common (1:0.2.78) UNRELEASED; urgency=low
     necessary.
   * Drop tests/fakesysfs.py, not used any more and obsolete.
   * Bump Standards-Version to 3.9.4 (no changes necessary).
+  * UbuntuDrivers/detect.py, system_aliases(): Tone down "Cannot read modalias
+    file" warning into a debug statement; this isn't particularly interesting
+    or an error the user could do something about, and it breaks tests on
+    powerpc.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 14 Jun 2013 14:31:47 +0200
 

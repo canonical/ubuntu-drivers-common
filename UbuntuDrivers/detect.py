@@ -39,7 +39,7 @@ def system_modaliases():
                 with open(os.path.join(path, 'modalias')) as f:
                     modalias = f.read().strip()
             except IOError as e:
-                logging.warning('system_modaliases(): Cannot read %s/modalias: %s',
+                logging.debug('system_modaliases(): Cannot read %s/modalias: %s',
                         path, e)
                 continue
 
