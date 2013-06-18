@@ -1,10 +1,10 @@
-ubuntu-drivers-common (1:0.2.79) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.79) saucy; urgency=low
 
   * Skip test_system_driver_packages_bad_encoding() on powerpc. It's not
     obvious why it fails there, and without a porter box there is little we
     can do.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 18 Jun 2013 14:47:07 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 18 Jun 2013 14:48:01 +0200
 
 ubuntu-drivers-common (1:0.2.78) saucy; urgency=low
 
