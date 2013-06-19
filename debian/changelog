@@ -1,3 +1,11 @@
+ubuntu-drivers-common (1:0.2.82) UNRELEASED; urgency=low
+
+  * debian/tests/system: Accept stderr messages from the
+    TestUbuntuDrivers.test_bcmwl() test, as this spits out lots of libkmod
+    errors due to the rather thin umockdev environment.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 19 Jun 2013 07:29:45 +0200
+
 ubuntu-drivers-common (1:0.2.81) saucy; urgency=low
 
   * debian/tests/system: Port to umockdev.

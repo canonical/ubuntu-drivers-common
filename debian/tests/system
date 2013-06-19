@@ -74,7 +74,7 @@ class TestUbuntuDrivers(unittest.TestCase):
         '''bcmwl-kernel-source'''
 
         self.do_test_driver('pci:v000014E4d00004353sv00sd01bc02sc80i00',
-                'bcmwl-kernel-source', 'wl', auto_install=True)
+                'bcmwl-kernel-source', 'wl', auto_install=True, allow_errors=True)
 
     def test_nvidia_304(self):
         '''nvidia-304'''
@@ -127,7 +127,8 @@ class TestUbuntuDrivers(unittest.TestCase):
 
         self.do_test_driver(None, 'virtualbox-dkms', 'vboxdrv', auto_install=False)
 
-    def do_test_driver(self, alias, package, module, auto_install=True):
+    def do_test_driver(self, alias, package, module, auto_install=True,
+                       allow_errors=False):
         if alias:
             self.testbed.add_device('pci', 'mydev', None, ['modalias', alias], [])
 
@@ -138,7 +139,10 @@ class TestUbuntuDrivers(unittest.TestCase):
         try:
             if auto_install:
                 # autoinstall works
-                o = program_out_success(['ubuntu-drivers', 'autoinstall'], self)
+                (c, o, e) = program_out(['ubuntu-drivers', 'autoinstall'])
+                self.assertEqual(c, 0, e)
+                if not allow_errors:
+                    self.assertEqual(e, '')
             else:
                 (c, o, e) = program_out(['apt-get', 'install', '-y', package])
                 self.assertEqual(c, 0, e)
