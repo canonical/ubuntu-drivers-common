@@ -2,6 +2,8 @@ ubuntu-drivers-common (1:0.2.83) UNRELEASED; urgency=low
 
   * debian/tests/control: Install libgl1-mesa-glx for the tests, so that
     the fglrx packages don't fail to install.
+  * debian/tests/system: nvidia-{310,313} are now transitional, drop tests and
+    test nvidia-319{,-updates} instead.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 05 Jul 2013 10:52:42 +0200
 
