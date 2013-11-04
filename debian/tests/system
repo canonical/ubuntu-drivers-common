@@ -158,7 +158,8 @@ class TestUbuntuDrivers(unittest.TestCase):
             if module:
                 (c, o, e) = program_out(['modinfo', module])
                 self.assertNotEqual(c, 0)
-                self.assertTrue(e.startswith('ERROR'), e)
+                self.assertIn('ERROR', e)
+                self.assertIn('not found', e)
                 self.assertEqual(o, '', o)
 
 # run ourselves through umockdev-wrapper

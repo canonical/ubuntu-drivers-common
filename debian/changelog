@@ -1,3 +1,10 @@
+ubuntu-drivers-common (1:0.2.84) UNRELEASED; urgency=low
+
+  * debian/tests/system: Update check of modinfo error message to also work
+    with current kmod.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 04 Nov 2013 10:12:22 +0100
+
 ubuntu-drivers-common (1:0.2.83) saucy; urgency=low
 
   * debian/tests/control: Install libgl1-mesa-glx for the tests, so that
