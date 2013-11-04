@@ -1,9 +1,9 @@
-ubuntu-drivers-common (1:0.2.84) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.84) trusty; urgency=low
 
   * debian/tests/system: Update check of modinfo error message to also work
     with current kmod.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 04 Nov 2013 10:12:22 +0100
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 04 Nov 2013 10:33:44 +0100
 
 ubuntu-drivers-common (1:0.2.83) saucy; urgency=low
 
