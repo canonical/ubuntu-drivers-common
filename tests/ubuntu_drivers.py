@@ -321,7 +321,7 @@ class DetectTest(unittest.TestCase):
 
         del self.umockdev
         res = UbuntuDrivers.detect.system_modaliases()
-        self.assertGreater(len(res), 5)
+        self.assertGreater(len(res), 3)
         self.assertTrue(':' in list(res)[0])
 
     def test_system_modalises_fake(self):
