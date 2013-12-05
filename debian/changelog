@@ -2,6 +2,7 @@ ubuntu-drivers-common (1:0.2.85) UNRELEASED; urgency=low
 
   * Depend on kmod | module-init-tools. Apparently some users manage to
     uninstall it. (LP: #1087222)
+  * Bump Standards-Version to 3.9.5. No changes necessary.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 05 Dec 2013 07:52:40 +0100
 
