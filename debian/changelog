@@ -1,10 +1,10 @@
-ubuntu-drivers-common (1:0.2.87) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.87) trusty; urgency=low
 
   * tests/ubuntu_drivers.py: Reduce the expected system modaliases from > 5 to
     > 3, as our arm64 builders seem a bit hardware deprived. Fixes FTBFS on
     arm64.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 05 Dec 2013 10:19:17 +0100
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 05 Dec 2013 10:20:08 +0100
 
 ubuntu-drivers-common (1:0.2.86) trusty; urgency=low
 
