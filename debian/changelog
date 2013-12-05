@@ -1,3 +1,10 @@
+ubuntu-drivers-common (1:0.2.86) UNRELEASED; urgency=low
+
+  * debian/tests/system: nvidia-319 is now a transitional package, update
+    tests to check nvidia-331 instead.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 05 Dec 2013 09:35:26 +0100
+
 ubuntu-drivers-common (1:0.2.85) trusty; urgency=low
 
   * Depend on kmod | module-init-tools. Apparently some users manage to
