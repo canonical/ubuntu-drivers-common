@@ -45,7 +45,8 @@ Depends: ${python3:Depends},
  udev (>= 204-0ubuntu4~),
  pciutils,
  usbutils,
- alsa-utils
+ alsa-utils,
+ kmod | module-init-tools,
 Recommends: python3-aptdaemon.pkcompat
 Replaces: nvidia-common (<< 1:0.2.46)
 Conflicts: nvidia-common (<< 1:0.2.46)
