@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.2.88) UNRELEASED; urgency=medium
+
+  * debian/tests/control: Add missing linux-headers test dependency.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 24 Jan 2014 09:49:33 +0100
+
 ubuntu-drivers-common (1:0.2.87) trusty; urgency=low
 
   * tests/ubuntu_drivers.py: Reduce the expected system modaliases from > 5 to
