@@ -1,6 +1,8 @@
 ubuntu-drivers-common (1:0.2.88) UNRELEASED; urgency=medium
 
   * debian/tests/control: Add missing linux-headers test dependency.
+  * Drop python3-aptdaemon.pkcompat recommends to a suggests, to avoid pulling
+    it into Kubuntu.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 24 Jan 2014 09:49:33 +0100
 
