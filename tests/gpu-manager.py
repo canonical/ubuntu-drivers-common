@@ -254,27 +254,27 @@ i915-brw 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
         self.assert_(gpu_test.has_intel)
         self.assert_(gpu_test.intel_loaded)
         self.assert_(gpu_test.mesa_enabled)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
-        self.assertRaises(gpu_test.fglrx_loaded)
-        self.assertRaises(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
-        self.assertRaises(gpu_test.has_nvidia)
-        self.assertRaises(gpu_test.nouveau_loaded)
-        self.assertRaises(gpu_test.nvidia_loaded)
-        self.assertRaises(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
         # No change
-        self.assertRaises(gpu_test.has_changed)
-        self.assertRaises(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
-        self.assertRaises(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
         # No action
         self.assert_(gpu_test.has_not_acted)
 
@@ -315,25 +315,25 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assert_(gpu_test.is_laptop)
 
         # No Intel
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
-        self.assertRaises(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.mesa_enabled)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
-        self.assertRaises(gpu_test.fglrx_loaded)
-        self.assertRaises(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
         self.assert_(gpu_test.has_nvidia)
         self.assert_(gpu_test.nvidia_loaded)
         self.assert_(gpu_test.nvidia_enabled)
         # No open!
-        self.assertRaises(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nouveau_loaded)
         # No change
-        self.assertRaises(gpu_test.has_changed)
-        self.assertRaises(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
-        self.assertRaises(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
         # No action
         self.assert_(gpu_test.has_not_acted)
 
@@ -370,25 +370,25 @@ nouveau 1447330 3 - Live 0x0000000000000000
         self.assert_(gpu_test.has_single_card)
 
         # No Intel
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
-        self.assertRaises(gpu_test.fglrx_loaded)
-        self.assertRaises(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
         self.assert_(gpu_test.has_nvidia)
-        self.assertRaises(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_enabled)
         # Open driver only!
-        self.assertRaises(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
         self.assert_(gpu_test.nouveau_loaded)
         self.assert_(gpu_test.mesa_enabled)
         # No change
-        self.assertRaises(gpu_test.has_changed)
-        self.assertRaises(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
-        self.assertRaises(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
         # No action
         self.assert_(gpu_test.has_not_acted)
 
@@ -426,25 +426,25 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assert_(gpu_test.has_single_card)
 
         # No Intel
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
-        self.assertRaises(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assertRaises(gpu_test.has_amd)
+        self.assert_(gpu_test.has_amd)
         # No radeon
-        self.assertRaises(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.radeon_loaded)
         self.assert_(gpu_test.fglrx_loaded)
         self.assert_(gpu_test.fglrx_enabled)
         # No NVIDIA
-        self.assertRaises(gpu_test.has_nvidia)
-        self.assertRaises(gpu_test.nvidia_loaded)
-        self.assertRaises(gpu_test.nvidia_enabled)
-        self.assertRaises(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nouveau_loaded)
         # No change
-        self.assertRaises(gpu_test.has_changed)
-        self.assertRaises(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
-        self.assertRaises(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
         # No action
         self.assert_(gpu_test.has_not_acted)
 
@@ -481,25 +481,25 @@ radeon 1447330 3 - Live 0x0000000000000000
         self.assert_(gpu_test.has_single_card)
 
         # No Intel
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
-        self.assertRaises(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+        self.assert_(gpu_test.mesa_enabled)
         # AMD
-        self.assertRaises(gpu_test.has_amd)
+        self.assert_(gpu_test.has_amd)
         # No fglrx
         self.assert_(gpu_test.radeon_loaded)
-        self.assertRaises(gpu_test.fglrx_loaded)
-        self.assertRaises(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
-        self.assertRaises(gpu_test.has_nvidia)
-        self.assertRaises(gpu_test.nvidia_loaded)
-        self.assertRaises(gpu_test.nvidia_enabled)
-        self.assertRaises(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nouveau_loaded)
         # No change
-        self.assertRaises(gpu_test.has_changed)
-        self.assertRaises(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
-        self.assertRaises(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
         # No action
         self.assert_(gpu_test.has_not_acted)
 
@@ -535,33 +535,33 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
         self.assert_(gpu_test.mesa_enabled)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
-        self.assertRaises(gpu_test.fglrx_loaded)
-        self.assertRaises(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
         self.assert_(gpu_test.has_nvidia)
-        self.assertRaises(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nouveau_loaded)
         self.assert_(gpu_test.nvidia_loaded)
         # We are going to enable nvidia
-        self.assertRaises(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
-        self.assertRaises(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
-        self.assertRaises(gpu_test.has_selected_driver)
+        self.assert_(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assert_(gpu_test.has_selected_driver)
         # Action is required
         # We enable nvidia
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Let's try again, only this time it's all
@@ -577,33 +577,33 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is not enabled
-        self.assertRaises(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_enabled)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
-        self.assertRaises(gpu_test.fglrx_loaded)
-        self.assertRaises(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
         self.assert_(gpu_test.has_nvidia)
-        self.assertRaises(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nouveau_loaded)
         self.assert_(gpu_test.nvidia_loaded)
         # We are going to enable nvidia
         self.assert_(gpu_test.nvidia_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
-        self.assertRaises(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
         # Action is required
         # We enable nvidia
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # What if the driver is enabled but the kernel
@@ -629,36 +629,36 @@ fake 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
 
         # No Intel
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is not enabled
-        self.assertRaises(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_enabled)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
-        self.assertRaises(gpu_test.fglrx_loaded)
-        self.assertRaises(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
         self.assert_(gpu_test.has_nvidia)
         #The open driver is blacklisted
-        self.assertRaises(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nouveau_loaded)
         # No kenrel module
-        self.assertRaises(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
         # The driver is enabled
         self.assert_(gpu_test.nvidia_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
         # We should switch to mesa
         self.assert_(gpu_test.has_selected_driver)
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
     def test_one_intel_to_nvidia_open(self):
         '''intel -> nouveau'''
@@ -691,31 +691,31 @@ nouveau 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
         self.assert_(gpu_test.mesa_enabled)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
-        self.assertRaises(gpu_test.fglrx_loaded)
-        self.assertRaises(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assert_(gpu_test.has_nvidia)
         self.assert_(gpu_test.nouveau_loaded)
-        self.assertRaises(gpu_test.nvidia_loaded)
-        self.assertRaises(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
-        self.assertRaises(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
     def test_one_intel_to_amd_binary(self):
         '''intel -> fglrx'''
@@ -749,33 +749,33 @@ fglrx 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
         self.assert_(gpu_test.mesa_enabled)
         # AMD
         self.assert_(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.radeon_loaded)
         self.assert_(gpu_test.fglrx_loaded)
         # No NVIDIA
-        self.assertRaises(gpu_test.has_nvidia)
-        self.assertRaises(gpu_test.nouveau_loaded)
-        self.assertRaises(gpu_test.nvidia_loaded)
-        self.assertRaises(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
         # We are going to enable fglrx
-        self.assertRaises(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.fglrx_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
-        self.assertRaises(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
+        self.assert_(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assert_(gpu_test.has_selected_driver)
         # Action is required
         # We enable fglrx
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Let's try again, only this time it's all
@@ -797,32 +797,32 @@ fglrx 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assertRaises(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_enabled)
         # AMD
         self.assert_(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.radeon_loaded)
         self.assert_(gpu_test.fglrx_loaded)
         # No NVIDIA
-        self.assertRaises(gpu_test.has_nvidia)
-        self.assertRaises(gpu_test.nouveau_loaded)
-        self.assertRaises(gpu_test.nvidia_loaded)
-        self.assertRaises(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
         # We don't need to enable fglrx again
         self.assert_(gpu_test.fglrx_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
-        self.assertRaises(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
         # Action is not required
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
 
@@ -849,33 +849,33 @@ fake 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assertRaises(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_enabled)
         # AMD
         self.assert_(gpu_test.has_amd)
         #The open driver is blacklisted
-        self.assertRaises(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.radeon_loaded)
         # No kernel module
-        self.assertRaises(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
         # No NVIDIA
-        self.assertRaises(gpu_test.has_nvidia)
-        self.assertRaises(gpu_test.nouveau_loaded)
-        self.assertRaises(gpu_test.nvidia_loaded)
-        self.assertRaises(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
         self.assert_(gpu_test.fglrx_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assert_(gpu_test.has_selected_driver)
         # We should switch to mesa
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
     def test_one_amd_open_to_intel(self):
         '''radeon -> intel'''
@@ -908,7 +908,7 @@ i915 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
 
@@ -919,22 +919,22 @@ i915 1447330 3 - Live 0x0000000000000000
         # Mesa is still enabled
         self.assert_(gpu_test.mesa_enabled)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
-        self.assertRaises(gpu_test.fglrx_loaded)
-        self.assertRaises(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
-        self.assertRaises(gpu_test.has_nvidia)
-        self.assertRaises(gpu_test.nouveau_loaded)
-        self.assertRaises(gpu_test.nvidia_loaded)
-        self.assertRaises(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
         # No need to do anything else
-        self.assertRaises(gpu_test.has_selected_driver)
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.has_not_acted)
 
     def test_one_amd_open_to_nvidia_open(self):
         '''radeon -> nouveau'''
@@ -967,33 +967,33 @@ nouveau 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
 
         # No Intel
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
         self.assert_(gpu_test.mesa_enabled)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
-        self.assertRaises(gpu_test.fglrx_loaded)
-        self.assertRaises(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
         self.assert_(gpu_test.has_nvidia)
         self.assert_(gpu_test.nouveau_loaded)
-        self.assertRaises(gpu_test.nvidia_loaded)
-        self.assertRaises(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
         # No need to do anything else
-        self.assertRaises(gpu_test.has_selected_driver)
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
     def test_one_amd_open_to_nvidia_binary(self):
@@ -1028,33 +1028,33 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
 
         # No Intel
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
         self.assert_(gpu_test.mesa_enabled)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
-        self.assertRaises(gpu_test.fglrx_loaded)
-        self.assertRaises(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
         self.assert_(gpu_test.has_nvidia)
-        self.assertRaises(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nouveau_loaded)
         self.assert_(gpu_test.nvidia_loaded)
-        self.assertRaises(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
-        self.assertRaises(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
+        self.assert_(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
         self.assert_(gpu_test.has_selected_driver)
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Let's try again, only this time it's all
@@ -1072,33 +1072,33 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
 
         # No Intel
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is not enabled
-        self.assertRaises(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_enabled)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
-        self.assertRaises(gpu_test.fglrx_loaded)
-        self.assertRaises(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
         self.assert_(gpu_test.has_nvidia)
-        self.assertRaises(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nouveau_loaded)
         self.assert_(gpu_test.nvidia_loaded)
-        self.assertRaises(gpu_test.nvidia_enabled)
+        self.assert_(gpu_test.nvidia_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
         # No need to do anything else
-        self.assertRaises(gpu_test.has_selected_driver)
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # What if the driver is enabled but the kernel
@@ -1124,36 +1124,36 @@ fake 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
 
         # No Intel
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is not enabled
-        self.assertRaises(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_enabled)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
-        self.assertRaises(gpu_test.fglrx_loaded)
-        self.assertRaises(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
         self.assert_(gpu_test.has_nvidia)
         #The open driver is blacklisted
-        self.assertRaises(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nouveau_loaded)
         # No kenrel module
-        self.assertRaises(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
         # The driver is enabled
         self.assert_(gpu_test.nvidia_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
         # We should switch to mesa
         self.assert_(gpu_test.has_selected_driver)
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
     def test_one_amd_binary_to_intel(self):
         '''fglrx -> intel'''
@@ -1192,7 +1192,7 @@ i915 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
 
@@ -1201,25 +1201,25 @@ i915 1447330 3 - Live 0x0000000000000000
         self.assert_(gpu_test.intel_loaded)
 
         # Mesa is not enabled
-        self.assertRaises(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_enabled)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
         # The binary driver is loaded and enabled
         self.assert_(gpu_test.fglrx_loaded)
         self.assert_(gpu_test.fglrx_enabled)
         # NVIDIA
-        self.assertRaises(gpu_test.has_nvidia)
-        self.assertRaises(gpu_test.nouveau_loaded)
-        self.assertRaises(gpu_test.nvidia_loaded)
-        self.assertRaises(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
         self.assert_(gpu_test.has_selected_driver)
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # User removed the discrete card without
@@ -1250,7 +1250,7 @@ i915 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
 
@@ -1259,27 +1259,27 @@ i915 1447330 3 - Live 0x0000000000000000
         self.assert_(gpu_test.intel_loaded)
 
         # Mesa is not enabled
-        self.assertRaises(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_enabled)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
         # The kernel module of the binary driver
         # is not loaded
-        self.assertRaises(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
         # The binary driver is still enabled
         self.assert_(gpu_test.fglrx_enabled)
         # NVIDIA
-        self.assertRaises(gpu_test.has_nvidia)
-        self.assertRaises(gpu_test.nouveau_loaded)
-        self.assertRaises(gpu_test.nvidia_loaded)
-        self.assertRaises(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
         self.assert_(gpu_test.has_selected_driver)
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
     def test_one_amd_binary_to_nvidia_open(self):
         '''fglrx -> nouveau'''
@@ -1319,34 +1319,34 @@ nouveau 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
 
         # No Intel
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is not enabled
-        self.assertRaises(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_enabled)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
         # The binary driver is loaded and enabled
         self.assert_(gpu_test.fglrx_loaded)
         self.assert_(gpu_test.fglrx_enabled)
         # NVIDIA
         self.assert_(gpu_test.has_nvidia)
         self.assert_(gpu_test.nouveau_loaded)
-        self.assertRaises(gpu_test.nvidia_loaded)
-        self.assertRaises(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
         self.assert_(gpu_test.has_selected_driver)
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # User swapped the discrete card with
@@ -1378,36 +1378,36 @@ nouveau 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
 
         # Intel
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is not enabled
-        self.assertRaises(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_enabled)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
         # The kernel module of the binary driver
         # is not loaded
-        self.assertRaises(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
         # The binary driver is still enabled
         self.assert_(gpu_test.fglrx_enabled)
         # NVIDIA
         self.assert_(gpu_test.has_nvidia)
         self.assert_(gpu_test.nouveau_loaded)
-        self.assertRaises(gpu_test.nvidia_loaded)
-        self.assertRaises(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
         self.assert_(gpu_test.has_selected_driver)
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
     def test_one_amd_binary_to_nvidia_binary(self):
         '''fglrx -> nvidia'''
@@ -1447,33 +1447,33 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
 
         # No Intel
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is not enabled
-        self.assertRaises(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_enabled)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
-        self.assertRaises(gpu_test.fglrx_loaded)
-        self.assertRaises(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
         self.assert_(gpu_test.has_nvidia)
-        self.assertRaises(gpu_test.nouveau_loaded)
-        self.assertRaises(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
         self.assert_(gpu_test.nvidia_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
         self.assert_(gpu_test.has_selected_driver)
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # User swapped the discrete card with
@@ -1506,33 +1506,33 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
 
         # No Intel
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is not enabled
-        self.assertRaises(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_enabled)
         # No AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
-        self.assertRaises(gpu_test.fglrx_loaded)
-        self.assertRaises(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
         self.assert_(gpu_test.has_nvidia)
-        self.assertRaises(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nouveau_loaded)
         self.assert_(gpu_test.nvidia_loaded)
         self.assert_(gpu_test.nvidia_enabled)
         # Has changed
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
         # No need to select the driver
-        self.assertRaises(gpu_test.has_selected_driver)
-        self.assertRaises(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.has_not_acted)
 
     def test_one_amd_open_to_amd_binary(self):
         '''radeon -> fglrx'''
@@ -1569,37 +1569,78 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         # Check the variables
 
         # Check if laptop
-        self.assertRaises(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.is_laptop)
 
         self.assert_(gpu_test.has_single_card)
 
         # No Intel
-        self.assertRaises(gpu_test.has_intel)
-        self.assertRaises(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is not enabled
-        self.assertRaises(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assertRaises(gpu_test.has_amd)
-        self.assertRaises(gpu_test.radeon_loaded)
+        self.assert_(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
         self.assert_(gpu_test.fglrx_loaded)
         self.assert_(gpu_test.fglrx_enabled)
         # No NVIDIA
-        self.assertRaises(gpu_test.has_nvidia)
-        self.assertRaises(gpu_test.nouveau_loaded)
-        self.assertRaises(gpu_test.nvidia_loaded)
-        self.assertRaises(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assertRaises(gpu_test.has_changed)
-        self.assertRaises(gpu_test.has_removed_xorg)
-        self.assertRaises(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
-        self.assertRaises(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.has_selected_driver)
         self.assert_(gpu_test.has_not_acted)
 
 
-
         # Different card
+        self.fake_lspci = open(self.fake_lspci.name, 'w')
+        self.fake_lspci.write('1002:2fe2;0:1:0;1')
+        self.fake_lspci.close()
+
+        # Call the program
+        self.exec_manager(fake_alternative)
+
+        # Collect data
+        gpu_test = self.check_vars(has_not_acted=False)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertFalse(gpu_test.is_laptop)
+
+        self.assert_(gpu_test.has_single_card)
+
+        # No Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        # AMD
+        self.assert_(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assert_(gpu_test.fglrx_loaded)
+        self.assert_(gpu_test.fglrx_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        # Has changed
+        self.assert_(gpu_test.has_changed)
+        # We remove the xorg.conf
+        self.assert_(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        # Select the driver
+        self.assertFalse(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.has_not_acted)
+
 
 if __name__ == '__main__':
     unittest.main()
