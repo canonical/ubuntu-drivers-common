@@ -814,6 +814,7 @@ APT::Get::AllowUnauthenticated "true";
                      'nvidia-current', 'special', 'picky']))
         self.assertEqual(ud.returncode, 0)
 
+    @unittest.skip("Skipping until we can pass syspath without APT_CONFIG")
     def test_list_system(self):
         '''ubuntu-drivers list for fake sysfs and system apt'''
 
@@ -869,6 +870,7 @@ APT::Get::AllowUnauthenticated "true";
         self.assertTrue('special - third-party free' in out, out)
         self.assertEqual(ud.returncode, 0)
 
+    @unittest.skip("Skipping until we can pass syspath without APT_CONFIG")
     def test_devices_system(self):
         '''ubuntu-drivers devices for fake sysfs and system apt'''
 

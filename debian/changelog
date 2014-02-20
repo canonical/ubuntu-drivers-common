@@ -6,8 +6,12 @@ ubuntu-drivers-common (1:0.2.88) UNRELEASED; urgency=medium
   * share/hybrid/gpu-manager.c:
     - Add the new gpu manager. This will replace hybrid-detect as soon as
       test coverage is complete.
+  * tests/ubuntu_drivers.py:
+    - Skip test_list_system() and test_devices_system() for now. We need
+      to find a way to pass syspath without the whole APT_CONFIG env var,
+      or the tests will fail if system packages match real system hardware.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 20 Feb 2014 15:33:40 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 20 Feb 2014 17:11:39 +0100
 
 ubuntu-drivers-common (1:0.2.87) trusty; urgency=low
 
