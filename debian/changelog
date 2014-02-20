@@ -3,8 +3,11 @@ ubuntu-drivers-common (1:0.2.88) UNRELEASED; urgency=medium
   * debian/tests/control: Add missing linux-headers test dependency.
   * Drop python3-aptdaemon.pkcompat recommends to a suggests, to avoid pulling
     it into Kubuntu.
+  * share/hybrid/gpu-manager.c:
+    - Add the new gpu manager. This will replace hybrid-detect as soon as
+      test coverage is complete.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 24 Jan 2014 09:49:33 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 20 Feb 2014 15:33:40 +0100
 
 ubuntu-drivers-common (1:0.2.87) trusty; urgency=low
 
