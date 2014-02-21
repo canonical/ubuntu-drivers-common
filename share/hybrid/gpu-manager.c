@@ -100,6 +100,7 @@ struct device {
     unsigned int vendor_id;
     unsigned int device_id;
     /* BusID components */
+    unsigned int domain;
     unsigned int bus;
     unsigned int dev;
     unsigned int func;
@@ -276,12 +277,13 @@ static int write_to_xorg_conf(struct device **devices, int cards_n,
             fprintf(pfile,
                "Section \"Device\"\n"
                "    Identifier \"Default Card %d\"\n"
-               "    BusID \"PCI:%x:%x:%x\"\n"
+               "    BusID \"PCI:%d@%d:%d:%d\"\n"
                "EndSection\n\n",
                i,
-               devices[i]->bus,
-               devices[i]->dev,
-               devices[i]->func);
+               (int)(devices[i]->bus),
+               (int)(devices[i]->domain),
+               (int)(devices[i]->dev),
+               (int)(devices[i]->func));
         }
     }
 
@@ -308,24 +310,26 @@ static int write_pxpress_xorg_conf(struct device **devices, int cards_n) {
                "    Identifier \"Default Card %d\"\n"
                "    Driver \"intel\"\n"
                "    Option \"AccelMethod\" \"uxa\"\n"
-               "    BusID \"PCI:%x:%x:%x\"\n"
+               "    BusID \"PCI:%d@%d:%d:%d\"\n"
                "EndSection\n\n",
                i,
-               devices[i]->bus,
-               devices[i]->dev,
-               devices[i]->func);
+               (int)(devices[i]->bus),
+               (int)(devices[i]->domain),
+               (int)(devices[i]->dev),
+               (int)(devices[i]->func));
         }
         else if (devices[i]->vendor_id == AMD) {
             fprintf(pfile,
                "Section \"Device\"\n"
                "    Identifier \"Default Card %d\"\n"
                "    Driver \"fglrx\"\n"
-               "    BusID \"PCI:%x:%x:%x\"\n"
+               "    BusID \"PCI:%d@%d:%d:%d\"\n"
                "EndSection\n\n",
                i,
-               devices[i]->bus,
-               devices[i]->dev,
-               devices[i]->func);
+               (int)(devices[i]->bus),
+               (int)(devices[i]->domain),
+               (int)(devices[i]->dev),
+               (int)(devices[i]->func));
         }
     }
 
@@ -380,6 +384,7 @@ static int has_system_changed(struct device **old_devices,
         if ((old_devices[i]->boot_vga != new_devices[i]->boot_vga) ||
             (old_devices[i]->vendor_id != new_devices[i]->vendor_id) ||
             (old_devices[i]->device_id != new_devices[i]->device_id) ||
+            (old_devices[i]->domain != new_devices[i]->domain) ||
             (old_devices[i]->bus != new_devices[i]->bus) ||
             (old_devices[i]->dev != new_devices[i]->dev) ||
             (old_devices[i]->func != new_devices[i]->func)) {
@@ -405,9 +410,10 @@ static int write_data_to_file(struct device **devices,
     }
 
     for(i = 0; i < cards_number; i++) {
-        fprintf(pfile, "%04x:%04x;%x:%x:%x;%d\n",
+        fprintf(pfile, "%04x:%04x;%04x:%02x:%02x:%d;%d\n",
                 devices[i]->vendor_id,
                 devices[i]->device_id,
+                devices[i]->domain,
                 devices[i]->bus,
                 devices[i]->dev,
                 devices[i]->func,
@@ -427,9 +433,10 @@ static int get_vars(FILE *file, struct device **devices, int num) {
     if (!devices[num])
         return EOF;
 
-    status = fscanf(file, "%04x:%04x;%x:%x:%x;%d\n",
+    status = fscanf(file, "%04x:%04x;%04x:%02x:%02x:%d;%d\n",
                     &devices[num]->vendor_id,
                     &devices[num]->device_id,
+                    &devices[num]->domain,
                     &devices[num]->bus,
                     &devices[num]->dev,
                     &devices[num]->func,
@@ -459,8 +466,8 @@ static int read_data_from_file(struct device **devices,
                     filename);
             return 0;
         }
-        fprintf(pfile, "%04x:%04x;%x:%x:%x;%d\n",
-                0, 0, 0, 0, 0, 0);
+        fprintf(pfile, "%04x:%04x;%04x:%02x:%02x:%d;%d\n",
+                0, 0, 0, 0, 0, 0, 0);
         fflush(pfile);
         fclose(pfile);
         /* Try again */

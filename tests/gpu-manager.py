@@ -278,10 +278,10 @@ class GpuManagerTest(unittest.TestCase):
     def test_one_intel_no_change(self):
         '''intel -> intel'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('8086:68d8;0:1:0;1')
+        self.fake_lspci.write('8086:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -334,10 +334,10 @@ i915-brw 1447330 3 - Live 0x0000000000000000
     def test_one_nvidia_binary_no_change(self):
         '''nvidia -> nvidia'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('10de:68d8;0:1:0;1')
+        self.last_boot_file.write('10de:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('10de:68d8;0:1:0;1')
+        self.fake_lspci.write('10de:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -393,10 +393,10 @@ nvidia 1447330 3 - Live 0x0000000000000000
     def test_one_nvidia_open_no_change(self):
         '''nvidia (nouveau) -> nvidia (nouveau)'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('10de:68d8;0:1:0;1')
+        self.last_boot_file.write('10de:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('10de:68d8;0:1:0;1')
+        self.fake_lspci.write('10de:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -448,10 +448,10 @@ nouveau 1447330 3 - Live 0x0000000000000000
     def test_one_amd_binary_no_change(self):
         '''fglrx -> fglrx'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:68d8;0:1:0;1')
+        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('1002:68d8;0:1:0;1')
+        self.fake_lspci.write('1002:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -545,10 +545,10 @@ fake 1447330 3 - Live 0x0000000000000000
     def test_one_amd_open_no_change(self):
         '''radeon -> radeon'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:68d8;0:1:0;1')
+        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('1002:68d8;0:1:0;1')
+        self.fake_lspci.write('1002:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -600,10 +600,10 @@ radeon 1447330 3 - Live 0x0000000000000000
     def test_one_intel_to_nvidia_binary(self):
         '''intel -> nvidia'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('10de:28e8;0:1:0;1')
+        self.fake_lspci.write('10de:28e8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -757,10 +757,10 @@ fake 1447330 3 - Live 0x0000000000000000
     def test_one_intel_to_nvidia_open(self):
         '''intel -> nouveau'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('10de:28e8;0:1:0;1')
+        self.fake_lspci.write('10de:28e8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -814,10 +814,10 @@ nouveau 1447330 3 - Live 0x0000000000000000
     def test_one_intel_to_amd_open(self):
         '''intel -> radeon'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('1002:28e8;0:1:0;1')
+        self.fake_lspci.write('1002:28e8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -873,10 +873,10 @@ radeon 1447330 3 - Live 0x0000000000000000
     def test_one_intel_to_amd_binary(self):
         '''intel -> fglrx'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('1002:28e8;0:1:0;1')
+        self.fake_lspci.write('1002:28e8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -1033,10 +1033,10 @@ fake 1447330 3 - Live 0x0000000000000000
     def test_one_amd_open_to_intel(self):
         '''radeon -> intel'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:28e8;0:1:0;1')
+        self.last_boot_file.write('1002:28e8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('8086:68d8;0:1:0;1')
+        self.fake_lspci.write('8086:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -1092,10 +1092,10 @@ i915 1447330 3 - Live 0x0000000000000000
     def test_one_amd_open_to_nvidia_open(self):
         '''radeon -> nouveau'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:28e8;0:1:0;1')
+        self.last_boot_file.write('1002:28e8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('10de:68d8;0:1:0;1')
+        self.fake_lspci.write('10de:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -1152,10 +1152,10 @@ nouveau 1447330 3 - Live 0x0000000000000000
     def test_one_amd_open_to_nvidia_binary(self):
         '''radeon -> nouveau'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:28e8;0:1:0;1')
+        self.last_boot_file.write('1002:28e8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('10de:68d8;0:1:0;1')
+        self.fake_lspci.write('10de:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -1311,10 +1311,10 @@ fake 1447330 3 - Live 0x0000000000000000
     def test_one_amd_binary_to_intel(self):
         '''fglrx -> intel'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:28e8;0:1:0;1')
+        self.last_boot_file.write('1002:28e8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('8086:68d8;0:1:0;1')
+        self.fake_lspci.write('8086:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         # User removed the discrete card without
@@ -1437,10 +1437,10 @@ i915 1447330 3 - Live 0x0000000000000000
     def test_one_amd_binary_to_nvidia_open(self):
         '''fglrx -> nouveau'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:28e8;0:1:0;1')
+        self.last_boot_file.write('1002:28e8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('10de:68d8;0:1:0;1')
+        self.fake_lspci.write('10de:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         # User swapped the discrete card with
@@ -1565,10 +1565,10 @@ nouveau 1447330 3 - Live 0x0000000000000000
     def test_one_amd_binary_to_nvidia_binary(self):
         '''fglrx -> nvidia'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:28e8;0:1:0;1')
+        self.last_boot_file.write('1002:28e8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('10de:68d8;0:1:0;1')
+        self.fake_lspci.write('10de:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         # User swapped the discrete card with
@@ -1690,11 +1690,11 @@ nvidia 1447330 3 - Live 0x0000000000000000
     def test_one_amd_open_to_amd_binary(self):
         '''radeon -> fglrx'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:28e8;0:1:0;1')
+        self.last_boot_file.write('1002:28e8;0000:00:01:0;1')
         self.last_boot_file.close()
 
         # Same card
-        self.fake_lspci.write('1002:28e8;0:1:0;1')
+        self.fake_lspci.write('1002:28e8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         # The module was built
@@ -1753,7 +1753,7 @@ fake_alt 1447330 3 - Live 0x0000000000000000
 
         # Different card
         self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('1002:2fe2;0:1:0;1')
+        self.fake_lspci.write('1002:2fe2;0000:00:01:0;1')
         self.fake_lspci.close()
 
         # Call the program
@@ -1799,7 +1799,7 @@ fake_alt 1447330 3 - Live 0x0000000000000000
 
         # Same card
         self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('1002:28e8;0:1:0;1')
+        self.fake_lspci.write('1002:28e8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         # The module was not built
@@ -1851,7 +1851,7 @@ fake_alt 1447330 3 - Live 0x0000000000000000
 
         # Different card
         self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('1002:2fe2;0:1:0;1')
+        self.fake_lspci.write('1002:2fe2;0000:00:01:0;1')
         self.fake_lspci.close()
 
         # Call the program
@@ -1896,10 +1896,10 @@ fake_alt 1447330 3 - Live 0x0000000000000000
     def test_one_nvidia_open_to_intel(self):
         '''nouveau -> intel'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('10de:28e8;0:1:0;1')
+        self.last_boot_file.write('10de:28e8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('8086:68d8;0:1:0;1')
+        self.fake_lspci.write('8086:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -1956,10 +1956,10 @@ i915 1447330 3 - Live 0x0000000000000000
     def test_one_nvidia_open_to_amd_open(self):
         '''nouveau -> radeon'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('10de:28e8;0:1:0;1')
+        self.last_boot_file.write('10de:28e8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('1002:68d8;0:1:0;1')
+        self.fake_lspci.write('1002:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -2016,10 +2016,10 @@ radeon 1447330 3 - Live 0x0000000000000000
     def test_one_nvidia_open_to_amd_binary(self):
         '''nouveau -> fglrx'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('10de:28e8;0:1:0;1')
+        self.last_boot_file.write('10de:28e8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('1002:68d8;0:1:0;1')
+        self.fake_lspci.write('1002:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         # No kernel module
@@ -2214,10 +2214,10 @@ fglrx 1447330 3 - Live 0x0000000000000000
     def test_one_nvidia_binary_to_intel(self):
         '''nvidia -> intel'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('10de:28e8;0:1:0;1')
+        self.last_boot_file.write('10de:28e8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('8086:68d8;0:1:0;1')
+        self.fake_lspci.write('8086:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         # Case 1: nvidia loaded and enabled
@@ -2413,10 +2413,10 @@ fake 1447330 3 - Live 0x0000000000000000
     def test_one_nvidia_binary_to_amd_open(self):
         '''nvidia -> radeon'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('10de:28e8;0:1:0;1')
+        self.last_boot_file.write('10de:28e8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('1002:68d8;0:1:0;1')
+        self.fake_lspci.write('1002:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         # Case 1: nvidia loaded and enabled
@@ -2616,10 +2616,10 @@ fake 1447330 3 - Live 0x0000000000000000
     def test_one_nvidia_binary_to_amd_binary(self):
         '''nvidia -> fglrx'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('10de:28e8;0:1:0;1')
+        self.last_boot_file.write('10de:28e8;0000:00:01:0;1')
         self.last_boot_file.close()
 
-        self.fake_lspci.write('1002:68d8;0:1:0;1')
+        self.fake_lspci.write('1002:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         # User swapped the discrete card with
@@ -2863,12 +2863,12 @@ fake_alt 1447330 3 - Live 0x0000000000000000
 
         # Case 1: the discrete card is now available (BIOS)
 
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -2926,8 +2926,8 @@ radeon 1447330 3 - Live 0x0000000000000000
         # Case 2: the discrete card was already available (BIOS)
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         # Call the program
@@ -2971,12 +2971,12 @@ radeon 1447330 3 - Live 0x0000000000000000
         # Case 3: the discrete card is no longer available (BIOS)
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('8086:68d8;0:1:0;1')
+        self.fake_lspci.write('8086:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -3027,12 +3027,12 @@ i915 1447330 3 - Live 0x0000000000000000
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Case 1: the discrete card is now available (BIOS)
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -3090,14 +3090,14 @@ radeon 1447330 3 - Live 0x0000000000000000
         # Case 2: the discrete card was already available (BIOS)
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         # Call the program
@@ -3141,12 +3141,12 @@ radeon 1447330 3 - Live 0x0000000000000000
         # Case 3: the discrete card is no longer available (BIOS)
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('8086:68d8;0:1:0;1')
+        self.fake_lspci.write('8086:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -3199,12 +3199,12 @@ i915 1447330 3 - Live 0x0000000000000000
 
         # Case 1a: the discrete card is now available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -3268,13 +3268,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
         # Case 1b: the discrete card is now available (BIOS)
         #          the driver is enabled but the module is not loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -3340,13 +3340,13 @@ fake 1447330 3 - Live 0x0000000000000000
         # Case 1c: the discrete card is now available (BIOS)
         #          the driver is not enabled but the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -3412,13 +3412,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
         # Case 1d: the discrete card is now available (BIOS)
         #          pxpress is enabled and the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -3485,13 +3485,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
         # Case 1e: the discrete card is now available (BIOS)
         #          pxpress is enabled but the module is not loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -3558,13 +3558,13 @@ fake 1447330 3 - Live 0x0000000000000000
         # Case 1f: the discrete card is now available (BIOS)
         #          pxpress is not enabled but the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -3632,14 +3632,14 @@ fglrx 1447330 3 - Live 0x0000000000000000
         #          the driver is enabled and the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -3707,14 +3707,14 @@ fglrx 1447330 3 - Live 0x0000000000000000
         #          the driver is enabled but the module is not loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -3782,14 +3782,14 @@ fake 1447330 3 - Live 0x0000000000000000
         #          the driver is not enabled but the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -3857,14 +3857,14 @@ fglrx 1447330 3 - Live 0x0000000000000000
         #          pxpress is enabled and the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -3932,14 +3932,14 @@ fglrx 1447330 3 - Live 0x0000000000000000
         #          pxpress is enabled but the module is not loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -4007,14 +4007,14 @@ fake 1447330 3 - Live 0x0000000000000000
         #          pxpress is not enabled but the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -4082,13 +4082,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
         #          the driver is enabled and the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
+8086:68d8;0000:00:01:0;1
 ''')
         self.fake_lspci.close()
 
@@ -4154,13 +4154,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
         #          the driver is enabled but the module is not loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
+8086:68d8;0000:00:01:0;1
 ''')
         self.fake_lspci.close()
 
@@ -4226,13 +4226,13 @@ fake 1447330 3 - Live 0x0000000000000000
         #          the driver is not enabled but the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
+8086:68d8;0000:00:01:0;1
 ''')
         self.fake_lspci.close()
 
@@ -4298,13 +4298,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
         #          pxpress is enabled and the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
+8086:68d8;0000:00:01:0;1
 ''')
         self.fake_lspci.close()
 
@@ -4370,13 +4370,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
         #          pxpress is enabled but the module is not loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
+8086:68d8;0000:00:01:0;1
 ''')
         self.fake_lspci.close()
 
@@ -4442,13 +4442,13 @@ fake 1447330 3 - Live 0x0000000000000000
         #          pxpress is not enabled but the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-1002:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
+8086:68d8;0000:00:01:0;1
 ''')
         self.fake_lspci.close()
 
@@ -4516,12 +4516,12 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 1: the discrete card is now available (BIOS)
 
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -4581,8 +4581,8 @@ nouveau 1447330 3 - Live 0x0000000000000000
         # Case 2: the discrete card was already available (BIOS)
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         # Call the program
@@ -4628,12 +4628,12 @@ nouveau 1447330 3 - Live 0x0000000000000000
         # Case 3: the discrete card is no longer available (BIOS)
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('8086:68d8;0:1:0;1')
+        self.fake_lspci.write('8086:68d8;0000:00:01:0;1')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -4686,12 +4686,12 @@ i915 1447330 3 - Live 0x0000000000000000
 
         # Case 1a: the discrete card is now available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules.write('''
@@ -4755,13 +4755,13 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # Case 1b: the discrete card is now available (BIOS)
         #          the driver is enabled but the module is not loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -4827,13 +4827,13 @@ fake 1447330 3 - Live 0x0000000000000000
         # Case 1c: the discrete card is now available (BIOS)
         #          the driver is not enabled but the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -4899,13 +4899,13 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # Case 1d: the discrete card is now available (BIOS)
         #          prime is enabled and the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -4972,13 +4972,13 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # Case 1e: the discrete card is now available (BIOS)
         #          prime is enabled but the module is not loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -5045,13 +5045,13 @@ fake 1447330 3 - Live 0x0000000000000000
         # Case 1f: the discrete card is now available (BIOS)
         #          pxpress is not enabled but the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0:1:0;1')
+        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -5119,14 +5119,14 @@ nvidia 1447330 3 - Live 0x0000000000000000
         #          the driver is enabled and the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -5194,14 +5194,14 @@ nvidia 1447330 3 - Live 0x0000000000000000
         #          the driver is enabled but the module is not loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -5269,14 +5269,14 @@ fake 1447330 3 - Live 0x0000000000000000
         #          the driver is not enabled but the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -5344,14 +5344,14 @@ nvidia 1447330 3 - Live 0x0000000000000000
         #          pxpress is enabled and the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -5419,14 +5419,14 @@ nvidia 1447330 3 - Live 0x0000000000000000
         #          prime is enabled but the module is not loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -5494,14 +5494,14 @@ fake 1447330 3 - Live 0x0000000000000000
         #          prime is not enabled but the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.fake_lspci.close()
 
         self.fake_modules = open(self.fake_modules.name, 'w')
@@ -5569,13 +5569,13 @@ nvidia 1447330 3 - Live 0x0000000000000000
         #          the driver is enabled and the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
+8086:68d8;0000:00:01:0;1
 ''')
         self.fake_lspci.close()
 
@@ -5641,13 +5641,13 @@ nvidia 1447330 3 - Live 0x0000000000000000
         #          the driver is enabled but the module is not loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
+8086:68d8;0000:00:01:0;1
 ''')
         self.fake_lspci.close()
 
@@ -5713,13 +5713,13 @@ fake 1447330 3 - Live 0x0000000000000000
         #          the driver is not enabled but the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
+8086:68d8;0000:00:01:0;1
 ''')
         self.fake_lspci.close()
 
@@ -5785,13 +5785,13 @@ nvidia 1447330 3 - Live 0x0000000000000000
         #          prime is enabled and the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
+8086:68d8;0000:00:01:0;1
 ''')
         self.fake_lspci.close()
 
@@ -5857,13 +5857,13 @@ nvidia 1447330 3 - Live 0x0000000000000000
         #          prime is enabled but the module is not loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
+8086:68d8;0000:00:01:0;1
 ''')
         self.fake_lspci.close()
 
@@ -5929,13 +5929,13 @@ fake 1447330 3 - Live 0x0000000000000000
         #          pxpress is not enabled but the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
-8086:68d8;0:1:0;1
-10de:28e8;1:0:0;0''')
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
         self.last_boot_file.close()
 
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_lspci.write('''
-8086:68d8;0:1:0;1
+8086:68d8;0000:00:01:0;1
 ''')
         self.fake_lspci.close()
 
