@@ -985,6 +985,9 @@ int main(int argc, char *argv[]) {
     fprintf(log_handle, "Is pxpress enabled? %s\n", pxpress_enabled ? "yes" : "no");
     fprintf(log_handle, "Is prime enabled? %s\n", prime_enabled ? "yes" : "no");
 
+    if (has_changed)
+        fprintf(log_handle, "System configuration has changed\n");
+
     if (cards_n == 1) {
         fprintf(log_handle, "Single card detected\n");
 
@@ -1156,10 +1159,11 @@ int main(int argc, char *argv[]) {
                         }
                         /* See if enabling the driver failed */
                         if (status) {
+                            /* Remove xorg.conf */
+                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
+                            move_xorg_conf();
+                            /* Write xorg.conf */
                             fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
-#if 0
-                            write_to_xorg_conf(discrete_bus, discrete_dev, discrete_func);
-#endif
                             write_to_xorg_conf(current_devices, cards_n, discrete_vendor_id);
                         }
                         else {
@@ -1234,6 +1238,10 @@ int main(int argc, char *argv[]) {
                         }
                         /* See if enabling the driver failed */
                         if (status) {
+                            /* Remove xorg.conf */
+                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
+                            move_xorg_conf();
+                            /* Write xorg.conf */
                             fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
                             /* Call aticonfig */
                             /* enable_all_amds(); */
@@ -1309,6 +1317,11 @@ int main(int argc, char *argv[]) {
                     /* TODO: If xorg.conf exists, make sure it contains
                      * the right BusIds (for boot vga and discrete cards) and fglrx.
                      * If it doesn't, create a xorg.conf from scratch using aticonfig */
+
+                    /* Remove xorg.conf */
+                    fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
+                    move_xorg_conf();
+                    /* Write xorg.conf */
                     fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
 
                     /* Call aticonfig */
@@ -1327,6 +1340,11 @@ int main(int argc, char *argv[]) {
                     /* TODO: If xorg.conf exists, make sure it contains
                      * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
                      * xorg.conf from scratch */
+
+                    /* Remove xorg.conf */
+                    fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
+                    move_xorg_conf();
+                    /* Write xorg.conf */
                     fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
                     /* Create xorg.conf for NVIDIA */
 #if 0
