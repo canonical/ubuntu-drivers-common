@@ -338,6 +338,103 @@ static int write_pxpress_xorg_conf(struct device **devices, int cards_n) {
     return 1;
 }
 
+static int check_vendor_bus_id_xorg_conf(struct device **devices, int cards_n,
+                                         unsigned int vendor_id, char *driver) {
+    int failure = 0;
+    int i;
+    int matches = 0;
+    int expected_matches = 0;
+    char line[4096];
+    char bus_id[256];
+	FILE *file;
+    struct stat stbuf;
+
+    /* If file doesn't exist */
+    if (stat(xorg_conf_file, &stbuf) == -1) {
+        fprintf(log_handle, "can't access %s\n", xorg_conf_file);
+        return 0;
+    }
+    /* If file is empty */
+    if ((stbuf.st_mode & S_IFMT) && ! stbuf.st_size) {
+        fprintf(log_handle, "%s is empty\n", xorg_conf_file);
+        return 0;
+    }
+
+
+    file = fopen(xorg_conf_file, "r");
+
+    if (!file) {
+        fprintf(log_handle, "Error: I couldn't open %s for reading.\n",
+                xorg_conf_file);
+        return 0;
+    }
+
+    for (i=0; i < cards_n; i++) {
+    /* BusID \"PCI:%d@%d:%d:%d\" */
+        if (devices[i]->vendor_id == vendor_id)
+            expected_matches += 1;
+    }
+
+    while (fgets(line, sizeof(line), file)) {
+        for (i=0; i < cards_n; i++) {
+            /* BusID \"PCI:%d@%d:%d:%d\" */
+            if (devices[i]->vendor_id == vendor_id) {
+                sprintf(bus_id, "\"PCI:%d@%d:%d:%d\"", (int)(devices[i]->bus),
+                                                       (int)(devices[i]->domain),
+                                                       (int)(devices[i]->dev),
+                                                       (int)(devices[i]->func));
+                if (strstr(line, bus_id) != NULL) {
+                    matches += 1;
+                    continue;
+                }
+                if ((strstr(line, "river") != NULL) && (strstr(line, driver) == NULL))
+                    failure = 1;
+            }
+        }
+    }
+
+    fclose(file);
+
+    return (matches == expected_matches && !failure);
+}
+
+
+static int check_all_bus_ids_xorg_conf(struct device **devices, int cards_n) {
+    /* int status = 0;*/
+    int i;
+    int matches = 0;
+    char line[4096];
+    char bus_id[256];
+	FILE *file;
+
+    file = fopen(xorg_conf_file, "r");
+
+    if (!file) {
+        fprintf(log_handle, "Error: I couldn't open %s for reading.\n",
+                xorg_conf_file);
+        return 0;
+    }
+
+    while (fgets(line, sizeof(line), file)) {
+        for (i=0; i < cards_n; i++) {
+            /* BusID \"PCI:%d@%d:%d:%d\" */
+            sprintf(bus_id, "\"PCI:%d@%d:%d:%d\"", (int)(devices[i]->bus),
+                                                   (int)(devices[i]->domain),
+                                                   (int)(devices[i]->dev),
+                                                   (int)(devices[i]->func));
+            if (strstr(line, bus_id) != NULL) {
+                matches += 1;
+            }
+        }
+    }
+
+    fclose(file);
+
+    return (matches == cards_n);
+    /* return status; */
+}
+
+
 static void get_boot_vga(struct device **devices,
                         int cards_number,
                         unsigned int *vendor_id,
@@ -1152,19 +1249,27 @@ int main(int argc, char *argv[]) {
                         /* Alternative in use */
                         else {
                             fprintf(log_handle, "Driver is already loaded and enabled\n");
-                            /* TODO: If xorg.conf exists, make sure it contains
-                             * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
-                             * xorg.conf from scratch */
                             status = 1;
                         }
                         /* See if enabling the driver failed */
                         if (status) {
-                            /* Remove xorg.conf */
-                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                            move_xorg_conf();
-                            /* Write xorg.conf */
-                            fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
-                            write_to_xorg_conf(current_devices, cards_n, discrete_vendor_id);
+                            /* If xorg.conf exists, make sure it contains
+                             * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
+                             * xorg.conf from scratch */
+                            if (!check_vendor_bus_id_xorg_conf(current_devices, cards_n,
+                                                               discrete_vendor_id, "nvidia")) {
+                                fprintf(log_handle, "Check failed\n");
+
+                                /* Remove xorg.conf */
+                                fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
+                                move_xorg_conf();
+                                /* Write xorg.conf */
+                                fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
+                                write_to_xorg_conf(current_devices, cards_n, discrete_vendor_id);
+                            }
+                            else {
+                                fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
+                            }
                         }
                         else {
                             /* FIXME: select Mesa here */
