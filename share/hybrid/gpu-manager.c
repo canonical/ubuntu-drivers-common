@@ -1272,8 +1272,12 @@ int main(int argc, char *argv[]) {
                             }
                         }
                         else {
-                            /* FIXME: select Mesa here */
+                            /* For some reason we failed to select the
+                             * driver. Let's select Mesa here */
                             fprintf(log_handle, "Error: failed to enable the driver\n");
+                            fprintf(log_handle, "Selecting mesa\n");
+                            select_driver(main_arch_path, "mesa");
+                            /* select_driver(other_arch_path, "mesa"); */
                             /* Remove xorg.conf */
                             fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
                             move_xorg_conf();
@@ -1336,25 +1340,36 @@ int main(int argc, char *argv[]) {
                         /* Alternative in use */
                         else {
                             fprintf(log_handle, "Driver is already loaded and enabled\n");
-                            /* TODO: If xorg.conf exists, make sure it contains
-                             * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
-                             * xorg.conf from scratch */
                             status = 1;
                         }
                         /* See if enabling the driver failed */
                         if (status) {
-                            /* Remove xorg.conf */
-                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                            move_xorg_conf();
-                            /* Write xorg.conf */
-                            fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
-                            /* Call aticonfig */
-                            /* enable_all_amds(); */
-                            write_to_xorg_conf(current_devices, cards_n, discrete_vendor_id);
+
+                            /* If xorg.conf exists, make sure it contains
+                             * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
+                             * xorg.conf from scratch */
+                            if (!check_vendor_bus_id_xorg_conf(current_devices, cards_n,
+                                                               discrete_vendor_id, "fglrx")) {
+                                fprintf(log_handle, "Check failed\n");
+
+                                /* Remove xorg.conf */
+                                fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
+                                move_xorg_conf();
+                                /* Write xorg.conf */
+                                fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
+                                write_to_xorg_conf(current_devices, cards_n, discrete_vendor_id);
+                            }
+                            else {
+                                fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
+                            }
                         }
                         else {
-                            /* FIXME: select Mesa here */
+                            /* For some reason we failed to select the
+                             * driver. Let's select Mesa here */
                             fprintf(log_handle, "Error: failed to enable the driver\n");
+                            fprintf(log_handle, "Selecting mesa\n");
+                            select_driver(main_arch_path, "mesa");
+                            /* select_driver(other_arch_path, "mesa"); */
                             /* Remove xorg.conf */
                             fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
                             move_xorg_conf();
@@ -1417,49 +1432,208 @@ int main(int argc, char *argv[]) {
             fprintf(log_handle, "AMD IGP detected\n");
             if (discrete_vendor_id == AMD) {
                 fprintf(log_handle, "Discrete AMD card detected\n");
-                if (fglrx_loaded && fglrx_enabled) {
-                    fprintf(log_handle, "Driver enabled and in use\n");
-                    /* TODO: If xorg.conf exists, make sure it contains
-                     * the right BusIds (for boot vga and discrete cards) and fglrx.
-                     * If it doesn't, create a xorg.conf from scratch using aticonfig */
 
-                    /* Remove xorg.conf */
-                    fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                    move_xorg_conf();
-                    /* Write xorg.conf */
-                    fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
 
-                    /* Call aticonfig */
-                    /* enable_all_amds(); */
-                    write_to_xorg_conf(current_devices, cards_n, discrete_vendor_id);
+                /* Kernel module is available */
+                if (fglrx_loaded) {
+                    /* Alternative not in use */
+                    if (!fglrx_enabled) {
+                        /* Select nvidia */
+                        fprintf(log_handle, "Selecting fglrx\n");
+                        status = select_driver(main_arch_path, "fglrx");
+                        /* select_driver(other_arch_path, "nvidia"); */
+                    }
+                    /* Alternative in use */
+                    else {
+                        fprintf(log_handle, "Driver is already loaded and enabled\n");
+                        status = 1;
+                    }
+                    /* See if enabling the driver failed */
+                    if (status) {
+
+                        /* If xorg.conf exists, make sure it contains
+                         * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
+                         * xorg.conf from scratch */
+                        if (!check_vendor_bus_id_xorg_conf(current_devices, cards_n,
+                                                           discrete_vendor_id, "fglrx")) {
+                            fprintf(log_handle, "Check failed\n");
+
+                            /* Remove xorg.conf */
+                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
+                            move_xorg_conf();
+                            /* Write xorg.conf */
+                            fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
+                            write_to_xorg_conf(current_devices, cards_n, discrete_vendor_id);
+                        }
+                        else {
+                            fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
+                        }
+                    }
+                    else {
+                        /* For some reason we failed to select the
+                         * driver. Let's select Mesa here */
+                        fprintf(log_handle, "Error: failed to enable the driver\n");
+                        fprintf(log_handle, "Selecting mesa\n");
+                        select_driver(main_arch_path, "mesa");
+                        /* select_driver(other_arch_path, "mesa"); */
+                        /* Remove xorg.conf */
+                        fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
+                        move_xorg_conf();
+                    }
                 }
+                /* Kernel module is not available */
                 else {
-                    fprintf(log_handle, "Driver not enabled or not in use\n");
-                    fprintf(log_handle, "Nothing to do\n");
+                    /* See if alternatives are broken */
+                    if (!mesa_enabled) {
+                        /* Select mesa as a fallback */
+                        fprintf(log_handle, "Kernel Module is not loaded\n");
+                        fprintf(log_handle, "Selecting mesa\n");
+                        status = select_driver(main_arch_path, "mesa");
+                        /* select_driver(other_arch_path, "mesa"); */
+                        /* Remove xorg.conf */
+                        fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
+                        move_xorg_conf();
+                    }
+                    else {
+                        if (has_changed) {
+                            fprintf(log_handle, "System configuration has changed\n");
+                            /* Remove xorg.conf */
+                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
+                            move_xorg_conf();
+                        }
+                        else {
+                            fprintf(log_handle, "Driver not enabled or not in use\n");
+                            fprintf(log_handle, "Nothing to do\n");
+                        }
+                    }
                 }
             }
             else if (discrete_vendor_id == NVIDIA) {
                 fprintf(log_handle, "Discrete AMD card detected\n");
-                if (nvidia_loaded && nvidia_enabled) {
-                    fprintf(log_handle, "Driver enabled and in use\n");
-                    /* TODO: If xorg.conf exists, make sure it contains
-                     * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
-                     * xorg.conf from scratch */
 
-                    /* Remove xorg.conf */
-                    fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                    move_xorg_conf();
-                    /* Write xorg.conf */
-                    fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
-                    /* Create xorg.conf for NVIDIA */
-#if 0
-                    write_to_xorg_conf(discrete_bus, discrete_dev, discrete_func);
-#endif
-                    write_to_xorg_conf(current_devices, cards_n, discrete_vendor_id);
+                /* Kernel module is available */
+                if (nvidia_loaded) {
+                    /* Alternative not in use */
+                    if (!nvidia_enabled) {
+                        /* Select nvidia */
+                        fprintf(log_handle, "Selecting nvidia\n");
+                        status = select_driver(main_arch_path, "nvidia");
+                        /* select_driver(other_arch_path, "nvidia"); */
+                    }
+                    /* Alternative in use */
+                    else {
+                        fprintf(log_handle, "Driver is already loaded and enabled\n");
+                        status = 1;
+                    }
+                    /* See if enabling the driver failed */
+                    if (status) {
+                        /* If xorg.conf exists, make sure it contains
+                         * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
+                         * xorg.conf from scratch */
+                        if (!check_vendor_bus_id_xorg_conf(current_devices, cards_n,
+                                                           discrete_vendor_id, "nvidia")) {
+                            fprintf(log_handle, "Check failed\n");
+
+                            /* Remove xorg.conf */
+                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
+                            move_xorg_conf();
+                            /* Write xorg.conf */
+                            fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
+                            write_to_xorg_conf(current_devices, cards_n, discrete_vendor_id);
+                        }
+                        else {
+                            fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
+                        }
+                    }
+                    else {
+                        /* For some reason we failed to select the
+                         * driver. Let's select Mesa here */
+                        fprintf(log_handle, "Error: failed to enable the driver\n");
+                        fprintf(log_handle, "Selecting mesa\n");
+                        select_driver(main_arch_path, "mesa");
+                        /* select_driver(other_arch_path, "mesa"); */
+                        /* Remove xorg.conf */
+                        fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
+                        move_xorg_conf();
+                    }
                 }
+                /* Nvidia kernel module is not available */
                 else {
-                    fprintf(log_handle, "Driver not enabled or not in use\n");
-                    fprintf(log_handle, "Nothing to do\n");
+                    /* See if fglrx is in use */
+                    /* Kernel module is available */
+                    if (fglrx_loaded) {
+                        /* Alternative not in use */
+                        if (!fglrx_enabled) {
+                            /* Select nvidia */
+                            fprintf(log_handle, "Selecting fglrx\n");
+                            status = select_driver(main_arch_path, "fglrx");
+                            /* select_driver(other_arch_path, "nvidia"); */
+                        }
+                        /* Alternative in use */
+                        else {
+                            fprintf(log_handle, "Driver is already loaded and enabled\n");
+                            status = 1;
+                        }
+                        /* See if enabling the driver failed */
+                        if (status) {
+
+                            /* If xorg.conf exists, make sure it contains
+                             * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
+                             * xorg.conf from scratch */
+                            if (!check_vendor_bus_id_xorg_conf(current_devices, cards_n,
+                                                               discrete_vendor_id, "fglrx")) {
+                                fprintf(log_handle, "Check failed\n");
+
+                                /* Remove xorg.conf */
+                                fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
+                                move_xorg_conf();
+                                /* Write xorg.conf */
+                                fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
+                                write_to_xorg_conf(current_devices, cards_n, discrete_vendor_id);
+                            }
+                            else {
+                                fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
+                            }
+                        }
+                        else {
+                            /* For some reason we failed to select the
+                             * driver. Let's select Mesa here */
+                            fprintf(log_handle, "Error: failed to enable the driver\n");
+                            fprintf(log_handle, "Selecting mesa\n");
+                            select_driver(main_arch_path, "mesa");
+                            /* select_driver(other_arch_path, "mesa"); */
+                            /* Remove xorg.conf */
+                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
+                            move_xorg_conf();
+                        }
+                    }
+                    /* Kernel module is not available */
+                    else {
+                        /* See if alternatives are broken */
+                        if (!mesa_enabled) {
+                            /* Select mesa as a fallback */
+                            fprintf(log_handle, "Kernel Module is not loaded\n");
+                            fprintf(log_handle, "Selecting mesa\n");
+                            status = select_driver(main_arch_path, "mesa");
+                            /* select_driver(other_arch_path, "mesa"); */
+                            /* Remove xorg.conf */
+                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
+                            move_xorg_conf();
+                        }
+                        else {
+                            if (has_changed) {
+                                fprintf(log_handle, "System configuration has changed\n");
+                                /* Remove xorg.conf */
+                                fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
+                                move_xorg_conf();
+                            }
+                            else {
+                                fprintf(log_handle, "Driver not enabled or not in use\n");
+                                fprintf(log_handle, "Nothing to do\n");
+                            }
+                        }
+
+                    }
                 }
             }
             else {
