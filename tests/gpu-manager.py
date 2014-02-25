@@ -68,6 +68,8 @@ class GpuManagerTest(unittest.TestCase):
         klass.new_boot_file.close()
         klass.xorg_file = tempfile.NamedTemporaryFile(mode='w', dir='/media/caviar4/data/ubuntu/gpu_manager/tmp/', delete=False)
         klass.xorg_file.close()
+        klass.amd_pcsdb_file = tempfile.NamedTemporaryFile(mode='w', dir='/media/caviar4/data/ubuntu/gpu_manager/tmp/', delete=False)
+        klass.amd_pcsdb_file.close()
         klass.fake_lspci = tempfile.NamedTemporaryFile(mode='w', dir='/media/caviar4/data/ubuntu/gpu_manager/tmp/', delete=False)
         klass.fake_lspci.close()
         klass.fake_modules = tempfile.NamedTemporaryFile(mode='w', dir='/media/caviar4/data/ubuntu/gpu_manager/tmp/', delete=False)
@@ -92,6 +94,7 @@ class GpuManagerTest(unittest.TestCase):
         klass.not_modified_xorg_pt = re.compile('No need to modify xorg.conf. Path .+')
         klass.no_action_pt = re.compile('Nothing to do')
         klass.has_skipped_hybrid_pt = re.compile('Intel hybrid laptop - nothing to do')
+        klass.loaded_and_enabled_pt = re.compile('Driver is already loaded and enabled')
 
     #@classmethod
     #def tearDownClass(klass):
@@ -114,6 +117,7 @@ class GpuManagerTest(unittest.TestCase):
         self.fake_modules = open(self.fake_modules.name, 'w')
         self.fake_alternatives = open(self.fake_alternatives.name, 'w')
         self.remove_xorg_conf()
+        self.remove_amd_pcsdb_file()
 
     def tearDown(self):
         for file in (self.last_boot_file,
@@ -122,7 +126,8 @@ class GpuManagerTest(unittest.TestCase):
                      self.fake_modules,
                      self.fake_alternatives,
                      self.log,
-                     self.xorg_file):
+                     self.xorg_file,
+                     self.amd_pcsdb_file):
             target_dir = '/media/caviar4/data/ubuntu/gpu_manager/%s' % self.this_function_name
             try:
                 file.close()
@@ -144,12 +149,19 @@ class GpuManagerTest(unittest.TestCase):
         except:
             pass
 
+    def remove_amd_pcsdb_file(self):
+        try:
+            os.unlink(self.amd_pcsdb_file.name)
+        except:
+            pass
+
     def exec_manager(self, fake_alternative, is_laptop=False):
         fake_laptop_arg = is_laptop and '--fake-laptop' or '--fake-desktop'
         os.system('/home/alberto/oem/nvidia/nvidia-common/ubuntu-drivers-common/share/hybrid/gpu-manager --dry-run '
                   '--last-boot-file %s '
                   '--fake-lspci %s '
                   '--xorg-conf-file %s '
+                  '--amd-pcsdb-file %s '
                   '--fake-alternative %s '
                   '--fake-modules-path %s '
                   '--fake-alternatives-path %s '
@@ -158,6 +170,7 @@ class GpuManagerTest(unittest.TestCase):
                   '--log %s ' % (self.last_boot_file.name,
                                  self.fake_lspci.name,
                                  self.xorg_file.name,
+                                 self.amd_pcsdb_file.name,
                                  fake_alternative,
                                  self.fake_modules.name,
                                  self.fake_alternatives.name,
@@ -168,6 +181,9 @@ class GpuManagerTest(unittest.TestCase):
 
         # Remove xorg.conf
         self.remove_xorg_conf()
+
+        # Remove amd_pcsdb_file
+        self.remove_amd_pcsdb_file()
 
     def check_vars(self, *args, **kwargs):
         gpu_test = GpuTest(**kwargs)
@@ -180,6 +196,7 @@ class GpuManagerTest(unittest.TestCase):
             has_card = self.has_card_pt.match(line)
             is_driver_loaded = self.is_driver_loaded_pt.match(line)
             is_driver_enabled = self.is_driver_enabled_pt.match(line)
+            loaded_and_enabled = self.loaded_and_enabled_pt.match(line)
 
             single_card = self.single_card_pt.match(line)
             laptop = self.is_laptop_pt.match(line)
@@ -229,9 +246,6 @@ class GpuManagerTest(unittest.TestCase):
             elif single_card:
                 gpu_test.has_single_card = True
             elif laptop:
-                if self.this_function_name == 'laptop_one_intel_one_amd_open':
-                    print line
-                    print laptop.group(1).strip().lower()
                 gpu_test.is_laptop = (laptop.group(1).strip().lower() == 'yes')
             elif no_change_stop:
                 gpu_test.has_changed = False
@@ -258,10 +272,14 @@ class GpuManagerTest(unittest.TestCase):
             elif has_skipped_hybrid:
                 gpu_test.has_skipped_hybrid = True
                 gpu_test.has_not_acted = True
-
+            elif loaded_and_enabled:
+                gpu_test.has_selected_driver = False
         # Close the log
         log.close()
 
+        # No driver selection and no changes to xorg.conf
+        if not gpu_test.has_selected_driver and not_modified_xorg:
+            gpu_test.has_not_acted = True
 
 
         '''
@@ -3270,15 +3288,172 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
+        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Let's create an amdpcsdb file where the discrete
+        # GPU is enabled
+        self.amd_pcsdb_file = open(self.amd_pcsdb_file.name, 'w')
+        self.amd_pcsdb_file.write('''
+FAKESETTINGS=BLAH
+FAKEGPUSETTINGS=BLAHBLAH''')
+
+        self.amd_pcsdb_file.close()
+
+        # Call the program
+        self.exec_manager(fake_alternative, is_laptop=True)
+
+        # Collect data
+        gpu_test = self.check_vars()
+
+        # Has changed
+        self.assert_(gpu_test.has_changed)
+        self.assert_(gpu_test.has_removed_xorg)
+        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+        # Let's create an amdpcsdb file where the discrete
+        # GPU is enabled, only this time xorg.conf is wrong
+        self.amd_pcsdb_file = open(self.amd_pcsdb_file.name, 'w')
+        self.amd_pcsdb_file.write('''
+FAKESETTINGS=BLAH
+FAKEGPUSETTINGS=BLAHBLAH''')
+
+        self.amd_pcsdb_file.close()
+
+        self.xorg_file = open(self.xorg_file.name, 'w')
+        self.xorg_file.write('''
+Section "ServerLayout"
+    Identifier     "aticonfig Layout"
+    Screen      0  "aticonfig-Screen[0]-0" 0 0
+EndSection
+
+Section "Module"
+EndSection
+
+Section "Monitor"
+    Identifier   "aticonfig-Monitor[0]-0"
+    Option      "VendorName" "ATI Proprietary Driver"
+    Option      "ModelName" "Generic Autodetecting Monitor"
+    Option      "DPMS" "true"
+EndSection
+
+Section "Device"
+    Identifier  "aticonfig-Device[0]-0"
+    Driver      "fglrx"
+    BusID       "PCI:1:0:0"
+EndSection
+
+Section "Device"
+    Identifier  "intel"
+    Driver      "intel"
+    Option      "AccelMethod" "uxa"
+EndSection
+
+Section "Screen"
+    Identifier "aticonfig-Screen[0]-0"
+    Device     "aticonfig-Device[0]-0"
+    Monitor    "aticonfig-Monitor[0]-0"
+    DefaultDepth     24
+    SubSection "Display"
+        Viewport   0 0
+        Depth     24
+    EndSubSection
+EndSection
+        ''')
+        self.xorg_file.close()
+
+        # Call the program
+        self.exec_manager(fake_alternative, is_laptop=True)
+
+        # Collect data
+        gpu_test = self.check_vars()
+
+        # Has changed
+        self.assert_(gpu_test.has_changed)
+        self.assert_(gpu_test.has_removed_xorg)
+        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Let's create an amdpcsdb file where the discrete
+        # GPU is enabled, only this time xorg.conf is correct
+        self.amd_pcsdb_file = open(self.amd_pcsdb_file.name, 'w')
+        self.amd_pcsdb_file.write('''
+FAKESETTINGS=BLAH
+FAKEGPUSETTINGS=BLAHBLAH''')
+
+        self.amd_pcsdb_file.close()
+
+        self.xorg_file = open(self.xorg_file.name, 'w')
+        self.xorg_file.write('''
+Section "ServerLayout"
+    Identifier     "aticonfig Layout"
+    Screen      0  "aticonfig-Screen[0]-0" 0 0
+EndSection
+
+Section "Module"
+EndSection
+
+Section "Monitor"
+    Identifier   "aticonfig-Monitor[0]-0"
+    Option      "VendorName" "ATI Proprietary Driver"
+    Option      "ModelName" "Generic Autodetecting Monitor"
+    Option      "DPMS" "true"
+EndSection
+
+Section "Device"
+    Identifier  "aticonfig-Device[0]-0"
+    Driver      "fglrx"
+    BusID       "PCI:1@0:0:0"
+EndSection
+
+Section "Device"
+    Identifier  "intel"
+    Driver      "intel"
+    Option      "AccelMethod" "uxa"
+    BusID       "PCI:0@0:1:0"
+EndSection
+
+Section "Screen"
+    Identifier "aticonfig-Screen[0]-0"
+    Device     "aticonfig-Device[0]-0"
+    Monitor    "aticonfig-Monitor[0]-0"
+    DefaultDepth     24
+    SubSection "Display"
+        Viewport   0 0
+        Depth     24
+    EndSubSection
+EndSection
+        ''')
+        self.xorg_file.close()
+
+        # Call the program
+        self.exec_manager(fake_alternative, is_laptop=True)
+
+        # Collect data
+        gpu_test = self.check_vars()
+
+        # Has changed
+        self.assert_(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
-        '''
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assert_(gpu_test.has_not_acted)
 
 
         # Case 1b: the discrete card is now available (BIOS)
@@ -3342,15 +3517,13 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        self.assert_(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 1c: the discrete card is now available (BIOS)
@@ -3414,15 +3587,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assert_(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 1d: the discrete card is now available (BIOS)
@@ -3487,15 +3658,15 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        self.assert_(gpu_test.has_regenerated_xorg)
+        # Select fglrx, as the discrete GPU
+        # is not disabled
+        self.assert_(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 1e: the discrete card is now available (BIOS)
@@ -3560,15 +3731,13 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        self.assert_(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 1f: the discrete card is now available (BIOS)
@@ -3633,15 +3802,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assert_(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 2a: the discrete card was already available (BIOS)
@@ -3708,15 +3875,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
-        self.assert_(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assert_(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
-        '''
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 2b: the discrete card was already available (BIOS)
@@ -3783,15 +3948,13 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
-        self.assert_(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        self.assert_(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 2c: the discrete card was already available (BIOS)
@@ -3858,15 +4021,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
-        self.assert_(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assert_(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 2d: the discrete card was already available (BIOS)
@@ -3933,15 +4094,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
-        self.assert_(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assert_(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 2e: the discrete card was already available (BIOS)
@@ -4008,15 +4167,13 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
-        self.assert_(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        self.assert_(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 2f: the discrete card was already available (BIOS)
@@ -4083,15 +4240,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
-        self.assert_(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assert_(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3a: the discrete card is no longer available (BIOS)
