@@ -1581,7 +1581,7 @@ int main(int argc, char *argv[]) {
                              * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
                              * xorg.conf from scratch */
                             if (!check_vendor_bus_id_xorg_conf(current_devices, cards_n,
-                                                               discrete_vendor_id, "fglrx")) {
+                                                               boot_vga_vendor_id, "fglrx")) {
                                 fprintf(log_handle, "Check failed\n");
 
                                 /* Remove xorg.conf */
