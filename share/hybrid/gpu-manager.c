@@ -73,9 +73,8 @@
       || ((((c) & 0x00ffff00)                                           \
            == ((PCI_CLASS_PROCESSOR << 16) | (PCI_SUBCLASS_PROCESSOR_COPROC << 8)))) )
 
-#define FILENAME_ "/var/lib/ubuntu-drivers-common/last_gfx_boot"
-#define FILENAME "last_gfx_boot"
-
+#define LAST_BOOT "/var/lib/ubuntu-drivers-common/last_gfx_boot"
+#define XORG_CONF "/etc/X11/xorg.conf"
 #define FORCE_LAPTOP "/etc/force-laptop"
 
 #define AMD 0x1002
@@ -1080,6 +1079,9 @@ int main(int argc, char *argv[]) {
     if (log_file)
         fprintf(log_handle, "log_file: %s\n", log_file);
 
+    if (!last_boot_file)
+        last_boot_file = strdup(LAST_BOOT);
+
     if (last_boot_file)
         fprintf(log_handle, "last_boot_file: %s\n", last_boot_file);
     else {
@@ -1097,9 +1099,9 @@ int main(int argc, char *argv[]) {
     if (xorg_conf_file)
         fprintf(log_handle, "xorg.conf file: %s\n", xorg_conf_file);
     else {
-        xorg_conf_file = (char*)malloc(strlen("/etc/X11/xorg.conf") + 1);
+        xorg_conf_file = (char*)malloc(strlen(XORG_CONF) + 1);
         if (xorg_conf_file) {
-            strcpy(xorg_conf_file, "/etc/X11/xorg.conf");
+            xorg_conf_file = strdup(XORG_CONF);
         }
         else {
             fprintf(log_handle, "Couldn't allocate xorg_conf_file\n");
