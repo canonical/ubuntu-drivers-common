@@ -1,3 +1,12 @@
+# Author: Alberto Milone
+#
+# Copyright (C) 2014 Canonical Ltd
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+
 import os
 import time
 import unittest
@@ -8,6 +17,10 @@ import tempfile
 import shutil
 import logging
 import re
+import argparse
+
+# Global path to save logs
+tests_path = None
 
 class GpuTest(object):
 
@@ -60,23 +73,21 @@ class GpuManagerTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(klass):
-        #FIXME: remove this
-        os.system('rm /media/caviar4/data/ubuntu/gpu_manager/tmp/*')
-        klass.last_boot_file = tempfile.NamedTemporaryFile(mode='w', dir='/media/caviar4/data/ubuntu/gpu_manager/tmp/', delete=False)
+        klass.last_boot_file = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.last_boot_file.close()
-        klass.new_boot_file = tempfile.NamedTemporaryFile(mode='w', dir='/media/caviar4/data/ubuntu/gpu_manager/tmp/', delete=False)
+        klass.new_boot_file = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.new_boot_file.close()
-        klass.xorg_file = tempfile.NamedTemporaryFile(mode='w', dir='/media/caviar4/data/ubuntu/gpu_manager/tmp/', delete=False)
+        klass.xorg_file = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.xorg_file.close()
-        klass.amd_pcsdb_file = tempfile.NamedTemporaryFile(mode='w', dir='/media/caviar4/data/ubuntu/gpu_manager/tmp/', delete=False)
+        klass.amd_pcsdb_file = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.amd_pcsdb_file.close()
-        klass.fake_lspci = tempfile.NamedTemporaryFile(mode='w', dir='/media/caviar4/data/ubuntu/gpu_manager/tmp/', delete=False)
+        klass.fake_lspci = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.fake_lspci.close()
-        klass.fake_modules = tempfile.NamedTemporaryFile(mode='w', dir='/media/caviar4/data/ubuntu/gpu_manager/tmp/', delete=False)
+        klass.fake_modules = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.fake_modules.close()
-        klass.fake_alternatives = tempfile.NamedTemporaryFile(mode='w', dir='/media/caviar4/data/ubuntu/gpu_manager/tmp/', delete=False)
+        klass.fake_alternatives = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.fake_alternatives.close()
-        klass.log = tempfile.NamedTemporaryFile(mode='w', dir='/media/caviar4/data/ubuntu/gpu_manager/tmp/', delete=False)
+        klass.log = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.log.close()
 
         # Patterns
@@ -96,21 +107,6 @@ class GpuManagerTest(unittest.TestCase):
         klass.has_skipped_hybrid_pt = re.compile('Intel hybrid laptop - nothing to do')
         klass.loaded_and_enabled_pt = re.compile('Driver is already loaded and enabled')
 
-    #@classmethod
-    #def tearDownClass(klass):
-    #    for file in (klass.last_boot_file,
-    #                 klass.new_boot_file,
-    #                 klass.fake_lspci,
-    #                 klass.fake_modules,
-    #                 klass.fake_alternatives,
-    #                 klass.log):
-    #        try:
-    #            file.close()
-    #        except:
-    #            pass
-            #shutil.copy(file.name, '/media/caviar4/data/ubuntu/gpu_manager/')
-            #os.unlink(file.name)
-
     def setUp(self):
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.fake_lspci = open(self.fake_lspci.name, 'w')
@@ -120,28 +116,14 @@ class GpuManagerTest(unittest.TestCase):
         self.remove_amd_pcsdb_file()
 
     def tearDown(self):
-        for file in (self.last_boot_file,
-                     self.new_boot_file,
-                     self.fake_lspci,
-                     self.fake_modules,
-                     self.fake_alternatives,
-                     self.log,
-                     self.xorg_file,
-                     self.amd_pcsdb_file):
-            target_dir = '/media/caviar4/data/ubuntu/gpu_manager/%s' % self.this_function_name
-            try:
-                file.close()
-            except:
-                pass
-            try:
-                os.mkdir(target_dir)
-            except:
-                pass
-            try:
-                shutil.copy(file.name, target_dir)
-                os.unlink(file.name)
-            except:
-                pass
+        # Remove all the logs
+        self.handle_logs(delete=True)
+
+    def cp_to_target_dir(self, filename):
+        try:
+            shutil.copy(filename, self.target_dir)
+        except:
+            pass
 
     def remove_xorg_conf(self):
         try:
@@ -154,6 +136,38 @@ class GpuManagerTest(unittest.TestCase):
             os.unlink(self.amd_pcsdb_file.name)
         except:
             pass
+
+    def handle_logs(self, delete=False, copy=False):
+        if tests_path:
+            self.target_dir = os.path.join(tests_path, self.this_function_name)
+            try:
+                os.mkdir(self.target_dir)
+            except:
+                pass
+
+        for file in (self.last_boot_file,
+            self.new_boot_file,
+            self.fake_lspci,
+            self.fake_modules,
+            self.fake_alternatives,
+            self.log,
+            self.xorg_file,
+            self.amd_pcsdb_file):
+            try:
+                file.close()
+            except:
+                pass
+
+            if copy:
+                # Copy to target dir
+                self.cp_to_target_dir(file.name)
+
+            if delete:
+                try:
+                    # Remove
+                    os.unlink(file.name)
+                except:
+                    pass
 
     def exec_manager(self, fake_alternative, is_laptop=False):
         fake_laptop_arg = is_laptop and '--fake-laptop' or '--fake-desktop'
@@ -178,12 +192,6 @@ class GpuManagerTest(unittest.TestCase):
                                  fake_laptop_arg,
                                  self.log.name)
                   )
-
-        # Remove xorg.conf
-        self.remove_xorg_conf()
-
-        # Remove amd_pcsdb_file
-        self.remove_amd_pcsdb_file()
 
     def check_vars(self, *args, **kwargs):
         gpu_test = GpuTest(**kwargs)
@@ -281,31 +289,15 @@ class GpuManagerTest(unittest.TestCase):
         if not gpu_test.has_selected_driver and not_modified_xorg:
             gpu_test.has_not_acted = True
 
+        # Copy the logs
+        if tests_path:
+            self.handle_logs(copy=True)
 
-        '''
-        for file in (self.last_boot_file,
-                     self.new_boot_file,
-                     self.fake_lspci,
-                     self.fake_modules,
-                     self.fake_alternatives,
-                     self.log):
-            target_dir = '/media/caviar4/data/ubuntu/gpu_manager/%s' % self.this_function_name
-            try:
-                file.close()
-            except:
-                pass
-            try:
-                os.mkdir(target_dir)
-            except:
-                pass
-            try:
-                shutil.copy(file.name, target_dir)
-                os.unlink(file.name)
-            except:
-                print 'problem with', file.name
-        '''
+        # Remove xorg.conf
+        self.remove_xorg_conf()
 
-
+        # Remove amd_pcsdb_file
+        self.remove_amd_pcsdb_file()
 
         return gpu_test
 
@@ -13996,5 +13988,23 @@ nouveau 1447330 3 - Live 0x0000000000000000
         # Case 2f: the discrete card was already available (BIOS)
         #          pxpress is not enabled but the module is loaded
 
+
+
 if __name__ == '__main__':
-    unittest.main()
+    # unittest.main() does its own parsing, therefore we
+    # do our own parsing, then we create a copy of sys.argv where
+    # we remove our custom and unsupported arguments, so that
+    # unittest doesn't complain
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--save-logs-to', help='Path to save logs to')
+
+    args = parser.parse_args()
+    tests_path = args.save_logs_to
+
+    new_argv = []
+    for elem in sys.argv:
+        if elem != '--save-logs-to' and elem != args.save_logs_to:
+            new_argv.append(elem)
+    unittest.main(argv=new_argv)
+
+
