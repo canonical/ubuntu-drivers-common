@@ -379,7 +379,8 @@ static int write_pxpress_xorg_conf(struct device **devices, int cards_n) {
  */
 static int is_pxpress_dgpu_disabled() {
     int disabled = 0;
-    char line[4096];
+    /* We don't need a huge buffer */
+    char line[100];
     FILE *file;
     struct stat stbuf;
 
@@ -426,7 +427,7 @@ static int check_pxpress_xorg_conf(struct device **devices,
     int intel_matches = 0;
     int amd_matches = 0;
     int x_options_matches = 0;
-    char line[4096];
+    char line[2048];
     char intel_bus_id[100];
     char amd_bus_id[100];
     FILE *file;
@@ -1414,6 +1415,7 @@ int main(int argc, char *argv[]) {
             fprintf(log_handle, "Intel IGP detected\n");
             /* AMD PowerXpress */
             if (laptop && intel_loaded && fglrx_loaded && !radeon_loaded) {
+                fprintf(log_handle, "PowerXpress detected\n");
                 /* See if the discrete GPU is disabled */
                 if (is_pxpress_dgpu_disabled()) {
                     if (!pxpress_enabled) {
