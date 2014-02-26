@@ -9,8 +9,8 @@ extra_data = []
 # Build hybrid-detect on x86
 if '86' in os.uname()[4]:
     subprocess.check_call(["make", "-C", "share/hybrid", "all"])
-    extra_data.append(("/usr/bin/", ["share/hybrid/hybrid-detect"]))
-    extra_data.append(("/etc/init/", glob.glob("share/hybrid/hybrid-gfx.conf")))
+    extra_data.append(("/usr/bin/", ["share/hybrid/gpu-manager"]))
+    extra_data.append(("/etc/init/", glob.glob("share/hybrid/gpu-manager.conf")))
 
 # Make the nvidia-installer hooks executable
 for x in glob.glob("nvidia-installer-hooks/*"):
