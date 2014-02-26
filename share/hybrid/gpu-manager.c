@@ -76,6 +76,7 @@
 #define LAST_BOOT "/var/lib/ubuntu-drivers-common/last_gfx_boot"
 #define XORG_CONF "/etc/X11/xorg.conf"
 #define FORCE_LAPTOP "/etc/force-laptop"
+#define KERN_PARAM "nogpumanager"
 
 #define AMD 0x1002
 #define INTEL 0x8086
@@ -290,6 +291,34 @@ static int is_file_empty(const char *file) {
     return 0;
 }
 
+static int has_cmdline_option(const char *option)
+{
+    FILE *pfile = NULL;
+    char  *line = NULL;
+    size_t len = 0;
+    size_t read;
+
+    int found = 0;
+
+    pfile = fopen("/proc/cmdline", "r");
+    if (pfile == NULL)
+         return found;
+    while ((read = getline(&line, &len, pfile)) != -1) {
+        if (istrstr(line, option) != NULL) {
+            found = 1;
+            break;
+        }
+    }
+    fclose(pfile);
+    if (line)
+        free(line);
+
+    return found;
+}
+
+static int is_disabled_in_cmdline() {
+    return has_cmdline_option(KERN_PARAM);
+}
 
 /* This is just for writing the BusID of the discrete
  * card
@@ -1073,6 +1102,13 @@ int main(int argc, char *argv[]) {
     else {
         log_handle = stdout;
     }
+
+    if (is_disabled_in_cmdline()) {
+        fprintf(log_handle, "Disabled by kernel parameter \"%s\"\n",
+                KERN_PARAM);
+        goto end;
+    }
+
 
     /* TODO: require arguments and abort if they're not available */
 
