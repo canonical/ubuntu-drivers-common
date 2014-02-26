@@ -8362,9 +8362,6 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # The alternative in use
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
-        # Remove xorg.conf
-        self.remove_xorg_conf()
-
         # Call the program
         self.exec_manager(fake_alternative)
 
