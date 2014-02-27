@@ -1355,7 +1355,7 @@ int main(int argc, char *argv[]) {
         }
         else if (boot_vga_vendor_id == AMD) {
             /* if fglrx is loaded enable fglrx alternative */
-            if (fglrx_loaded) {
+            if (fglrx_loaded && !radeon_loaded) {
                 if (!fglrx_enabled) {
                     /* Select fglrx */
                     fprintf(log_handle, "Selecting fglrx\n");
@@ -1392,7 +1392,7 @@ int main(int argc, char *argv[]) {
         }
         else if (boot_vga_vendor_id == NVIDIA) {
             /* if nvidia is loaded enable nvidia alternative */
-            if (nvidia_loaded) {
+            if (nvidia_loaded && !nouveau_loaded) {
                 if (!nvidia_enabled) {
                     /* Select nvidia */
                     fprintf(log_handle, "Selecting nvidia\n");
@@ -1539,7 +1539,7 @@ int main(int argc, char *argv[]) {
                     fprintf(log_handle, "Discrete NVIDIA card detected\n");
 
                     /* Kernel module is available */
-                    if (nvidia_loaded) {
+                    if (nvidia_loaded && !nouveau_loaded) {
                         /* Alternative not in use */
                         if (!nvidia_enabled) {
                             /* Select nvidia */
@@ -1630,7 +1630,7 @@ int main(int argc, char *argv[]) {
                     fprintf(log_handle, "Discrete AMD card detected\n");
 
                     /* Kernel module is available */
-                    if (fglrx_loaded) {
+                    if (fglrx_loaded && !radeon_loaded) {
                         /* Alternative not in use */
                         if (!fglrx_enabled) {
                             /* Select nvidia */
@@ -1736,7 +1736,7 @@ int main(int argc, char *argv[]) {
 
 
                 /* Kernel module is available */
-                if (fglrx_loaded) {
+                if (fglrx_loaded && !radeon_loaded) {
                     /* Alternative not in use */
                     if (!fglrx_enabled) {
                         /* Select nvidia */
@@ -1813,7 +1813,7 @@ int main(int argc, char *argv[]) {
                 fprintf(log_handle, "Discrete AMD card detected\n");
 
                 /* Kernel module is available */
-                if (nvidia_loaded) {
+                if (nvidia_loaded && !nouveau_loaded) {
                     /* Alternative not in use */
                     if (!nvidia_enabled) {
                         /* Select nvidia */
@@ -1862,7 +1862,7 @@ int main(int argc, char *argv[]) {
                 else {
                     /* See if fglrx is in use */
                     /* Kernel module is available */
-                    if (fglrx_loaded) {
+                    if (fglrx_loaded && !radeon_loaded) {
                         /* Alternative not in use */
                         if (!fglrx_enabled) {
                             /* Select nvidia */
