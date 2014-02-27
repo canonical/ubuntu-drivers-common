@@ -236,7 +236,7 @@ static char * get_current_alternative(char *master_link) {
 static int set_alternative(char *arch_path, char *alternative) {
     int status = -1;
     char command[200];
-    sprintf(command, "update-alternatives --set %s_gl_conf %s",
+    sprintf(command, "/usr/bin/update-alternatives --set %s_gl_conf %s",
             arch_path, alternative);
 
     if (dry_run) {
@@ -244,19 +244,25 @@ static int set_alternative(char *arch_path, char *alternative) {
         fprintf(log_handle, "%s\n", command);
     }
     else {
+        fprintf(log_handle, "%s\n", command);
         status = system(command);
+        fprintf(log_handle, "update-alternatives status %d\n", status);
     }
 
-    if (!status)
+    if (status == -1)
         return 0;
 
     /* call ldconfig */
-    if (dry_run)
+    if (dry_run) {
         fprintf(log_handle, "Calling ldconfig\n");
-    else
-        status = system("ldconfig");
+    }
+    else {
+        fprintf(log_handle, "Calling ldconfig\n");
+        status = system("/sbin/ldconfig");
+        fprintf(log_handle, "ldconfig status %d\n", status);
+    }
 
-    if (!status)
+    if (status == -1)
         return 0;
     return 1;
 }
