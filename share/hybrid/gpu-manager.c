@@ -1373,6 +1373,16 @@ int main(int argc, char *argv[]) {
                 }
             }
             else {
+                /* If both the closed kernel module and the open
+                 * kernel module are loaded, then we're in trouble
+                 */
+                if (fglrx_loaded && radeon_loaded) {
+                    /* Fake a system change to trigger
+                     * a reconfiguration
+                     */
+                    has_changed = 1;
+                }
+
                 /* Select mesa as a fallback */
                 fprintf(log_handle, "Kernel Module is not loaded\n");
                 if (!mesa_enabled) {
@@ -1410,6 +1420,16 @@ int main(int argc, char *argv[]) {
                 }
             }
             else {
+                /* If both the closed kernel module and the open
+                 * kernel module are loaded, then we're in trouble
+                 */
+                if (nvidia_loaded && nouveau_loaded) {
+                    /* Fake a system change to trigger
+                     * a reconfiguration
+                     */
+                    has_changed = 1;
+                }
+
                 /* Select mesa as a fallback */
                 fprintf(log_handle, "Kernel Module is not loaded\n");
                 if (!mesa_enabled) {
@@ -1586,6 +1606,16 @@ int main(int argc, char *argv[]) {
                     }
                     /* Kernel module is not available */
                     else {
+                        /* If both the closed kernel module and the open
+                         * kernel module are loaded, then we're in trouble
+                         */
+                        if (nvidia_loaded && nouveau_loaded) {
+                            /* Fake a system change to trigger
+                             * a reconfiguration
+                             */
+                            has_changed = 1;
+                        }
+
                         /* See if alternatives are broken */
                         if (!mesa_enabled) {
                             /* Select mesa as a fallback */
@@ -1611,20 +1641,6 @@ int main(int argc, char *argv[]) {
                         }
 
                     }
-#if 0
-                    if (nvidia_loaded && nvidia_enabled) {
-                        fprintf(log_handle, "Driver enabled and in use\n");
-                        /* TODO: If xorg.conf exists, make sure it contains
-                         * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
-                         * xorg.conf from scratch */
-                        fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
-                        write_to_xorg_conf(discrete_bus, discrete_dev, discrete_func);
-                    }
-                    else {
-                        fprintf(log_handle, "Driver not enabled or not in use\n");
-                        fprintf(log_handle, "Nothing to do\n");
-                    }
-#endif
                 }
                 else if (discrete_vendor_id == AMD) {
                     fprintf(log_handle, "Discrete AMD card detected\n");
@@ -1678,6 +1694,16 @@ int main(int argc, char *argv[]) {
                     }
                     /* Kernel module is not available */
                     else {
+                        /* If both the closed kernel module and the open
+                         * kernel module are loaded, then we're in trouble
+                         */
+                        if (fglrx_loaded && radeon_loaded) {
+                            /* Fake a system change to trigger
+                             * a reconfiguration
+                             */
+                            has_changed = 1;
+                        }
+
                         /* See if alternatives are broken */
                         if (!mesa_enabled) {
                             /* Select mesa as a fallback */
@@ -1702,24 +1728,6 @@ int main(int argc, char *argv[]) {
                             }
                         }
                     }
-
-
-#if 0
-                    if (fglrx_loaded && fglrx_enabled) {
-                        fprintf(log_handle, "Driver enabled and in use\n");
-                        /* TODO: If xorg.conf exists, make sure it contains
-                         * the right BusId and fglrx. If it doesn't, create a
-                         * xorg.conf from scratch using aticonfig */
-                        fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
-
-                        /* Call aticonfig */
-                        enable_all_amds();
-                    }
-                    else {
-                        fprintf(log_handle, "Driver not enabled or not in use\n");
-                        fprintf(log_handle, "Nothing to do\n");
-                    }
-#endif
                 }
                 else {
                     fprintf(log_handle, "Unsupported discrete card vendor: %x\n", discrete_vendor_id);
@@ -1739,7 +1747,7 @@ int main(int argc, char *argv[]) {
                 if (fglrx_loaded && !radeon_loaded) {
                     /* Alternative not in use */
                     if (!fglrx_enabled) {
-                        /* Select nvidia */
+                        /* Select fglrx */
                         fprintf(log_handle, "Selecting fglrx\n");
                         status = select_driver(main_arch_path, "fglrx");
                         /* select_driver(other_arch_path, "nvidia"); */
@@ -1784,6 +1792,15 @@ int main(int argc, char *argv[]) {
                 }
                 /* Kernel module is not available */
                 else {
+                    /* If both the closed kernel module and the open
+                     * kernel module are loaded, then we're in trouble
+                     */
+                    if (fglrx_loaded && radeon_loaded) {
+                        /* Fake a system change to trigger
+                         * a reconfiguration
+                         */
+                        has_changed = 1;
+                    }
                     /* See if alternatives are broken */
                     if (!mesa_enabled) {
                         /* Select mesa as a fallback */
@@ -1910,6 +1927,17 @@ int main(int argc, char *argv[]) {
                     }
                     /* Kernel module is not available */
                     else {
+                        /* If both the closed kernel module and the open
+                         * kernel module are loaded, then we're in trouble
+                         */
+                        if ((fglrx_loaded && radeon_loaded) ||
+                            (nvidia_loaded && nouveau_loaded)) {
+                            /* Fake a system change to trigger
+                             * a reconfiguration
+                             */
+                            has_changed = 1;
+                        }
+
                         /* See if alternatives are broken */
                         if (!mesa_enabled) {
                             /* Select mesa as a fallback */
