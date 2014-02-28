@@ -757,6 +757,64 @@ static int check_all_bus_ids_xorg_conf(struct device **devices, int cards_n) {
 }
 
 
+static int write_prime_xorg_conf(struct device **devices, int cards_n) {
+    int i;
+    FILE *pfile = NULL;
+    pfile = fopen(xorg_conf_file, "w");
+    if (pfile == NULL) {
+        fprintf(log_handle, "I couldn't open %s for writing.\n",
+                xorg_conf_file);
+        return 0;
+    }
+
+    fprintf(pfile,
+            "Section \"ServerLayout\"\n"
+            "    Identifier \"layout\"\n"
+            "    Screen 0 \"nvidia\"\n"
+            "    Inactive \"intel\"\n"
+            "EndSection\n\n");
+
+    for(i = 0; i < cards_n; i++) {
+        if (devices[i]->vendor_id == INTEL) {
+            fprintf(pfile,
+                "Section \"Device\"\n"
+                "    Identifier \"intel\"\n"
+                "    Driver \"modesetting\"\n"
+                "    BusID \"PCI:%d@%d:%d:%d\"\n"
+                "EndSection\n\n"
+                "Section \"Screen\"\n"
+                "    Identifier \"intel\"\n"
+                "    Device \"intel\"\n"
+                "EndSection\n\n",
+               (int)(devices[i]->bus),
+               (int)(devices[i]->domain),
+               (int)(devices[i]->dev),
+               (int)(devices[i]->func));
+        }
+        else if (devices[i]->vendor_id == NVIDIA) {
+            fprintf(pfile,
+                "Section \"Device\"\n"
+                "    Identifier \"nvidia\"\n"
+                "    Driver \"nvidia\"\n"
+                "    BusID \"PCI:%d@%d:%d:%d\"\n"
+                "EndSection\n\n"
+                "Section \"Screen\"\n"
+                "    Identifier \"nvidia\"\n"
+                "    Device \"nvidia\"\n"
+                "EndSection\n\n",
+               (int)(devices[i]->bus),
+               (int)(devices[i]->domain),
+               (int)(devices[i]->dev),
+               (int)(devices[i]->func));
+        }
+    }
+
+    fflush(pfile);
+    fclose(pfile);
+    return 1;
+}
+
+
 static void get_boot_vga(struct device **devices,
                         int cards_number,
                         unsigned int *vendor_id,
