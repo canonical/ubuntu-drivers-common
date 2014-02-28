@@ -1414,14 +1414,6 @@ int main(int argc, char *argv[]) {
 
     fprintf(log_handle, "Current alternative: %s\n", alternative->current);
 
-#if 0
-    nvidia_enabled = is_alternative_in_use(alternative, "nvidia");
-    fglrx_enabled = is_alternative_in_use(alternative, "fglrx");
-    mesa_enabled = is_alternative_in_use(alternative, "mesa");
-    pxpress_enabled = is_alternative_in_use(alternative, "pxpress");
-    prime_enabled = is_alternative_in_use(alternative, "prime");
-#endif
-
     fprintf(log_handle, "Is nvidia enabled? %s\n", alternative->nvidia_enabled ? "yes" : "no");
     fprintf(log_handle, "Is fglrx enabled? %s\n", alternative->fglrx_enabled ? "yes" : "no");
     fprintf(log_handle, "Is mesa enabled? %s\n", alternative->mesa_enabled ? "yes" : "no");
@@ -1433,6 +1425,16 @@ int main(int argc, char *argv[]) {
     fprintf(log_handle, "Is mesa available? %s\n", alternative->mesa_available ? "yes" : "no");
     fprintf(log_handle, "Is pxpress available? %s\n", alternative->pxpress_available ? "yes" : "no");
     fprintf(log_handle, "Is prime available? %s\n", alternative->prime_available ? "yes" : "no");
+
+    /* If the module is loaded but the alternatives are not there
+     * we're probably dealing with a proprietary installer
+     */
+    if ((fglrx_loaded && !alternative->fglrx_available) ||
+        (nvidia_loaded && !alternative->nvidia_available)) {
+        fprintf(log_handle, "Proprietary driver installer detected\n");
+        fprintf(log_handle, "Nothing to do\n");
+        goto end;
+    }
 
     if (has_changed)
         fprintf(log_handle, "System configuration has changed\n");

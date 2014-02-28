@@ -45,7 +45,8 @@ class GpuTest(object):
                  has_regenerated_xorg=False,
                  has_selected_driver=False,
                  has_not_acted=True,
-                 has_skipped_hybrid=False):
+                 has_skipped_hybrid=False,
+                 proprietary_installer=False):
         self.has_single_card = has_single_card
         self.is_laptop = is_laptop
         self.has_intel = has_intel
@@ -67,6 +68,7 @@ class GpuTest(object):
         self.has_selected_driver = has_selected_driver
         self.has_not_acted = has_not_acted
         self.has_skipped_hybrid = has_skipped_hybrid
+        self.proprietary_installer = proprietary_installer
 
 
 class GpuManagerTest(unittest.TestCase):
@@ -106,6 +108,7 @@ class GpuManagerTest(unittest.TestCase):
         klass.no_action_pt = re.compile('Nothing to do')
         klass.has_skipped_hybrid_pt = re.compile('Intel hybrid laptop - nothing to do')
         klass.loaded_and_enabled_pt = re.compile('Driver is already loaded and enabled')
+        klass.proprietary_installer_pt = re.compile('Proprietary driver installer detected.*')
 
     def setUp(self):
         self.last_boot_file = open(self.last_boot_file.name, 'w')
@@ -218,6 +221,7 @@ class GpuManagerTest(unittest.TestCase):
             selected_driver = self.selected_driver_pt.match(line)
             no_action = self.no_action_pt.match(line)
             has_skipped_hybrid = self.has_skipped_hybrid_pt.match(line)
+            proprietary_installer = self.proprietary_installer_pt.match(line)
 
             # Detect the vendor
             if has_card:
@@ -282,6 +286,8 @@ class GpuManagerTest(unittest.TestCase):
                 gpu_test.has_not_acted = True
             elif loaded_and_enabled:
                 gpu_test.has_selected_driver = False
+            elif proprietary_installer:
+                gpu_test.proprietary_installer = True
         # Close the log
         log.close()
 
@@ -13985,6 +13991,65 @@ nouveau 1447330 3 - Live 0x0000000000000000
         # Case 2f: the discrete card was already available (BIOS)
         #          pxpress is not enabled but the module is loaded
 
+    def test_proprietary_installer(self):
+        '''detect proprietary installer'''
+        self.this_function_name = sys._getframe().f_code.co_name
+
+        # Case 1a: the discrete card is now available (BIOS)
+        #          the driver is enabled and the module is loaded
+        self.last_boot_file.write('''
+1002:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
+        self.last_boot_file.close()
+
+        self.fake_lspci.write('''
+1002:68d8;0000:00:01:0;1
+1002:28e8;0000:01:00:0;0''')
+        self.fake_lspci.close()
+
+        self.fake_modules.write('''
+fglrx 1447330 3 - Live 0x0000000000000000
+fake 1447330 3 - Live 0x0000000000000000
+''')
+        self.fake_modules.close()
+
+        self.fake_alternatives.write('''
+/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
+''')
+        self.fake_alternatives.close()
+
+        # The alternative in use
+        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
+
+        # Call the program
+        self.exec_manager(fake_alternative)
+
+        # Collect data
+        gpu_test = self.check_vars()
+
+        self.assert_(gpu_test.proprietary_installer)
+
+        # Let try with nvidia
+        self.fake_modules = open(self.fake_modules.name, 'w')
+        self.fake_modules.write('''
+nvidia 1447330 3 - Live 0x0000000000000000
+fake 1447330 3 - Live 0x0000000000000000
+''')
+        self.fake_modules.close()
+
+        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
+        self.fake_alternatives.write('''
+/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
+''')
+        self.fake_alternatives.close()
+
+        # Call the program
+        self.exec_manager(fake_alternative)
+
+        # Collect data
+        gpu_test = self.check_vars()
+
+        self.assert_(gpu_test.proprietary_installer)
 
 
 if __name__ == '__main__':
