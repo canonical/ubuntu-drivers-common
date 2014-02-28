@@ -1393,14 +1393,20 @@ int main(int argc, char *argv[]) {
                 /* We don't support more than MAX_CARDS_N */
                 if (cards_n < MAX_CARDS_N) {
                     current_devices[cards_n] = malloc(sizeof(struct device));
+                    if (!current_devices[cards_n])
+                        goto end;
                     current_devices[cards_n]->boot_vga = pci_device_is_boot_vga(info);
                     current_devices[cards_n]->vendor_id = info->vendor_id;
                     current_devices[cards_n]->device_id = info->device_id;
+                    current_devices[cards_n]->domain = info->domain;
                     current_devices[cards_n]->bus = info->bus;
                     current_devices[cards_n]->dev = info->dev;
                     current_devices[cards_n]->func = info->func;
                 }
                 else {
+                    fprintf(log_handle, "Warning: too many devices %d. "
+                                        "Max supported %d. Ignoring the rest.\n",
+                                        cards_n, MAX_CARDS_N);
                     break;
                 }
                 /*
