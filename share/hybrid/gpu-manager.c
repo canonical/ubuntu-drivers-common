@@ -109,6 +109,27 @@ struct device {
 };
 
 
+struct alternatives {
+    /* These are just to
+     *  detect the installer
+     */
+    int nvidia_available;
+    int fglrx_available;
+    int mesa_available;
+    int pxpress_available;
+    int prime_available;
+
+    /* The ones that may be enabled */
+    int nvidia_enabled;
+    int fglrx_enabled;
+    int mesa_enabled;
+    int pxpress_enabled;
+    int prime_enabled;
+
+    char *current;
+};
+
+
 /* Case insensitive equivalent of strstr */
 static const char *istrstr(const char *str1, const char *str2)
 {
@@ -155,7 +176,7 @@ char* get_output(char *command) {
     }
 
     if (fgets(temp, sizeof(temp), pfile) != NULL) {
-        output = (char*)malloc(strlen(temp) + 1);
+        output = malloc(strlen(temp) + 1);
         if (!output) {
             pclose(pfile);
             return NULL;
@@ -219,16 +240,105 @@ static char* get_alternative_link(char *arch_path, char *pattern) {
     return alternative;
 }
 
+static void detect_available_alternatives(struct alternatives *info, char *pattern) {
+    if (strstr(pattern, "mesa")) {
+        info->mesa_available = 1;
+    }
+    else if (strstr(pattern, "fglrx")) {
+        info->fglrx_available = 1;
+    }
+    else if (strstr(pattern, "pxpress")) {
+        info->pxpress_available = 1;
+    }
+    else if (strstr(pattern, "nvidia")) {
+        if (strstr(pattern, "prime") != NULL) {
+            info->prime_available = 1;
+        }
+        else {
+            info->nvidia_available = 1;
+        }
+    }
+}
 
-static char * get_current_alternative(char *master_link) {
-    char *alternative = NULL;
+static void detect_enabled_alternatives(struct alternatives *info) {
+    if (strstr(info->current, "mesa") != NULL) {
+        info->mesa_enabled = 1;
+    }
+    else if (strstr(info->current, "fglrx") != NULL) {
+        info->fglrx_enabled = 1;
+    }
+    else if (strstr(info->current, "pxpress") != NULL) {
+        info->pxpress_enabled = 1;
+    }
+    else if (strstr(info->current, "nvidia") != NULL) {
+        if (strstr(info->current, "prime") != NULL) {
+            info->prime_enabled = 1;
+        }
+        else {
+            info->nvidia_enabled = 1;
+        }
+    }
+}
+
+
+static int get_alternatives(struct alternatives *info, const char *master_link) {
+    int len;
     char command[200];
-    sprintf(command, "/usr/bin/update-alternatives --query %s_gl_conf "
-            "| grep \"Value:\" | sed \"s/Value: //g\"",
-            master_link);
-    alternative = get_output(command);
+    char buffer[1035];
+    FILE *pfile = NULL;
+    char *value = NULL;
+    char *other = NULL;
+    const char ch = '/';
 
-    return alternative;
+    /* Test */
+    if (fake_alternatives_path) {
+        pfile = fopen(fake_alternatives_path, "r");
+        /* Set the enabled alternatives in the struct */
+        detect_enabled_alternatives(info);
+    }
+    else {
+        sprintf(command, "/usr/bin/update-alternatives --query %s_gl_conf", master_link);
+
+        pfile = popen(command, "r");
+        if (pfile == NULL) {
+            fprintf(stderr, "Failed to run command: %s\n", command);
+            return 0;
+        }
+    }
+
+    while (fgets(buffer, sizeof(buffer), pfile) != NULL) {
+        if (strstr(buffer, "Value:")) {
+            value = strchr(buffer, ch);
+            if (value != NULL) {
+                /* If info->current is not NULL, then it's a fake
+                 * alternative, which we won't override
+                 */
+                if (!info->current) {
+                    info->current = strdup(value);
+                    /* Remove newline */
+                    len = strlen(info->current);
+                    if(info->current[len-1] == '\n' )
+                       info->current[len-1] = 0;
+                }
+                /* Set the enabled alternatives in the struct */
+                detect_enabled_alternatives(info);
+            }
+
+        }
+        else if (strstr(buffer, "Alternative:") || fake_alternatives_path) {
+            other = strchr(buffer, ch);
+            if (other != NULL) {
+                /* Set the available alternatives in the struct */
+                detect_available_alternatives(info, other);
+            }
+
+
+        }
+    }
+
+    pclose(pfile);
+
+    return 1;
 }
 
 
@@ -737,7 +847,7 @@ static int write_data_to_file(struct device **devices,
 static int get_vars(FILE *file, struct device **devices, int num) {
     int status;
 
-    devices[num] = (struct device*) malloc(sizeof(struct device));
+    devices[num] = malloc(sizeof(struct device));
 
     if (!devices[num])
         return EOF;
@@ -762,7 +872,6 @@ static int read_data_from_file(struct device **devices,
                                int *cards_number,
                                char *filename) {
     /* Read from last boot gfx */
-    int i;
     FILE *pfile = NULL;
     pfile = fopen(filename, "r");
     if (pfile == NULL) {
@@ -888,17 +997,6 @@ static int is_laptop (void) {
 }
 
 
-static int is_alternative_in_use(char *alternative, char *pattern) {
-    /* Avoid getting false positives when looking for nvidia
-     * and finding nvidia-*-prime instead
-     */
-    if ((strcmp(pattern, "nvidia") == 0) &&
-        (strstr(alternative, "prime") != NULL))
-        return 0;
-    return (strstr(alternative, pattern) != NULL);
-}
-
-
 static int move_xorg_conf(void) {
     int status;
     char backup[200];
@@ -965,11 +1063,9 @@ int main(int argc, char *argv[]) {
     struct device *old_devices[MAX_CARDS_N];
 
     /* Alternatives */
-    char *alternative = NULL;
     char *main_arch_path = NULL;
     char *other_arch_path = NULL;
-    int nvidia_enabled = 0, fglrx_enabled = 0, mesa_enabled = 0;
-    int pxpress_enabled = 0, prime_enabled = 0;
+    struct alternatives *alternative = NULL;
 
     while (1) {
         static struct option long_options[] =
@@ -1016,7 +1112,7 @@ int main(int argc, char *argv[]) {
                 break;
             case 'l':
                 /* printf("option -l with value '%s'\n", optarg); */
-                log_file = (char*)malloc(strlen(optarg) + 1);
+                log_file = malloc(strlen(optarg) + 1);
                 if (log_file)
                     strcpy(log_file, optarg);
                 else
@@ -1024,7 +1120,7 @@ int main(int argc, char *argv[]) {
                 break;
             case 'b':
                 /* printf("option -b with value '%s'\n", optarg); */
-                last_boot_file = (char*)malloc(strlen(optarg) + 1);
+                last_boot_file = malloc(strlen(optarg) + 1);
                 if (last_boot_file)
                     strcpy(last_boot_file, optarg);
                 else
@@ -1032,7 +1128,7 @@ int main(int argc, char *argv[]) {
                 break;
             case 'n':
                 /* printf("option -n with value '%s'\n", optarg); */
-                new_boot_file = (char*)malloc(strlen(optarg) + 1);
+                new_boot_file = malloc(strlen(optarg) + 1);
                 if (new_boot_file)
                     strcpy(new_boot_file, optarg);
                 else
@@ -1040,7 +1136,7 @@ int main(int argc, char *argv[]) {
                 break;
             case 'f':
                 /* printf("option -f with value '%s'\n", optarg); */
-                fake_lspci_file = (char*)malloc(strlen(optarg) + 1);
+                fake_lspci_file = malloc(strlen(optarg) + 1);
                 if (fake_lspci_file)
                     strcpy(fake_lspci_file, optarg);
                 else
@@ -1048,7 +1144,7 @@ int main(int argc, char *argv[]) {
                 break;
             case 'x':
                 /* printf("option -x with value '%s'\n", optarg); */
-                xorg_conf_file = (char*)malloc(strlen(optarg) + 1);
+                xorg_conf_file = malloc(strlen(optarg) + 1);
                 if (xorg_conf_file)
                     strcpy(xorg_conf_file, optarg);
                 else
@@ -1056,7 +1152,7 @@ int main(int argc, char *argv[]) {
                 break;
             case 'd':
                 /* printf("option -x with value '%s'\n", optarg); */
-                amd_pcsdb_file = (char*)malloc(strlen(optarg) + 1);
+                amd_pcsdb_file = malloc(strlen(optarg) + 1);
                 if (amd_pcsdb_file)
                     strcpy(amd_pcsdb_file, optarg);
                 else
@@ -1064,15 +1160,21 @@ int main(int argc, char *argv[]) {
                 break;
             case 'a':
                 /* printf("option -a with value '%s'\n", optarg); */
-                alternative = (char*)malloc(strlen(optarg) + 1);
-                if (alternative)
-                    strcpy(alternative, optarg);
-                else
+                alternative = calloc(1, sizeof(struct alternatives));
+                if (!alternative) {
                     abort();
+                }
+                else {
+                    alternative->current = strdup(optarg);
+                    if (!alternative->current) {
+                        free(alternative);
+                        abort();
+                    }
+                }
                 break;
             case 'm':
                 /* printf("option -m with value '%s'\n", optarg); */
-                fake_modules_path = (char*)malloc(strlen(optarg) + 1);
+                fake_modules_path = malloc(strlen(optarg) + 1);
                 if (fake_modules_path)
                     strcpy(fake_modules_path, optarg);
                 else
@@ -1080,7 +1182,7 @@ int main(int argc, char *argv[]) {
                 break;
             case 'p':
                 /* printf("option -p with value '%s'\n", optarg); */
-                fake_alternatives_path = (char*)malloc(strlen(optarg) + 1);
+                fake_alternatives_path = malloc(strlen(optarg) + 1);
                 if (fake_alternatives_path)
                     strcpy(fake_alternatives_path, optarg);
                 else
@@ -1141,11 +1243,8 @@ int main(int argc, char *argv[]) {
     if (xorg_conf_file)
         fprintf(log_handle, "xorg.conf file: %s\n", xorg_conf_file);
     else {
-        xorg_conf_file = (char*)malloc(strlen(XORG_CONF) + 1);
-        if (xorg_conf_file) {
-            xorg_conf_file = strdup(XORG_CONF);
-        }
-        else {
+        xorg_conf_file = strdup(XORG_CONF);
+        if (!xorg_conf_file) {
             fprintf(log_handle, "Couldn't allocate xorg_conf_file\n");
             goto end;
         }
@@ -1155,7 +1254,7 @@ int main(int argc, char *argv[]) {
     if (amd_pcsdb_file)
         fprintf(log_handle, "amd_pcsdb_file file: %s\n", amd_pcsdb_file);
     else {
-        amd_pcsdb_file = (char*)malloc(strlen("/etc/ati/amdpcsdb") + 1);
+        amd_pcsdb_file = malloc(strlen("/etc/ati/amdpcsdb") + 1);
         if (amd_pcsdb_file) {
             strcpy(amd_pcsdb_file, "/etc/ati/amdpcsdb");
         }
@@ -1235,7 +1334,7 @@ int main(int argc, char *argv[]) {
 
                 /* We don't support more than MAX_CARDS_N */
                 if (cards_n < MAX_CARDS_N) {
-                    current_devices[cards_n] = (struct device*) malloc(sizeof(struct device));
+                    current_devices[cards_n] = malloc(sizeof(struct device));
                     current_devices[cards_n]->boot_vga = pci_device_is_boot_vga(info);
                     current_devices[cards_n]->vendor_id = info->vendor_id;
                     current_devices[cards_n]->device_id = info->device_id;
@@ -1305,26 +1404,35 @@ int main(int argc, char *argv[]) {
 
     /* If alternative is not NULL, then it's a test */
     if (!alternative)
-        alternative = get_current_alternative(main_arch_path);
+        alternative = calloc(1, sizeof(struct alternatives));
+    get_alternatives(alternative, main_arch_path);
 
-    if (!alternative) {
+    if (!alternative->current) {
         fprintf(stderr, "Error: no alternative found\n");
         goto end;
     }
 
-    fprintf(log_handle, "Current alternative: %s\n", alternative);
+    fprintf(log_handle, "Current alternative: %s\n", alternative->current);
 
+#if 0
     nvidia_enabled = is_alternative_in_use(alternative, "nvidia");
     fglrx_enabled = is_alternative_in_use(alternative, "fglrx");
     mesa_enabled = is_alternative_in_use(alternative, "mesa");
     pxpress_enabled = is_alternative_in_use(alternative, "pxpress");
     prime_enabled = is_alternative_in_use(alternative, "prime");
+#endif
 
-    fprintf(log_handle, "Is nvidia enabled? %s\n", nvidia_enabled ? "yes" : "no");
-    fprintf(log_handle, "Is fglrx enabled? %s\n", fglrx_enabled ? "yes" : "no");
-    fprintf(log_handle, "Is mesa enabled? %s\n", mesa_enabled ? "yes" : "no");
-    fprintf(log_handle, "Is pxpress enabled? %s\n", pxpress_enabled ? "yes" : "no");
-    fprintf(log_handle, "Is prime enabled? %s\n", prime_enabled ? "yes" : "no");
+    fprintf(log_handle, "Is nvidia enabled? %s\n", alternative->nvidia_enabled ? "yes" : "no");
+    fprintf(log_handle, "Is fglrx enabled? %s\n", alternative->fglrx_enabled ? "yes" : "no");
+    fprintf(log_handle, "Is mesa enabled? %s\n", alternative->mesa_enabled ? "yes" : "no");
+    fprintf(log_handle, "Is pxpress enabled? %s\n", alternative->pxpress_enabled ? "yes" : "no");
+    fprintf(log_handle, "Is prime enabled? %s\n", alternative->prime_enabled ? "yes" : "no");
+
+    fprintf(log_handle, "Is nvidia available? %s\n", alternative->nvidia_available ? "yes" : "no");
+    fprintf(log_handle, "Is fglrx available? %s\n", alternative->fglrx_available ? "yes" : "no");
+    fprintf(log_handle, "Is mesa available? %s\n", alternative->mesa_available ? "yes" : "no");
+    fprintf(log_handle, "Is pxpress available? %s\n", alternative->pxpress_available ? "yes" : "no");
+    fprintf(log_handle, "Is prime available? %s\n", alternative->prime_available ? "yes" : "no");
 
     if (has_changed)
         fprintf(log_handle, "System configuration has changed\n");
@@ -1338,7 +1446,7 @@ int main(int argc, char *argv[]) {
                      &boot_vga_device_id);
 
         if (boot_vga_vendor_id == INTEL) {
-            if (!mesa_enabled) {
+            if (!alternative->mesa_enabled) {
                 /* Select mesa */
                 fprintf(log_handle, "Selecting mesa\n");
                 status = select_driver(main_arch_path, "mesa");
@@ -1356,7 +1464,7 @@ int main(int argc, char *argv[]) {
         else if (boot_vga_vendor_id == AMD) {
             /* if fglrx is loaded enable fglrx alternative */
             if (fglrx_loaded && !radeon_loaded) {
-                if (!fglrx_enabled) {
+                if (!alternative->fglrx_enabled) {
                     /* Select fglrx */
                     fprintf(log_handle, "Selecting fglrx\n");
                     status = select_driver(main_arch_path, "fglrx");
@@ -1385,7 +1493,7 @@ int main(int argc, char *argv[]) {
 
                 /* Select mesa as a fallback */
                 fprintf(log_handle, "Kernel Module is not loaded\n");
-                if (!mesa_enabled) {
+                if (!alternative->mesa_enabled) {
                     fprintf(log_handle, "Selecting mesa\n");
                     status = select_driver(main_arch_path, "mesa");
                     /* select_driver(other_arch_path, "mesa"); */
@@ -1403,7 +1511,7 @@ int main(int argc, char *argv[]) {
         else if (boot_vga_vendor_id == NVIDIA) {
             /* if nvidia is loaded enable nvidia alternative */
             if (nvidia_loaded && !nouveau_loaded) {
-                if (!nvidia_enabled) {
+                if (!alternative->nvidia_enabled) {
                     /* Select nvidia */
                     fprintf(log_handle, "Selecting nvidia\n");
                     status = select_driver(main_arch_path, "nvidia");
@@ -1432,7 +1540,7 @@ int main(int argc, char *argv[]) {
 
                 /* Select mesa as a fallback */
                 fprintf(log_handle, "Kernel Module is not loaded\n");
-                if (!mesa_enabled) {
+                if (!alternative->mesa_enabled) {
                     fprintf(log_handle, "Selecting mesa\n");
                     status = select_driver(main_arch_path, "mesa");
                     /* select_driver(other_arch_path, "mesa"); */
@@ -1482,7 +1590,7 @@ int main(int argc, char *argv[]) {
                 fprintf(log_handle, "PowerXpress detected\n");
                 /* See if the discrete GPU is disabled */
                 if (is_pxpress_dgpu_disabled()) {
-                    if (!pxpress_enabled) {
+                    if (!alternative->pxpress_enabled) {
                         fprintf(log_handle, "Selecting pxpress\n");
                         status = select_driver(main_arch_path, "pxpress");
                     }
@@ -1492,7 +1600,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 else {
-                    if (!fglrx_enabled) {
+                    if (!alternative->fglrx_enabled) {
                         fprintf(log_handle, "Selecting fglrx\n");
                         status = select_driver(main_arch_path, "fglrx");
                     }
@@ -1534,7 +1642,7 @@ int main(int argc, char *argv[]) {
             }
             /* NVIDIA Optimus */
             else if (laptop && (intel_loaded && !nouveau_loaded &&
-                                (nvidia_enabled || prime_enabled ||
+                                (alternative->nvidia_enabled || alternative->prime_enabled ||
                                  nvidia_loaded))) {
                 /* Hybrid graphics
                  * No need to do anything, as either nvidia-prime or
@@ -1561,7 +1669,7 @@ int main(int argc, char *argv[]) {
                     /* Kernel module is available */
                     if (nvidia_loaded && !nouveau_loaded) {
                         /* Alternative not in use */
-                        if (!nvidia_enabled) {
+                        if (!alternative->nvidia_enabled) {
                             /* Select nvidia */
                             fprintf(log_handle, "Selecting nvidia\n");
                             status = select_driver(main_arch_path, "nvidia");
@@ -1617,7 +1725,7 @@ int main(int argc, char *argv[]) {
                         }
 
                         /* See if alternatives are broken */
-                        if (!mesa_enabled) {
+                        if (!alternative->mesa_enabled) {
                             /* Select mesa as a fallback */
                             fprintf(log_handle, "Kernel Module is not loaded\n");
                             fprintf(log_handle, "Selecting mesa\n");
@@ -1648,7 +1756,7 @@ int main(int argc, char *argv[]) {
                     /* Kernel module is available */
                     if (fglrx_loaded && !radeon_loaded) {
                         /* Alternative not in use */
-                        if (!fglrx_enabled) {
+                        if (!alternative->fglrx_enabled) {
                             /* Select nvidia */
                             fprintf(log_handle, "Selecting fglrx\n");
                             status = select_driver(main_arch_path, "fglrx");
@@ -1705,7 +1813,7 @@ int main(int argc, char *argv[]) {
                         }
 
                         /* See if alternatives are broken */
-                        if (!mesa_enabled) {
+                        if (!alternative->mesa_enabled) {
                             /* Select mesa as a fallback */
                             fprintf(log_handle, "Kernel Module is not loaded\n");
                             fprintf(log_handle, "Selecting mesa\n");
@@ -1746,7 +1854,7 @@ int main(int argc, char *argv[]) {
                 /* Kernel module is available */
                 if (fglrx_loaded && !radeon_loaded) {
                     /* Alternative not in use */
-                    if (!fglrx_enabled) {
+                    if (!alternative->fglrx_enabled) {
                         /* Select fglrx */
                         fprintf(log_handle, "Selecting fglrx\n");
                         status = select_driver(main_arch_path, "fglrx");
@@ -1802,7 +1910,7 @@ int main(int argc, char *argv[]) {
                         has_changed = 1;
                     }
                     /* See if alternatives are broken */
-                    if (!mesa_enabled) {
+                    if (!alternative->mesa_enabled) {
                         /* Select mesa as a fallback */
                         fprintf(log_handle, "Kernel Module is not loaded\n");
                         fprintf(log_handle, "Selecting mesa\n");
@@ -1832,7 +1940,7 @@ int main(int argc, char *argv[]) {
                 /* Kernel module is available */
                 if (nvidia_loaded && !nouveau_loaded) {
                     /* Alternative not in use */
-                    if (!nvidia_enabled) {
+                    if (!alternative->nvidia_enabled) {
                         /* Select nvidia */
                         fprintf(log_handle, "Selecting nvidia\n");
                         status = select_driver(main_arch_path, "nvidia");
@@ -1881,7 +1989,7 @@ int main(int argc, char *argv[]) {
                     /* Kernel module is available */
                     if (fglrx_loaded && !radeon_loaded) {
                         /* Alternative not in use */
-                        if (!fglrx_enabled) {
+                        if (!alternative->fglrx_enabled) {
                             /* Select nvidia */
                             fprintf(log_handle, "Selecting fglrx\n");
                             status = select_driver(main_arch_path, "fglrx");
@@ -1939,7 +2047,7 @@ int main(int argc, char *argv[]) {
                         }
 
                         /* See if alternatives are broken */
-                        if (!mesa_enabled) {
+                        if (!alternative->mesa_enabled) {
                             /* Select mesa as a fallback */
                             fprintf(log_handle, "Kernel Module is not loaded\n");
                             fprintf(log_handle, "Selecting mesa\n");
@@ -2005,14 +2113,17 @@ end:
     if (other_arch_path)
         free(other_arch_path);
 
+    if (alternative) {
+        if (alternative->current)
+            free(alternative->current);
+        free(alternative);
+    }
+
     if (fake_alternatives_path)
         free(fake_alternatives_path);
 
     if (fake_modules_path)
         free(fake_modules_path);
-
-    if (alternative)
-        free(alternative);
 
     /* Free the devices structs */
     for(i = 0; i < cards_n; i++) {
