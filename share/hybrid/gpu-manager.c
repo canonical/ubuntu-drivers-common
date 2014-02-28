@@ -482,33 +482,59 @@ static int write_pxpress_xorg_conf(struct device **devices, int cards_n) {
         return 0;
     }
 
+    fprintf(pfile,
+            "Section \"ServerLayout\"\n"
+            "    Identifier \"amd-layout\"\n"
+            "    Screen 0 \"amd-screen\" 0 0\n"
+            "EndSection\n\n");
+
+    /* FIXME: fglrx doesn't seem to support
+     *        the domain, so we only use
+     *        bus, dev, and func
+     */
     for(i = 0; i < cards_n; i++) {
         if (devices[i]->vendor_id == INTEL) {
             fprintf(pfile,
-               "Section \"Device\"\n"
-               "    Identifier \"Default Card %d\"\n"
-               "    Driver \"intel\"\n"
-               "    Option \"AccelMethod\" \"uxa\"\n"
-               "    BusID \"PCI:%d@%d:%d:%d\"\n"
-               "EndSection\n\n",
-               i,
-               (int)(devices[i]->bus),
-               (int)(devices[i]->domain),
-               (int)(devices[i]->dev),
-               (int)(devices[i]->func));
+                "Section \"Device\"\n"
+                "    Identifier \"intel\"\n"
+                "    Driver \"intel\"\n"
+                "    Option \"AccelMethod\" \"uxa\"\n"
+                /*"    BusID \"PCI:%d@%d:%d:%d\"\n" */
+                "    BusID \"PCI:%d:%d:%d\"\n"
+                "EndSection\n\n",
+                (int)(devices[i]->bus),
+                /* (int)(devices[i]->domain), */
+                (int)(devices[i]->dev),
+                (int)(devices[i]->func));
         }
         else if (devices[i]->vendor_id == AMD) {
             fprintf(pfile,
-               "Section \"Device\"\n"
-               "    Identifier \"Default Card %d\"\n"
-               "    Driver \"fglrx\"\n"
-               "    BusID \"PCI:%d@%d:%d:%d\"\n"
-               "EndSection\n\n",
-               i,
-               (int)(devices[i]->bus),
-               (int)(devices[i]->domain),
-               (int)(devices[i]->dev),
-               (int)(devices[i]->func));
+                "Section \"Device\"\n"
+                "    Identifier \"amd-device\"\n"
+                "    Driver \"fglrx\"\n"
+                /*"    BusID \"PCI:%d@%d:%d:%d\"\n" */
+                "    BusID \"PCI:%d:%d:%d\"\n"
+                "EndSection\n\n"
+                "Section \"Monitor\"\n"
+                "    Identifier \"amd-monitor\"\n"
+                "    Option \"VendorName\" \"ATI Proprietary Driver\"\n"
+                "    Option \"ModelName\" \"Generic Autodetecting Monitor\"\n"
+                "    Option \"DPMS\" \"true\"\n"
+                "EndSection\n\n"
+                "Section \"Screen\"\n"
+                "    Identifier \"amd-screen\"\n"
+                "    Device \"amd-device\"\n"
+                "    Monitor \"amd-monitor\"\n"
+                "    DefaultDepth 24\n"
+                "    SubSection \"Display\"\n"
+                "        Viewport   0 0\n"
+                "        Depth     24\n"
+                "    EndSubSection\n"
+                "EndSection\n\n",
+                (int)(devices[i]->bus),
+                /* (int)(devices[i]->domain), */
+                (int)(devices[i]->dev),
+                (int)(devices[i]->func));
         }
     }
 
