@@ -21,6 +21,8 @@ import argparse
 
 # Global path to save logs
 tests_path = None
+# Global path to use valgrind
+with_valgrind = False
 
 class GpuTest(object):
 
@@ -29,12 +31,17 @@ class GpuTest(object):
                  is_laptop=False,
                  has_intel=False,
                  intel_loaded=False,
+                 intel_unloaded=False,
                  has_amd=False,
                  fglrx_loaded=False,
+                 fglrx_unloaded=False,
                  radeon_loaded=False,
+                 radeon_unloaded=False,
                  has_nvidia=False,
                  nouveau_loaded=False,
+                 nouveau_unloaded=False,
                  nvidia_loaded=False,
+                 nvidia_unloaded=False,
                  nvidia_enabled=False,
                  fglrx_enabled=False,
                  mesa_enabled=False,
@@ -51,12 +58,17 @@ class GpuTest(object):
         self.is_laptop = is_laptop
         self.has_intel = has_intel
         self.intel_loaded = intel_loaded
+        self.intel_unloaded = intel_unloaded
         self.has_amd = has_amd
         self.radeon_loaded = radeon_loaded
+        self.radeon_unloaded = radeon_unloaded
         self.fglrx_loaded = fglrx_loaded
+        self.fglrx_unloaded = fglrx_unloaded
         self.has_nvidia = has_nvidia
         self.nouveau_loaded = nouveau_loaded
+        self.nouveau_unloaded = nouveau_unloaded
         self.nvidia_loaded = nvidia_loaded
+        self.nvidia_unloaded = nvidia_unloaded
         self.nvidia_enabled = nvidia_enabled
         self.fglrx_enabled = fglrx_enabled
         self.mesa_enabled = mesa_enabled
@@ -89,11 +101,17 @@ class GpuManagerTest(unittest.TestCase):
         klass.fake_modules.close()
         klass.fake_alternatives = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.fake_alternatives.close()
+        klass.fake_dmesg = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.fake_dmesg.close()
         klass.log = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.log.close()
 
+        klass.valgrind_log = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.valgrind_log.close()
+
         # Patterns
         klass.is_driver_loaded_pt = re.compile('Is (.+) loaded\? (.+)')
+        klass.is_driver_unloaded_pt = re.compile('Was (.+) unloaded\? (.+)')
         klass.is_driver_enabled_pt = re.compile('Is (.+) enabled\? (.+)')
         klass.has_card_pt = re.compile('Has (.+)\? (.+)')
         klass.single_card_pt = re.compile('Single card detected.*')
@@ -119,6 +137,7 @@ class GpuManagerTest(unittest.TestCase):
         self.remove_amd_pcsdb_file()
 
     def tearDown(self):
+        print '%s over' % self.this_function_name
         # Remove all the logs
         self.handle_logs(delete=True)
 
@@ -140,6 +159,18 @@ class GpuManagerTest(unittest.TestCase):
         except:
             pass
 
+    def remove_fake_dmesg(self):
+        try:
+            os.unlink(self.fake_dmesg.name)
+        except:
+            pass
+
+    def remove_valgrind_log(self):
+        try:
+            os.unlink(self.valgrind_log.name)
+        except:
+            pass
+
     def handle_logs(self, delete=False, copy=False):
         if tests_path:
             self.target_dir = os.path.join(tests_path, self.this_function_name)
@@ -153,9 +184,11 @@ class GpuManagerTest(unittest.TestCase):
             self.fake_lspci,
             self.fake_modules,
             self.fake_alternatives,
+            self.fake_dmesg,
             self.log,
             self.xorg_file,
-            self.amd_pcsdb_file):
+            self.amd_pcsdb_file,
+            self.valgrind_log):
             try:
                 file.close()
             except:
@@ -174,27 +207,95 @@ class GpuManagerTest(unittest.TestCase):
 
     def exec_manager(self, fake_alternative, is_laptop=False):
         fake_laptop_arg = is_laptop and '--fake-laptop' or '--fake-desktop'
-        os.system('/home/alberto/oem/nvidia/nvidia-common/ubuntu-drivers-common/share/hybrid/gpu-manager --dry-run '
-                  '--last-boot-file %s '
-                  '--fake-lspci %s '
-                  '--xorg-conf-file %s '
-                  '--amd-pcsdb-file %s '
-                  '--fake-alternative %s '
-                  '--fake-modules-path %s '
-                  '--fake-alternatives-path %s '
-                  '--new-boot-file %s '
-                  '%s '
-                  '--log %s ' % (self.last_boot_file.name,
-                                 self.fake_lspci.name,
-                                 self.xorg_file.name,
-                                 self.amd_pcsdb_file.name,
-                                 fake_alternative,
-                                 self.fake_modules.name,
-                                 self.fake_alternatives.name,
-                                 self.new_boot_file.name,
-                                 fake_laptop_arg,
-                                 self.log.name)
-                  )
+        if with_valgrind:
+            valgrind = ['valgrind', '--tool=memcheck', '--leak-check=full',
+                        '--show-reachable=yes', '--log-file=%s' % self.valgrind_log.name,
+                        '--']
+        else:
+            valgrind = []
+
+        command = ['share/hybrid/gpu-manager',
+                   '--dry-run',
+                   '--last-boot-file',
+                   self.last_boot_file.name,
+                   '--fake-lspci',
+                   self.fake_lspci.name,
+                   '--xorg-conf-file',
+                   self.xorg_file.name,
+                   '--amd-pcsdb-file',
+                   self.amd_pcsdb_file.name,
+                   '--fake-alternative',
+                   fake_alternative,
+                   '--fake-modules-path',
+                   self.fake_modules.name,
+                   '--fake-alternatives-path',
+                   self.fake_alternatives.name,
+                   '--fake-dmesg-path',
+                   self.fake_dmesg.name,
+                   '--new-boot-file',
+                   self.new_boot_file.name,
+                   fake_laptop_arg,
+                   '--log',
+                   self.log.name]
+
+        if valgrind:
+            # Prepend the valgrind arguments
+            command[:0] = valgrind
+
+        #devnull = open('/dev/null', 'w')
+
+        #p1 = subprocess.Popen(command, stdout=devnull,
+        #                      stderr=devnull, universal_newlines=True)
+
+        #print ' '.join(command)
+        os.system(' '.join(command))
+
+        #p1 = subprocess.Popen(command, universal_newlines=True)
+        #p = p1.communicate()[0]
+
+        #devnull.close()
+
+        if valgrind:
+            self.valgrind_log = open(self.valgrind_log.name, 'r')
+            errors_pt = re.compile('(.+) ERROR SUMMARY: (.+) errors from (.+) '
+                       'contexts (suppressed: .+ from .+).*')
+            for line in self.valgrind_log.readlines():
+                errors = errors_pt.match(line)
+                if errors:
+                    print errors.group(2)
+                    if errors.group(2) != 0:
+                        self.valgrind_log = open(self.valgrind_log.name, 'w')
+                        self.valgrind_log.write(''.join(c, '\n'))
+                        self.valgrind_log.close()
+                        # Copy the logs
+                        self.handle_logs(copy=True)
+                        return False
+            self.valgrind_log.close()
+        # os.system('%sshare/hybrid/gpu-manager --dry-run '
+        #           '--last-boot-file %s '
+        #           '--fake-lspci %s '
+        #           '--xorg-conf-file %s '
+        #           '--amd-pcsdb-file %s '
+        #           '--fake-alternative %s '
+        #           '--fake-modules-path %s '
+        #           '--fake-alternatives-path %s '
+        #           '--fake-dmesg-path %s '
+        #           '--new-boot-file %s '
+        #           '%s '
+        #           '--log %s ' % (valgrind
+        #                          self.last_boot_file.name,
+        #                          self.fake_lspci.name,
+        #                          self.xorg_file.name,
+        #                          self.amd_pcsdb_file.name,
+        #                          fake_alternative,
+        #                          self.fake_modules.name,
+        #                          self.fake_alternatives.name,
+        #                          self.fake_dmesg.name,
+        #                          self.new_boot_file.name,
+        #                          fake_laptop_arg,
+        #                          self.log.name)
+        #           )
+        return True
 
     def check_vars(self, *args, **kwargs):
         gpu_test = GpuTest(**kwargs)
@@ -206,6 +307,7 @@ class GpuManagerTest(unittest.TestCase):
         for line in log.readlines():
             has_card = self.has_card_pt.match(line)
             is_driver_loaded = self.is_driver_loaded_pt.match(line)
+            is_driver_unloaded = self.is_driver_unloaded_pt.match(line)
             is_driver_enabled = self.is_driver_enabled_pt.match(line)
             loaded_and_enabled = self.loaded_and_enabled_pt.match(line)
 
@@ -243,6 +345,17 @@ class GpuManagerTest(unittest.TestCase):
                     gpu_test.radeon_loaded = (is_driver_loaded.group(2).strip().lower() == 'yes')
                 elif is_driver_loaded.group(1).strip().lower() == 'fglrx':
                     gpu_test.fglrx_loaded = (is_driver_loaded.group(2).strip().lower() == 'yes')
+            elif is_driver_unloaded:
+                if is_driver_unloaded.group(1).strip().lower() == 'nouveau':
+                    gpu_test.nouveau_unloaded = (is_driver_unloaded.group(2).strip().lower() == 'yes')
+                elif is_driver_unloaded.group(1).strip().lower() == 'nvidia':
+                    gpu_test.nvidia_unloaded = (is_driver_unloaded.group(2).strip().lower() == 'yes')
+                elif is_driver_unloaded.group(1).strip().lower() == 'intel':
+                    gpu_test.intel_unloaded = (is_driver_unloaded.group(2).strip().lower() == 'yes')
+                elif is_driver_unloaded.group(1).strip().lower() == 'radeon':
+                    gpu_test.radeon_unloaded = (is_driver_unloaded.group(2).strip().lower() == 'yes')
+                elif is_driver_unloaded.group(1).strip().lower() == 'fglrx':
+                    gpu_test.fglrx_unloaded = (is_driver_unloaded.group(2).strip().lower() == 'yes')
             # Detect the alternative
             elif is_driver_enabled:
                 if is_driver_enabled.group(1).strip().lower() == 'nvidia':
@@ -292,7 +405,9 @@ class GpuManagerTest(unittest.TestCase):
         log.close()
 
         # No driver selection and no changes to xorg.conf
-        if not gpu_test.has_selected_driver and not_modified_xorg:
+        if (not gpu_test.has_selected_driver and
+           (not gpu_test.has_removed_xorg and
+            not gpu_test.has_regenerated_xorg)):
             gpu_test.has_not_acted = True
 
         # Copy the logs
@@ -302,8 +417,14 @@ class GpuManagerTest(unittest.TestCase):
         # Remove xorg.conf
         self.remove_xorg_conf()
 
+        # Remove fake dmesg
+        self.remove_fake_dmesg()
+
         # Remove amd_pcsdb_file
         self.remove_amd_pcsdb_file()
+
+        # Remove the valgrind log
+        self.remove_valgrind_log()
 
         return gpu_test
 
@@ -330,7 +451,7 @@ i915-brw 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_changed=True,
@@ -445,7 +566,7 @@ nouveau 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_changed=True,
@@ -501,7 +622,7 @@ fglrx 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -541,7 +662,7 @@ fake 1447330 3 - Live 0x0000000000000000
         self.fake_modules.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -597,7 +718,7 @@ radeon 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_changed=True,
@@ -653,7 +774,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -695,7 +816,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -747,7 +868,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -809,7 +930,7 @@ nouveau 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -866,7 +987,7 @@ radeon 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -926,7 +1047,7 @@ fglrx 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -968,13 +1089,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -1026,7 +1147,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -1085,7 +1206,7 @@ i915 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -1144,7 +1265,7 @@ nouveau 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -1205,7 +1326,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -1249,7 +1370,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -1301,7 +1422,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -1369,7 +1490,7 @@ i915 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -1427,7 +1548,7 @@ i915 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -1496,7 +1617,7 @@ nouveau 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -1555,7 +1676,7 @@ nouveau 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -1624,7 +1745,7 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -1683,7 +1804,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -1746,7 +1867,7 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -1789,7 +1910,7 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         self.fake_lspci.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -1843,7 +1964,7 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         self.fake_modules.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -1887,7 +2008,7 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         self.fake_lspci.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -1957,7 +2078,7 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -2001,7 +2122,7 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         self.fake_lspci.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -2057,7 +2178,7 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         self.fake_modules.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -2101,7 +2222,7 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         self.fake_lspci.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -2162,7 +2283,7 @@ i915 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -2222,7 +2343,7 @@ radeon 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -2284,7 +2405,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -2326,7 +2447,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -2376,7 +2497,7 @@ fglrx 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -2420,7 +2541,7 @@ fglrx 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -2484,7 +2605,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -2525,7 +2646,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -2573,7 +2694,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -2620,7 +2741,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -2683,7 +2804,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -2725,7 +2846,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -2774,7 +2895,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -2822,7 +2943,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -2889,7 +3010,7 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -2948,7 +3069,7 @@ fglrx 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -3007,7 +3128,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -3067,7 +3188,7 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -3296,7 +3417,7 @@ radeon 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -3347,7 +3468,7 @@ radeon 1447330 3 - Live 0x0000000000000000
         self.fake_lspci.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -3402,7 +3523,7 @@ i915 1447330 3 - Live 0x0000000000000000
         self.fake_modules.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -3629,7 +3750,7 @@ EndSection
 Section "Device"
     Identifier  "aticonfig-Device[0]-0"
     Driver      "fglrx"
-    BusID       "PCI:1@0:0:0"
+    BusID       "PCI:1:0:0"
 EndSection
 
 Section "Device"
@@ -3698,7 +3819,7 @@ EndSection
 Section "Device"
     Identifier  "aticonfig-Device[0]-0"
     Driver      "fglrx"
-    BusID       "PCI:1@0:0:0"
+    BusID       "PCI:1:0:0"
 EndSection
 
 Section "Device"
@@ -3732,10 +3853,103 @@ EndSection
         self.assertFalse(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # We should select pxpress here
-        self.assert_(gpu_test.has_selected_driver)
+        # but we won't for now
+        self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
+        self.assert_(gpu_test.has_not_acted)
+
+
+        # Let's create a case where the discrete
+        # GPU is disabled, fglrx was unloaded, and xorg.conf
+        # is correct
+        self.fake_dmesg = open(self.fake_dmesg.name, 'w')
+        self.fake_dmesg.write('''
+[   23.462986] fglrx_pci 0000:01:00.0: Max Payload Size 16384, but upstream 0000:00:01.0 set to 128; if necessary, use "pci=pcie_bus_safe" and report a bug
+[   23.462994] fglrx_pci 0000:01:00.0: no hotplug settings from platform
+[   23.467552] waiting module removal not supported: please upgrade<6>[fglrx] module unloaded - fglrx 13.35.5 [Jan 29 2014]
+                                   ''')
+        self.fake_dmesg.close()
+
+        self.fake_modules = open(self.fake_modules.name, 'w')
+        self.fake_modules.write('''
+i915 1447330 3 - Live 0x0000000000000000
+fake 1447330 3 - Live 0x0000000000000000
+''')
+        self.fake_modules.close()
+
+        # Only intel should show up
+        self.fake_lspci = open(self.fake_lspci.name, 'w')
+        self.fake_lspci.write('''
+8086:68d8;0000:00:01:0;1
+        ''')
+        self.fake_lspci.close()
+
+        self.xorg_file = open(self.xorg_file.name, 'w')
+        self.xorg_file.write('''
+Section "ServerLayout"
+    Identifier     "aticonfig Layout"
+    Screen      0  "aticonfig-Screen[0]-0" 0 0
+EndSection
+
+Section "Module"
+EndSection
+
+Section "Monitor"
+    Identifier   "aticonfig-Monitor[0]-0"
+    Option      "VendorName" "ATI Proprietary Driver"
+    Option      "ModelName" "Generic Autodetecting Monitor"
+    Option      "DPMS" "true"
+EndSection
+
+Section "Device"
+    Identifier  "aticonfig-Device[0]-0"
+    Driver      "fglrx"
+    BusID       "PCI:1:0:0"
+EndSection
+
+Section "Device"
+    Identifier  "intel"
+    Driver      "intel"
+    Option      "AccelMethod" "uxa"
+    BusID       "PCI:0@0:1:0"
+EndSection
+
+Section "Screen"
+    Identifier "aticonfig-Screen[0]-0"
+    Device     "aticonfig-Device[0]-0"
+    Monitor    "aticonfig-Monitor[0]-0"
+    DefaultDepth     24
+    SubSection "Display"
+        Viewport   0 0
+        Depth     24
+    EndSubSection
+EndSection
+        ''')
+        self.xorg_file.close()
+
+        # Call the program
+        self.exec_manager(fake_alternative, is_laptop=True)
+
+        # Collect data
+        gpu_test = self.check_vars()
+
+        # Check that fglrx was unloaded
+        self.assert_(gpu_test.fglrx_unloaded)
+
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assert_(gpu_test.intel_loaded)
+
+        # Has changed
+        self.assertFalse(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        # We should select pxpress here
+        # but we won't for now
+        self.assertFalse(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assert_(gpu_test.has_not_acted)
 
 
         # Case 1b: the discrete card is now available (BIOS)
@@ -3872,7 +4086,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
         self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        # We should select the driver here
+        # but we won't for now
+        self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -3945,7 +4161,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assert_(gpu_test.has_regenerated_xorg)
         # Select fglrx, as the discrete GPU
         # is not disabled
-        self.assert_(gpu_test.has_selected_driver)
+        # We should select the driver here
+        # but we won't for now
+        self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -4087,7 +4305,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
         self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        # We should select the driver here
+        # but we won't for now
+        self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -4306,7 +4526,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
         self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        # We should select the driver here
+        # but we won't for now
+        self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -4379,7 +4601,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
         self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        # We should select the driver here
+        # but we won't for now
+        self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -4525,7 +4749,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
         self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        # We should select the driver here
+        # but we won't for now
+        self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -4742,6 +4968,8 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
+        # We should select the driver here
+        # but we won't for now
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -7942,7 +8170,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -8011,7 +8239,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -8082,7 +8310,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -8154,7 +8382,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -8225,7 +8453,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -8296,7 +8524,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -8369,7 +8597,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -8421,7 +8649,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -8461,7 +8689,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -8521,7 +8749,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -8594,7 +8822,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -8667,7 +8895,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -8740,7 +8968,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -8818,7 +9046,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -8890,7 +9118,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -8962,7 +9190,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -9034,7 +9262,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -9106,7 +9334,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -9178,7 +9406,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -9247,7 +9475,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -9316,7 +9544,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -9385,7 +9613,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -9456,7 +9684,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/pxpress/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -9527,7 +9755,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/pxpress/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -9598,7 +9826,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -9671,7 +9899,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -9728,7 +9956,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -9768,7 +9996,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -9828,7 +10056,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -9901,7 +10129,7 @@ fglrx 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -9974,7 +10202,7 @@ fglrx 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/pxpress/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -10047,7 +10275,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/pxpress/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -10125,7 +10353,7 @@ fglrx 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -10197,7 +10425,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -10269,7 +10497,7 @@ fglrx 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -10341,7 +10569,7 @@ fglrx 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/pxpress/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -10413,7 +10641,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/pxpress/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -10485,7 +10713,7 @@ fglrx 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -11859,7 +12087,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -11906,7 +12134,7 @@ fake 1447330 3 - Live 0x0000000000000000
         self.fake_modules.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -12088,7 +12316,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -12137,7 +12365,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -12161,7 +12389,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -12184,7 +12412,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -12207,7 +12435,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -12250,7 +12478,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -12319,7 +12547,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -12369,7 +12597,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -12393,7 +12621,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -12416,7 +12644,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -12439,7 +12667,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -12482,7 +12710,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -12533,7 +12761,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -12557,7 +12785,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -12580,7 +12808,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -12603,7 +12831,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -12646,7 +12874,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -12717,7 +12945,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -12790,7 +13018,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -12863,7 +13091,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -12936,7 +13164,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -13009,7 +13237,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -13082,7 +13310,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -13153,7 +13381,7 @@ nouveau 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -13222,7 +13450,7 @@ nouveau 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -13291,7 +13519,7 @@ nouveau 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -13362,7 +13590,7 @@ nouveau 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/pxpress/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -13433,7 +13661,7 @@ nouveau 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/pxpress/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -13504,7 +13732,7 @@ nouveau 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -13577,7 +13805,7 @@ nouveau 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -13629,7 +13857,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -13669,7 +13897,7 @@ EndSection
         self.xorg_file.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -13729,7 +13957,7 @@ nouveau 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/fglrx/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -13802,7 +14030,7 @@ fglrx 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -13875,7 +14103,7 @@ fglrx 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/pxpress/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -13948,7 +14176,7 @@ nouveau 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/pxpress/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars(has_not_acted=True)
@@ -14022,7 +14250,7 @@ fake 1447330 3 - Live 0x0000000000000000
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -14044,7 +14272,7 @@ fake 1447330 3 - Live 0x0000000000000000
         self.fake_alternatives.close()
 
         # Call the program
-        self.exec_manager(fake_alternative)
+        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
         gpu_test = self.check_vars()
@@ -14059,13 +14287,16 @@ if __name__ == '__main__':
     # unittest doesn't complain
     parser = argparse.ArgumentParser()
     parser.add_argument('--save-logs-to', help='Path to save logs to')
+    parser.add_argument('--with-valgrind', action="store_true", help='Run the app within valgrind')
 
     args = parser.parse_args()
     tests_path = args.save_logs_to
+    with_valgrind = args.with_valgrind
 
     new_argv = []
     for elem in sys.argv:
-        if elem != '--save-logs-to' and elem != args.save_logs_to:
+        if ((elem != '--save-logs-to' and elem != args.save_logs_to) and
+            (elem != '--with-valgrind' and elem != args.with_valgrind)):
             new_argv.append(elem)
     unittest.main(argv=new_argv)
 
