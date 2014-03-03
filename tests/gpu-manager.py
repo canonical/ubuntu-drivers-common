@@ -103,6 +103,11 @@ class GpuManagerTest(unittest.TestCase):
         klass.fake_alternatives.close()
         klass.fake_dmesg = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.fake_dmesg.close()
+        klass.prime_settings = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.prime_settings.close()
+        klass.bbswitch_path = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.bbswitch_path.close()
+
         klass.log = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.log.close()
 
@@ -159,6 +164,14 @@ class GpuManagerTest(unittest.TestCase):
         except:
             pass
 
+    def remove_prime_files(self):
+        for elem in (self.prime_settings,
+                     self.bbswitch_path):
+            try:
+                os.unlink(elem.name)
+            except:
+                pass
+
     def remove_fake_dmesg(self):
         try:
             os.unlink(self.fake_dmesg.name)
@@ -185,6 +198,8 @@ class GpuManagerTest(unittest.TestCase):
             self.fake_modules,
             self.fake_alternatives,
             self.fake_dmesg,
+            self.prime_settings,
+            self.bbswitch_path,
             self.log,
             self.xorg_file,
             self.amd_pcsdb_file,
@@ -232,6 +247,10 @@ class GpuManagerTest(unittest.TestCase):
                    self.fake_alternatives.name,
                    '--fake-dmesg-path',
                    self.fake_dmesg.name,
+                   '--prime-settings',
+                   self.prime_settings.name,
+                   '--bbswitch-path',
+                   self.bbswitch_path.name,
                    '--new-boot-file',
                    self.new_boot_file.name,
                    fake_laptop_arg,
@@ -422,6 +441,9 @@ class GpuManagerTest(unittest.TestCase):
 
         # Remove amd_pcsdb_file
         self.remove_amd_pcsdb_file()
+
+        # Remove files for PRIME
+        self.remove_prime_files()
 
         # Remove the valgrind log
         self.remove_valgrind_log()
@@ -3865,6 +3887,7 @@ EndSection
         # is correct
         self.fake_dmesg = open(self.fake_dmesg.name, 'w')
         self.fake_dmesg.write('''
+[   23.462972] fglrx: module license 'Proprietary. (C) 2002 - ATI Technologies, Starnberg, GERMANY' taints kernel.
 [   23.462986] fglrx_pci 0000:01:00.0: Max Payload Size 16384, but upstream 0000:00:01.0 set to 128; if necessary, use "pci=pcie_bus_safe" and report a bug
 [   23.462994] fglrx_pci 0000:01:00.0: no hotplug settings from platform
 [   23.467552] waiting module removal not supported: please upgrade<6>[fglrx] module unloaded - fglrx 13.35.5 [Jan 29 2014]
@@ -3957,6 +3980,7 @@ EndSection
         # is incorrect
         self.fake_dmesg = open(self.fake_dmesg.name, 'w')
         self.fake_dmesg.write('''
+[   23.462972] fglrx: module license 'Proprietary. (C) 2002 - ATI Technologies, Starnberg, GERMANY' taints kernel.
 [   23.462986] fglrx_pci 0000:01:00.0: Max Payload Size 16384, but upstream 0000:00:01.0 set to 128; if necessary, use "pci=pcie_bus_safe" and report a bug
 [   23.462994] fglrx_pci 0000:01:00.0: no hotplug settings from platform
 [   23.467552] waiting module removal not supported: please upgrade<6>[fglrx] module unloaded - fglrx 13.35.5 [Jan 29 2014]
@@ -6935,6 +6959,14 @@ nvidia 1447330 3 - Live 0x0000000000000000
 ''')
         self.fake_alternatives.close()
 
+        self.prime_settings = open(self.prime_settings.name, 'w')
+        self.prime_settings.write('ON')
+        self.prime_settings.close()
+
+        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
+        self.bbswitch_path.write('0000:01:00.0 ON')
+        self.bbswitch_path.close()
+
         # The alternative in use
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
@@ -6969,15 +7001,14 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assert_(gpu_test.nvidia_loaded)
         self.assert_(gpu_test.nvidia_enabled)
         # Has changed
-        '''
         # Enable when we support hybrid laptops
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assert_(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
-        '''
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 1b: the discrete card is now available (BIOS)
@@ -7010,6 +7041,14 @@ fake 1447330 3 - Live 0x0000000000000000
         # The alternative in use
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
+        self.prime_settings = open(self.prime_settings.name, 'w')
+        self.prime_settings.write('ON')
+        self.prime_settings.close()
+
+        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
+        self.bbswitch_path.write('0000:01:00.0 ON')
+        self.bbswitch_path.close()
+
         # Call the program
         self.exec_manager(fake_alternative, is_laptop=True)
 
@@ -7039,17 +7078,16 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assert_(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_unloaded)
         self.assert_(gpu_test.nvidia_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        self.assert_(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 1c: the discrete card is now available (BIOS)
@@ -7078,6 +7116,14 @@ nvidia 1447330 3 - Live 0x0000000000000000
 /usr/lib/nvidia-331-updates-prime/ld.so.conf
 ''')
         self.fake_alternatives.close()
+
+        self.prime_settings = open(self.prime_settings.name, 'w')
+        self.prime_settings.write('ON')
+        self.prime_settings.close()
+
+        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
+        self.bbswitch_path.write('0000:01:00.0 ON')
+        self.bbswitch_path.close()
 
         # The alternative in use
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
@@ -7113,15 +7159,13 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assert_(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assert_(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 1d: the discrete card is now available (BIOS)
@@ -7153,6 +7197,14 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # The alternative in use
         fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
+
+        self.prime_settings = open(self.prime_settings.name, 'w')
+        self.prime_settings.write('OFF')
+        self.prime_settings.close()
+
+        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
+        self.bbswitch_path.write('0000:01:00.0 ON')
+        self.bbswitch_path.close()
 
         # Call the program
         self.exec_manager(fake_alternative, is_laptop=True)
@@ -7186,15 +7238,13 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assert_(gpu_test.prime_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
-        '''
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 1e: the discrete card is now available (BIOS)
@@ -7226,6 +7276,14 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # The alternative in use
         fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
+
+        self.prime_settings = open(self.prime_settings.name, 'w')
+        self.prime_settings.write('ON')
+        self.prime_settings.close()
+
+        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
+        self.bbswitch_path.write('0000:01:00.0 ON')
+        self.bbswitch_path.close()
 
         # Call the program
         self.exec_manager(fake_alternative, is_laptop=True)
@@ -7259,15 +7317,14 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assert_(gpu_test.prime_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
         self.assert_(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        # Fall back to mesa
+        self.assert_(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 1f: the discrete card is now available (BIOS)
@@ -7450,6 +7507,14 @@ fake 1447330 3 - Live 0x0000000000000000
         # The alternative in use
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
+        self.prime_settings = open(self.prime_settings.name, 'w')
+        self.prime_settings.write('ON')
+        self.prime_settings.close()
+
+        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
+        self.bbswitch_path.write('0000:01:00.0 ON')
+        self.bbswitch_path.close()
+
         # Call the program
         self.exec_manager(fake_alternative, is_laptop=True)
 
@@ -7482,15 +7547,13 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assert_(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
-        self.assert_(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        self.assert_(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 2c: the discrete card was already available (BIOS)
@@ -7525,6 +7588,14 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # The alternative in use
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
+        self.prime_settings = open(self.prime_settings.name, 'w')
+        self.prime_settings.write('ON')
+        self.prime_settings.close()
+
+        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
+        self.bbswitch_path.write('0000:01:00.0 ON')
+        self.bbswitch_path.close()
+
         # Call the program
         self.exec_manager(fake_alternative, is_laptop=True)
 
@@ -7557,19 +7628,17 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
-        self.assert_(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assert_(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 2d: the discrete card was already available (BIOS)
-        #          pxpress is enabled and the module is loaded
+        #          prime is enabled and the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
 8086:68d8;0000:00:01:0;1
@@ -7599,6 +7668,14 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # The alternative in use
         fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
+
+        self.prime_settings = open(self.prime_settings.name, 'w')
+        self.prime_settings.write('OFF')
+        self.prime_settings.close()
+
+        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
+        self.bbswitch_path.write('0000:01:00.0 ON')
+        self.bbswitch_path.close()
 
         # Call the program
         self.exec_manager(fake_alternative, is_laptop=True)
@@ -7632,15 +7709,13 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assert_(gpu_test.prime_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
-        self.assert_(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
-        '''
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 2e: the discrete card was already available (BIOS)
@@ -7675,6 +7750,14 @@ fake 1447330 3 - Live 0x0000000000000000
         # The alternative in use
         fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
 
+        self.prime_settings = open(self.prime_settings.name, 'w')
+        self.prime_settings.write('OFF')
+        self.prime_settings.close()
+
+        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
+        self.bbswitch_path.write('0000:01:00.0 ON')
+        self.bbswitch_path.close()
+
         # Call the program
         self.exec_manager(fake_alternative, is_laptop=True)
 
@@ -7707,15 +7790,14 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assert_(gpu_test.prime_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
-        self.assert_(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        # Fallback
+        self.assert_(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 2f: the discrete card was already available (BIOS)
@@ -7750,6 +7832,14 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # The alternative in use
         fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
 
+        self.prime_settings = open(self.prime_settings.name, 'w')
+        self.prime_settings.write('OFF')
+        self.prime_settings.close()
+
+        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
+        self.bbswitch_path.write('0000:01:00.0 ON')
+        self.bbswitch_path.close()
+
         # Call the program
         self.exec_manager(fake_alternative, is_laptop=True)
 
@@ -7782,15 +7872,14 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
-        self.assert_(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_changed)
         self.assert_(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        # Select PRIME
+        self.assert_(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3a: the discrete card is no longer available (BIOS)
@@ -7937,7 +8026,190 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_not_acted)
 
 
-        # Case 3c: the discrete card is no longer available (BIOS)
+        # Case 3c: the discrete card is no longer available (bbswitch)
+        #          prime is enabled and the module is not loaded
+        self.last_boot_file = open(self.last_boot_file.name, 'w')
+        self.last_boot_file.write('''
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
+        self.last_boot_file.close()
+
+        self.fake_lspci = open(self.fake_lspci.name, 'w')
+        self.fake_lspci.write('''
+8086:68d8;0000:00:01:0;1
+''')
+        self.fake_lspci.close()
+
+        self.fake_modules = open(self.fake_modules.name, 'w')
+        self.fake_modules.write('''
+i915 1447330 3 - Live 0x0000000000000000
+fake 1447330 3 - Live 0x0000000000000000
+''')
+        self.fake_modules.close()
+
+        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
+        self.fake_alternatives.write('''
+/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
+/usr/lib/nvidia-331-updates/ld.so.conf
+/usr/lib/nvidia-331-updates-prime/ld.so.conf
+''')
+        self.fake_alternatives.close()
+
+        # The alternative in use
+        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
+
+        self.prime_settings = open(self.prime_settings.name, 'w')
+        self.prime_settings.write('OFF')
+        self.prime_settings.close()
+
+        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
+        self.bbswitch_path.write('0000:01:00.0 OFF')
+        self.bbswitch_path.close()
+
+        self.fake_dmesg = open(self.fake_dmesg.name, 'w')
+        self.fake_dmesg.write('''
+[   18.017267] nvidia: module license 'NVIDIA' taints kernel.
+[   18.019886] nvidia: module verification failed: signature and/or  required key missing - tainting kernel
+[   18.022845] nvidia 0000:01:00.0: enabling device (0000 -> 0003)
+[   18.689111] [drm] Initialized nvidia-drm 0.0.0 20130102 for 0000:01:00.0 on minor 1
+[   35.604564] init: Failed to spawn nvidia-persistenced main process: unable to execute: No such file or directory
+                             ''')
+        self.fake_dmesg.close()
+
+
+        # Call the program
+        self.exec_manager(fake_alternative, is_laptop=True)
+
+        # Collect data
+        gpu_test = self.check_vars(has_not_acted=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assert_(gpu_test.is_laptop)
+
+        self.assert_(gpu_test.has_single_card)
+
+        # Intel
+        self.assert_(gpu_test.has_intel)
+        self.assert_(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assert_(gpu_test.prime_enabled)
+        # Has changed
+        self.assert_(gpu_test.has_changed)
+        self.assert_(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 3d: the discrete card is no longer available (bbswitch)
+        #          prime is enabled and the module is not loaded and
+        #          we need to select nvidia for better performance
+        self.last_boot_file = open(self.last_boot_file.name, 'w')
+        self.last_boot_file.write('''
+8086:68d8;0000:00:01:0;1
+10de:28e8;0000:01:00:0;0''')
+        self.last_boot_file.close()
+
+        self.fake_lspci = open(self.fake_lspci.name, 'w')
+        self.fake_lspci.write('''
+8086:68d8;0000:00:01:0;1
+''')
+        self.fake_lspci.close()
+
+        self.fake_modules = open(self.fake_modules.name, 'w')
+        self.fake_modules.write('''
+i915 1447330 3 - Live 0x0000000000000000
+fake 1447330 3 - Live 0x0000000000000000
+''')
+        self.fake_modules.close()
+
+        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
+        self.fake_alternatives.write('''
+/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
+/usr/lib/nvidia-331-updates/ld.so.conf
+/usr/lib/nvidia-331-updates-prime/ld.so.conf
+''')
+        self.fake_alternatives.close()
+
+        # The alternative in use
+        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
+
+        self.prime_settings = open(self.prime_settings.name, 'w')
+        self.prime_settings.write('ON')
+        self.prime_settings.close()
+
+        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
+        self.bbswitch_path.write('0000:01:00.0 OFF')
+        self.bbswitch_path.close()
+
+        self.fake_dmesg = open(self.fake_dmesg.name, 'w')
+        self.fake_dmesg.write('''
+[   18.017267] nvidia: module license 'NVIDIA' taints kernel.
+[   18.019886] nvidia: module verification failed: signature and/or  required key missing - tainting kernel
+[   18.022845] nvidia 0000:01:00.0: enabling device (0000 -> 0003)
+[   18.689111] [drm] Initialized nvidia-drm 0.0.0 20130102 for 0000:01:00.0 on minor 1
+[   35.604564] init: Failed to spawn nvidia-persistenced main process: unable to execute: No such file or directory
+                             ''')
+        self.fake_dmesg.close()
+
+
+        # Call the program
+        self.exec_manager(fake_alternative, is_laptop=True)
+
+        # Collect data
+        gpu_test = self.check_vars(has_not_acted=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assert_(gpu_test.is_laptop)
+
+        self.assert_(gpu_test.has_single_card)
+
+        # Intel
+        self.assert_(gpu_test.has_intel)
+        self.assert_(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assert_(gpu_test.prime_enabled)
+        # Has changed
+        self.assert_(gpu_test.has_changed)
+        self.assert_(gpu_test.has_removed_xorg)
+        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assert_(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 3e: the discrete card is no longer available (BIOS)
         #          the driver is not enabled but the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
@@ -8009,7 +8281,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_not_acted)
 
 
-        # Case 3d: the discrete card is no longer available (BIOS)
+        # Case 3f: the discrete card is no longer available (BIOS)
         #          prime is enabled and the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
@@ -8081,7 +8353,7 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_not_acted)
 
 
-        # Case 3e: the discrete card is no longer available (BIOS)
+        # Case 3g: the discrete card is no longer available (BIOS)
         #          prime is enabled but the module is not loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
@@ -8153,7 +8425,7 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_not_acted)
 
 
-        # Case 3f: the discrete card is no longer available (BIOS)
+        # Case 3h: the discrete card is no longer available (BIOS)
         #          pxpress is not enabled but the module is loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.last_boot_file.write('''
