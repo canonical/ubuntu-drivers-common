@@ -3952,6 +3952,92 @@ EndSection
         self.assert_(gpu_test.has_not_acted)
 
 
+        # Let's create a case where the discrete
+        # GPU is disabled, fglrx was unloaded, and xorg.conf
+        # is incorrect
+        self.fake_dmesg = open(self.fake_dmesg.name, 'w')
+        self.fake_dmesg.write('''
+[   23.462986] fglrx_pci 0000:01:00.0: Max Payload Size 16384, but upstream 0000:00:01.0 set to 128; if necessary, use "pci=pcie_bus_safe" and report a bug
+[   23.462994] fglrx_pci 0000:01:00.0: no hotplug settings from platform
+[   23.467552] waiting module removal not supported: please upgrade<6>[fglrx] module unloaded - fglrx 13.35.5 [Jan 29 2014]
+                                   ''')
+        self.fake_dmesg.close()
+
+        self.fake_modules = open(self.fake_modules.name, 'w')
+        self.fake_modules.write('''
+i915 1447330 3 - Live 0x0000000000000000
+fake 1447330 3 - Live 0x0000000000000000
+''')
+        self.fake_modules.close()
+
+        # Only intel should show up
+        self.fake_lspci = open(self.fake_lspci.name, 'w')
+        self.fake_lspci.write('''
+8086:68d8;0000:00:01:0;1
+        ''')
+        self.fake_lspci.close()
+
+        self.xorg_file = open(self.xorg_file.name, 'w')
+        self.xorg_file.write('''
+Section "ServerLayout"
+    Identifier     "aticonfig Layout"
+    Screen      0  "aticonfig-Screen[0]-0" 0 0
+EndSection
+
+Section "Module"
+EndSection
+
+Section "Monitor"
+    Identifier   "aticonfig-Monitor[0]-0"
+    Option      "VendorName" "ATI Proprietary Driver"
+    Option      "ModelName" "Generic Autodetecting Monitor"
+    Option      "DPMS" "true"
+EndSection
+
+Section "Device"
+    Identifier  "intel"
+    Driver      "intel"
+    Option      "AccelMethod" "uxa"
+    BusID       "PCI:0@0:1:0"
+EndSection
+
+Section "Screen"
+    Identifier "aticonfig-Screen[0]-0"
+    Device     "aticonfig-Device[0]-0"
+    Monitor    "aticonfig-Monitor[0]-0"
+    DefaultDepth     24
+    SubSection "Display"
+        Viewport   0 0
+        Depth     24
+    EndSubSection
+EndSection
+        ''')
+        self.xorg_file.close()
+
+        # Call the program
+        self.exec_manager(fake_alternative, is_laptop=True)
+
+        # Collect data
+        gpu_test = self.check_vars()
+
+        # Check that fglrx was unloaded
+        self.assert_(gpu_test.fglrx_unloaded)
+
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assert_(gpu_test.intel_loaded)
+
+        # Has changed
+        self.assertFalse(gpu_test.has_changed)
+        self.assert_(gpu_test.has_removed_xorg)
+        self.assert_(gpu_test.has_regenerated_xorg)
+        # We should select pxpress here
+        # but we won't for now
+        self.assertFalse(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
         # Case 1b: the discrete card is now available (BIOS)
         #          the driver is enabled but the module is not loaded
         self.last_boot_file = open(self.last_boot_file.name, 'w')

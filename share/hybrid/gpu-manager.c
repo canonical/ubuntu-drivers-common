@@ -635,6 +635,8 @@ static int check_pxpress_xorg_conf(struct device **devices,
     int i;
     int intel_matches = 0;
     int amd_matches = 0;
+    int fglrx_set = 0;
+    int intel_set = 0;
     int x_options_matches = 0;
     char line[2048];
     char intel_bus_id[100];
@@ -693,27 +695,24 @@ static int check_pxpress_xorg_conf(struct device **devices,
             /* Parse options here */
             if (istrstr(line, "Option") != NULL) {
                 if (istrstr(line, "AccelMethod") != NULL &&
-                         istrstr(line, "UXA") != NULL) {
+                    istrstr(line, "UXA") != NULL) {
                     x_options_matches += 1;
                 }
             }
             else if (strstr(line, intel_bus_id) != NULL) {
                 intel_matches += 1;
             }
-            else if (strstr(line, amd_bus_id) != NULL) {
+            else if (cards_n >1 && strstr(line, amd_bus_id) != NULL) {
                 amd_matches += 1;
             }
-            /* It has to be either intel or fglrx */
+            /* The driver has to be either intel or fglrx */
             else if (istrstr(line, "Driver") != NULL) {
-                if (istrstr(line, "intel") == NULL &&
-                    istrstr(line, "fglrx") == NULL) {
-                    failure = 1;
-                    fprintf(log_handle, "Unsupported driver in "
-                            "xorg.conf. Path: %s\n", xorg_conf_file);
-                    fprintf(log_handle, "line: %s\n", line);
-                    break;
+                if (istrstr(line, "intel") != NULL){
+                    intel_set += 1;
                 }
-
+                else if (istrstr(line, "fglrx") != NULL) {
+                    fglrx_set += 1;
+                }
             }
 
         }
@@ -721,11 +720,27 @@ static int check_pxpress_xorg_conf(struct device **devices,
 
     fclose(file);
 
-    fprintf(log_handle, "intel_matches: %d, x_options_matches: %d, failure: %d\n",
-            intel_matches, x_options_matches, failure);
+    fprintf(log_handle,
+            "intel_matches: %d, amd_matches: %d, "
+            "intel_set: %d, fglrx_set: %d "
+            "x_options_matches: %d, failure: %d\n",
+            intel_matches, amd_matches,
+            intel_set, fglrx_set,
+            x_options_matches, failure);
 
-    return (intel_matches == 1 &&
-            x_options_matches > 0 && !failure);
+    if (cards_n == 1) {
+        /* The module was probably unloaded when
+         * the card was powered down
+         */
+        return (intel_matches == 1 &&
+                intel_set == 1 && fglrx_set == 1 &&
+                x_options_matches > 0 && !failure);
+    }
+    else {
+        return (intel_matches == 1 && amd_matches == 1 &&
+                intel_set == 1 && fglrx_set == 1 &&
+                x_options_matches > 0 && !failure);
+    }
 }
 
 
@@ -1038,6 +1053,97 @@ static int read_data_from_file(struct device **devices,
 
     fclose(pfile);
     return 1;
+}
+
+
+/* Parse a string to extract the PCI BusID */
+static int add_amd_gpu_from_string(char *line, struct device **devices, int *num) {
+    int status;
+    int is_next = 0;
+    char *tok;
+
+    if (!line) {
+        fprintf(log_handle, "Error: passed invalid string.\n");
+        return 0;
+    }
+
+    devices[*num] = malloc(sizeof(struct device));
+
+    if (!devices[*num])
+        return 0;
+
+    /* Look for the bus */
+    tok = strtok(line, " ");
+    while (tok != NULL)
+    {
+        tok = strtok (NULL, " ");
+        if (is_next) {
+            fprintf(log_handle, "Found fglrx pci id in dmesg: %s.\n",
+                    tok);
+            break;
+        }
+        is_next = (strcmp(tok, "fglrx_pci") == 0);
+    }
+
+    /* Extract the data from the string */
+    status = sscanf(tok, "%04x:%02x:%02x.%d\n",
+                    &devices[*num]->domain,
+                    &devices[*num]->bus,
+                    &devices[*num]->dev,
+                    &devices[*num]->func);
+
+    if (status == EOF) {
+        free(devices[*num]);
+        return 0;
+    }
+
+    /* Add fake device and vendor ids */
+    devices[*num]->vendor_id = AMD;
+    devices[*num]->device_id = 0x68d8;
+
+    /* Increment number of cards */
+    *num += 1;
+
+    return status;
+}
+
+
+/* Get the PCI BusID from dmesg */
+static int add_amd_gpu_bus_from_dmesg(struct device **devices,
+                                  int *cards_number) {
+    int status = 0;
+    char command[100];
+    char *pci = NULL;
+
+    if (dry_run && fake_dmesg_path) {
+        struct stat stbuf;
+
+        /* If file doesn't exist */
+        if (stat(fake_dmesg_path, &stbuf) == -1) {
+            fprintf(log_handle, "can't access %s\n", amd_pcsdb_file);
+            return 0;
+        }
+        /* If file is empty */
+        if ((stbuf.st_mode & S_IFMT) && ! stbuf.st_size) {
+            fprintf(log_handle, "%s is empty\n", fake_dmesg_path);
+            return 0;
+        }
+
+        sprintf(command, "grep fglrx_pci %s",
+                fake_dmesg_path);
+    }
+    else {
+        sprintf(command, "dmesg | grep fglrx_pci");
+    }
+
+    /* Get the output */
+    pci = get_output(command);
+    /* Extract ID from the string */
+    status = add_amd_gpu_from_string(pci, devices, cards_number);
+    free(pci);
+    fprintf(log_handle, "pci bus from dmesg status %d\n", status);
+
+    return status;
 }
 
 
@@ -1602,6 +1708,8 @@ int main(int argc, char *argv[]) {
             /* AMD PowerXpress */
             if (laptop && fglrx_unloaded) {
                 fprintf(log_handle, "PowerXpress detected\n");
+
+                add_amd_gpu_bus_from_dmesg(current_devices, &cards_n);
 
                 /* FIXME: check only xorg.conf for now */
                 if (!check_pxpress_xorg_conf(current_devices, cards_n)) {
