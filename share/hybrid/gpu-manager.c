@@ -1149,6 +1149,11 @@ static int prime_enable_discrete() {
 static int prime_disable_discrete() {
     int status = 0;
 
+    /* Tell nvidia-persistenced the nvidia card is about
+     * to be switched off
+     */
+    system("/sbin/initctl emit nvidia-off");
+
     /* Unload the module */
     status = unload_module("nvidia");
 
