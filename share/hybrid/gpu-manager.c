@@ -396,7 +396,7 @@ static char* get_alternative_link(char *arch_path, char *pattern) {
         if (pfile == NULL) {
             fprintf(stderr, "I couldn't open %s for reading.\n",
                     fake_alternatives_path);
-            return 0;
+            return NULL;
         }
         while (fgets(command, sizeof(command), pfile)) {
             if (strstr(command, pattern) != NULL) {
@@ -617,18 +617,38 @@ static int set_alternative(char *arch_path, char *alternative) {
     return 1;
 }
 
-static int select_driver(char *arch_path, char *driver) {
+static int select_driver(char *driver) {
     int status = 0;
     char *alternative = NULL;
-    alternative = get_alternative_link(arch_path, driver);
+    alternative = get_alternative_link(main_arch_path, driver);
 
     if (alternative == NULL) {
         fprintf(log_handle, "Error: no alternative found for %s\n", driver);
     }
     else {
         /* Set the alternative */
-        status = set_alternative(arch_path, alternative);
-        free(alternative);
+        status = set_alternative(main_arch_path, alternative);
+
+        /* Only for amd64 */
+        if (status && strcmp(main_arch_path, "x86_64-linux-gnu") == 0) {
+            /* Free the alternative */
+            free(alternative);
+            alternative = NULL;
+
+            /* Try to get the alternative for the other architecture */
+            alternative = get_alternative_link(other_arch_path, driver);
+            if (alternative) {
+                /* No need to check its status */
+                set_alternative(other_arch_path, alternative);
+
+                /* Free the alternative */
+                free(alternative);
+            }
+        }
+        else {
+            /* Free the alternative */
+            free(alternative);
+        }
     }
     return status;
 }
@@ -1702,8 +1722,7 @@ static int remove_xorg_conf(void) {
 static int enable_mesa() {
     int status = 0;
     fprintf(log_handle, "Selecting mesa\n");
-    status = select_driver(main_arch_path, "mesa");
-    /* select_driver(other_arch_path, "mesa"); */
+    status = select_driver("mesa");
 
     /* Remove xorg.conf */
     remove_xorg_conf();
@@ -1722,7 +1741,7 @@ static int enable_nvidia(struct alternatives *alternative,
     if (!alternative->nvidia_enabled) {
         /* Select nvidia */
         fprintf(log_handle, "Selecting nvidia\n");
-        status = select_driver(main_arch_path, "nvidia");
+        status = select_driver("nvidia");
         /* select_driver(other_arch_path, "nvidia"); */
     }
     /* Alternative in use */
@@ -1832,7 +1851,7 @@ static int enable_prime(const char *prime_settings,
         if (!alternative->prime_enabled) {
             /* Select prime */
             fprintf(log_handle, "Selecting prime\n");
-            select_driver(main_arch_path, "prime");
+            select_driver("prime");
         }
 
         /* Remove xorg.conf */
@@ -1867,7 +1886,7 @@ static int enable_fglrx(struct alternatives *alternative,
     if (!alternative->fglrx_enabled) {
         /* Select fglrx */
         fprintf(log_handle, "Selecting fglrx\n");
-        status = select_driver(main_arch_path, "fglrx");
+        status = select_driver("fglrx");
         /* select_driver(other_arch_path, "nvidia"); */
     }
     /* Alternative in use */
@@ -1932,7 +1951,7 @@ static int enable_pxpress(struct device **devices,
     if (is_pxpress_dgpu_disabled()) {
         if (!alternative->pxpress_enabled) {
             fprintf(log_handle, "Selecting pxpress\n");
-            status = select_driver(main_arch_path, "pxpress");
+            status = select_driver("pxpress");
         }
         else {
             fprintf(log_handle, "Driver is already loaded and enabled\n");
@@ -1942,7 +1961,7 @@ static int enable_pxpress(struct device **devices,
     else {
         if (!alternative->fglrx_enabled) {
             fprintf(log_handle, "Selecting fglrx\n");
-            status = select_driver(main_arch_path, "fglrx");
+            status = select_driver("fglrx");
         }
         else {
             fprintf(log_handle, "Driver is already loaded and enabled\n");
@@ -1971,7 +1990,7 @@ static int enable_pxpress(struct device **devices,
          * driver. Let's select Mesa here */
         fprintf(log_handle, "Error: failed to enable the driver\n");
         fprintf(log_handle, "Selecting mesa\n");
-        select_driver(main_arch_path, "mesa");
+        select_driver("mesa");
         /* select_driver(other_arch_path, "mesa"); */
         /* Remove xorg.conf */
         remove_xorg_conf();
