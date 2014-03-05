@@ -129,7 +129,7 @@ class GpuManagerTest(unittest.TestCase):
         klass.regenerated_xorg_pt = re.compile('Regenerating xorg.conf. Path: .+')
         klass.not_modified_xorg_pt = re.compile('No need to modify xorg.conf. Path .+')
         klass.no_action_pt = re.compile('Nothing to do')
-        klass.has_skipped_hybrid_pt = re.compile('Intel hybrid laptop - nothing to do')
+        klass.has_skipped_hybrid_pt = re.compile('Lightdm is not the default display manager. Nothing to do')
         klass.loaded_and_enabled_pt = re.compile('Driver is already loaded and enabled')
         klass.proprietary_installer_pt = re.compile('Proprietary driver installer detected.*')
 
@@ -220,7 +220,7 @@ class GpuManagerTest(unittest.TestCase):
                 except:
                     pass
 
-    def exec_manager(self, fake_alternative, is_laptop=False):
+    def exec_manager(self, fake_alternative, is_laptop=False, uses_lightdm=True):
         fake_laptop_arg = is_laptop and '--fake-laptop' or '--fake-desktop'
         if with_valgrind:
             valgrind = ['valgrind', '--tool=memcheck', '--leak-check=full',
@@ -256,6 +256,9 @@ class GpuManagerTest(unittest.TestCase):
                    fake_laptop_arg,
                    '--log',
                    self.log.name]
+
+        if uses_lightdm:
+            command.append('--fake-lightdm')
 
         if valgrind:
             # Prepend the valgrind arguments

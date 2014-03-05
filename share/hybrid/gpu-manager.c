@@ -90,11 +90,15 @@ static char *last_boot_file = NULL;
 static char *xorg_conf_file = NULL;
 static char *amd_pcsdb_file = NULL;
 static int dry_run = 0;
+static int fake_lightdm = 0;
 static char *fake_modules_path = NULL;
 static char *fake_alternatives_path = NULL;
 static char *fake_dmesg_path = NULL;
 static char *prime_settings = NULL;
 static char *bbswitch_path = NULL;
+static char *main_arch_path = NULL;
+static char *other_arch_path = NULL;
+
 
 static struct pci_slot_match match = {
     PCI_MATCH_ANY, PCI_MATCH_ANY, PCI_MATCH_ANY, PCI_MATCH_ANY, 0
@@ -346,6 +350,41 @@ static int has_unloaded_module(char *module) {
 }
 
 
+static find_string_in_file(const char *path, const char *pattern) {
+    FILE *pfile = NULL;
+    char  *line = NULL;
+    size_t len = 0;
+    size_t read;
+
+    int found = 0;
+
+    pfile = fopen(path, "r");
+    if (pfile == NULL)
+         return found;
+    while ((read = getline(&line, &len, pfile)) != -1) {
+        if (istrstr(line, pattern) != NULL) {
+            found = 1;
+            break;
+        }
+    }
+    fclose(pfile);
+    if (line)
+        free(line);
+
+    return found;
+}
+
+
+/* Check if lightdm is the default login manager */
+static int is_lightdm_default() {
+    if (dry_run)
+        return fake_lightdm;
+
+    return (find_string_in_file("/etc/X11/default-display-manager",
+            "lightdm"));
+}
+
+
 static void detect_available_alternatives(struct alternatives *info, char *pattern) {
     if (strstr(pattern, "mesa")) {
         info->mesa_available = 1;
@@ -516,28 +555,9 @@ static int is_file_empty(const char *file) {
 
 static int has_cmdline_option(const char *option)
 {
-    FILE *pfile = NULL;
-    char  *line = NULL;
-    size_t len = 0;
-    size_t read;
-
-    int found = 0;
-
-    pfile = fopen("/proc/cmdline", "r");
-    if (pfile == NULL)
-         return found;
-    while ((read = getline(&line, &len, pfile)) != -1) {
-        if (istrstr(line, option) != NULL) {
-            found = 1;
-            break;
-        }
-    }
-    fclose(pfile);
-    if (line)
-        free(line);
-
-    return found;
+    return (find_string_in_file("/proc/cmdline", option));
 }
+
 
 static int is_disabled_in_cmdline() {
     return has_cmdline_option(KERN_PARAM);
@@ -550,6 +570,9 @@ static int write_to_xorg_conf(struct device **devices, int cards_n,
                               unsigned int vendor_id) {
     int i;
     FILE *pfile = NULL;
+
+    fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
+
     pfile = fopen(xorg_conf_file, "w");
     if (pfile == NULL) {
         fprintf(log_handle, "I couldn't open %s for writing.\n",
@@ -582,6 +605,9 @@ static int write_to_xorg_conf(struct device **devices, int cards_n,
 static int write_pxpress_xorg_conf(struct device **devices, int cards_n) {
     int i;
     FILE *pfile = NULL;
+
+    fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
+
     pfile = fopen(xorg_conf_file, "w");
     if (pfile == NULL) {
         fprintf(log_handle, "I couldn't open %s for writing.\n",
@@ -1009,6 +1035,9 @@ static int check_all_bus_ids_xorg_conf(struct device **devices, int cards_n) {
 static int write_prime_xorg_conf(struct device **devices, int cards_n) {
     int i;
     FILE *pfile = NULL;
+
+    fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
+
     pfile = fopen(xorg_conf_file, "w");
     if (pfile == NULL) {
         fprintf(log_handle, "I couldn't open %s for writing.\n",
@@ -1544,12 +1573,15 @@ static int is_laptop (void) {
 }
 
 
-static int move_xorg_conf(void) {
+/* Make a backup and remove xorg.conf */
+static int remove_xorg_conf(void) {
     int status;
     char backup[200];
     char buffer[80];
     time_t rawtime;
     struct tm *info;
+
+    fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
 
     time(&rawtime);
     info = localtime(&rawtime);
@@ -1557,18 +1589,304 @@ static int move_xorg_conf(void) {
     strftime(buffer, 80, "%m%d%Y", info);
     sprintf(backup, "%s.%s", xorg_conf_file, buffer);
 
-    fprintf(log_handle, "Moving %s to %s\n", xorg_conf_file, backup);
-
     status = rename(xorg_conf_file, backup);
-    if (!status)
+    if (!status) {
         status = unlink(xorg_conf_file);
         if (!status)
             return 0;
         else
             return 1;
+    }
+    else {
+        fprintf(log_handle, "Moved %s to %s\n", xorg_conf_file, backup);
+    }
+    return 1;
+}
+
+
+static int enable_mesa() {
+    int status = 0;
+    fprintf(log_handle, "Selecting mesa\n");
+    status = select_driver(main_arch_path, "mesa");
+    /* select_driver(other_arch_path, "mesa"); */
+
+    /* Remove xorg.conf */
+    remove_xorg_conf();
+
+    return status;
+}
+
+
+static int enable_nvidia(struct alternatives *alternative,
+                         unsigned int vendor_id,
+                         struct device **devices,
+                         int cards_n) {
+    int status = 0;
+
+    /* Alternative not in use */
+    if (!alternative->nvidia_enabled) {
+        /* Select nvidia */
+        fprintf(log_handle, "Selecting nvidia\n");
+        status = select_driver(main_arch_path, "nvidia");
+        /* select_driver(other_arch_path, "nvidia"); */
+    }
+    /* Alternative in use */
+    else {
+        fprintf(log_handle, "Driver is already loaded and enabled\n");
+        status = 1;
+    }
+    /* See if enabling the driver failed */
+    if (status) {
+        /* If xorg.conf exists, make sure it contains
+         * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
+         * xorg.conf from scratch */
+        if (!check_vendor_bus_id_xorg_conf(devices, cards_n,
+                                           vendor_id, "nvidia")) {
+            fprintf(log_handle, "Check failed\n");
+
+            /* Remove xorg.conf */
+            remove_xorg_conf();
+
+            /* Only useful if more than one card is available */
+            if (cards_n > 1) {
+                /* Write xorg.conf */
+                write_to_xorg_conf(devices, cards_n, vendor_id);
+            }
+        }
+        else {
+            fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
+        }
+    }
+    else {
+        /* For some reason we failed to select the
+         * driver. Let's select Mesa here */
+        fprintf(log_handle, "Error: failed to enable the driver\n");
+        enable_mesa();
+    }
+
+    return status;
+}
+
+
+static int enable_prime(const char *prime_settings,
+                        int bbswitch_loaded,
+                        unsigned int vendor_id,
+                        struct alternatives *alternative,
+                        struct device **devices,
+                        int cards_n) {
+    int status = 0;
+    int prime_discrete_on = 0;
+    int prime_action_on = 0;
+
+    /* We only support Lightdm at this time */
+    if (!is_lightdm_default()) {
+        fprintf(log_handle, "Lightdm is not the default display "
+                            "manager. Nothing to do\n");
+        return 0;
+    }
+
+    /* Check if prime_settings is available
+     * File doesn't exist or empty
+     */
+    if (!exists_not_empty(prime_settings)) {
+        fprintf(log_handle, "Error: no settings for prime can be found in %s\n",
+                prime_settings);
+        return 0;
+    }
+
+    if (!bbswitch_loaded) {
+        /* Try to load bbswitch */
+        /* opts="`/sbin/get-quirk-options`"
+        /sbin/modprobe bbswitch load_state=-1 unload_state=1 "$opts" || true */
+        status = load_bbswitch();
+        if (!status) {
+            fprintf(log_handle, "Error: can't load bbswitch\n");
+            /* Select mesa as a fallback */
+            enable_mesa();
+
+            /* Remove xorg.conf */
+            remove_xorg_conf();
+            return 0;
+        }
+    }
+
+    /* Get the current status from bbswitch */
+    prime_discrete_on = prime_is_discrete_nvidia_on();
+    /* Get the current settings for discrete */
+    prime_action_on = prime_is_action_on();
+
+    if (prime_action_on) {
+        if (!alternative->nvidia_enabled) {
+            /* Select nvidia */
+            enable_nvidia(alternative, vendor_id, devices, cards_n);
+        }
+
+        if (!check_prime_xorg_conf(devices, cards_n)) {
+            fprintf(log_handle, "Check failed\n");
+
+            /* Remove xorg.conf */
+            remove_xorg_conf();
+            /* Write xorg.conf */
+            write_prime_xorg_conf(devices, cards_n);
+        }
+        else {
+            fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
+        }
+    }
+    else {
+        if (!alternative->prime_enabled) {
+            /* Select prime */
+            fprintf(log_handle, "Selecting prime\n");
+            select_driver(main_arch_path, "prime");
+        }
+
+        /* Remove xorg.conf */
+        remove_xorg_conf();
+    }
+
+    /* This means we need to call bbswitch
+     * to take action
+     */
+    if (prime_action_on == prime_discrete_on) {
+        if (prime_discrete_on) {
+            fprintf(log_handle, "Powering on the discrete card\n");
+            prime_enable_discrete();
+        }
+        else {
+            fprintf(log_handle, "Powering off the discrete card\n");
+            prime_disable_discrete();
+        }
+    }
 
     return 1;
 }
+
+
+static int enable_fglrx(struct alternatives *alternative,
+                        unsigned int vendor_id,
+                        struct device **devices,
+                        int cards_n) {
+    int status = 0;
+
+    /* Alternative not in use */
+    if (!alternative->fglrx_enabled) {
+        /* Select fglrx */
+        fprintf(log_handle, "Selecting fglrx\n");
+        status = select_driver(main_arch_path, "fglrx");
+        /* select_driver(other_arch_path, "nvidia"); */
+    }
+    /* Alternative in use */
+    else {
+        fprintf(log_handle, "Driver is already loaded and enabled\n");
+        status = 1;
+    }
+
+    if (status) {
+        /* If xorg.conf exists, make sure it contains
+         * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
+         * xorg.conf from scratch */
+        if (!check_vendor_bus_id_xorg_conf(devices, cards_n,
+                                           vendor_id, "fglrx")) {
+            fprintf(log_handle, "Check failed\n");
+
+            /* Remove xorg.conf */
+            remove_xorg_conf();
+
+            /* Only useful if more than one card is available */
+            if (cards_n > 1) {
+                /* Write xorg.conf */
+                write_to_xorg_conf(devices, cards_n, vendor_id);
+            }
+        }
+        else {
+            fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
+        }
+    }
+    else {
+        /* For some reason we failed to select the
+         * driver. Let's select Mesa here */
+        fprintf(log_handle, "Error: failed to enable the driver\n");
+        enable_mesa();
+    }
+
+    return status;
+}
+
+
+static int enable_pxpress(struct device **devices,
+                          int cards_n) {
+    int status = 0;
+
+    /* FIXME: check only xorg.conf for now */
+    if (!check_pxpress_xorg_conf(devices, cards_n)) {
+        fprintf(log_handle, "Check failed\n");
+
+        /* Remove xorg.conf */
+        remove_xorg_conf();
+        /* Write xorg.conf */
+        status = write_pxpress_xorg_conf(devices, cards_n);
+    }
+    else {
+        fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
+        status = 1;
+    }
+
+    /* Reenable this when we know more about amdpcsdb */
+#if 0
+    /* See if the discrete GPU is disabled */
+    if (is_pxpress_dgpu_disabled()) {
+        if (!alternative->pxpress_enabled) {
+            fprintf(log_handle, "Selecting pxpress\n");
+            status = select_driver(main_arch_path, "pxpress");
+        }
+        else {
+            fprintf(log_handle, "Driver is already loaded and enabled\n");
+            status = 1;
+        }
+    }
+    else {
+        if (!alternative->fglrx_enabled) {
+            fprintf(log_handle, "Selecting fglrx\n");
+            status = select_driver(main_arch_path, "fglrx");
+        }
+        else {
+            fprintf(log_handle, "Driver is already loaded and enabled\n");
+            status = 1;
+        }
+    }
+
+    if (status) {
+        /* If xorg.conf exists, make sure it contains
+         * the right BusId and the correct drivers. If it doesn't, create a
+         * xorg.conf from scratch */
+        if (!check_pxpress_xorg_conf(current_devices, cards_n)) {
+            fprintf(log_handle, "Check failed\n");
+
+            /* Remove xorg.conf */
+            remove_xorg_conf();
+            /* Write xorg.conf */
+            write_pxpress_xorg_conf(current_devices, cards_n);
+        }
+        else {
+            fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
+        }
+    }
+    else {
+        /* For some reason we failed to select the
+         * driver. Let's select Mesa here */
+        fprintf(log_handle, "Error: failed to enable the driver\n");
+        fprintf(log_handle, "Selecting mesa\n");
+        select_driver(main_arch_path, "mesa");
+        /* select_driver(other_arch_path, "mesa"); */
+        /* Remove xorg.conf */
+        remove_xorg_conf();
+    }
+#endif
+
+    return status;
+}
+
+
 
 
 int main(int argc, char *argv[]) {
@@ -1577,7 +1895,7 @@ int main(int argc, char *argv[]) {
     char *fake_lspci_file = NULL;
     char *new_boot_file = NULL;
 
-    static int fake_laptop;
+    static int fake_laptop = 0;
 
     int has_intel = 0, has_amd = 0, has_nvidia = 0;
     int has_changed = 0;
@@ -1611,13 +1929,7 @@ int main(int argc, char *argv[]) {
     struct device *old_devices[MAX_CARDS_N];
 
     /* Alternatives */
-    char *main_arch_path = NULL;
-    char *other_arch_path = NULL;
     struct alternatives *alternative = NULL;
-
-    /* Prime */
-    int prime_discrete_on = 0;
-    int prime_action = 0;
 
 
     while (1) {
@@ -1627,12 +1939,9 @@ int main(int argc, char *argv[]) {
         {"dry-run", no_argument,     &dry_run, 1},
         {"fake-laptop", no_argument, &fake_laptop, 1},
         {"fake-desktop", no_argument, &fake_laptop, 0},
+        {"fake-lightdm", no_argument, &fake_lightdm, 1},
         /* These options don't set a flag.
           We distinguish them by their indices. */
-        /*
-        {"",  no_argument,       0, 'a'},
-        {"log",  no_argument,       0, 'l'},
-        */
         {"log",  required_argument, 0, 'l'},
         {"fake-lspci",  required_argument, 0, 'f'},
         {"last-boot-file", required_argument, 0, 'b'},
@@ -1994,8 +2303,6 @@ int main(int argc, char *argv[]) {
     fprintf(log_handle, "Has the system changed? %s\n", has_changed ? "Yes" : "No");
 
 
-    /* TODO: disable if Bumblebee is in use */
-
     /* Check alternatives */
     get_architecture_paths(&main_arch_path, &other_arch_path);
 
@@ -2058,22 +2365,15 @@ int main(int argc, char *argv[]) {
             if (laptop && fglrx_unloaded) {
                 fprintf(log_handle, "PowerXpress detected\n");
 
+                /* Get the BusID of the disabled discrete from dmesg */
                 add_amd_gpu_bus_from_dmesg(current_devices, &cards_n);
 
-                /* FIXME: check only xorg.conf for now */
-                if (!check_pxpress_xorg_conf(current_devices, cards_n)) {
-                    fprintf(log_handle, "Check failed\n");
+                /* Get data about the first discrete card */
+                get_first_discrete(current_devices, cards_n,
+                                   &discrete_vendor_id,
+                                   &discrete_device_id);
 
-                    /* Remove xorg.conf */
-                    fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                    move_xorg_conf();
-                    /* Write xorg.conf */
-                    fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
-                    write_pxpress_xorg_conf(current_devices, cards_n);
-                }
-                else {
-                    fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
-                }
+                enable_pxpress(current_devices, cards_n);
                 /* No further action */
                 goto end;
             }
@@ -2081,98 +2381,24 @@ int main(int argc, char *argv[]) {
                 /* NVIDIA PRIME */
                 fprintf(log_handle, "PRIME detected\n");
 
-                /* If we're here, it means that nvidia has been unloaded.
-                 * Let's look up the bus id in dmesg.
-                 */
+                /* Get the BusID of the disabled discrete from dmesg */
                 add_nvidia_gpu_bus_from_dmesg(current_devices, &cards_n);
 
-                /* Check if prime_settings is available
-                 * File doesn't exist or empty
-                 */
-                if (!exists_not_empty(prime_settings)) {
-                    fprintf(log_handle, "Error: no settings for prime can be found in %s\n",
-                            prime_settings);
-                    goto end;
-                }
+                /* Get data about the first discrete card */
+                get_first_discrete(current_devices, cards_n,
+                                   &discrete_vendor_id,
+                                   &discrete_device_id);
 
-                if (!bbswitch_loaded) {
-                    /* Try to load bbswitch */
-                    /* opts="`/sbin/get-quirk-options`"
-                    /sbin/modprobe bbswitch load_state=-1 unload_state=1 "$opts" || true */
-                    status = load_bbswitch();
-                    if (!status) {
-                        fprintf(log_handle, "Error: can't load bbswitch\n");
-                        /* Select mesa as a fallback */
-                        fprintf(log_handle, "Selecting mesa\n");
-                        status = select_driver(main_arch_path, "mesa");
-                        /* Remove xorg.conf */
-                        fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                        move_xorg_conf();
-                        goto end;
-                    }
-                }
-
-                /* Get the current status from bbswitch */
-                prime_discrete_on = prime_is_discrete_nvidia_on();
-                /* Get the current settings for discrete */
-                prime_action = prime_is_action_on();
-
-                if (prime_action) {
-                    if (!alternative->nvidia_enabled) {
-                        /* Select nvidia */
-                        fprintf(log_handle, "Selecting nvidia\n");
-                        status = select_driver(main_arch_path, "nvidia");
-                    }
-
-                    if (!check_prime_xorg_conf(current_devices, cards_n)) {
-                        fprintf(log_handle, "Check failed\n");
-
-                        /* Remove xorg.conf */
-                        fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                        move_xorg_conf();
-                        /* Write xorg.conf */
-                        fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
-                        write_prime_xorg_conf(current_devices, cards_n);
-                    }
-                    else {
-                        fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
-                    }
-                }
-                else {
-                    if (!alternative->prime_enabled) {
-                        /* Select prime */
-                        fprintf(log_handle, "Selecting prime\n");
-                        status = select_driver(main_arch_path, "prime");
-                    }
-
-                    /* Remove xorg.conf */
-                    fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                    move_xorg_conf();
-                }
-
-                /* This means we need to call bbswitch */
-                if (prime_action == prime_discrete_on) {
-                    if (prime_discrete_on) {
-                        fprintf(log_handle, "Powering on the discrete card\n");
-                        prime_enable_discrete();
-                    }
-                    else {
-                        fprintf(log_handle, "Powering off the discrete card\n");
-                        prime_disable_discrete();
-                    }
-                }
+                /* Try to enable prime */
+                enable_prime(prime_settings, bbswitch_loaded,
+                             discrete_vendor_id, alternative,
+                             current_devices, cards_n);
                 goto end;
             }
             else {
                 if (!alternative->mesa_enabled) {
                     /* Select mesa */
-                    fprintf(log_handle, "Selecting mesa\n");
-                    status = select_driver(main_arch_path, "mesa");
-                    /* select_driver(other_arch_path, "mesa"); */
-
-                    /* Remove xorg.conf */
-                    fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                    move_xorg_conf();
+                    status = enable_mesa();
                     has_moved_xorg_conf = 1;
                 }
                 else {
@@ -2184,14 +2410,8 @@ int main(int argc, char *argv[]) {
             /* if fglrx is loaded enable fglrx alternative */
             if (fglrx_loaded && !radeon_loaded) {
                 if (!alternative->fglrx_enabled) {
-                    /* Select fglrx */
-                    fprintf(log_handle, "Selecting fglrx\n");
-                    status = select_driver(main_arch_path, "fglrx");
-                    /* select_driver(other_arch_path, "fglrx"); */
-
-                    /* Remove xorg.conf */
-                    fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                    move_xorg_conf();
+                    /* Try to enable fglrx */
+                    enable_fglrx(alternative, discrete_vendor_id, current_devices, cards_n);
                     has_moved_xorg_conf = 1;
                 }
                 else {
@@ -2213,13 +2433,7 @@ int main(int argc, char *argv[]) {
                 /* Select mesa as a fallback */
                 fprintf(log_handle, "Kernel Module is not loaded\n");
                 if (!alternative->mesa_enabled) {
-                    fprintf(log_handle, "Selecting mesa\n");
-                    status = select_driver(main_arch_path, "mesa");
-                    /* select_driver(other_arch_path, "mesa"); */
-
-                    /* Remove xorg.conf */
-                    fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                    move_xorg_conf();
+                    status = enable_mesa();
                     has_moved_xorg_conf = 1;
                 }
                 else {
@@ -2231,14 +2445,8 @@ int main(int argc, char *argv[]) {
             /* if nvidia is loaded enable nvidia alternative */
             if (nvidia_loaded && !nouveau_loaded) {
                 if (!alternative->nvidia_enabled) {
-                    /* Select nvidia */
-                    fprintf(log_handle, "Selecting nvidia\n");
-                    status = select_driver(main_arch_path, "nvidia");
-                    /* select_driver(other_arch_path, "nvidia"); */
-
-                    /* Remove xorg.conf */
-                    fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                    move_xorg_conf();
+                    /* Try to enable nvidia */
+                    enable_nvidia(alternative, discrete_vendor_id, current_devices, cards_n);
                     has_moved_xorg_conf = 1;
                 }
                 else {
@@ -2260,13 +2468,7 @@ int main(int argc, char *argv[]) {
                 /* Select mesa as a fallback */
                 fprintf(log_handle, "Kernel Module is not loaded\n");
                 if (!alternative->mesa_enabled) {
-                    fprintf(log_handle, "Selecting mesa\n");
-                    status = select_driver(main_arch_path, "mesa");
-                    /* select_driver(other_arch_path, "mesa"); */
-
-                    /* Remove xorg.conf */
-                    fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                    move_xorg_conf();
+                    status = enable_mesa();
                     has_moved_xorg_conf = 1;
                 }
                 else {
@@ -2282,8 +2484,7 @@ int main(int argc, char *argv[]) {
 
             if (!has_moved_xorg_conf) {
                 /* Remove xorg.conf */
-                fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                move_xorg_conf();
+                remove_xorg_conf();
             }
         }
         else if (!has_moved_xorg_conf) {
@@ -2308,170 +2509,18 @@ int main(int argc, char *argv[]) {
             if (laptop && intel_loaded && fglrx_loaded && !radeon_loaded) {
                 fprintf(log_handle, "PowerXpress detected\n");
 
-                /* FIXME: check only xorg.conf for now */
-                if (!check_pxpress_xorg_conf(current_devices, cards_n)) {
-                    fprintf(log_handle, "Check failed\n");
-
-                    /* Remove xorg.conf */
-                    fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                    move_xorg_conf();
-                    /* Write xorg.conf */
-                    fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
-                    write_pxpress_xorg_conf(current_devices, cards_n);
-                }
-                else {
-                    fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
-                }
-
-                /* Reenable this when we know more about amdpcsdb */
-#if 0
-                /* See if the discrete GPU is disabled */
-                if (is_pxpress_dgpu_disabled()) {
-                    if (!alternative->pxpress_enabled) {
-                        fprintf(log_handle, "Selecting pxpress\n");
-                        status = select_driver(main_arch_path, "pxpress");
-                    }
-                    else {
-                        fprintf(log_handle, "Driver is already loaded and enabled\n");
-                        status = 1;
-                    }
-                }
-                else {
-                    if (!alternative->fglrx_enabled) {
-                        fprintf(log_handle, "Selecting fglrx\n");
-                        status = select_driver(main_arch_path, "fglrx");
-                    }
-                    else {
-                        fprintf(log_handle, "Driver is already loaded and enabled\n");
-                        status = 1;
-                    }
-                }
-
-                if (status) {
-                    /* If xorg.conf exists, make sure it contains
-                     * the right BusId and the correct drivers. If it doesn't, create a
-                     * xorg.conf from scratch */
-                    if (!check_pxpress_xorg_conf(current_devices, cards_n)) {
-                        fprintf(log_handle, "Check failed\n");
-
-                        /* Remove xorg.conf */
-                        fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                        move_xorg_conf();
-                        /* Write xorg.conf */
-                        fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
-                        write_pxpress_xorg_conf(current_devices, cards_n);
-                    }
-                    else {
-                        fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
-                    }
-                }
-                else {
-                    /* For some reason we failed to select the
-                     * driver. Let's select Mesa here */
-                    fprintf(log_handle, "Error: failed to enable the driver\n");
-                    fprintf(log_handle, "Selecting mesa\n");
-                    select_driver(main_arch_path, "mesa");
-                    /* select_driver(other_arch_path, "mesa"); */
-                    /* Remove xorg.conf */
-                    fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                    move_xorg_conf();
-                }
-#endif
+                enable_pxpress(current_devices, cards_n);
             }
             /* NVIDIA Optimus */
             else if (laptop && (intel_loaded && !nouveau_loaded &&
                                 (alternative->nvidia_available ||
                                  alternative->prime_available) &&
                                  nvidia_loaded)) {
-                /* FIXME: nvidia won't be loaded on log out when in power saving
-                 *        mode
-                 *        SOLUTION: look for clues in DMESG
-                 *
-                 */
+                fprintf(log_handle, "Intel hybrid laptop\n");
 
-
-                /* Hybrid graphics
-                 * No need to do anything, as either nvidia-prime or
-                 * fglrx-pxpress will take over.
-                 */
-                fprintf(log_handle, "Intel hybrid laptop - nothing to do\n");
-
-
-                /* Check if prime_settings are available
-                 * File doesn't exist or empty
-                 */
-                if (!exists_not_empty(prime_settings)) {
-                    fprintf(log_handle, "Error: no settings for prime can be found in %s\n",
-                            prime_settings);
-                    goto end;
-                }
-
-                if (!bbswitch_loaded) {
-                    /* Try to load bbswitch */
-                    /* opts="`/sbin/get-quirk-options`"
-                    /sbin/modprobe bbswitch load_state=-1 unload_state=1 "$opts" || true */
-                    status = load_bbswitch();
-                    if (!status) {
-                        fprintf(log_handle, "Error: can't load bbswitch\n");
-                        /* Select mesa as a fallback */
-                        fprintf(log_handle, "Selecting mesa\n");
-                        status = select_driver(main_arch_path, "mesa");
-                        /* Remove xorg.conf */
-                        fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                        move_xorg_conf();
-                        goto end;
-                    }
-                }
-
-                /* Get the current status from bbswitch */
-                prime_discrete_on = prime_is_discrete_nvidia_on();
-                /* Get the current settings for discrete */
-                prime_action = prime_is_action_on();
-
-                if (prime_action) {
-                    if (!alternative->nvidia_enabled) {
-                        /* Select nvidia */
-                        fprintf(log_handle, "Selecting nvidia\n");
-                        status = select_driver(main_arch_path, "nvidia");
-                    }
-
-                    if (!check_prime_xorg_conf(current_devices, cards_n)) {
-                        fprintf(log_handle, "Check failed\n");
-
-                        /* Remove xorg.conf */
-                        fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                        move_xorg_conf();
-                        /* Write xorg.conf */
-                        fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
-                        write_prime_xorg_conf(current_devices, cards_n);
-                    }
-                    else {
-                        fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
-                    }
-                }
-                else {
-                    if (!alternative->prime_enabled) {
-                        /* Select prime */
-                        fprintf(log_handle, "Selecting prime\n");
-                        status = select_driver(main_arch_path, "prime");
-                    }
-
-                    /* Remove xorg.conf */
-                    fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                    move_xorg_conf();
-                }
-
-                /* This means we need to call bbswitch */
-                if (prime_action == prime_discrete_on) {
-                    if (prime_discrete_on) {
-                        fprintf(log_handle, "Powering on the discrete card\n");
-                        prime_enable_discrete();
-                    }
-                    else {
-                        fprintf(log_handle, "Powering off the discrete card\n");
-                        prime_disable_discrete();
-                    }
-                }
+                enable_prime(prime_settings, bbswitch_loaded,
+                             discrete_vendor_id, alternative,
+                             current_devices, cards_n);
                 goto end;
             }
             else {
@@ -2491,49 +2540,8 @@ int main(int argc, char *argv[]) {
 
                     /* Kernel module is available */
                     if (nvidia_loaded && !nouveau_loaded) {
-                        /* Alternative not in use */
-                        if (!alternative->nvidia_enabled) {
-                            /* Select nvidia */
-                            fprintf(log_handle, "Selecting nvidia\n");
-                            status = select_driver(main_arch_path, "nvidia");
-                            /* select_driver(other_arch_path, "nvidia"); */
-                        }
-                        /* Alternative in use */
-                        else {
-                            fprintf(log_handle, "Driver is already loaded and enabled\n");
-                            status = 1;
-                        }
-                        /* See if enabling the driver failed */
-                        if (status) {
-                            /* If xorg.conf exists, make sure it contains
-                             * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
-                             * xorg.conf from scratch */
-                            if (!check_vendor_bus_id_xorg_conf(current_devices, cards_n,
-                                                               discrete_vendor_id, "nvidia")) {
-                                fprintf(log_handle, "Check failed\n");
-
-                                /* Remove xorg.conf */
-                                fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                                move_xorg_conf();
-                                /* Write xorg.conf */
-                                fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
-                                write_to_xorg_conf(current_devices, cards_n, discrete_vendor_id);
-                            }
-                            else {
-                                fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
-                            }
-                        }
-                        else {
-                            /* For some reason we failed to select the
-                             * driver. Let's select Mesa here */
-                            fprintf(log_handle, "Error: failed to enable the driver\n");
-                            fprintf(log_handle, "Selecting mesa\n");
-                            select_driver(main_arch_path, "mesa");
-                            /* select_driver(other_arch_path, "mesa"); */
-                            /* Remove xorg.conf */
-                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                            move_xorg_conf();
-                        }
+                        /* Try to enable nvidia */
+                        enable_nvidia(alternative, discrete_vendor_id, current_devices, cards_n);
                     }
                     /* Kernel module is not available */
                     else {
@@ -2551,19 +2559,13 @@ int main(int argc, char *argv[]) {
                         if (!alternative->mesa_enabled) {
                             /* Select mesa as a fallback */
                             fprintf(log_handle, "Kernel Module is not loaded\n");
-                            fprintf(log_handle, "Selecting mesa\n");
-                            status = select_driver(main_arch_path, "mesa");
-                            /* select_driver(other_arch_path, "mesa"); */
-                            /* Remove xorg.conf */
-                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                            move_xorg_conf();
+                            status = enable_mesa();
                         }
                         else {
                             if (has_changed) {
                                 fprintf(log_handle, "System configuration has changed\n");
                                 /* Remove xorg.conf */
-                                fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                                move_xorg_conf();
+                                remove_xorg_conf();
                             }
                             else {
                                 fprintf(log_handle, "Driver not enabled or not in use\n");
@@ -2578,50 +2580,8 @@ int main(int argc, char *argv[]) {
 
                     /* Kernel module is available */
                     if (fglrx_loaded && !radeon_loaded) {
-                        /* Alternative not in use */
-                        if (!alternative->fglrx_enabled) {
-                            /* Select nvidia */
-                            fprintf(log_handle, "Selecting fglrx\n");
-                            status = select_driver(main_arch_path, "fglrx");
-                            /* select_driver(other_arch_path, "nvidia"); */
-                        }
-                        /* Alternative in use */
-                        else {
-                            fprintf(log_handle, "Driver is already loaded and enabled\n");
-                            status = 1;
-                        }
-                        /* See if enabling the driver failed */
-                        if (status) {
-
-                            /* If xorg.conf exists, make sure it contains
-                             * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
-                             * xorg.conf from scratch */
-                            if (!check_vendor_bus_id_xorg_conf(current_devices, cards_n,
-                                                               discrete_vendor_id, "fglrx")) {
-                                fprintf(log_handle, "Check failed\n");
-
-                                /* Remove xorg.conf */
-                                fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                                move_xorg_conf();
-                                /* Write xorg.conf */
-                                fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
-                                write_to_xorg_conf(current_devices, cards_n, discrete_vendor_id);
-                            }
-                            else {
-                                fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
-                            }
-                        }
-                        else {
-                            /* For some reason we failed to select the
-                             * driver. Let's select Mesa here */
-                            fprintf(log_handle, "Error: failed to enable the driver\n");
-                            fprintf(log_handle, "Selecting mesa\n");
-                            select_driver(main_arch_path, "mesa");
-                            /* select_driver(other_arch_path, "mesa"); */
-                            /* Remove xorg.conf */
-                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                            move_xorg_conf();
-                        }
+                        /* Try to enable fglrx */
+                        enable_fglrx(alternative, discrete_vendor_id, current_devices, cards_n);
                     }
                     /* Kernel module is not available */
                     else {
@@ -2639,19 +2599,13 @@ int main(int argc, char *argv[]) {
                         if (!alternative->mesa_enabled) {
                             /* Select mesa as a fallback */
                             fprintf(log_handle, "Kernel Module is not loaded\n");
-                            fprintf(log_handle, "Selecting mesa\n");
-                            status = select_driver(main_arch_path, "mesa");
-                            /* select_driver(other_arch_path, "mesa"); */
-                            /* Remove xorg.conf */
-                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                            move_xorg_conf();
+                            status = enable_mesa();
                         }
                         else {
                             if (has_changed) {
                                 fprintf(log_handle, "System configuration has changed\n");
                                 /* Remove xorg.conf */
-                                fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                                move_xorg_conf();
+                                remove_xorg_conf();
                             }
                             else {
                                 fprintf(log_handle, "Driver not enabled or not in use\n");
@@ -2676,50 +2630,8 @@ int main(int argc, char *argv[]) {
 
                 /* Kernel module is available */
                 if (fglrx_loaded && !radeon_loaded) {
-                    /* Alternative not in use */
-                    if (!alternative->fglrx_enabled) {
-                        /* Select fglrx */
-                        fprintf(log_handle, "Selecting fglrx\n");
-                        status = select_driver(main_arch_path, "fglrx");
-                        /* select_driver(other_arch_path, "nvidia"); */
-                    }
-                    /* Alternative in use */
-                    else {
-                        fprintf(log_handle, "Driver is already loaded and enabled\n");
-                        status = 1;
-                    }
-                    /* See if enabling the driver failed */
-                    if (status) {
-
-                        /* If xorg.conf exists, make sure it contains
-                         * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
-                         * xorg.conf from scratch */
-                        if (!check_vendor_bus_id_xorg_conf(current_devices, cards_n,
-                                                           discrete_vendor_id, "fglrx")) {
-                            fprintf(log_handle, "Check failed\n");
-
-                            /* Remove xorg.conf */
-                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                            move_xorg_conf();
-                            /* Write xorg.conf */
-                            fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
-                            write_to_xorg_conf(current_devices, cards_n, discrete_vendor_id);
-                        }
-                        else {
-                            fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
-                        }
-                    }
-                    else {
-                        /* For some reason we failed to select the
-                         * driver. Let's select Mesa here */
-                        fprintf(log_handle, "Error: failed to enable the driver\n");
-                        fprintf(log_handle, "Selecting mesa\n");
-                        select_driver(main_arch_path, "mesa");
-                        /* select_driver(other_arch_path, "mesa"); */
-                        /* Remove xorg.conf */
-                        fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                        move_xorg_conf();
-                    }
+                    /* Try to enable fglrx */
+                    enable_fglrx(alternative, discrete_vendor_id, current_devices, cards_n);
                 }
                 /* Kernel module is not available */
                 else {
@@ -2736,19 +2648,13 @@ int main(int argc, char *argv[]) {
                     if (!alternative->mesa_enabled) {
                         /* Select mesa as a fallback */
                         fprintf(log_handle, "Kernel Module is not loaded\n");
-                        fprintf(log_handle, "Selecting mesa\n");
-                        status = select_driver(main_arch_path, "mesa");
-                        /* select_driver(other_arch_path, "mesa"); */
-                        /* Remove xorg.conf */
-                        fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                        move_xorg_conf();
+                        status = enable_mesa();
                     }
                     else {
                         if (has_changed) {
                             fprintf(log_handle, "System configuration has changed\n");
                             /* Remove xorg.conf */
-                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                            move_xorg_conf();
+                            remove_xorg_conf();
                         }
                         else {
                             fprintf(log_handle, "Driver not enabled or not in use\n");
@@ -2758,103 +2664,20 @@ int main(int argc, char *argv[]) {
                 }
             }
             else if (discrete_vendor_id == NVIDIA) {
-                fprintf(log_handle, "Discrete AMD card detected\n");
+                fprintf(log_handle, "Discrete NVIDIA card detected\n");
 
                 /* Kernel module is available */
                 if (nvidia_loaded && !nouveau_loaded) {
-                    /* Alternative not in use */
-                    if (!alternative->nvidia_enabled) {
-                        /* Select nvidia */
-                        fprintf(log_handle, "Selecting nvidia\n");
-                        status = select_driver(main_arch_path, "nvidia");
-                        /* select_driver(other_arch_path, "nvidia"); */
-                    }
-                    /* Alternative in use */
-                    else {
-                        fprintf(log_handle, "Driver is already loaded and enabled\n");
-                        status = 1;
-                    }
-                    /* See if enabling the driver failed */
-                    if (status) {
-                        /* If xorg.conf exists, make sure it contains
-                         * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
-                         * xorg.conf from scratch */
-                        if (!check_vendor_bus_id_xorg_conf(current_devices, cards_n,
-                                                           discrete_vendor_id, "nvidia")) {
-                            fprintf(log_handle, "Check failed\n");
-
-                            /* Remove xorg.conf */
-                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                            move_xorg_conf();
-                            /* Write xorg.conf */
-                            fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
-                            write_to_xorg_conf(current_devices, cards_n, discrete_vendor_id);
-                        }
-                        else {
-                            fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
-                        }
-                    }
-                    else {
-                        /* For some reason we failed to select the
-                         * driver. Let's select Mesa here */
-                        fprintf(log_handle, "Error: failed to enable the driver\n");
-                        fprintf(log_handle, "Selecting mesa\n");
-                        select_driver(main_arch_path, "mesa");
-                        /* select_driver(other_arch_path, "mesa"); */
-                        /* Remove xorg.conf */
-                        fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                        move_xorg_conf();
-                    }
+                    /* Try to enable nvidia */
+                    enable_nvidia(alternative, discrete_vendor_id, current_devices, cards_n);
                 }
                 /* Nvidia kernel module is not available */
                 else {
                     /* See if fglrx is in use */
                     /* Kernel module is available */
                     if (fglrx_loaded && !radeon_loaded) {
-                        /* Alternative not in use */
-                        if (!alternative->fglrx_enabled) {
-                            /* Select nvidia */
-                            fprintf(log_handle, "Selecting fglrx\n");
-                            status = select_driver(main_arch_path, "fglrx");
-                            /* select_driver(other_arch_path, "nvidia"); */
-                        }
-                        /* Alternative in use */
-                        else {
-                            fprintf(log_handle, "Driver is already loaded and enabled\n");
-                            status = 1;
-                        }
-                        /* See if enabling the driver failed */
-                        if (status) {
-
-                            /* If xorg.conf exists, make sure it contains
-                             * the right BusId and NO NOUVEAU or FGLRX. If it doesn't, create a
-                             * xorg.conf from scratch */
-                            if (!check_vendor_bus_id_xorg_conf(current_devices, cards_n,
-                                                               boot_vga_vendor_id, "fglrx")) {
-                                fprintf(log_handle, "Check failed\n");
-
-                                /* Remove xorg.conf */
-                                fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                                move_xorg_conf();
-                                /* Write xorg.conf */
-                                fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
-                                write_to_xorg_conf(current_devices, cards_n, discrete_vendor_id);
-                            }
-                            else {
-                                fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
-                            }
-                        }
-                        else {
-                            /* For some reason we failed to select the
-                             * driver. Let's select Mesa here */
-                            fprintf(log_handle, "Error: failed to enable the driver\n");
-                            fprintf(log_handle, "Selecting mesa\n");
-                            select_driver(main_arch_path, "mesa");
-                            /* select_driver(other_arch_path, "mesa"); */
-                            /* Remove xorg.conf */
-                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                            move_xorg_conf();
-                        }
+                        /* Try to enable fglrx */
+                        enable_fglrx(alternative, boot_vga_vendor_id, current_devices, cards_n);
                     }
                     /* Kernel module is not available */
                     else {
@@ -2873,19 +2696,13 @@ int main(int argc, char *argv[]) {
                         if (!alternative->mesa_enabled) {
                             /* Select mesa as a fallback */
                             fprintf(log_handle, "Kernel Module is not loaded\n");
-                            fprintf(log_handle, "Selecting mesa\n");
-                            status = select_driver(main_arch_path, "mesa");
-                            /* select_driver(other_arch_path, "mesa"); */
-                            /* Remove xorg.conf */
-                            fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                            move_xorg_conf();
+                            enable_mesa();
                         }
                         else {
                             if (has_changed) {
                                 fprintf(log_handle, "System configuration has changed\n");
                                 /* Remove xorg.conf */
-                                fprintf(log_handle, "Removing xorg.conf. Path: %s\n", xorg_conf_file);
-                                move_xorg_conf();
+                                remove_xorg_conf();
                             }
                             else {
                                 fprintf(log_handle, "Driver not enabled or not in use\n");
