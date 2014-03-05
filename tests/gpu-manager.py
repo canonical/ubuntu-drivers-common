@@ -53,7 +53,9 @@ class GpuTest(object):
                  has_selected_driver=False,
                  has_not_acted=True,
                  has_skipped_hybrid=False,
-                 proprietary_installer=False):
+                 proprietary_installer=False,
+                 matched_quirk=False,
+                 loaded_with_quirk=False):
         self.has_single_card = has_single_card
         self.is_laptop = is_laptop
         self.has_intel = has_intel
@@ -81,6 +83,8 @@ class GpuTest(object):
         self.has_not_acted = has_not_acted
         self.has_skipped_hybrid = has_skipped_hybrid
         self.proprietary_installer = proprietary_installer
+        self.matched_quirk = matched_quirk
+        self.loaded_with_quirk = loaded_with_quirk
 
 
 class GpuManagerTest(unittest.TestCase):
@@ -107,6 +111,10 @@ class GpuManagerTest(unittest.TestCase):
         klass.prime_settings.close()
         klass.bbswitch_path = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.bbswitch_path.close()
+        klass.bbswitch_quirks_path = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.bbswitch_quirks_path.close()
+        klass.dmi_product_version_path = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.dmi_product_version_path.close()
 
         klass.log = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.log.close()
@@ -132,6 +140,8 @@ class GpuManagerTest(unittest.TestCase):
         klass.has_skipped_hybrid_pt = re.compile('Lightdm is not the default display manager. Nothing to do')
         klass.loaded_and_enabled_pt = re.compile('Driver is already loaded and enabled')
         klass.proprietary_installer_pt = re.compile('Proprietary driver installer detected.*')
+        klass.matched_quirk_pt = re.compile('Found matching quirk.*')
+        klass.loaded_with_args_pt = re.compile('Loading (.+) with \"(.+)\" parameters.*')
 
     def setUp(self):
         self.last_boot_file = open(self.last_boot_file.name, 'w')
@@ -166,7 +176,9 @@ class GpuManagerTest(unittest.TestCase):
 
     def remove_prime_files(self):
         for elem in (self.prime_settings,
-                     self.bbswitch_path):
+                     self.bbswitch_path,
+                     self.bbswitch_quirks_path,
+                     self.dmi_product_version_path):
             try:
                 os.unlink(elem.name)
             except:
@@ -200,6 +212,8 @@ class GpuManagerTest(unittest.TestCase):
             self.fake_dmesg,
             self.prime_settings,
             self.bbswitch_path,
+            self.bbswitch_quirks_path,
+            self.dmi_product_version_path,
             self.log,
             self.xorg_file,
             self.amd_pcsdb_file,
@@ -251,6 +265,10 @@ class GpuManagerTest(unittest.TestCase):
                    self.prime_settings.name,
                    '--bbswitch-path',
                    self.bbswitch_path.name,
+                   '--bbswitch-quirks-path',
+                   self.bbswitch_quirks_path.name,
+                   '--dmi-product-version-path',
+                   self.dmi_product_version_path.name,
                    '--new-boot-file',
                    self.new_boot_file.name,
                    fake_laptop_arg,
@@ -293,30 +311,6 @@ class GpuManagerTest(unittest.TestCase):
                         self.handle_logs(copy=True)
                         return False
             self.valgrind_log.close()
-        # os.system('%sshare/hybrid/gpu-manager --dry-run '
-        #           '--last-boot-file %s '
-        #           '--fake-lspci %s '
-        #           '--xorg-conf-file %s '
-        #           '--amd-pcsdb-file %s '
-        #           '--fake-alternative %s '
-        #           '--fake-modules-path %s '
-        #           '--fake-alternatives-path %s '
-        #           '--fake-dmesg-path %s '
-        #           '--new-boot-file %s '
-        #           '%s '
-        #           '--log %s ' % (valgrind
-        #                          self.last_boot_file.name,
-        #                          self.fake_lspci.name,
-        #                          self.xorg_file.name,
-        #                          self.amd_pcsdb_file.name,
-        #                          fake_alternative,
-        #                          self.fake_modules.name,
-        #                          self.fake_alternatives.name,
-        #                          self.fake_dmesg.name,
-        #                          self.new_boot_file.name,
-        #                          fake_laptop_arg,
-        #                          self.log.name)
-        #           )
         return True
 
     def check_vars(self, *args, **kwargs):
@@ -332,6 +326,9 @@ class GpuManagerTest(unittest.TestCase):
             is_driver_unloaded = self.is_driver_unloaded_pt.match(line)
             is_driver_enabled = self.is_driver_enabled_pt.match(line)
             loaded_and_enabled = self.loaded_and_enabled_pt.match(line)
+
+            matched_quirk = self.matched_quirk_pt.match(line)
+            loaded_with_args = self.loaded_with_args_pt.match(line)
 
             single_card = self.single_card_pt.match(line)
             laptop = self.is_laptop_pt.match(line)
@@ -423,6 +420,13 @@ class GpuManagerTest(unittest.TestCase):
                 gpu_test.has_selected_driver = False
             elif proprietary_installer:
                 gpu_test.proprietary_installer = True
+            elif matched_quirk:
+                gpu_test.matched_quirk = True
+            elif loaded_with_args:
+                if (loaded_with_args.group(1) == 'bbswitch' and
+                    loaded_with_args.group(2) != 'no'):
+                    gpu_test.loaded_with_quirk = True
+
         # Close the log
         log.close()
 
@@ -6970,6 +6974,19 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.bbswitch_path.write('0000:01:00.0 ON')
         self.bbswitch_path.close()
 
+        # Set dmi
+        self.dmi_product_version_path = open(self.dmi_product_version_path.name, 'w')
+        self.dmi_product_version_path.write('ThinkPad T410s\n')
+        self.dmi_product_version_path.close()
+
+        # Set quirk
+        self.bbswitch_quirks_path = open(self.bbswitch_quirks_path.name, 'w')
+        self.bbswitch_quirks_path.write('''
+"ThinkPad T410" "skip_optimus_dsm=1"
+"ThinkPad T410s" "skip_optimus_dsm=1"
+        ''')
+        self.bbswitch_quirks_path.close()
+
         # The alternative in use
         fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
 
@@ -6980,6 +6997,10 @@ nvidia 1447330 3 - Live 0x0000000000000000
         gpu_test = self.check_vars()
 
         # Check the variables
+
+        # Check quirks
+        self.assert_(gpu_test.matched_quirk)
+        self.assert_(gpu_test.loaded_with_quirk)
 
         # Check if laptop
         self.assert_(gpu_test.is_laptop)

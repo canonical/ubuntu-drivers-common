@@ -96,6 +96,8 @@ static char *fake_alternatives_path = NULL;
 static char *fake_dmesg_path = NULL;
 static char *prime_settings = NULL;
 static char *bbswitch_path = NULL;
+static char *bbswitch_quirks_path = NULL;
+static char *dmi_product_version_path = NULL;
 static char *main_arch_path = NULL;
 static char *other_arch_path = NULL;
 
@@ -170,6 +172,98 @@ static const char *istrstr(const char *str1, const char *str2)
 }
 
 
+static int exists_not_empty(const char *file) {
+    struct stat stbuf;
+
+    /* If file doesn't exist */
+    if (stat(file, &stbuf) == -1) {
+        fprintf(log_handle, "can't access %s\n", file);
+        return 0;
+    }
+    /* If file is empty */
+    if ((stbuf.st_mode & S_IFMT) && ! stbuf.st_size) {
+        fprintf(log_handle, "%s is empty\n", file);
+        return 0;
+    }
+    return 1;
+}
+
+
+/* Get parameters we may need to pass to bbswitch */
+static char * get_params_from_quirks() {
+    char *dmi_product_version = NULL;
+    FILE *file;
+    char *params = NULL;
+    char line[1035];
+    size_t len = 0;
+    char *tok;
+
+    if (!exists_not_empty(dmi_product_version_path)) {
+        fprintf(log_handle, "Error: %s does not exist or is empty.\n", dmi_product_version_path);
+    }
+
+    if (!exists_not_empty(bbswitch_quirks_path)) {
+        fprintf(log_handle, "Error: %s does not exist or is empty.\n", bbswitch_quirks_path);
+    }
+
+    /* get dmi product version */
+    file = fopen(dmi_product_version_path, "r");
+    if (file == NULL) {
+        fprintf(log_handle, "can't open %s\n", dmi_product_version_path);
+        return NULL;
+    }
+    if (getline(&dmi_product_version, &len, file) == -1) {
+        fprintf(log_handle, "can't get line from %s\n", dmi_product_version_path);
+        return NULL;
+    }
+    fclose(file);
+
+    if (dmi_product_version) {
+        /* Remove newline */
+        len = strlen(dmi_product_version);
+        if(dmi_product_version[len-1] == '\n' )
+           dmi_product_version[len-1] = 0;
+
+        fprintf(log_handle, "dmi_product_version=\"%s\"\n", dmi_product_version);
+
+        file = fopen(bbswitch_quirks_path, "r");
+        if (file == NULL) {
+            fprintf(log_handle, "can't open %s\n", bbswitch_quirks_path);
+            free(dmi_product_version);
+            return NULL;
+        }
+
+        while (fgets(line, sizeof(line), file)) {
+            /* Ignore comments */
+            if (strstr(line, "#") != NULL) {
+                continue;
+            }
+
+            if (istrstr(line, dmi_product_version) != NULL) {
+                fprintf(log_handle, "Found matching quirk\n");
+
+                tok = strtok(line, "\"");
+
+                while (tok != NULL)
+                {
+                    tok = strtok (NULL, "\"");
+                    if (tok && (isspace(tok[0]) == 0)) {
+                        params = strdup(tok);
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+        fclose(file);
+
+        free(dmi_product_version);
+    }
+
+    return params;
+}
+
+
 static int act_upon_module_with_params(const char *module,
                                        int mode,
                                        const char *params) {
@@ -180,17 +274,18 @@ static int act_upon_module_with_params(const char *module,
             mode ? "Loading" : "Unloading",
             module, params ? params : "no");
 
-    if (dry_run)
-        return 1;
-
     if (params) {
         sprintf(command, "%s %s %s", mode ? "/sbin/modprobe" : "/sbin/rmmod",
                 module, params);
+        free(params);
     }
     else {
         sprintf(command, "%s %s", mode ? "/sbin/modprobe" : "/sbin/rmmod",
                 module);
     }
+
+    if (dry_run)
+        return 1;
 
     status = system(command);
 
@@ -218,27 +313,27 @@ static int unload_module(const char *module) {
 
 /* Load bbswitch and pass some parameters */
 static int load_bbswitch() {
-    /* FIXME: get quirks here
-     * opts="`/sbin/get-quirk-options`"
-     */
-    return (load_module_with_params("bbswitch", "load_state=-1 unload_state=1"));
-}
+    char *params = NULL;
+    char *temp_params = NULL;
+    char basic[] = "load_state=-1 unload_state=1";
 
-
-static int exists_not_empty(const char *file) {
-    struct stat stbuf;
-
-    /* If file doesn't exist */
-    if (stat(file, &stbuf) == -1) {
-        fprintf(log_handle, "can't access %s\n", file);
-        return 0;
+    temp_params = get_params_from_quirks();
+    if (!temp_params) {
+        params = strdup(basic);
     }
-    /* If file is empty */
-    if ((stbuf.st_mode & S_IFMT) && ! stbuf.st_size) {
-        fprintf(log_handle, "%s is empty\n", file);
-        return 0;
+    else {
+        params = malloc(strlen(temp_params) + strlen(basic) + 2);
+        if (!params)
+            return 0;
+        strcpy(params, basic);
+        strcat(params, " ");
+        strcat(params, temp_params);
+
+        free(temp_params);
     }
-    return 1;
+
+
+    return (load_module_with_params("bbswitch", params));
 }
 
 
@@ -936,7 +1031,7 @@ static int check_vendor_bus_id_xorg_conf(struct device **devices, int cards_n,
     int expected_matches = 0;
     char line[4096];
     char bus_id[256];
-	FILE *file;
+    FILE *file;
     struct stat stbuf;
 
     /* If file doesn't exist */
@@ -1002,7 +1097,7 @@ static int check_all_bus_ids_xorg_conf(struct device **devices, int cards_n) {
     int matches = 0;
     char line[4096];
     char bus_id[256];
-	FILE *file;
+    FILE *file;
 
     file = fopen(xorg_conf_file, "r");
 
@@ -1486,7 +1581,7 @@ static int add_nvidia_gpu_bus_from_dmesg(struct device **devices,
 static int is_module_loaded(const char *module) {
     int status = 0;
     char line[4096];
-	FILE *file;
+    FILE *file;
     if (!fake_modules_path)
         file = fopen("/proc/modules", "r");
     else
@@ -1954,6 +2049,8 @@ int main(int argc, char *argv[]) {
         {"fake-dmesg-path", required_argument, 0, 's'},
         {"prime-settings", required_argument, 0, 'z'},
         {"bbswitch-path", required_argument, 0, 'y'},
+        {"bbswitch-quirks-path", required_argument, 0, 'g'},
+        {"dmi-product-version-path", required_argument, 0, 'h'},
         {0, 0, 0, 0}
         };
         /* getopt_long stores the option index here. */
@@ -2073,6 +2170,18 @@ int main(int argc, char *argv[]) {
                 if (!bbswitch_path)
                     abort();
                 break;
+            case 'g':
+                /* printf("option -p with value '%s'\n", optarg); */
+                bbswitch_quirks_path = strdup(optarg);
+                if (!bbswitch_quirks_path)
+                    abort();
+                break;
+            case 'h':
+                /* printf("option -p with value '%s'\n", optarg); */
+                dmi_product_version_path = strdup(optarg);
+                if (!dmi_product_version_path)
+                    abort();
+                break;
             case '?':
                 /* getopt_long already printed an error message. */
                 exit(1);
@@ -2151,6 +2260,26 @@ int main(int argc, char *argv[]) {
         bbswitch_path = strdup("/proc/acpi/bbswitch");
         if (!bbswitch_path) {
             fprintf(log_handle, "Couldn't allocate bbswitch_path\n");
+            goto end;
+        }
+    }
+
+    if (bbswitch_quirks_path)
+        fprintf(log_handle, "bbswitch_quirks_path file: %s\n", bbswitch_quirks_path);
+    else {
+        bbswitch_quirks_path = strdup("/usr/share/nvidia-prime/prime-quirks");
+        if (!bbswitch_quirks_path) {
+            fprintf(log_handle, "Couldn't allocate bbswitch_quirks_path\n");
+            goto end;
+        }
+    }
+
+    if (dmi_product_version_path)
+        fprintf(log_handle, "bbswitch_path file: %s\n", dmi_product_version_path);
+    else {
+        dmi_product_version_path = strdup("/sys/class/dmi/id/product_version");
+        if (!dmi_product_version_path) {
+            fprintf(log_handle, "Couldn't allocate dmi_product_version_path\n");
             goto end;
         }
     }
@@ -2773,6 +2902,12 @@ end:
 
     if (bbswitch_path)
         free(bbswitch_path);
+
+    if (bbswitch_quirks_path)
+        free(bbswitch_quirks_path);
+
+    if (dmi_product_version_path)
+        free(dmi_product_version_path);
 
     /* Free the devices structs */
     for(i = 0; i < cards_n; i++) {
