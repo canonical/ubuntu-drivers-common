@@ -6961,8 +6961,8 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         self.fake_alternatives.write('''
 /usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
 /usr/lib/nvidia-331-updates-prime/ld.so.conf
+/usr/lib/nvidia-331-updates/ld.so.conf
 ''')
         self.fake_alternatives.close()
 
@@ -7136,8 +7136,8 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.fake_alternatives = open(self.fake_alternatives.name, 'w')
         self.fake_alternatives.write('''
 /usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
 /usr/lib/nvidia-331-updates-prime/ld.so.conf
+/usr/lib/nvidia-331-updates/ld.so.conf
 ''')
         self.fake_alternatives.close()
 

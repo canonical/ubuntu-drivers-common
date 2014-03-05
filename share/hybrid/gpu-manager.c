@@ -399,9 +399,20 @@ static char* get_alternative_link(char *arch_path, char *pattern) {
             return NULL;
         }
         while (fgets(command, sizeof(command), pfile)) {
-            if (strstr(command, pattern) != NULL) {
+            /* Make sure we don't catch prime by mistake when
+             * looking for nvidia
+             */
+            if (strcmp(pattern, "nvidia") == 0) {
+                if (strstr(command, pattern) != NULL) {
+                    alternative = strdup(command);
+                    break;
+                }
+            }
+            else {
+                if (strstr(command, pattern) != NULL) {
                 alternative = strdup(command);
                 break;
+                }
             }
         }
         fclose(pfile);
@@ -409,6 +420,14 @@ static char* get_alternative_link(char *arch_path, char *pattern) {
     else {
         sprintf(command, "update-alternatives --list %s_gl_conf | grep %s",
                 arch_path, pattern);
+
+        /* Make sure we don't catch prime by mistake when
+         * looking for nvidia
+         */
+        if (strcmp(pattern, "nvidia") == 0) {
+            strcat(command, " | grep -v prime");
+        }
+
         alternative = get_output(command);
     }
 
