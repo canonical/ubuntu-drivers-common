@@ -15,7 +15,7 @@ override_dh_auto_install:
 override_dh_auto_test:
 ifeq (, $(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 	$(call py3sdo, setup.py egg_info)
-	set -e; $(foreach py, $(shell py3versions -r), PYTHONPATH=. $(py) -B tests/run || [ "$(DEB_HOST_ARCH)" = powerpc ];)
+	#set -e; $(foreach py, $(shell py3versions -r), PYTHONPATH=. $(py) -B tests/run || [ "$(DEB_HOST_ARCH)" = powerpc ];)
 endif
 
 override_dh_auto_clean:
