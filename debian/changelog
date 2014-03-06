@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.2.89.2) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.89.2) trusty; urgency=low
 
-  * 
+  * tests/gpu-manager.py:
+    - Fix FTBFS.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 06 Mar 2014 11:44:02 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 06 Mar 2014 11:45:29 +0100
 
 ubuntu-drivers-common (1:0.2.89.1) trusty; urgency=low
 
