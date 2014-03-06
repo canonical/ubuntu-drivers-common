@@ -1,6 +1,8 @@
 ubuntu-drivers-common (1:0.2.89.4) UNRELEASED; urgency=medium
 
   * Reenable tests.
+  * Mark the three failing tests as expected failure instead of skipping them
+    entirely, so that we can see what they do on the buildds.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 06 Mar 2014 16:50:01 +0100
 
