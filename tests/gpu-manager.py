@@ -301,7 +301,6 @@ class GpuManagerTest(unittest.TestCase):
             for line in self.valgrind_log.readlines():
                 errors = errors_pt.match(line)
                 if errors:
-                    print errors.group(2)
                     if errors.group(2) != 0:
                         self.valgrind_log = open(self.valgrind_log.name, 'w')
                         self.valgrind_log.write(''.join(c, '\n'))
