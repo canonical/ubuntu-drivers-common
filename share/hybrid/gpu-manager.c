@@ -266,7 +266,7 @@ static char * get_params_from_quirks() {
 
 static int act_upon_module_with_params(const char *module,
                                        int mode,
-                                       const char *params) {
+                                       char *params) {
     int status = 0;
     char command[300];
 
@@ -294,7 +294,7 @@ static int act_upon_module_with_params(const char *module,
 
 /* Load a kernel module and pass it parameters */
 static int load_module_with_params(const char *module,
-                                   const char *params) {
+                                   char *params) {
     return (act_upon_module_with_params(module, 1, params));
 }
 
