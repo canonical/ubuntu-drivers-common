@@ -14661,6 +14661,8 @@ fake 1447330 3 - Live 0x0000000000000000
 
 
 if __name__ == '__main__':
+    if not '86' in os.uname()[4]:
+        exit(0)
     # unittest.main() does its own parsing, therefore we
     # do our own parsing, then we create a copy of sys.argv where
     # we remove our custom and unsupported arguments, so that
