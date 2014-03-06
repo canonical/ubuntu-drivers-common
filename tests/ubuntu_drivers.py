@@ -39,8 +39,6 @@ APTDAEMON_DEBUG = False
 
 dbus_address = None
 
-# Do not look at /var/log/Xorg.0.log for the hybrid checks
-os.environ['UBUNTU_DRIVERS_XORG_LOG'] = '/nonexisting'
 
 # modalias of an nvidia card covered by our nvidia-* packages
 modalias_nv = 'pci:v000010DEd000010C3sv00003842sd00002670bc03sc03i00'
@@ -445,29 +443,6 @@ Description: broken \xEB encoding
         res = UbuntuDrivers.detect.system_driver_packages() 
         self.assertTrue('coreutils' in res, list(res.keys()))
         self.assertEqual(res['coreutils'], {'free': True, 'from_distro': True, 'plugin': 'extra.py'})
-
-    def test_system_driver_packages_hybrid(self):
-        '''system_driver_packages() on hybrid Intel/NVidia systems'''
-
-        chroot = aptdaemon.test.Chroot()
-        try:
-            chroot.setup()
-            chroot.add_test_repository()
-            archive = gen_fakearchive()
-            chroot.add_repository(archive.path, True, False)
-            cache = apt.Cache(rootdir=chroot.path)
-
-            xorg_log = os.path.join(chroot.path, 'Xorg.0.log')
-            os.environ['UBUNTU_DRIVERS_XORG_LOG'] = xorg_log
-
-            with open(xorg_log, 'wb') as f:
-                f.write(b'X.Org X Server 1.11.3\xe2\x99\xa5\n[     5.547] (II) LoadModule: "extmod"\n[     5.560] (II) Loading /usr/lib/xorg/modules/drivers/intel_drv.so\n')
-
-            self.assertEqual(set(UbuntuDrivers.detect.system_driver_packages(cache)),
-                             set(['chocolate', 'vanilla']))
-        finally:
-            os.environ['UBUNTU_DRIVERS_XORG_LOG'] = '/nonexisting'
-            chroot.remove()
 
     def test_system_device_drivers_chroot(self):
         '''system_device_drivers() for test package repository'''

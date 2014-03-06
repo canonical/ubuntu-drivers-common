@@ -91,20 +91,6 @@ def _check_video_abi_compat(apt_cache, record):
         logging.debug('Driver package %s is incompatible with current X.org server ABI %s', 
                 record['Package'], xorg_video_abi)
         return False
-
-    # Current X.org/nvidia proprietary drivers do not work on hybrid
-    # Intel/NVidia systems; disable the driver for now
-    if 'nvidia' in record['Package']:
-        xorg_log = os.environ.get('UBUNTU_DRIVERS_XORG_LOG', '/var/log/Xorg.0.log')
-        try:
-            with open(xorg_log, 'rb') as f:
-                if b'drivers/intel_drv.so' in f.read():
-                    logging.debug('X.org log reports loaded intel driver, disabling driver %s for hybrid system', 
-                            record['Package'])
-                    return False
-        except IOError:
-            logging.debug('Cannot open X.org log %s, cannot determine hybrid state', xorg_log)
-
     return True
 
 def _apt_cache_modalias_map(apt_cache):
