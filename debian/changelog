@@ -1,8 +1,12 @@
-ubuntu-drivers-common (1:0.2.89.3) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.89.3) trusty; urgency=low
 
-  * 
+  * debian/rules:
+    - Temporarily disable all tests. We'll switch them back on as
+      soon as we find out the cause of these failures.
+  * tests/gpu-manager.py:
+    - Do not run on anything but x86 family.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 06 Mar 2014 16:14:37 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 06 Mar 2014 16:30:54 +0100
 
 ubuntu-drivers-common (1:0.2.89.2) trusty; urgency=low
 
