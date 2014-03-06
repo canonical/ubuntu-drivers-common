@@ -464,7 +464,7 @@ static int has_unloaded_module(char *module) {
 }
 
 
-static find_string_in_file(const char *path, const char *pattern) {
+static int find_string_in_file(const char *path, const char *pattern) {
     FILE *pfile = NULL;
     char  *line = NULL;
     size_t len = 0;
