@@ -50,6 +50,7 @@ Depends: ${python3:Depends},
 Suggests: python3-aptdaemon.pkcompat
 Replaces: nvidia-common (<< 1:0.2.46)
 Conflicts: nvidia-common (<< 1:0.2.46)
+Breaks: nvidia-prime (<< 0.6)
 Provides: nvidia-common
 Enhances: packagekit-system-interface
 Description: Detect and install additional Ubuntu driver packages

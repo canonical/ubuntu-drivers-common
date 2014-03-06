@@ -1,15 +1,24 @@
-ubuntu-drivers-common (1:0.2.89) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.89) trusty; urgency=low
 
+  * debian/control:
+    - Breaks: nvidia-prime (<< 0.6). We don't want the gpu-manager
+      to compete with the old nvidia-prime on hybrid systems.
   * share/hybrid/gpu-manager.c:
     - Fix memory leaks and complete the different test cases.
   * tests/gpu-manager.py:
     - Add test suite for gpu-manager to reproduce different
       hardware/software scenarios.
+  * UbuntuDrivers/detect.py, tests/ubuntu_drivers.py:
+    - Enable installing graphics drivers on laptops with hybrid
+      graphics (LP: #1126234), and on desktop systems where the
+      BIOS doesn't disable the integrated GPU when a discrete
+      card is available (LP: #1126234). This is now possible
+      thanks to the gpu-manager (now enabled by default).
   * Replace the deprecated hybrid-detect program with gpu-manager (now
     enabled by default). In case of problems with the gpu-manager, it
-    can be disabled by booting with the "nogpumanager" kernel parameter.
+    can be disabled by passing "nogpumanager" as a boot parameter.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 06 Mar 2014 07:51:02 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 06 Mar 2014 09:24:54 +0100
 
 ubuntu-drivers-common (1:0.2.88) trusty; urgency=medium
 
