@@ -1,8 +1,15 @@
 ubuntu-drivers-common (1:0.2.89) UNRELEASED; urgency=low
 
-  * 
+  * share/hybrid/gpu-manager.c:
+    - Fix memory leaks and complete the different test cases.
+  * tests/gpu-manager.py:
+    - Add test suite for gpu-manager to reproduce different
+      hardware/software scenarios.
+  * Replace the deprecated hybrid-detect program with gpu-manager (now
+    enabled by default). In case of problems with the gpu-manager, it
+    can be disabled by booting with the "nogpumanager" kernel parameter.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 27 Feb 2014 10:18:43 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 06 Mar 2014 07:51:02 +0100
 
 ubuntu-drivers-common (1:0.2.88) trusty; urgency=medium
 
