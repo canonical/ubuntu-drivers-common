@@ -152,7 +152,6 @@ class GpuManagerTest(unittest.TestCase):
         self.remove_amd_pcsdb_file()
 
     def tearDown(self):
-        print '%s over' % self.this_function_name
         # Remove all the logs
         self.handle_logs(delete=True)
 
