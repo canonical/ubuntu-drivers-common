@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.2.89.1) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.89.1) trusty; urgency=low
 
-  * 
+  * tests/gpu-manager.py:
+    - Remove leftover print that caused tests to fail in -proposed.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 06 Mar 2014 10:45:39 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 06 Mar 2014 10:47:44 +0100
 
 ubuntu-drivers-common (1:0.2.89) trusty; urgency=low
 
