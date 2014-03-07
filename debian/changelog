@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.89.4) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.89.4) trusty; urgency=medium
 
   [ Martin Pitt ]
   * Reenable tests.
@@ -9,8 +9,12 @@ ubuntu-drivers-common (1:0.2.89.4) UNRELEASED; urgency=medium
   * tests/gpu-manager.py:
     - Refactor the test suite by reusing more code and reducing the
       overall code.
+    - Add test case for zero length dmi product version.
+  * share/hybrid/gpu-manager.c:
+    - Do not try to match quirks if dmi product version has zero length
+      (LP: #1289298).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 07 Mar 2014 19:09:15 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 07 Mar 2014 22:54:22 +0100
 
 ubuntu-drivers-common (1:0.2.89.3) trusty; urgency=low
 
