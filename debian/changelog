@@ -1,10 +1,16 @@
 ubuntu-drivers-common (1:0.2.89.4) UNRELEASED; urgency=medium
 
+  [ Martin Pitt ]
   * Reenable tests.
   * Mark the three failing tests as expected failure instead of skipping them
     entirely, so that we can see what they do on the buildds.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 06 Mar 2014 16:50:01 +0100
+  [ Alberto Milone ]
+  * tests/gpu-manager.py:
+    - Refactor the test suite by reusing more code and reducing the
+      overall code.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 07 Mar 2014 19:09:15 +0100
 
 ubuntu-drivers-common (1:0.2.89.3) trusty; urgency=low
 
