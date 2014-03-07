@@ -224,6 +224,15 @@ static char * get_params_from_quirks() {
         if(dmi_product_version[len-1] == '\n' )
            dmi_product_version[len-1] = 0;
 
+        /* Look for zero-length dmi_product_version */
+        if (strlen(dmi_product_version) == 0) {
+            fprintf(log_handle, "Invalid dmi_product_version=\"%s\"\n",
+                    dmi_product_version);
+
+            free(dmi_product_version);
+            return params;
+        }
+
         fprintf(log_handle, "dmi_product_version=\"%s\"\n", dmi_product_version);
 
         file = fopen(bbswitch_quirks_path, "r");

@@ -55,7 +55,7 @@ class GpuTest(object):
                  has_skipped_hybrid=False,
                  proprietary_installer=False,
                  matched_quirk=False,
-                 loaded_with_quirk=False):
+                 loaded_with_args=False):
         self.has_single_card = has_single_card
         self.is_laptop = is_laptop
         self.has_intel = has_intel
@@ -84,7 +84,7 @@ class GpuTest(object):
         self.has_skipped_hybrid = has_skipped_hybrid
         self.proprietary_installer = proprietary_installer
         self.matched_quirk = matched_quirk
-        self.loaded_with_quirk = loaded_with_quirk
+        self.loaded_with_args = loaded_with_args
 
 
 class GpuManagerTest(unittest.TestCase):
@@ -432,7 +432,7 @@ class GpuManagerTest(unittest.TestCase):
             elif loaded_with_args:
                 if (loaded_with_args.group(1) == 'bbswitch' and
                     loaded_with_args.group(2) != 'no'):
-                    gpu_test.loaded_with_quirk = True
+                    gpu_test.loaded_with_args = True
 
         # Close the log
         log.close()
@@ -5419,7 +5419,7 @@ EndSection
 
         # Check quirks
         self.assertTrue(gpu_test.matched_quirk)
-        self.assertTrue(gpu_test.loaded_with_quirk)
+        self.assertTrue(gpu_test.loaded_with_args)
 
         # Check if laptop
         self.assertTrue(gpu_test.is_laptop)
@@ -5452,6 +5452,34 @@ EndSection
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
+
+
+        # What if dmi product version is invalid?
+
+        # Set dmi product version
+        self.set_dmi_product_version('')
+
+        # Set default quirks
+        self.set_bbswitch_quirks()
+
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
+
+        # Request action from bbswitch
+        self.request_prime_discrete_on(False)
+
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 is_laptop=True)
+
+        # Check the variables
+
+        # Check quirks
+        self.assertFalse(gpu_test.matched_quirk)
+        self.assertTrue(gpu_test.loaded_with_args)
 
 
         # Case 1b: the discrete card is now available (BIOS)
