@@ -130,7 +130,7 @@ class GpuManagerTest(unittest.TestCase):
         klass.single_card_pt = re.compile('Single card detected.*')
         klass.is_laptop_pt = re.compile('Is laptop\? (.+)')
         klass.no_change_stop_pt = re.compile('No change - nothing to do')
-        klass.has_changed_pt = re.compile('System configuration has changed')
+        klass.has_changed_pt = re.compile('Has the system changed\? (.+)')
 
         klass.selected_driver_pt = re.compile('Selecting (.+)')
         klass.removed_xorg_pt = re.compile('Removing xorg.conf. Path: .+')
@@ -143,15 +143,24 @@ class GpuManagerTest(unittest.TestCase):
         klass.matched_quirk_pt = re.compile('Found matching quirk.*')
         klass.loaded_with_args_pt = re.compile('Loading (.+) with \"(.+)\" parameters.*')
 
+        klass.vendors = {'amd': 0x1002, 'nvidia': 0x10de,
+                        'intel': 0x8086, 'unknown': 0x1016}
+
+        klass.fake_alternative = ''
+
+
     def setUp(self):
+        '''
         self.last_boot_file = open(self.last_boot_file.name, 'w')
         self.fake_lspci = open(self.fake_lspci.name, 'w')
         self.fake_modules = open(self.fake_modules.name, 'w')
         self.fake_alternatives = open(self.fake_alternatives.name, 'w')
+        '''
         self.remove_xorg_conf()
         self.remove_amd_pcsdb_file()
 
     def tearDown(self):
+        print(self.this_function_name, 'over')
         # Remove all the logs
         self.handle_logs(delete=True)
 
@@ -233,7 +242,7 @@ class GpuManagerTest(unittest.TestCase):
                 except:
                     pass
 
-    def exec_manager(self, fake_alternative, is_laptop=False, uses_lightdm=True):
+    def exec_manager(self, is_laptop=False, uses_lightdm=True):
         fake_laptop_arg = is_laptop and '--fake-laptop' or '--fake-desktop'
         if with_valgrind:
             valgrind = ['valgrind', '--tool=memcheck', '--leak-check=full',
@@ -253,7 +262,7 @@ class GpuManagerTest(unittest.TestCase):
                    '--amd-pcsdb-file',
                    self.amd_pcsdb_file.name,
                    '--fake-alternative',
-                   fake_alternative,
+                   self.fake_alternative,
                    '--fake-modules-path',
                    self.fake_modules.name,
                    '--fake-alternatives-path',
@@ -343,7 +352,9 @@ class GpuManagerTest(unittest.TestCase):
             proprietary_installer = self.proprietary_installer_pt.match(line)
 
             # Detect the vendor
-            if has_card:
+            if has_changed:
+                gpu_test.has_changed = (has_changed.group(1).strip().lower() == 'yes')
+            elif has_card:
                 if has_card.group(1).strip().lower() == 'nvidia':
                     gpu_test.has_nvidia = (has_card.group(2).strip().lower() == 'yes')
                 elif has_card.group(1).strip().lower() == 'intel':
@@ -390,10 +401,8 @@ class GpuManagerTest(unittest.TestCase):
             elif laptop:
                 gpu_test.is_laptop = (laptop.group(1).strip().lower() == 'yes')
             elif no_change_stop:
-                gpu_test.has_changed = False
+                #gpu_test.has_changed = False
                 gpu_test.has_not_acted = True
-            elif has_changed:
-                gpu_test.has_changed = True
             elif no_action:
                 gpu_test.has_not_acted = True
             elif removed_xorg:
@@ -436,7 +445,7 @@ class GpuManagerTest(unittest.TestCase):
 
         # Copy the logs
         if tests_path:
-            self.handle_logs(copy=True)
+            self.handle_logs(copy=True, delete=True)
 
         # Remove xorg.conf
         self.remove_xorg_conf()
@@ -455,44 +464,241 @@ class GpuManagerTest(unittest.TestCase):
 
         return gpu_test
 
+    def _add_pci_ids(self, ids):
+        if ids:
+            self.fake_lspci = open(self.fake_lspci.name, 'w')
+            for item in ids:
+                self.fake_lspci.write(item)
+            self.fake_lspci.close()
+
+    def _add_pci_ids_from_last_boot(self, ids):
+        if ids:
+            self.last_boot_file = open(self.last_boot_file.name, 'w')
+            for item in ids:
+                self.last_boot_file.write(item)
+            self.last_boot_file.close()
+
+    def _get_cards_from_list(self, cards,
+                             bump_boot_vga_device_id=False,
+                             bump_discrete_device_id=False):
+        cards_list = []
+        it = 0
+        boot_vga_device_id = 0x68d8
+        discrete_device_id = 0x28e8
+        for card in cards:
+            card_line = '%04x:%04x;0000:%02d:%02d:0;%d\n' % (self.vendors.get(card),
+                                           ((it == 0) and
+                                            (bump_boot_vga_device_id and
+                                             boot_vga_device_id + 1 or
+                                             boot_vga_device_id) or
+                                            (bump_discrete_device_id and
+                                             discrete_device_id + 1 or
+                                             discrete_device_id)),
+                                           (it == 0) and 0 or it,
+                                           (it == 0) and 1 or 0,
+                                           (it == 0) and 1 or 0)
+            cards_list.append(card_line)
+            it += 1
+        return cards_list
+
+    def set_current_cards(self, cards,
+                          bump_boot_vga_device_id=False,
+                          bump_discrete_device_id=False):
+        '''Set the current cards in the system
+
+        cards is a list of cards such as ["intel", "nvidia"].
+        The first cards on the list gets to be the boot_vga
+        one.'''
+        cards_list = self._get_cards_from_list(cards,
+                                               bump_boot_vga_device_id,
+                                               bump_discrete_device_id)
+        self._add_pci_ids(cards_list)
+
+    def set_cards_from_last_boot(self, cards):
+        '''Set the cards in the system from last boot
+
+        cards is a list of cards such as ["intel", "nvidia"].
+        The first cards on the list gets to be the boot_vga
+        one.'''
+        cards_list = self._get_cards_from_list(cards)
+        self._add_pci_ids_from_last_boot(cards_list)
+
+
+    def add_kernel_modules(self, modules):
+        if modules:
+            self.fake_modules = open(self.fake_modules.name, 'w')
+            for item in modules:
+                line = '%s 1447330 3 - Live 0x0000000000000000\n' % item
+                self.fake_modules.write(line)
+            self.fake_modules.close()
+
+    def request_prime_discrete_on(self, is_on=True):
+        '''Request that discrete is switched on or off'''
+        self.prime_settings = open(self.prime_settings.name, 'w')
+        self.prime_settings.write(is_on and 'ON' or 'OFF')
+        self.prime_settings.close()
+
+    def set_prime_discrete_default_status_on(self, is_on=True):
+        '''Sets the default status of the discrete card in bbswitch'''
+        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
+        self.bbswitch_path.write('0000:01:00.0 %s\n' % (is_on and 'ON' or 'OFF'))
+        self.bbswitch_path.close()
+
+    def set_dmi_product_version(self, label):
+        '''Set dmi product version'''
+        self.dmi_product_version_path = open(self.dmi_product_version_path.name, 'w')
+        self.dmi_product_version_path.write('%s\n' % label)
+        self.dmi_product_version_path.close()
+
+    def set_bbswitch_quirks(self):
+        '''Set bbswitch quirks'''
+        self.bbswitch_quirks_path = open(self.bbswitch_quirks_path.name, 'w')
+        self.bbswitch_quirks_path.write('''
+"ThinkPad T410" "skip_optimus_dsm=1"
+"ThinkPad T410s" "skip_optimus_dsm=1"
+        ''')
+        self.bbswitch_quirks_path.close()
+
+
+    def set_unloaded_module_in_dmesg(self, module):
+        if module:
+            self.fake_dmesg = open(self.fake_dmesg.name, 'w')
+            if module == 'nvidia':
+                self.fake_dmesg.write('[   18.017267] nvidia: module license '
+                                      '\'NVIDIA\' taints kernel.\n')
+                self.fake_dmesg.write('[   18.019886] nvidia: module verification '
+                                      'failed: signature and/or  required key '
+                                      'missing - tainting kernel\n')
+                self.fake_dmesg.write('[   18.022845] nvidia 0000:01:00.0: '
+                                      'enabling device (0000 -> 0003)\n')
+                self.fake_dmesg.write('[   18.689111] [drm] Initialized nvidia-drm '
+                                      '0.0.0 20130102 for 0000:01:00.0 on minor 1\n')
+                self.fake_dmesg.write('[   35.604564] init: Failed to spawn '
+                                      'nvidia-persistenced main process: unable to '
+                                      'execute: No such file or directory\n')
+            elif module == 'fglrx':
+                self.fake_dmesg.write('fglrx: module license \'Proprietary. (C) 2002 - '
+                                      'ATI Technologies, Starnberg, GERMANY\' taints kernel.')
+                self.fake_dmesg.write('[   23.462986] fglrx_pci 0000:01:00.0: '
+                                      'Max Payload Size 16384, but upstream 0000:00:01.0 '
+                                      'set to 128; if necessary, use "pci=pcie_bus_safe" '
+                                      'and report a bug\n')
+                self.fake_dmesg.write('[   23.462994] fglrx_pci 0000:01:00.0: no hotplug '
+                                      'settings from platform\n')
+                self.fake_dmesg.write('[   23.467552] waiting module removal not supported: '
+                                      'please upgrade<6>[fglrx] module unloaded - fglrx '
+                                      '13.35.5 [Jan 29 2014]\n')
+            else:
+                self.fake_dmesg.write('[   23.462972] %s: module license '
+                                  '\'Proprietary. (C) blah blah\'\n' % module)
+            self.fake_dmesg.close()
+
+
+
+    def set_params(self, last_boot, current_boot,
+                   loaded_modules, available_drivers,
+                   enabled_driver,
+                   unloaded_module='',
+                   proprietary_installer=False,
+                   matched_quirk=False,
+                   loaded_with_quirk=False,
+                   bump_boot_vga_device_id=False,
+                   bump_discrete_device_id=False):
+
+        # Last boot
+        self.set_cards_from_last_boot(last_boot)
+
+        # Current boot
+        self.set_current_cards(current_boot,
+                          bump_boot_vga_device_id,
+                          bump_discrete_device_id)
+
+        # Kernel modules
+        self.add_kernel_modules(loaded_modules)
+        # Optional unloaded kernel module
+        if unloaded_module:
+            self.set_unloaded_module_in_dmesg(unloaded_module)
+
+        # Available alternatives
+        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
+
+        if 'mesa' in available_drivers:
+            self.fake_alternatives.write('/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf\n')
+
+        # Only one of these at a time
+        if 'nvidia' in available_drivers:
+            self.fake_alternatives.write('/usr/lib/nvidia-331-updates-prime/ld.so.conf\n')
+            self.fake_alternatives.write('/usr/lib/nvidia-331-updates/ld.so.conf\n')
+        elif 'fglrx' in available_drivers:
+            self.fake_alternatives.write('/usr/lib/fglrx/ld.so.conf\n')
+            self.fake_alternatives.write('/usr/lib/pxpress/ld.so.conf\n')
+        else:
+            for driver in available_drivers:
+                self.fake_alternatives.write('/usr/lib/x86_64-linux-gnu/%s/ld.so.conf\n' % (driver))
+        self.fake_alternatives.close()
+
+        # The selected alternative
+        if enabled_driver == 'mesa':
+            self.fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
+        elif enabled_driver == 'nvidia':
+            self.fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
+        elif enabled_driver == 'fglrx':
+            self.fake_alternative = '/usr/lib/fglrx/ld.so.conf'
+        elif enabled_driver == 'prime':
+            self.fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
+        elif enabled_driver == 'pxpress':
+            self.fake_alternative = '/usr/lib/pxpress/ld.so.conf'
+        else:
+            self.fake_alternative = '/usr/lib/x86_64-linux-gnu/%s/ld.so.conf' % (enabled_driver)
+
+    def run_manager_and_get_data(self, last_boot, current_boot,
+                   loaded_modules, available_drivers,
+                   enabled_driver,
+                   unloaded_module='',
+                   is_laptop=False,
+                   proprietary_installer=False,
+                   matched_quirk=False,
+                   loaded_with_quirk=False,
+                   bump_boot_vga_device_id=False,
+                   bump_discrete_device_id=False):
+
+        self.set_params(last_boot, current_boot,
+                   loaded_modules, available_drivers,
+                   enabled_driver,
+                   unloaded_module,
+                   proprietary_installer,
+                   matched_quirk,
+                   loaded_with_quirk,
+                   bump_boot_vga_device_id,
+                   bump_discrete_device_id)
+
+        # Call the program
+        self.exec_manager(is_laptop=is_laptop)
+
+        # Return data
+        return self.check_vars()
+
     def test_one_intel_no_change(self):
         '''intel -> intel'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('8086:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-i915-brw 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_changed=True,
-                                   has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                      ['intel'],
+                                      ['i915-brw'],
+                                      ['mesa'],
+                                      'mesa')
+
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -509,43 +715,25 @@ i915-brw 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No action
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_nvidia_binary_no_change(self):
         '''nvidia -> nvidia'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('10de:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('10de:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars(has_changed=True,
-                                   has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                      ['nvidia'],
+                                      ['nvidia'],
+                                      ['mesa', 'nvidia'],
+                                      'nvidia',
+                                      is_laptop=True)
 
         # Check the variables
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -557,9 +745,9 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # No open!
         self.assertFalse(gpu_test.nouveau_loaded)
         # No change
@@ -568,39 +756,18 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No action
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_nvidia_open_no_change(self):
         '''nvidia (nouveau) -> nvidia (nouveau)'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('10de:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('10de:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-nouveau 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_changed=True,
-                                   has_not_acted=True)
-
-        # Check the variables
-        self.assert_(gpu_test.has_single_card)
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                      ['nvidia'],
+                                      ['nouveau'],
+                                      ['mesa'],
+                                      'mesa')
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -611,62 +778,44 @@ nouveau 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Open driver only!
         self.assertFalse(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No change
         self.assertFalse(gpu_test.has_changed)
         self.assertFalse(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No action
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_amd_binary_no_change(self):
         '''fglrx -> fglrx'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('1002:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                      ['amd'],
+                                      ['fglrx'],
+                                      ['mesa', 'fglrx'],
+                                      'fglrx')
 
         # Check the variables
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         # No radeon
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nvidia_loaded)
@@ -678,36 +827,32 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No action
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
 
         # What if the kernel module wasn't built
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                      ['amd'],
+                                      ['fake'],
+                                      ['mesa', 'fglrx'],
+                                      'fglrx')
+
 
         # Check the variables
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         # No radeon
         self.assertFalse(gpu_test.radeon_loaded)
         # fglrx is not loaded
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nvidia_loaded)
@@ -716,52 +861,33 @@ fake 1447330 3 - Live 0x0000000000000000
         # No change
         self.assertFalse(gpu_test.has_changed)
         # Select fallback and remove xorg.conf
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # Fallback action
         self.assertFalse(gpu_test.has_not_acted)
 
     def test_one_amd_open_no_change(self):
         '''radeon -> radeon'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('1002:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
         # Collect data
-        gpu_test = self.check_vars(has_changed=True,
-                                   has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd'],
+                                                 ['radeon'],
+                                                 ['mesa'],
+                                                 'mesa')
 
         # Check the variables
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         # No fglrx
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
@@ -775,64 +901,46 @@ radeon 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No action
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_intel_to_nvidia_binary(self):
         '''intel -> nvidia'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('10de:28e8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['nvidia'],
+                                                 ['nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         # We are going to enable nvidia
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # Action is required
         # We enable nvidia
         self.assertFalse(gpu_test.has_not_acted)
@@ -840,20 +948,18 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # Let's try again, only this time it's all
         # already in place
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['nvidia'],
+                                                 ['nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
@@ -865,14 +971,14 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         # We are going to enable nvidia
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # Action is required
@@ -885,27 +991,20 @@ nvidia 1447330 3 - Live 0x0000000000000000
         #
         # The binary driver is not there
         # whereas the open driver is blacklisted
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['nvidia'],
+                                                 ['fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -919,73 +1018,56 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         #The open driver is blacklisted
         self.assertFalse(gpu_test.nouveau_loaded)
         # No kenrel module
         self.assertFalse(gpu_test.nvidia_loaded)
         # The driver is enabled
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # We should switch to mesa
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.has_not_acted)
 
     def test_one_intel_to_nvidia_open(self):
         '''intel -> nouveau'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('10de:28e8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-nouveau 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['nvidia'],
+                                                 ['nouveau'],
+                                                 ['mesa'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -994,47 +1076,30 @@ nouveau 1447330 3 - Live 0x0000000000000000
     def test_one_intel_to_amd_open(self):
         '''intel -> radeon'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('1002:28e8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['amd'],
+                                                 ['radeon'],
+                                                 ['mesa'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
@@ -1043,8 +1108,8 @@ radeon 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -1053,47 +1118,29 @@ radeon 1447330 3 - Live 0x0000000000000000
     def test_one_intel_to_amd_binary(self):
         '''intel -> fglrx'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('1002:28e8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['amd'],
+                                                 ['fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -1102,10 +1149,10 @@ fglrx 1447330 3 - Live 0x0000000000000000
         # We are going to enable fglrx
         self.assertFalse(gpu_test.fglrx_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # Action is required
         # We enable fglrx
         self.assertFalse(gpu_test.has_not_acted)
@@ -1113,45 +1160,39 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Let's try again, only this time it's all
         # already in place
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['amd'],
+                                                 ['fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # We don't need to enable fglrx again
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # Action is not required
@@ -1164,34 +1205,27 @@ fglrx 1447330 3 - Live 0x0000000000000000
         #
         # The binary driver is not there
         # whereas the open driver is blacklisted
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['amd'],
+                                                 ['fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         #The open driver is blacklisted
         self.assertFalse(gpu_test.radeon_loaded)
         # No kernel module
@@ -1201,56 +1235,39 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # We should switch to mesa
         self.assertFalse(gpu_test.has_not_acted)
 
     def test_one_amd_open_to_intel(self):
         '''radeon -> intel'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:28e8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('8086:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['intel'],
+                                                 ['i915'],
+                                                 ['mesa'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -1262,8 +1279,8 @@ i915 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # No need to do anything else
         self.assertFalse(gpu_test.has_selected_driver)
@@ -1272,57 +1289,40 @@ i915 1447330 3 - Live 0x0000000000000000
     def test_one_amd_open_to_nvidia_open(self):
         '''radeon -> nouveau'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:28e8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('10de:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-nouveau 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['nvidia'],
+                                                 ['nouveau'],
+                                                 ['mesa'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # No need to do anything else
         self.assertFalse(gpu_test.has_selected_driver)
@@ -1332,82 +1332,62 @@ nouveau 1447330 3 - Live 0x0000000000000000
     def test_one_amd_open_to_nvidia_binary(self):
         '''radeon -> nouveau'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:28e8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('10de:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['nvidia'],
+                                                 ['nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Let's try again, only this time it's all
         # already in place
 
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['nvidia'],
+                                                 ['nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -1421,13 +1401,13 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # No need to do anything else
         self.assertFalse(gpu_test.has_selected_driver)
@@ -1439,27 +1419,20 @@ nvidia 1447330 3 - Live 0x0000000000000000
         #
         # The binary driver is not there
         # whereas the open driver is blacklisted
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['nvidia'],
+                                                 ['fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -1473,65 +1446,46 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         #The open driver is blacklisted
         self.assertFalse(gpu_test.nouveau_loaded)
         # No kenrel module
         self.assertFalse(gpu_test.nvidia_loaded)
         # The driver is enabled
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # We should switch to mesa
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.has_not_acted)
 
     def test_one_amd_binary_to_intel(self):
         '''fglrx -> intel'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:28e8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('8086:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
 
         # User removed the discrete card without
-        # uninstalling the binary driver
+        # uninstalling the binary driver and somehow
         # the kernel module is still loaded
 
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-i915 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['intel'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -1539,57 +1493,43 @@ i915 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         # The binary driver is loaded and enabled
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         # NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # User removed the discrete card without
         # uninstalling the binary driver
         # the kernel module is no longer loaded
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['intel'],
+                                                 ['i915'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -1600,61 +1540,42 @@ i915 1447330 3 - Live 0x0000000000000000
         # is not loaded
         self.assertFalse(gpu_test.fglrx_loaded)
         # The binary driver is still enabled
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         # NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.has_not_acted)
 
     def test_one_amd_binary_to_nvidia_open(self):
         '''fglrx -> nouveau'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:28e8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('10de:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
 
         # User swapped the discrete card with
         # a discrete card from another vendor
         # without uninstalling the binary driver
         # the kernel module is still loaded
 
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-nouveau 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['nvidia'],
+                                                 ['nouveau', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -1666,19 +1587,19 @@ nouveau 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         # The binary driver is loaded and enabled
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.has_not_acted)
 
 
@@ -1686,34 +1607,20 @@ nouveau 1447330 3 - Live 0x0000000000000000
         # a discrete card from another vendor
         # without uninstalling the binary driver
         # the kernel module is no longer loaded
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-nouveau 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['nvidia'],
+                                                 ['nouveau'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
         self.assertFalse(gpu_test.has_intel)
@@ -1728,61 +1635,42 @@ nouveau 1447330 3 - Live 0x0000000000000000
         # is not loaded
         self.assertFalse(gpu_test.fglrx_loaded)
         # The binary driver is still enabled
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.has_not_acted)
 
     def test_one_amd_binary_to_nvidia_binary(self):
         '''fglrx -> nvidia'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:28e8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('10de:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
 
         # User swapped the discrete card with
         # a discrete card from another vendor
         # and installed the new binary driver
         # however the kernel module wasn't built
 
-        self.fake_modules.write('''
-fake 1447330 3 - Live 0x0000000000000000
-fake_alt 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['nvidia'],
+                                                 ['fake', 'fake_alt'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -1796,16 +1684,16 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.has_not_acted)
 
 
@@ -1813,35 +1701,20 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         # a discrete card from another vendor
         # and installed the new binary driver
         # correctly
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['nvidia'],
+                                                 ['fake', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -1855,13 +1728,13 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # No need to select the driver
         self.assertFalse(gpu_test.has_selected_driver)
@@ -1870,41 +1743,20 @@ nvidia 1447330 3 - Live 0x0000000000000000
     def test_one_amd_open_to_amd_binary(self):
         '''radeon -> fglrx'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:28e8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        # Same card
-        self.fake_lspci.write('1002:28e8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        # The module was built
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-fake_alt 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd'],
+                                                 ['fglrx', 'fake_alt'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -1913,10 +1765,10 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -1928,26 +1780,25 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
         self.assertFalse(gpu_test.has_selected_driver)
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
 
         # Different card
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('1002:2fe2;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd'],
+                                                 ['fglrx', 'fake_alt'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 bump_boot_vga_device_id=True)
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -1956,19 +1807,19 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_changed)
         # We remove the xorg.conf
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
         self.assertFalse(gpu_test.has_selected_driver)
@@ -1978,30 +1829,20 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         # What if the module was not built?
 
         # Same card
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('1002:28e8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        # The module was not built
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake 1447330 3 - Live 0x0000000000000000
-fake_alt 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd'],
+                                                 ['fake', 'fake_alt'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -2010,10 +1851,10 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -2022,30 +1863,29 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         # Has not changed
         self.assertFalse(gpu_test.has_changed)
         # Move away xorg.conf if falling back
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver (fallback)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Different card
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('1002:2fe2;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd'],
+                                                 ['fake', 'fake_alt'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 bump_boot_vga_device_id=True)
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -2054,79 +1894,61 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_changed)
         # We remove the xorg.conf
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver (fallback)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.has_not_acted)
 
 
     def test_one_amd_binary_to_amd_open(self):
         '''fglrx -> radeon'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('1002:28e8;0000:00:01:0;1')
-        self.last_boot_file.close()
 
         # Same card
-        self.fake_lspci.write('1002:28e8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
 
         # Case 1: fglrx is still installed and in use
         # the user switched to mesa without
         # uninstalling fglrx
 
         # The module was built
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-fake_alt 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd'],
+                                                 ['fglrx', 'fake_alt'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -2135,42 +1957,41 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
         # We switch back to fglrx
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Different card
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('1002:2fe2;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd'],
+                                                 ['fglrx', 'fake_alt'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa',
+                                                 bump_boot_vga_device_id=True)
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -2178,54 +1999,42 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_changed)
         # We remove the xorg.conf
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 2: fglrx was removed
 
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
         # Same card
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('1002:28e8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-fake_alt 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd'],
+                                                 ['radeon', 'fake_alt'],
+                                                 ['mesa'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
@@ -2240,36 +2049,34 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Nothing to select
         self.assertFalse(gpu_test.has_selected_driver)
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
 
         # Different card
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('1002:2fe2;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
-
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd'],
+                                                 ['radeon', 'fake_alt'],
+                                                 ['mesa'],
+                                                 'mesa',
+                                                 bump_boot_vga_device_id=True)
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
@@ -2278,9 +2085,9 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_changed)
         # We remove the xorg.conf
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Nothing to select
         self.assertFalse(gpu_test.has_selected_driver)
@@ -2290,44 +2097,27 @@ fake_alt 1447330 3 - Live 0x0000000000000000
     def test_one_nvidia_open_to_intel(self):
         '''nouveau -> intel'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('10de:28e8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('8086:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['intel'],
+                                                 ['i915'],
+                                                 ['mesa'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
 
         # No AMD
         self.assertFalse(gpu_test.has_amd)
@@ -2340,8 +2130,8 @@ i915 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -2350,48 +2140,31 @@ i915 1447330 3 - Live 0x0000000000000000
     def test_one_nvidia_open_to_amd_open(self):
         '''nouveau -> radeon'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('10de:28e8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('1002:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['amd'],
+                                                 ['radeon'],
+                                                 ['mesa'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
 
         # No AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
@@ -2400,8 +2173,8 @@ radeon 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -2410,49 +2183,32 @@ radeon 1447330 3 - Live 0x0000000000000000
     def test_one_nvidia_open_to_amd_binary(self):
         '''nouveau -> fglrx'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('10de:28e8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('1002:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
 
         # No kernel module
-        self.fake_modules.write('''
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # Mesa enabled
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['amd'],
+                                                 ['fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
 
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
@@ -2462,8 +2218,8 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -2471,20 +2227,20 @@ fake 1447330 3 - Live 0x0000000000000000
 
 
         # What if fglrx is enabled? (no kernel module)
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['amd'],
+                                                 ['fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
         self.assertFalse(gpu_test.has_intel)
@@ -2494,59 +2250,52 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.mesa_enabled)
 
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the fallback
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # Action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # What if kernel module is available and mesa is enabled?
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        # Mesa enabled
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['amd'],
+                                                 ['fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
 
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -2554,31 +2303,31 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # Action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # What if kernel module is available and fglrx is enabled?
         # fglrx enabled
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['amd'],
+                                                 ['fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
         self.assertFalse(gpu_test.has_intel)
@@ -2588,18 +2337,18 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.mesa_enabled)
 
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -2608,43 +2357,24 @@ fglrx 1447330 3 - Live 0x0000000000000000
     def test_one_nvidia_binary_to_intel(self):
         '''nvidia -> intel'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('10de:28e8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('8086:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
 
         # Case 1: nvidia loaded and enabled
 
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -2656,39 +2386,39 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         # nvidia is still enabled
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # Action is required
         # We enable mesa
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 2: nvidia loaded and not enabled
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -2697,12 +2427,12 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         # nvidia is not enabled
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -2710,30 +2440,22 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
 
         # Case 3: nvidia not loaded and enabled
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -2747,43 +2469,36 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         # nvidia is still enabled
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 4: nvidia not loaded and not enabled
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -2796,8 +2511,8 @@ fake 1447330 3 - Live 0x0000000000000000
         # nvidia is not enabled
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -2807,41 +2522,22 @@ fake 1447330 3 - Live 0x0000000000000000
     def test_one_nvidia_binary_to_amd_open(self):
         '''nvidia -> radeon'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('10de:28e8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('1002:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
 
         # Case 1: nvidia loaded and enabled
 
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['amd'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
         # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
@@ -2849,61 +2545,61 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         # nvidia is still enabled
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # Action is required
         # We enable mesa
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 2: nvidia loaded and not enabled
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['amd'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
         # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         # nvidia is not enabled
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -2911,28 +2607,20 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
 
         # Case 3: nvidia not loaded and enabled
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['amd'],
+                                                 ['radeon', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
         # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
@@ -2940,8 +2628,8 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
@@ -2949,47 +2637,40 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         # nvidia is still enabled
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 4: nvidia not loaded and not enabled
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['amd'],
+                                                 ['radeon', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
         #No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
@@ -2999,8 +2680,8 @@ fake 1447330 3 - Live 0x0000000000000000
         # nvidia is not enabled
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -3010,44 +2691,25 @@ fake 1447330 3 - Live 0x0000000000000000
     def test_one_nvidia_binary_to_amd_binary(self):
         '''nvidia -> fglrx'''
         self.this_function_name = sys._getframe().f_code.co_name
-        self.last_boot_file.write('10de:28e8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('1002:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
 
         # User swapped the discrete card with
         # a discrete card from another vendor
         # and installed the new binary driver
         # however the kernel module wasn't built
 
-        self.fake_modules.write('''
-fake 1447330 3 - Live 0x0000000000000000
-fake_alt 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['amd'],
+                                                 ['fake', 'fake_alt'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -3056,21 +2718,21 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.has_not_acted)
 
 
@@ -3078,35 +2740,20 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         # a discrete card from another vendor
         # and installed the new binary driver
         # correctly
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['amd'],
+                                                 ['fake', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -3115,18 +2762,18 @@ fglrx 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # No need to select the driver
         self.assertFalse(gpu_test.has_selected_driver)
@@ -3137,35 +2784,20 @@ fglrx 1447330 3 - Live 0x0000000000000000
         # a discrete card from another vendor
         # but did not install the new binary driver
         # The kernel module is still loaded.
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['amd'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -3174,21 +2806,21 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver (fallback)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.has_not_acted)
 
 
@@ -3197,35 +2829,19 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # but did not install the new binary driver
         # The kernel module is no longer loaded.
 
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-fake_alt 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['amd'],
+                                                 ['radeon', 'fake_alt'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -3234,21 +2850,21 @@ fake_alt 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select the driver (fallback)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.has_not_acted)
 
     def test_laptop_one_intel_one_amd_open(self):
@@ -3257,50 +2873,30 @@ fake_alt 1447330 3 - Live 0x0000000000000000
 
         # Case 1: the discrete card is now available (BIOS)
 
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-radeon 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'radeon'],
+                                                 ['mesa'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
@@ -3309,8 +2905,8 @@ radeon 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -3318,34 +2914,31 @@ radeon 1447330 3 - Live 0x0000000000000000
 
 
         # Case 2: the discrete card was already available (BIOS)
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'radeon'],
+                                                 ['mesa'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
@@ -3359,45 +2952,32 @@ radeon 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No action is required
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
 
         # Case 3: the discrete card is no longer available (BIOS)
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('8086:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel'],
+                                                 ['i915'],
+                                                 ['mesa'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -3409,8 +2989,8 @@ i915 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -3421,33 +3001,13 @@ i915 1447330 3 - Live 0x0000000000000000
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Case 1: the discrete card is now available (BIOS)
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-radeon 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'radeon'],
+                                                 ['mesa'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -3457,14 +3017,14 @@ radeon 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
@@ -3473,8 +3033,8 @@ radeon 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -3482,23 +3042,13 @@ radeon 1447330 3 - Live 0x0000000000000000
 
 
         # Case 2: the discrete card was already available (BIOS)
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'radeon'],
+                                                 ['mesa'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -3508,14 +3058,14 @@ radeon 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         # No NVIDIA
@@ -3529,45 +3079,31 @@ radeon 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No action is required
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
 
         # Case 3: the discrete card is no longer available (BIOS)
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('8086:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel'],
+                                                 ['i915'],
+                                                 ['mesa'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -3579,8 +3115,8 @@ i915 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -3593,54 +3129,33 @@ i915 1447330 3 - Live 0x0000000000000000
 
         # Case 1a: the discrete card is now available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -3648,9 +3163,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
@@ -3666,16 +3181,18 @@ FAKEGPUSETTINGS=BLAHBLAH''')
 
         self.amd_pcsdb_file.close()
 
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
@@ -3732,16 +3249,18 @@ EndSection
         ''')
         self.xorg_file.close()
 
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
@@ -3800,20 +3319,22 @@ EndSection
         ''')
         self.xorg_file.close()
 
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # Has changed
-        self.assert_(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_changed)
         self.assertFalse(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
 
         # Let's create an amdpcsdb file where the discrete
@@ -3869,14 +3390,16 @@ EndSection
         ''')
         self.xorg_file.close()
 
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # Has changed
-        self.assert_(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_changed)
         self.assertFalse(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # We should select pxpress here
@@ -3884,34 +3407,14 @@ EndSection
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
 
         # Let's create a case where the discrete
         # GPU is disabled, fglrx was unloaded, and xorg.conf
         # is correct
-        self.fake_dmesg = open(self.fake_dmesg.name, 'w')
-        self.fake_dmesg.write('''
-[   23.462972] fglrx: module license 'Proprietary. (C) 2002 - ATI Technologies, Starnberg, GERMANY' taints kernel.
-[   23.462986] fglrx_pci 0000:01:00.0: Max Payload Size 16384, but upstream 0000:00:01.0 set to 128; if necessary, use "pci=pcie_bus_safe" and report a bug
-[   23.462994] fglrx_pci 0000:01:00.0: no hotplug settings from platform
-[   23.467552] waiting module removal not supported: please upgrade<6>[fglrx] module unloaded - fglrx 13.35.5 [Jan 29 2014]
-                                   ''')
-        self.fake_dmesg.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
 
         # Only intel should show up
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-        ''')
-        self.fake_lspci.close()
 
         self.xorg_file = open(self.xorg_file.name, 'w')
         self.xorg_file.write('''
@@ -3956,17 +3459,20 @@ EndSection
         ''')
         self.xorg_file.close()
 
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 unloaded_module='fglrx',
+                                                 is_laptop=True)
 
         # Check that fglrx was unloaded
-        self.assert_(gpu_test.fglrx_unloaded)
+        self.assertTrue(gpu_test.fglrx_unloaded)
 
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Has changed
         self.assertFalse(gpu_test.has_changed)
@@ -3977,34 +3483,11 @@ EndSection
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
-        self.assert_(gpu_test.has_not_acted)
-
+        self.assertTrue(gpu_test.has_not_acted)
 
         # Let's create a case where the discrete
         # GPU is disabled, fglrx was unloaded, and xorg.conf
         # is incorrect
-        self.fake_dmesg = open(self.fake_dmesg.name, 'w')
-        self.fake_dmesg.write('''
-[   23.462972] fglrx: module license 'Proprietary. (C) 2002 - ATI Technologies, Starnberg, GERMANY' taints kernel.
-[   23.462986] fglrx_pci 0000:01:00.0: Max Payload Size 16384, but upstream 0000:00:01.0 set to 128; if necessary, use "pci=pcie_bus_safe" and report a bug
-[   23.462994] fglrx_pci 0000:01:00.0: no hotplug settings from platform
-[   23.467552] waiting module removal not supported: please upgrade<6>[fglrx] module unloaded - fglrx 13.35.5 [Jan 29 2014]
-                                   ''')
-        self.fake_dmesg.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        # Only intel should show up
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-        ''')
-        self.fake_lspci.close()
 
         self.xorg_file = open(self.xorg_file.name, 'w')
         self.xorg_file.write('''
@@ -4043,22 +3526,25 @@ EndSection
         ''')
         self.xorg_file.close()
 
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 unloaded_module='fglrx',
+                                                 is_laptop=True)
 
         # Check that fglrx was unloaded
-        self.assert_(gpu_test.fglrx_unloaded)
+        self.assertTrue(gpu_test.fglrx_unloaded)
 
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         # We should select pxpress here
         # but we won't for now
         self.assertFalse(gpu_test.has_selected_driver)
@@ -4069,58 +3555,33 @@ EndSection
 
         # Case 1b: the discrete card is now available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -4128,10 +3589,10 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -4139,57 +3600,32 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 1c: the discrete card is now available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -4198,9 +3634,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         # We should select the driver here
         # but we won't for now
         self.assertFalse(gpu_test.has_selected_driver)
@@ -4211,59 +3647,34 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 1d: the discrete card is now available (BIOS)
         #          pxpress is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -4271,9 +3682,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         # Select fglrx, as the discrete GPU
         # is not disabled
         # We should select the driver here
@@ -4286,59 +3697,34 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 1e: the discrete card is now available (BIOS)
         #          pxpress is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -4346,10 +3732,10 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -4357,57 +3743,32 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 1f: the discrete card is now available (BIOS)
         #          pxpress is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -4417,9 +3778,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         # We should select the driver here
         # but we won't for now
         self.assertFalse(gpu_test.has_selected_driver)
@@ -4430,60 +3791,33 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 2a: the discrete card was already available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -4493,8 +3827,8 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
@@ -4503,60 +3837,33 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 2b: the discrete card was already available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -4566,9 +3873,9 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -4576,59 +3883,32 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 2c: the discrete card was already available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -4639,8 +3919,8 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         # We should select the driver here
         # but we won't for now
         self.assertFalse(gpu_test.has_selected_driver)
@@ -4651,61 +3931,34 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 2d: the discrete card was already available (BIOS)
         #          pxpress is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -4714,8 +3967,8 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         # We should select the driver here
         # but we won't for now
         self.assertFalse(gpu_test.has_selected_driver)
@@ -4726,61 +3979,34 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 2e: the discrete card was already available (BIOS)
         #          pxpress is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -4789,9 +4015,9 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -4799,59 +4025,32 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 2f: the discrete card was already available (BIOS)
         #          pxpress is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -4862,8 +4061,8 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         # We should select the driver here
         # but we won't for now
         self.assertFalse(gpu_test.has_selected_driver)
@@ -4874,60 +4073,33 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 3a: the discrete card is no longer available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -4936,62 +4108,35 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3b: the discrete card is no longer available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -4999,7 +4144,7 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -5008,69 +4153,42 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3c: the discrete card is no longer available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -5080,8 +4198,8 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # We should select the driver here
         # but we won't for now
@@ -5092,61 +4210,35 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 3d: the discrete card is no longer available (BIOS)
         #          pxpress is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress',
+                                                 is_laptop=True)
+
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -5154,62 +4246,35 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3e: the discrete card is no longer available (BIOS)
         #          pxpress is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -5218,7 +4283,7 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -5226,69 +4291,42 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3f: the discrete card is no longer available (BIOS)
         #          pxpress is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
 
         # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -5298,8 +4336,8 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -5311,35 +4349,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 1a: the discrete card is now available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
@@ -5349,16 +4365,16 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -5366,9 +4382,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
@@ -5377,39 +4393,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 1b: the discrete card is now available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
@@ -5419,16 +4409,16 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -5436,10 +4426,10 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -5447,39 +4437,13 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 1c: the discrete card is now available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -5489,15 +4453,15 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -5506,10 +4470,10 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -5517,39 +4481,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 1d: the discrete card is now available (BIOS)
         #          pxpress is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress')
 
         # Check the variables
 
@@ -5559,17 +4497,17 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -5577,12 +4515,12 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         # Select fglrx, as the discrete GPU
         # is not disabled
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -5590,39 +4528,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 1e: the discrete card is now available (BIOS)
         #          pxpress is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress')
 
         # Check the variables
 
@@ -5632,17 +4544,17 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -5650,10 +4562,10 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -5661,39 +4573,13 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 1f: the discrete card is now available (BIOS)
         #          pxpress is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -5703,15 +4589,15 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -5721,10 +4607,10 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -5732,41 +4618,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 2a: the discrete card was already available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
 
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
@@ -5776,16 +4634,16 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -5795,8 +4653,8 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
@@ -5805,41 +4663,12 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 2b: the discrete card was already available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
-
         # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
@@ -5849,16 +4678,16 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -5868,9 +4697,9 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -5878,41 +4707,12 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 2c: the discrete card was already available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -5922,15 +4722,15 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -5941,9 +4741,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -5951,41 +4751,12 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 2d: the discrete card was already available (BIOS)
         #          pxpress is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress')
 
         # Check the variables
 
@@ -5995,17 +4766,17 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -6014,9 +4785,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -6024,41 +4795,12 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 2e: the discrete card was already available (BIOS)
         #          pxpress is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress')
 
         # Check the variables
 
@@ -6068,17 +4810,17 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -6087,9 +4829,9 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -6097,41 +4839,12 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 2f: the discrete card was already available (BIOS)
         #          pxpress is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -6141,15 +4854,15 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -6160,9 +4873,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -6170,60 +4883,31 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 3a: the discrete card is no longer available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -6232,62 +4916,33 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3b: the discrete card is no longer available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -6295,7 +4950,7 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -6304,69 +4959,40 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3c: the discrete card is no longer available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -6376,8 +5002,8 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -6386,61 +5012,32 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 3d: the discrete card is no longer available (BIOS)
         #          pxpress is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -6448,62 +5045,33 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3e: the discrete card is no longer available (BIOS)
         #          pxpress is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -6512,7 +5080,7 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -6520,69 +5088,40 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3f: the discrete card is no longer available (BIOS)
         #          pxpress is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['intel'],
+                                                 ['i915', 'fglrx'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -6592,8 +5131,8 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -6604,48 +5143,26 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Case 1: the discrete card is now available (BIOS)
-
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nouveau 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nouveau'],
+                                                 ['mesa'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -6653,14 +5170,14 @@ nouveau 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -6668,31 +5185,26 @@ nouveau 1447330 3 - Live 0x0000000000000000
 
 
         # Case 2: the discrete card was already available (BIOS)
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nouveau'],
+                                                 ['mesa'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -6700,8 +5212,8 @@ nouveau 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
@@ -6711,45 +5223,30 @@ nouveau 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No action is required
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
 
         # Case 3: the discrete card is no longer available (BIOS)
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('8086:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915'],
+                                                 ['mesa'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -6761,8 +5258,8 @@ i915 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -6773,34 +5270,11 @@ i915 1447330 3 - Live 0x0000000000000000
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Case 1: the discrete card is now available (BIOS)
-
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nouveau 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nouveau'],
+                                                 ['mesa'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -6810,11 +5284,11 @@ nouveau 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -6822,14 +5296,14 @@ nouveau 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -6837,17 +5311,11 @@ nouveau 1447330 3 - Live 0x0000000000000000
 
 
         # Case 2: the discrete card was already available (BIOS)
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nouveau'],
+                                                 ['mesa'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -6857,11 +5325,11 @@ nouveau 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -6869,8 +5337,8 @@ nouveau 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
@@ -6880,45 +5348,29 @@ nouveau 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No action is required
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
 
         # Case 3: the discrete card is no longer available (BIOS)
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('8086:68d8;0000:00:01:0;1')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=False)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915'],
+                                                 ['mesa'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is still enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -6930,8 +5382,8 @@ i915 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -6943,71 +5395,40 @@ i915 1447330 3 - Live 0x0000000000000000
 
         # Case 1a: the discrete card is now available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
 
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
+        # Set dmi product version
+        self.set_dmi_product_version('ThinkPad T410s')
 
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
+        # Set default quirks
+        self.set_bbswitch_quirks()
 
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-''')
-        self.fake_alternatives.close()
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
 
-        self.prime_settings = open(self.prime_settings.name, 'w')
-        self.prime_settings.write('ON')
-        self.prime_settings.close()
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
 
-        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
-        self.bbswitch_path.write('0000:01:00.0 ON')
-        self.bbswitch_path.close()
-
-        # Set dmi
-        self.dmi_product_version_path = open(self.dmi_product_version_path.name, 'w')
-        self.dmi_product_version_path.write('ThinkPad T410s\n')
-        self.dmi_product_version_path.close()
-
-        # Set quirk
-        self.bbswitch_quirks_path = open(self.bbswitch_quirks_path.name, 'w')
-        self.bbswitch_quirks_path.write('''
-"ThinkPad T410" "skip_optimus_dsm=1"
-"ThinkPad T410s" "skip_optimus_dsm=1"
-        ''')
-        self.bbswitch_quirks_path.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check quirks
-        self.assert_(gpu_test.matched_quirk)
-        self.assert_(gpu_test.loaded_with_quirk)
+        self.assertTrue(gpu_test.matched_quirk)
+        self.assertTrue(gpu_test.loaded_with_quirk)
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -7018,15 +5439,15 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
         # Enable when we support hybrid laptops
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
@@ -7035,58 +5456,29 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # Case 1b: the discrete card is now available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
 
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
 
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        self.prime_settings = open(self.prime_settings.name, 'w')
-        self.prime_settings.write('ON')
-        self.prime_settings.close()
-
-        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
-        self.bbswitch_path.write('0000:01:00.0 ON')
-        self.bbswitch_path.close()
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
-
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 is_laptop=True)
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -7097,16 +5489,16 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_unloaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -7114,61 +5506,33 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 1c: the discrete card is now available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
 
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
 
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        self.prime_settings = open(self.prime_settings.name, 'w')
-        self.prime_settings.write('ON')
-        self.prime_settings.close()
-
-        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
-        self.bbswitch_path.write('0000:01:00.0 ON')
-        self.bbswitch_path.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -7176,15 +5540,15 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -7192,58 +5556,30 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # Case 1d: the discrete card is now available (BIOS)
         #          prime is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
 
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
+        # Request action from bbswitch
+        self.request_prime_discrete_on(False)
 
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        self.prime_settings = open(self.prime_settings.name, 'w')
-        self.prime_settings.write('OFF')
-        self.prime_settings.close()
-
-        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
-        self.bbswitch_path.write('0000:01:00.0 ON')
-        self.bbswitch_path.close()
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -7254,14 +5590,14 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
@@ -7271,58 +5607,30 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # Case 1e: the discrete card is now available (BIOS)
         #          prime is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
 
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
 
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        self.prime_settings = open(self.prime_settings.name, 'w')
-        self.prime_settings.write('ON')
-        self.prime_settings.close()
-
-        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
-        self.bbswitch_path.write('0000:01:00.0 ON')
-        self.bbswitch_path.close()
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -7333,71 +5641,51 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Fall back to mesa
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 1f: the discrete card is now available (BIOS)
-        #          pxpress is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
+        #          prime is not enabled but the module is loaded
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
 
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
 
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -7405,71 +5693,47 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        '''
-        # Enable when we support hybrid laptops
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        '''
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 2a: the discrete card was already available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
 
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
 
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -7480,79 +5744,49 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        '''
+
         # Enable when we support hybrid laptops
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
-        '''
+
         # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 2b: the discrete card was already available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
 
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
 
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        self.prime_settings = open(self.prime_settings.name, 'w')
-        self.prime_settings.write('ON')
-        self.prime_settings.close()
-
-        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
-        self.bbswitch_path.write('0000:01:00.0 ON')
-        self.bbswitch_path.close()
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -7563,16 +5797,16 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -7580,63 +5814,33 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 2c: the discrete card was already available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
 
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
 
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        self.prime_settings = open(self.prime_settings.name, 'w')
-        self.prime_settings.write('ON')
-        self.prime_settings.close()
-
-        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
-        self.bbswitch_path.write('0000:01:00.0 ON')
-        self.bbswitch_path.close()
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -7644,16 +5848,16 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -7661,60 +5865,30 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # Case 2d: the discrete card was already available (BIOS)
         #          prime is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
 
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
+        # Request action from bbswitch
+        self.request_prime_discrete_on(False)
 
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        self.prime_settings = open(self.prime_settings.name, 'w')
-        self.prime_settings.write('OFF')
-        self.prime_settings.close()
-
-        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
-        self.bbswitch_path.write('0000:01:00.0 ON')
-        self.bbswitch_path.close()
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -7725,14 +5899,14 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
@@ -7742,60 +5916,30 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # Case 2e: the discrete card was already available (BIOS)
         #          prime is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
 
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
+        # Request action from bbswitch
+        self.request_prime_discrete_on(False)
 
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        self.prime_settings = open(self.prime_settings.name, 'w')
-        self.prime_settings.write('OFF')
-        self.prime_settings.close()
-
-        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
-        self.bbswitch_path.write('0000:01:00.0 ON')
-        self.bbswitch_path.close()
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -7806,17 +5950,17 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Fallback
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -7824,63 +5968,33 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 2f: the discrete card was already available (BIOS)
         #          prime is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
 
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
+        # Request action from bbswitch
+        self.request_prime_discrete_on(False)
 
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        self.prime_settings = open(self.prime_settings.name, 'w')
-        self.prime_settings.write('OFF')
-        self.prime_settings.close()
-
-        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
-        self.bbswitch_path.write('0000:01:00.0 ON')
-        self.bbswitch_path.close()
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -7888,17 +6002,17 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # Select PRIME
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -7906,52 +6020,23 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # Case 3a: the discrete card is no longer available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -7964,66 +6049,36 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3b: the discrete card is no longer available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
-
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 is_laptop=True)
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -8037,84 +6092,44 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3c: the discrete card is no longer available (bbswitch)
         #          prime is enabled and the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(False)
 
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
+        # Request action from bbswitch
+        self.request_prime_discrete_on(False)
 
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        self.prime_settings = open(self.prime_settings.name, 'w')
-        self.prime_settings.write('OFF')
-        self.prime_settings.close()
-
-        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
-        self.bbswitch_path.write('0000:01:00.0 OFF')
-        self.bbswitch_path.close()
-
-        self.fake_dmesg = open(self.fake_dmesg.name, 'w')
-        self.fake_dmesg.write('''
-[   18.017267] nvidia: module license 'NVIDIA' taints kernel.
-[   18.019886] nvidia: module verification failed: signature and/or  required key missing - tainting kernel
-[   18.022845] nvidia 0000:01:00.0: enabling device (0000 -> 0003)
-[   18.689111] [drm] Initialized nvidia-drm 0.0.0 20130102 for 0000:01:00.0 on minor 1
-[   35.604564] init: Failed to spawn nvidia-persistenced main process: unable to execute: No such file or directory
-                             ''')
-        self.fake_dmesg.close()
-
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime',
+                                                 unloaded_module='nvidia',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -8129,10 +6144,10 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -8142,71 +6157,31 @@ fake 1447330 3 - Live 0x0000000000000000
         # Case 3d: the discrete card is no longer available (bbswitch)
         #          prime is enabled and the module is not loaded and
         #          we need to select nvidia for better performance
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
 
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(False)
 
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
 
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        self.prime_settings = open(self.prime_settings.name, 'w')
-        self.prime_settings.write('ON')
-        self.prime_settings.close()
-
-        self.bbswitch_path = open(self.bbswitch_path.name, 'w')
-        self.bbswitch_path.write('0000:01:00.0 OFF')
-        self.bbswitch_path.close()
-
-        self.fake_dmesg = open(self.fake_dmesg.name, 'w')
-        self.fake_dmesg.write('''
-[   18.017267] nvidia: module license 'NVIDIA' taints kernel.
-[   18.019886] nvidia: module verification failed: signature and/or  required key missing - tainting kernel
-[   18.022845] nvidia 0000:01:00.0: enabling device (0000 -> 0003)
-[   18.689111] [drm] Initialized nvidia-drm 0.0.0 20130102 for 0000:01:00.0 on minor 1
-[   35.604564] init: Failed to spawn nvidia-persistenced main process: unable to execute: No such file or directory
-                             ''')
-        self.fake_dmesg.close()
-
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime',
+                                                 unloaded_module='nvidia',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -8221,67 +6196,38 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3e: the discrete card is no longer available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -8291,12 +6237,12 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -8305,52 +6251,23 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # Case 3f: the discrete card is no longer available (BIOS)
         #          prime is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -8363,66 +6280,37 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3g: the discrete card is no longer available (BIOS)
         #          prime is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -8437,67 +6325,38 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3h: the discrete card is no longer available (BIOS)
-        #          pxpress is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        #          prime is not enabled but the module is loaded
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -8507,17 +6366,16 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
-
 
     def test_desktop_one_intel_one_nvidia_binary(self):
         '''desktop: intel + nvidia'''
@@ -8525,35 +6383,11 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # Case 1a: the discrete card is now available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
@@ -8563,8 +6397,8 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -8575,14 +6409,14 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -8590,39 +6424,11 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # Case 1b: the discrete card is now available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
@@ -8632,8 +6438,8 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -8644,15 +6450,15 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
 
         # Enable when we support hybrid laptops
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
@@ -8661,39 +6467,11 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 1c: the discrete card is now available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -8703,11 +6481,11 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -8715,17 +6493,17 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
 
         # Enable when we support hybrid laptops
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -8733,39 +6511,11 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # Case 1d: the discrete card is now available (BIOS)
         #          prime is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime')
 
         # Check the variables
 
@@ -8775,8 +6525,8 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -8787,16 +6537,16 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -8804,39 +6554,11 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # Case 1e: the discrete card is now available (BIOS)
         #          prime is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime')
 
         # Check the variables
 
@@ -8846,8 +6568,8 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -8858,56 +6580,28 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 1f: the discrete card is now available (BIOS)
-        #          pxpress is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('8086:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        #          prime is not enabled but the module is loaded
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -8917,11 +6611,11 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -8929,16 +6623,16 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -8946,41 +6640,11 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # Case 2a: the discrete card was already available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
@@ -8990,8 +6654,8 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -9002,15 +6666,15 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
@@ -9028,11 +6692,11 @@ EndSection
 ''');
         self.xorg_file.close()
 
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # No AMD
         self.assertFalse(gpu_test.has_amd)
@@ -9041,10 +6705,10 @@ EndSection
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
@@ -9053,7 +6717,7 @@ EndSection
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
 
         # See if it still regenerates xorg.conf if the
@@ -9068,11 +6732,11 @@ EndSection
 ''');
         self.xorg_file.close()
 
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # No AMD
         self.assertFalse(gpu_test.has_amd)
@@ -9081,15 +6745,15 @@ EndSection
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
@@ -9098,41 +6762,11 @@ EndSection
 
         # Case 2b: the discrete card was already available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
@@ -9142,8 +6776,8 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -9154,16 +6788,16 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -9171,41 +6805,11 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 2c: the discrete card was already available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -9215,11 +6819,11 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -9227,16 +6831,16 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -9244,41 +6848,11 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # Case 2d: the discrete card was already available (BIOS)
         #          prime is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime')
 
         # Check the variables
 
@@ -9288,8 +6862,8 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -9300,16 +6874,16 @@ nvidia 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -9317,41 +6891,11 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # Case 2e: the discrete card was already available (BIOS)
         #          prime is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime')
 
         # Check the variables
 
@@ -9361,8 +6905,8 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -9373,16 +6917,16 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -9395,52 +6939,22 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 3a: the discrete card is no longer available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -9453,66 +6967,36 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3b: the discrete card is no longer available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -9526,68 +7010,38 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3c: the discrete card is no longer available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -9597,12 +7051,12 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -9611,52 +7065,22 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # Case 3d: the discrete card is no longer available (BIOS)
         #          prime is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -9669,66 +7093,36 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3e: the discrete card is no longer available (BIOS)
         #          prime is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
@@ -9743,67 +7137,37 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3f: the discrete card is no longer available (BIOS)
-        #          pxpress is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-8086:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-8086:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-i915 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        #          prime is not enabled but the module is loaded
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # Intel
-        self.assert_(gpu_test.has_intel)
-        self.assert_(gpu_test.intel_loaded)
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -9813,12 +7177,12 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -9830,35 +7194,11 @@ nvidia 1447330 3 - Live 0x0000000000000000
 
         # Case 1a: the discrete card is now available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
@@ -9874,10 +7214,10 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -9885,9 +7225,9 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -9895,39 +7235,11 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 1b: the discrete card is now available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-old_fake 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'amd'],
+                                                 ['old_fake', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'fglrx')
 
         # Check the variables
 
@@ -9943,10 +7255,10 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -9954,8 +7266,8 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
@@ -9964,39 +7276,11 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 1c: the discrete card is now available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -10010,11 +7294,11 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -10024,10 +7308,10 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
 
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -10035,39 +7319,11 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 1d: the discrete card is now available (BIOS)
         #          pxpress is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress')
 
         # Check the variables
 
@@ -10083,11 +7339,11 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -10095,10 +7351,10 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -10106,39 +7362,11 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 1e: the discrete card is now available (BIOS)
         #          pxpress is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fake_old', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress')
 
         # Check the variables
 
@@ -10154,11 +7382,11 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -10166,10 +7394,10 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -10177,39 +7405,11 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 1f: the discrete card is now available (BIOS)
         #          pxpress is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -10223,11 +7423,11 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -10237,10 +7437,10 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -10248,41 +7448,11 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 2a: the discrete card was already available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
@@ -10298,10 +7468,10 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -10311,8 +7481,8 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
@@ -10335,17 +7505,17 @@ EndSection
 ''');
         self.xorg_file.close()
 
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -10360,7 +7530,7 @@ EndSection
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
 
         # See if it still regenerates xorg.conf if the
@@ -10375,17 +7545,17 @@ EndSection
 ''');
         self.xorg_file.close()
 
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -10395,8 +7565,8 @@ EndSection
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
@@ -10405,41 +7575,11 @@ EndSection
 
         # Case 2b: the discrete card was already available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fake_old', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
@@ -10455,10 +7595,10 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -10468,9 +7608,9 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -10478,41 +7618,11 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 2c: the discrete card was already available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -10526,11 +7636,11 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -10541,9 +7651,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -10551,41 +7661,11 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 2d: the discrete card was already available (BIOS)
         #          pxpress is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress')
 
         # Check the variables
 
@@ -10601,11 +7681,11 @@ fglrx 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -10614,9 +7694,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -10624,41 +7704,11 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 2e: the discrete card was already available (BIOS)
         #          pxpress is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fake_old', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress')
 
         # Check the variables
 
@@ -10674,11 +7724,11 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -10687,9 +7737,9 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -10702,48 +7752,18 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 3a: the discrete card is no longer available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -10752,10 +7772,10 @@ fglrx 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -10764,8 +7784,8 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -10774,48 +7794,18 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 3b: the discrete card is no longer available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd'],
+                                                 ['fake_old', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -10824,10 +7814,10 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -10836,69 +7826,39 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3c: the discrete card is no longer available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -10908,58 +7868,28 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3d: the discrete card is no longer available (BIOS)
         #          pxpress is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -10968,11 +7898,11 @@ fglrx 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -10980,58 +7910,28 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3e: the discrete card is no longer available (BIOS)
         #          pxpress is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd'],
+                                                 ['fake_old', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -11040,11 +7940,11 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -11052,69 +7952,39 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3f: the discrete card is no longer available (BIOS)
         #          pxpress is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
 
         # Check the variables
 
         # Check if laptop
         self.assertFalse(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -11124,12 +7994,13 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
+
 
     def test_laptop_two_amd_binary(self):
         '''laptop Multiple AMD GPUs fglrx'''
@@ -11137,40 +8008,17 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 1a: the discrete card is now available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -11181,10 +8029,10 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -11192,9 +8040,9 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -11202,44 +8050,17 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 1b: the discrete card is now available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-old_fake 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fake_old', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -11250,10 +8071,10 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -11261,8 +8082,8 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
@@ -11271,44 +8092,17 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 1c: the discrete card is now available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -11317,11 +8111,11 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # No AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -11331,10 +8125,10 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
 
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -11342,44 +8136,17 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 1d: the discrete card is now available (BIOS)
         #          pxpress is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -11390,11 +8157,11 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -11402,10 +8169,10 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -11413,44 +8180,17 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 1e: the discrete card is now available (BIOS)
         #          pxpress is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fake_old', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -11461,11 +8201,11 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -11473,10 +8213,10 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -11484,44 +8224,17 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 1f: the discrete card is now available (BIOS)
         #          pxpress is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -11530,11 +8243,11 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -11544,10 +8257,10 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -11555,46 +8268,17 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 2a: the discrete card was already available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -11605,10 +8289,10 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -11618,8 +8302,8 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
@@ -11642,17 +8326,18 @@ EndSection
 ''');
         self.xorg_file.close()
 
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -11667,7 +8352,7 @@ EndSection
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
 
         # See if it still regenerates xorg.conf if the
@@ -11682,17 +8367,18 @@ EndSection
 ''');
         self.xorg_file.close()
 
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -11702,8 +8388,8 @@ EndSection
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
@@ -11712,46 +8398,17 @@ EndSection
 
         # Case 2b: the discrete card was already available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fake_old', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -11762,10 +8419,10 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -11775,9 +8432,9 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -11785,46 +8442,17 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 2c: the discrete card was already available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -11833,11 +8461,11 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -11848,9 +8476,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -11858,46 +8486,17 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 2d: the discrete card was already available (BIOS)
         #          pxpress is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -11908,11 +8507,11 @@ fglrx 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -11921,9 +8520,9 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -11931,46 +8530,17 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 2e: the discrete card was already available (BIOS)
         #          pxpress is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fake_old', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -11981,11 +8551,11 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -11994,9 +8564,9 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -12009,48 +8579,19 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 3a: the discrete card is no longer available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -12059,10 +8600,10 @@ fglrx 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -12071,8 +8612,8 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -12081,48 +8622,19 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 3b: the discrete card is no longer available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd'],
+                                                 ['fake_old', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -12131,10 +8643,10 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -12143,69 +8655,40 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3c: the discrete card is no longer available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -12215,58 +8698,29 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3d: the discrete card is no longer available (BIOS)
         #          pxpress is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -12275,11 +8729,11 @@ fglrx 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -12287,58 +8741,29 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3e: the discrete card is no longer available (BIOS)
         #          pxpress is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd'],
+                                                 ['fake_old', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -12347,11 +8772,11 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
@@ -12359,69 +8784,40 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 3f: the discrete card is no longer available (BIOS)
         #          pxpress is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
-        self.assert_(gpu_test.has_single_card)
+        self.assertTrue(gpu_test.has_single_card)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # No NVIDIA
@@ -12431,10 +8827,10 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
@@ -12444,33 +8840,11 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 1a: the discrete card is now available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'amd'],
+                                                 ['radeon', 'fake'],
+                                                 ['mesa'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -12484,10 +8858,10 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
@@ -12497,8 +8871,8 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -12506,18 +8880,11 @@ fake 1447330 3 - Live 0x0000000000000000
 
 
         # What if radeon is blacklisted
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fake_old', 'fake'],
+                                                 ['mesa'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -12531,9 +8898,9 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
@@ -12544,13 +8911,14 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # We'll probably use vesa + llvmpipe
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
+
 
     def test_laptop_two_amd_open(self):
         '''laptop Multiple AMD GPUs radeon'''
@@ -12558,38 +8926,17 @@ fake 1447330 3 - Live 0x0000000000000000
 
         # Case 1a: the discrete card is now available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'amd'],
+                                                 ['radeon', 'fake'],
+                                                 ['mesa'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -12598,10 +8945,10 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
@@ -12611,8 +8958,8 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -12620,23 +8967,17 @@ fake 1447330 3 - Live 0x0000000000000000
 
 
         # What if radeon is blacklisted
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        # Call the program
-        self.exec_manager(fake_alternative, is_laptop=True)
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fake_old', 'fake'],
+                                                 ['mesa'],
+                                                 'mesa',
+                                                 is_laptop=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assert_(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.is_laptop)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -12645,9 +8986,9 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
@@ -12658,48 +8999,23 @@ fake 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         # We'll probably use vesa + llvmpipe
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
-
     def test_desktop_one_amd_open_one_nvidia_binary(self):
         self.this_function_name = sys._getframe().f_code.co_name
         # Case 1a: the discrete card is now available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
@@ -12715,20 +9031,20 @@ nvidia 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -12744,17 +9060,17 @@ EndSection
 ''');
         self.xorg_file.close()
 
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         self.assertFalse(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
         # Let's try again with a good xorg.conf
         # this time with the driver specified
@@ -12768,17 +9084,17 @@ EndSection
 ''');
         self.xorg_file.close()
 
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         self.assertFalse(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
         # Let's try again with an incorrect xorg.conf
         self.xorg_file = open(self.xorg_file.name, 'w')
@@ -12791,14 +9107,14 @@ EndSection
 ''');
         self.xorg_file.close()
 
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
-        # Collect data
-        gpu_test = self.check_vars()
-
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -12814,14 +9130,14 @@ EndSection
 ''');
         self.xorg_file.close()
 
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
-        # Collect data
-        gpu_test = self.check_vars()
-
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -12829,39 +9145,11 @@ EndSection
 
         # Case 1b: the discrete card is now available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
@@ -12877,991 +9165,19 @@ fake 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.has_nvidia)
         self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-
-        # Case 1c: the discrete card is now available (BIOS)
-        #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
-
-        # Check the variables
-
-        # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
-
-        self.assertFalse(gpu_test.has_single_card)
-
-        # Intel
-        self.assertFalse(gpu_test.has_intel)
-        self.assertFalse(gpu_test.intel_loaded)
-
-        # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
-        # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
-        self.assertFalse(gpu_test.fglrx_loaded)
-        self.assertFalse(gpu_test.fglrx_enabled)
-        self.assertFalse(gpu_test.pxpress_enabled)
-        # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assertFalse(gpu_test.nvidia_enabled)
-        # Has changed
-
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
-
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-        # Let's try again with a good xorg.conf
-        self.xorg_file = open(self.xorg_file.name, 'w')
-        self.xorg_file.write('''
-Section "Device"
-    Identifier "Default Card 1"
-    BusID "PCI:1@0:0:0"
-EndSection
-''');
-        self.xorg_file.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
-
-        self.assertFalse(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-        # Let's try again with a good xorg.conf
-        # this time with the driver specified
-        self.xorg_file = open(self.xorg_file.name, 'w')
-        self.xorg_file.write('''
-Section "Device"
-    Identifier "Default Card 1"
-    Driver "nvidia"
-    BusID "PCI:1@0:0:0"
-EndSection
-''');
-        self.xorg_file.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
-
-        self.assertFalse(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-        # Let's try again with an incorrect xorg.conf
-        self.xorg_file = open(self.xorg_file.name, 'w')
-        self.xorg_file.write('''
-Section "Device"
-    Identifier "Default Card 1"
-    BusID "PCI:1@0:0:0"
-    Driver "fglrx"
-EndSection
-''');
-        self.xorg_file.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
-
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-        # Let's try again with an incorrect xorg.conf
-        # Wrong BusID
-        self.xorg_file = open(self.xorg_file.name, 'w')
-        self.xorg_file.write('''
-Section "Device"
-    Identifier "Default Card 1"
-    BusID "PCI:0@0:1:0"
-EndSection
-''');
-        self.xorg_file.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
-
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-
-        # Case 1d: the discrete card is now available (BIOS)
-        #          prime is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
-
-        # Check the variables
-
-        # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
-
-        self.assertFalse(gpu_test.has_single_card)
-
-        # Intel
-        self.assertFalse(gpu_test.has_intel)
-        self.assertFalse(gpu_test.intel_loaded)
-
-        # Mesa is not enabled
-        self.assertFalse(gpu_test.mesa_enabled)
-        # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
-        self.assertFalse(gpu_test.fglrx_loaded)
-        self.assertFalse(gpu_test.fglrx_enabled)
-        self.assertFalse(gpu_test.pxpress_enabled)
-        # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
-        # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
-
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-
-        # Let's try again with a good xorg.conf
-        self.xorg_file = open(self.xorg_file.name, 'w')
-        self.xorg_file.write('''
-Section "Device"
-    Identifier "Default Card 1"
-    BusID "PCI:1@0:0:0"
-EndSection
-''');
-        self.xorg_file.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
-
-        self.assertFalse(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-        # Let's try again with a good xorg.conf
-        # this time with the driver specified
-        self.xorg_file = open(self.xorg_file.name, 'w')
-        self.xorg_file.write('''
-Section "Device"
-    Identifier "Default Card 1"
-    Driver "nvidia"
-    BusID "PCI:1@0:0:0"
-EndSection
-''');
-        self.xorg_file.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
-
-        self.assertFalse(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-        # Let's try again with an incorrect xorg.conf
-        self.xorg_file = open(self.xorg_file.name, 'w')
-        self.xorg_file.write('''
-Section "Device"
-    Identifier "Default Card 1"
-    BusID "PCI:1@0:0:0"
-    Driver "fglrx"
-EndSection
-''');
-        self.xorg_file.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
-
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-        # Let's try again with an incorrect xorg.conf
-        # Wrong BusID
-        self.xorg_file = open(self.xorg_file.name, 'w')
-        self.xorg_file.write('''
-Section "Device"
-    Identifier "Default Card 1"
-    BusID "PCI:0@0:1:0"
-EndSection
-''');
-        self.xorg_file.close()
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
-
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-
-        # Case 1e: the discrete card is now available (BIOS)
-        #          prime is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
-
-        # Check the variables
-
-        # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
-
-        self.assertFalse(gpu_test.has_single_card)
-
-        # Intel
-        self.assertFalse(gpu_test.has_intel)
-        self.assertFalse(gpu_test.intel_loaded)
-
-        # Mesa is not enabled
-        self.assertFalse(gpu_test.mesa_enabled)
-        # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
-        self.assertFalse(gpu_test.fglrx_loaded)
-        self.assertFalse(gpu_test.fglrx_enabled)
-        self.assertFalse(gpu_test.pxpress_enabled)
-        # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assertFalse(gpu_test.nouveau_loaded)
-        self.assertFalse(gpu_test.nvidia_loaded)
-        self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
-        # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
-
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-
-        # Case 1f: the discrete card is now available (BIOS)
-        #          prime is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
-
-        # Check the variables
-
-        # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
-
-        self.assertFalse(gpu_test.has_single_card)
-
-        # Intel
-        self.assertFalse(gpu_test.has_intel)
-        self.assertFalse(gpu_test.intel_loaded)
-
-        # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
-        # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
-        self.assertFalse(gpu_test.fglrx_loaded)
-        self.assertFalse(gpu_test.fglrx_enabled)
-        self.assertFalse(gpu_test.pxpress_enabled)
-        # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assertFalse(gpu_test.nvidia_enabled)
-        self.assertFalse(gpu_test.prime_enabled)
-        # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
-
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-
-        # Case 2a: the discrete card was already available (BIOS)
-        #          the driver is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
-
-        # Check the variables
-
-        # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
-
-        self.assertFalse(gpu_test.has_single_card)
-
-        # Intel
-        self.assertFalse(gpu_test.has_intel)
-        self.assertFalse(gpu_test.intel_loaded)
-
-        # Mesa is not enabled
-        self.assertFalse(gpu_test.mesa_enabled)
-        # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
-        self.assertFalse(gpu_test.fglrx_loaded)
-        self.assertFalse(gpu_test.fglrx_enabled)
-        self.assertFalse(gpu_test.pxpress_enabled)
-        # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
-        self.assertFalse(gpu_test.prime_enabled)
-        # Has changed
-        self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-
-        # Case 2b: the discrete card was already available (BIOS)
-        #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
-
-        # Check the variables
-
-        # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
-
-        self.assertFalse(gpu_test.has_single_card)
-
-        # No Intel
-        self.assertFalse(gpu_test.has_intel)
-        self.assertFalse(gpu_test.intel_loaded)
-
-        # Mesa is not enabled
-        self.assertFalse(gpu_test.mesa_enabled)
-        # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
-        self.assertFalse(gpu_test.fglrx_loaded)
-        self.assertFalse(gpu_test.fglrx_enabled)
-        self.assertFalse(gpu_test.pxpress_enabled)
-        # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assertFalse(gpu_test.nouveau_loaded)
-        self.assertFalse(gpu_test.nvidia_loaded)
-        self.assert_(gpu_test.nvidia_enabled)
-        self.assertFalse(gpu_test.prime_enabled)
-        # Has changed
-        self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
-
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-
-        # Case 2c: the discrete card was already available (BIOS)
-        #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
-
-        # Check the variables
-
-        # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
-
-        self.assertFalse(gpu_test.has_single_card)
-
-        # No Intel
-        self.assertFalse(gpu_test.has_intel)
-        self.assertFalse(gpu_test.intel_loaded)
-
-        # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
-        # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
-        self.assertFalse(gpu_test.fglrx_loaded)
-        self.assertFalse(gpu_test.fglrx_enabled)
-        self.assertFalse(gpu_test.pxpress_enabled)
-        # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assertFalse(gpu_test.nvidia_enabled)
-        self.assertFalse(gpu_test.prime_enabled)
-        # Has changed
-        self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
-
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-
-        # Case 2d: the discrete card was already available (BIOS)
-        #          prime is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-nvidia 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
-
-        # Check the variables
-
-        # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
-
-        self.assertFalse(gpu_test.has_single_card)
-
-        # No Intel
-        self.assertFalse(gpu_test.has_intel)
-        self.assertFalse(gpu_test.intel_loaded)
-
-        # Mesa is not enabled
-        self.assertFalse(gpu_test.mesa_enabled)
-        # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
-        self.assertFalse(gpu_test.fglrx_loaded)
-        self.assertFalse(gpu_test.fglrx_enabled)
-        self.assertFalse(gpu_test.pxpress_enabled)
-        # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assertFalse(gpu_test.nouveau_loaded)
-        self.assert_(gpu_test.nvidia_loaded)
-        self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
-        # Has changed
-        self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
-
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-
-        # Case 2e: the discrete card was already available (BIOS)
-        #          prime is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-radeon 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/nvidia-331-updates/ld.so.conf
-/usr/lib/nvidia-331-updates-prime/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
-
-        # Check the variables
-
-        # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
-
-        self.assertFalse(gpu_test.has_single_card)
-
-        # No Intel
-        self.assertFalse(gpu_test.has_intel)
-        self.assertFalse(gpu_test.intel_loaded)
-
-        # Mesa is not enabled
-        self.assertFalse(gpu_test.mesa_enabled)
-        # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assert_(gpu_test.radeon_loaded)
-        self.assertFalse(gpu_test.fglrx_loaded)
-        self.assertFalse(gpu_test.fglrx_enabled)
-        self.assertFalse(gpu_test.pxpress_enabled)
-        # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assertFalse(gpu_test.nouveau_loaded)
-        self.assertFalse(gpu_test.nvidia_loaded)
-        self.assertFalse(gpu_test.nvidia_enabled)
-        self.assert_(gpu_test.prime_enabled)
-        # Has changed
-        self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
-
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-
-    def test_desktop_one_amd_binary_one_nvidia_open(self):
-        '''Multiple AMD GPUs'''
-        self.this_function_name = sys._getframe().f_code.co_name
-
-        # Case 1a: the discrete card is now available (BIOS)
-        #          the driver is enabled and the module is loaded
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-nouveau 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
-
-        # Check the variables
-
-        # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
-
-        self.assertFalse(gpu_test.has_single_card)
-
-        # Intel
-        self.assertFalse(gpu_test.has_intel)
-        self.assertFalse(gpu_test.intel_loaded)
-
-        # Mesa is not enabled
-        self.assertFalse(gpu_test.mesa_enabled)
-        # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
-        self.assertFalse(gpu_test.pxpress_enabled)
-        # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
-        self.assertFalse(gpu_test.nvidia_loaded)
-        self.assertFalse(gpu_test.nvidia_enabled)
-        # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-
-        # Case 1b: the discrete card is now available (BIOS)
-        #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-old_fake 1447330 3 - Live 0x0000000000000000
-nouveau 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
-
-        # Check the variables
-
-        # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
-
-        self.assertFalse(gpu_test.has_single_card)
-
-        # Intel
-        self.assertFalse(gpu_test.has_intel)
-        self.assertFalse(gpu_test.intel_loaded)
-
-        # Mesa is not enabled
-        self.assertFalse(gpu_test.mesa_enabled)
-        # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assertFalse(gpu_test.radeon_loaded)
-        self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
-        self.assertFalse(gpu_test.pxpress_enabled)
-        # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
-        self.assertFalse(gpu_test.nvidia_loaded)
-        self.assertFalse(gpu_test.nvidia_enabled)
-        # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
         self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
@@ -13870,39 +9186,11 @@ nouveau 1447330 3 - Live 0x0000000000000000
 
         # Case 1c: the discrete card is now available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-nouveau 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -13916,64 +9204,128 @@ nouveau 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
-        # No AMD
-        self.assert_(gpu_test.has_amd)
-        self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
-        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         # Has changed
 
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+        # Let's try again with a good xorg.conf
+        self.xorg_file = open(self.xorg_file.name, 'w')
+        self.xorg_file.write('''
+Section "Device"
+    Identifier "Default Card 1"
+    BusID "PCI:1@0:0:0"
+EndSection
+''');
+        self.xorg_file.close()
+
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
+
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+        # Let's try again with a good xorg.conf
+        # this time with the driver specified
+        self.xorg_file = open(self.xorg_file.name, 'w')
+        self.xorg_file.write('''
+Section "Device"
+    Identifier "Default Card 1"
+    Driver "nvidia"
+    BusID "PCI:1@0:0:0"
+EndSection
+''');
+        self.xorg_file.close()
+
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
+
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+        # Let's try again with an incorrect xorg.conf
+        self.xorg_file = open(self.xorg_file.name, 'w')
+        self.xorg_file.write('''
+Section "Device"
+    Identifier "Default Card 1"
+    BusID "PCI:1@0:0:0"
+    Driver "fglrx"
+EndSection
+''');
+        self.xorg_file.close()
+
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
+
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+        # Let's try again with an incorrect xorg.conf
+        # Wrong BusID
+        self.xorg_file = open(self.xorg_file.name, 'w')
+        self.xorg_file.write('''
+Section "Device"
+    Identifier "Default Card 1"
+    BusID "PCI:0@0:1:0"
+EndSection
+''');
+        self.xorg_file.close()
+
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
+
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 1d: the discrete card is now available (BIOS)
-        #          pxpress is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-nouveau 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        #          prime is enabled and the module is loaded
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime')
 
         # Check the variables
 
@@ -13989,62 +9341,127 @@ nouveau 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
-        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
-        self.assertFalse(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
+        # Let's try again with a good xorg.conf
+        self.xorg_file = open(self.xorg_file.name, 'w')
+        self.xorg_file.write('''
+Section "Device"
+    Identifier "Default Card 1"
+    BusID "PCI:1@0:0:0"
+EndSection
+''');
+        self.xorg_file.close()
+
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime')
+
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+        # Let's try again with a good xorg.conf
+        # this time with the driver specified
+        self.xorg_file = open(self.xorg_file.name, 'w')
+        self.xorg_file.write('''
+Section "Device"
+    Identifier "Default Card 1"
+    Driver "nvidia"
+    BusID "PCI:1@0:0:0"
+EndSection
+''');
+        self.xorg_file.close()
+
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime')
+
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+        # Let's try again with an incorrect xorg.conf
+        self.xorg_file = open(self.xorg_file.name, 'w')
+        self.xorg_file.write('''
+Section "Device"
+    Identifier "Default Card 1"
+    BusID "PCI:1@0:0:0"
+    Driver "fglrx"
+EndSection
+''');
+        self.xorg_file.close()
+
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime')
+
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+        # Let's try again with an incorrect xorg.conf
+        # Wrong BusID
+        self.xorg_file = open(self.xorg_file.name, 'w')
+        self.xorg_file.write('''
+Section "Device"
+    Identifier "Default Card 1"
+    BusID "PCI:0@0:1:0"
+EndSection
+''');
+        self.xorg_file.close()
+
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime')
+
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
         # Case 1e: the discrete card is now available (BIOS)
-        #          pxpress is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-nouveau 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        #          prime is enabled but the module is not loaded
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime')
 
         # Check the variables
 
@@ -14060,62 +9477,34 @@ nouveau 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
-        self.assertFalse(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 1f: the discrete card is now available (BIOS)
-        #          pxpress is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('1002:68d8;0000:00:01:0;1')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-nouveau 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        #          prime is not enabled but the module is loaded
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -14129,24 +9518,24 @@ nouveau 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
-        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
-        self.assert_(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -14154,41 +9543,11 @@ nouveau 1447330 3 - Live 0x0000000000000000
 
         # Case 2a: the discrete card was already available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-nouveau 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd', 'nvidia'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
 
         # Check the variables
 
@@ -14204,21 +9563,493 @@ nouveau 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
-        self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        # Has changed
+        self.assertFalse(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 2b: the discrete card was already available (BIOS)
+        #          the driver is enabled but the module is not loaded
+        gpu_test = self.run_manager_and_get_data(['amd', 'nvidia'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia')
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertFalse(gpu_test.is_laptop)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # No Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        # Has changed
+        self.assertFalse(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 2c: the discrete card was already available (BIOS)
+        #          the driver is not enabled but the module is loaded
+        gpu_test = self.run_manager_and_get_data(['amd', 'nvidia'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa')
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertFalse(gpu_test.is_laptop)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # No Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+
+        # Mesa is enabled
+        self.assertTrue(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        # Has changed
+        self.assertFalse(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 2d: the discrete card was already available (BIOS)
+        #          prime is enabled and the module is loaded
+        gpu_test = self.run_manager_and_get_data(['amd', 'nvidia'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime')
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertFalse(gpu_test.is_laptop)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # No Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
+        # Has changed
+        self.assertFalse(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 2e: the discrete card was already available (BIOS)
+        #          prime is enabled but the module is not loaded
+        gpu_test = self.run_manager_and_get_data(['amd', 'nvidia'],
+                                                 ['amd', 'nvidia'],
+                                                 ['radeon', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime')
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertFalse(gpu_test.is_laptop)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # No Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        self.assertTrue(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
+        # Has changed
+        self.assertFalse(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+    def test_desktop_one_amd_binary_one_nvidia_open(self):
+        '''Multiple AMD GPUs'''
+        self.this_function_name = sys._getframe().f_code.co_name
+
+        # Case 1a: the discrete card is now available (BIOS)
+        #          the driver is enabled and the module is loaded
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['fglrx', 'nouveau'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertFalse(gpu_test.is_laptop)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 1b: the discrete card is now available (BIOS)
+        #          the driver is enabled but the module is not loaded
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['fake_old', 'nouveau'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertFalse(gpu_test.is_laptop)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 1c: the discrete card is now available (BIOS)
+        #          the driver is not enabled but the module is loaded
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['fglrx', 'nouveau'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertFalse(gpu_test.is_laptop)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+
+        # Mesa is enabled
+        self.assertTrue(gpu_test.mesa_enabled)
+        # No AMD
+        self.assertTrue(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        # Has changed
+
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 1d: the discrete card is now available (BIOS)
+        #          pxpress is enabled and the module is loaded
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['fglrx', 'nouveau'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress')
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertFalse(gpu_test.is_laptop)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 1e: the discrete card is now available (BIOS)
+        #          pxpress is enabled but the module is not loaded
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['fake_old', 'nouveau'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress')
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertFalse(gpu_test.is_laptop)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 1f: the discrete card is now available (BIOS)
+        #          pxpress is not enabled but the module is loaded
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                                 ['amd', 'nvidia'],
+                                                 ['fglrx', 'nouveau'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertFalse(gpu_test.is_laptop)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+
+        # Mesa is enabled
+        self.assertTrue(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 2a: the discrete card was already available (BIOS)
+        #          the driver is enabled and the module is loaded
+        gpu_test = self.run_manager_and_get_data(['amd', 'nvidia'],
+                                                 ['amd', 'nvidia'],
+                                                 ['fglrx', 'nouveau'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertFalse(gpu_test.is_laptop)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
@@ -14236,21 +10067,21 @@ EndSection
 ''');
         self.xorg_file.close()
 
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd', 'nvidia'],
+                                                 ['amd', 'nvidia'],
+                                                 ['fglrx', 'nouveau'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
@@ -14261,7 +10092,7 @@ EndSection
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
-        self.assert_(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
 
         # See if it still regenerates xorg.conf if the
@@ -14276,28 +10107,28 @@ EndSection
 ''');
         self.xorg_file.close()
 
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
+        gpu_test = self.run_manager_and_get_data(['amd', 'nvidia'],
+                                                 ['amd', 'nvidia'],
+                                                 ['fglrx', 'nouveau'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
@@ -14306,41 +10137,11 @@ EndSection
 
         # Case 2b: the discrete card was already available (BIOS)
         #          the driver is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-nouveau 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/fglrx/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'nvidia'],
+                                                 ['amd', 'nvidia'],
+                                                 ['fake_old', 'nouveau'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
 
         # Check the variables
 
@@ -14356,22 +10157,22 @@ nouveau 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
-        self.assert_(gpu_test.fglrx_enabled)
+        self.assertTrue(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -14379,41 +10180,11 @@ nouveau 1447330 3 - Live 0x0000000000000000
 
         # Case 2c: the discrete card was already available (BIOS)
         #          the driver is not enabled but the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-nouveau 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'nvidia'],
+                                                 ['amd', 'nvidia'],
+                                                 ['fglrx', 'nouveau'],
+                                                 ['mesa', 'fglrx'],
+                                                 'mesa')
 
         # Check the variables
 
@@ -14427,24 +10198,24 @@ fglrx 1447330 3 - Live 0x0000000000000000
         self.assertFalse(gpu_test.intel_loaded)
 
         # Mesa is enabled
-        self.assert_(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
         self.assertFalse(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -14452,41 +10223,11 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 2d: the discrete card was already available (BIOS)
         #          pxpress is enabled and the module is loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-nouveau 1447330 3 - Live 0x0000000000000000
-fglrx 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'nvidia'],
+                                                 ['amd', 'nvidia'],
+                                                 ['fglrx', 'nouveau'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress')
 
         # Check the variables
 
@@ -14502,22 +10243,22 @@ fglrx 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
-        self.assert_(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
-        self.assert_(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -14525,41 +10266,11 @@ fglrx 1447330 3 - Live 0x0000000000000000
 
         # Case 2e: the discrete card was already available (BIOS)
         #          pxpress is enabled but the module is not loaded
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
-
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-10de:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-fake_old 1447330 3 - Live 0x0000000000000000
-nouveau 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-/usr/lib/fglrx/ld.so.conf
-/usr/lib/pxpress/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/pxpress/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars(has_not_acted=True)
+        gpu_test = self.run_manager_and_get_data(['amd', 'nvidia'],
+                                                 ['amd', 'nvidia'],
+                                                 ['fake_old', 'nouveau'],
+                                                 ['mesa', 'fglrx'],
+                                                 'pxpress')
 
         # Check the variables
 
@@ -14575,22 +10286,22 @@ nouveau 1447330 3 - Live 0x0000000000000000
         # Mesa is not enabled
         self.assertFalse(gpu_test.mesa_enabled)
         # AMD
-        self.assert_(gpu_test.has_amd)
+        self.assertTrue(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.fglrx_loaded)
         self.assertFalse(gpu_test.fglrx_enabled)
-        self.assert_(gpu_test.pxpress_enabled)
+        self.assertTrue(gpu_test.pxpress_enabled)
         # NVIDIA
-        self.assert_(gpu_test.has_nvidia)
-        self.assert_(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nouveau_loaded)
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_enabled)
         self.assertFalse(gpu_test.prime_enabled)
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assert_(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assert_(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
@@ -14605,59 +10316,23 @@ nouveau 1447330 3 - Live 0x0000000000000000
 
         # Case 1a: the discrete card is now available (BIOS)
         #          the driver is enabled and the module is loaded
-        self.last_boot_file.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.last_boot_file.close()
+        gpu_test = self.run_manager_and_get_data(['amd',],
+                                                 ['amd', 'nvidia'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa'],
+                                                 'mesa')
 
-        self.fake_lspci.write('''
-1002:68d8;0000:00:01:0;1
-1002:28e8;0000:01:00:0;0''')
-        self.fake_lspci.close()
-
-        self.fake_modules.write('''
-fglrx 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
-
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-''')
-        self.fake_alternatives.close()
-
-        # The alternative in use
-        fake_alternative = '/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf'
-
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
-
-        self.assert_(gpu_test.proprietary_installer)
+        self.assertTrue(gpu_test.proprietary_installer)
 
         # Let try with nvidia
-        self.fake_modules = open(self.fake_modules.name, 'w')
-        self.fake_modules.write('''
-nvidia 1447330 3 - Live 0x0000000000000000
-fake 1447330 3 - Live 0x0000000000000000
-''')
-        self.fake_modules.close()
+        gpu_test = self.run_manager_and_get_data(['amd',],
+                                                 ['amd', 'nvidia'],
+                                                 ['nvidia', 'fake'],
+                                                 ['mesa'],
+                                                 'mesa')
 
-        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
-        self.fake_alternatives.write('''
-/usr/lib/x86_64-linux-gnu/mesa/ld.so.conf
-''')
-        self.fake_alternatives.close()
+        self.assertTrue(gpu_test.proprietary_installer)
 
-        # Call the program
-        self.assert_(self.exec_manager(fake_alternative))
-
-        # Collect data
-        gpu_test = self.check_vars()
-
-        self.assert_(gpu_test.proprietary_installer)
 
 
 if __name__ == '__main__':
