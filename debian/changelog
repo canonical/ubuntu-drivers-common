@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.2.89.5) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.89.5) trusty; urgency=low
 
-  * 
+  * tests/run:
+    - Skip gpu-manager.py on anything other than the x86 family.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 07 Mar 2014 23:42:34 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Sat, 08 Mar 2014 01:26:18 +0100
 
 ubuntu-drivers-common (1:0.2.89.4) trusty; urgency=medium
 
