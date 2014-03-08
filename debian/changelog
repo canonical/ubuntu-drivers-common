@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.2.89.6) UNRELEASED; urgency=low
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Sat, 08 Mar 2014 17:07:09 +0100
+
 ubuntu-drivers-common (1:0.2.89.5) trusty; urgency=low
 
   * tests/run:
