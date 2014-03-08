@@ -1891,14 +1891,17 @@ static int enable_prime(const char *prime_settings,
      * to take action
      */
     if (prime_action_on == prime_discrete_on) {
-        if (prime_discrete_on) {
-            fprintf(log_handle, "Powering on the discrete card\n");
-            prime_enable_discrete();
-        }
-        else {
-            fprintf(log_handle, "Powering off the discrete card\n");
-            prime_disable_discrete();
-        }
+        fprintf(log_handle, "No need to change the current bbswitch status\n");
+        return 1;
+    }
+
+    if (prime_action_on) {
+        fprintf(log_handle, "Powering on the discrete card\n");
+        prime_enable_discrete();
+    }
+    else {
+        fprintf(log_handle, "Powering off the discrete card\n");
+        prime_disable_discrete();
     }
 
     return 1;
