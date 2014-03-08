@@ -1,8 +1,10 @@
-ubuntu-drivers-common (1:0.2.89.6) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.89.6) trusty; urgency=low
 
-  * 
+  * gpu-manager.c:
+    - Take action if settings don't match the current bbswitch status
+      (LP: #1289420).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Sat, 08 Mar 2014 17:07:09 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Sat, 08 Mar 2014 17:07:28 +0100
 
 ubuntu-drivers-common (1:0.2.89.5) trusty; urgency=low
 
