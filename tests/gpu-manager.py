@@ -10362,6 +10362,88 @@ EndSection
         self.assertTrue(gpu_test.proprietary_installer)
 
 
+    def test_valid_boot_files(self):
+        self.this_function_name = sys._getframe().f_code.co_name
+
+        # Invalid boot file
+        self.last_boot_file = open(self.last_boot_file.name, 'w')
+
+        it = 0
+        while it < 16:
+            item = 'a' * 200
+            self.last_boot_file.write(item)
+            it += 1
+
+        self.last_boot_file.close()
+
+        # No Kernel modules
+        self.add_kernel_modules([])
+
+        # No available alternatives
+        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
+
+        self.fake_alternatives.write('')
+
+        self.fake_alternatives.close()
+
+        # no selected alternative
+        self.fake_alternative = ''
+
+        self.exec_manager(is_laptop=False)
+
+        # Return data
+        gpu_test = self.check_vars()
+
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+
+        self.assertFalse(gpu_test.has_selected_driver)
+
+
+        # What if there are no graphics cards in the system?
+        self.fake_lspci = open(self.fake_lspci.name, 'w')
+        it = 0
+        while it < 16:
+            item = 'a' * 200
+            self.fake_lspci.write(item)
+            it += 1
+        self.fake_lspci.close()
+
+        # Invalid boot file
+        self.last_boot_file = open(self.last_boot_file.name, 'w')
+
+        it = 0
+        while it < 16:
+            item = 'a' * 200
+            self.last_boot_file.write(item)
+            it += 1
+
+        self.last_boot_file.close()
+
+        # No Kernel modules
+        self.add_kernel_modules([])
+
+        # No available alternatives
+        self.fake_alternatives = open(self.fake_alternatives.name, 'w')
+
+        self.fake_alternatives.write('')
+
+        self.fake_alternatives.close()
+
+        # no selected alternative
+        self.fake_alternative = ''
+
+        self.exec_manager(is_laptop=False)
+
+        # Return data
+        gpu_test = self.check_vars()
+
+        # Has changed
+        self.assertFalse(gpu_test.has_changed)
+
+        self.assertFalse(gpu_test.has_selected_driver)
+
+
 
 if __name__ == '__main__':
     if not '86' in os.uname()[4]:

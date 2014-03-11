@@ -1438,7 +1438,8 @@ static int write_data_to_file(struct device **devices,
 }
 
 
-static int get_vars(FILE *file, struct device **devices, int num) {
+static int get_vars(const char *line, struct device **devices,
+                    int num, int desired_matches) {
     int status;
 
     devices[num] = malloc(sizeof(struct device));
@@ -1446,7 +1447,7 @@ static int get_vars(FILE *file, struct device **devices, int num) {
     if (!devices[num])
         return EOF;
 
-    status = fscanf(file, "%04x:%04x;%04x:%02x:%02x:%d;%d\n",
+    status = sscanf(line, "%04x:%04x;%04x:%02x:%02x:%d;%d\n",
                     &devices[num]->vendor_id,
                     &devices[num]->device_id,
                     &devices[num]->domain,
@@ -1455,7 +1456,8 @@ static int get_vars(FILE *file, struct device **devices, int num) {
                     &devices[num]->func,
                     &devices[num]->boot_vga);
 
-    if (status == EOF)
+    /* Make sure that we match "desired_matches" */
+    if (status == EOF || status != desired_matches)
         free(devices[num]);
 
     return status;
@@ -1466,7 +1468,11 @@ static int read_data_from_file(struct device **devices,
                                int *cards_number,
                                char *filename) {
     /* Read from last boot gfx */
+    char line[100];
     FILE *pfile = NULL;
+    /* The number of digits we expect to match per line */
+    int desired_matches = 7;
+
     pfile = fopen(filename, "r");
     if (pfile == NULL) {
         fprintf(log_handle, "I couldn't open %s for reading.\n", filename);
@@ -1491,8 +1497,16 @@ static int read_data_from_file(struct device **devices,
         return 0;
     }
     else {
-        while (get_vars(pfile, devices, *cards_number) != EOF) {
-            *cards_number += 1;
+        /* Use fgets so as to limit the buffer length */
+        while (fgets(line, sizeof(line), pfile) && (*cards_number < MAX_CARDS_N)) {
+            if (strlen(line) > 0) {
+                /* See if we actually get all the desired digits,
+                 * as per "desired_matches"
+                 */
+                if (get_vars(line, devices, *cards_number, desired_matches) == desired_matches) {
+                    *cards_number += 1;
+                }
+            }
         }
     }
 
@@ -1536,6 +1550,8 @@ static int add_gpu_from_stream(FILE *pfile, const char *pattern, struct device *
     int status = EOF;
     char line[1035];
     char *match = NULL;
+    /* The number of digits we expect to match per line */
+    int desired_matches = 4;
 
     if (!pfile) {
         fprintf(log_handle, "Error: passed invalid stream.\n");
@@ -1561,7 +1577,10 @@ static int add_gpu_from_stream(FILE *pfile, const char *pattern, struct device *
         }
     }
 
-    if (status == EOF) {
+    /* Check that we actually matched all the desired digits,
+     * as per "desired_matches"
+     */
+    if (status == EOF || status != desired_matches) {
         free(devices[*num]);
         return 0;
     }
