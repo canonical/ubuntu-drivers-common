@@ -346,33 +346,47 @@ static int load_bbswitch() {
 }
 
 
-/* Get the first line of the output of a command */
-char* get_output(char *command) {
+/* Get the first match from the output of a command */
+static char* get_output(char *command, char *pattern, char *ignore) {
     int len;
-    char temp[1035];
+    char buffer[1035];
     char *output = NULL;
     FILE *pfile = NULL;
     pfile = popen(command, "r");
     if (pfile == NULL) {
-        fprintf(stderr, "Failed to run command\n");
+        fprintf(stderr, "Failed to run command %s\n", command);
         return NULL;
     }
 
-    if (fgets(temp, sizeof(temp), pfile) != NULL) {
-        output = malloc(strlen(temp) + 1);
-        if (!output) {
-            pclose(pfile);
-            return NULL;
+    while (fgets(buffer, sizeof(buffer), pfile)) {
+        /* If no search pattern was provided, just
+         * return the first non zero legth line
+         */
+        if (!pattern) {
+            output = strdup(buffer);
+            break;
         }
-        strcpy(output, temp);
+        else {
+            /* Look for the search pattern */
+            if (ignore && (strstr(buffer, ignore) != NULL)) {
+                /* Skip this line */
+                continue;
+            }
+            /* Look for the pattern */
+            if (strstr(buffer, pattern) != NULL) {
+                output = strdup(buffer);
+                break;
+            }
+        }
     }
     pclose(pfile);
 
-    /* Remove newline */
-    len = strlen(output);
-    if(output[len-1] == '\n' )
-       output[len-1] = 0;
-
+    if (output) {
+        /* Remove newline */
+        len = strlen(output);
+        if(output[len-1] == '\n' )
+           output[len-1] = 0;
+    }
     return output;
 }
 
@@ -381,7 +395,7 @@ static void get_architecture_paths(char **main_arch_path,
                                   char **other_arch_path) {
     char *main_arch = NULL;
 
-    main_arch = get_output("dpkg --print-architecture");
+    main_arch = get_output("dpkg --print-architecture", NULL, NULL);
     if (strcmp(main_arch, "amd64") == 0) {
         *main_arch_path = strdup("x86_64-linux-gnu");
         *other_arch_path = strdup("i386-linux-gnu");
@@ -427,17 +441,16 @@ static char* get_alternative_link(char *arch_path, char *pattern) {
         fclose(pfile);
     }
     else {
-        sprintf(command, "update-alternatives --list %s_gl_conf | grep %s",
-                arch_path, pattern);
+        sprintf(command, "update-alternatives --list %s_gl_conf",
+                arch_path);
 
         /* Make sure we don't catch prime by mistake when
          * looking for nvidia
          */
-        if (strcmp(pattern, "nvidia") == 0) {
-            strcat(command, " | grep -v prime");
-        }
-
-        alternative = get_output(command);
+        if (strcmp(pattern, "nvidia") == 0)
+            alternative = get_output(command, pattern, "prime");
+        else
+            alternative = get_output(command, pattern, NULL);
     }
 
     return alternative;
