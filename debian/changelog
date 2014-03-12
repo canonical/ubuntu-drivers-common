@@ -1,8 +1,14 @@
 ubuntu-drivers-common (1:0.2.90) UNRELEASED; urgency=low
 
-  * 
+  * gpu-manager.c, gpu-manager.py:
+    - Match only PCI_CLASS_DISPLAY, except for PCI_CLASS_DISPLAY_OTHER.
+    - Re-enable outputs connected to NVIDIA discrete cards. This only
+      affects Optimus systems (LP: #1290711).
+    - Prevent possible buffer overflow when reading the configuration
+      from last boot.
+    - Clean up and make get_output() more robust (LP: #1290831).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Sun, 09 Mar 2014 11:13:31 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 12 Mar 2014 17:45:27 +0100
 
 ubuntu-drivers-common (1:0.2.89.6) trusty; urgency=low
 
