@@ -928,8 +928,10 @@ static int check_prime_xorg_conf(struct device **devices,
         if (strstr(line, "#") == NULL) {
             /* Parse options here */
             if (istrstr(line, "Option") != NULL) {
-                if (istrstr(line, "UseDisplayDevice") != NULL &&
-                    istrstr(line, "none") != NULL) {
+                if ((istrstr(line, "AllowEmptyInitialConfiguration") != NULL &&
+                    istrstr(line, "on") != NULL) ||
+                    (istrstr(line, "ConstrainCursor") != NULL &&
+                    istrstr(line, "off") != NULL)) {
                     x_options_matches += 1;
                 }
             }
@@ -968,12 +970,12 @@ static int check_prime_xorg_conf(struct device **devices,
          */
         return (intel_matches == 1 &&
                 intel_set == 1 && nvidia_set == 1 &&
-                x_options_matches > 0);
+                x_options_matches > 1);
     }
     else {
         return (intel_matches == 1 && nvidia_matches == 1 &&
                 intel_set == 1 && nvidia_set == 1 &&
-                x_options_matches > 0);
+                x_options_matches > 1);
     }
 }
 
@@ -1231,11 +1233,12 @@ static int write_prime_xorg_conf(struct device **devices, int cards_n) {
                 "    Identifier \"nvidia\"\n"
                 "    Driver \"nvidia\"\n"
                 "    BusID \"PCI:%d@%d:%d:%d\"\n"
+                "    Option \"ConstrainCursor\" \"off\"\n"
                 "EndSection\n\n"
                 "Section \"Screen\"\n"
                 "    Identifier \"nvidia\"\n"
                 "    Device \"nvidia\"\n"
-                "    Option \"UseDisplayDevice\" \"none\"\n"
+                "    Option \"AllowEmptyInitialConfiguration\" \"on\"\n"
                 "EndSection\n\n",
                (int)(devices[i]->bus),
                (int)(devices[i]->domain),
