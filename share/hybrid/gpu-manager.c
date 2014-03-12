@@ -55,23 +55,13 @@
 #include <time.h>
 
 
-#define PCI_CLASS_PREHISTORIC           0x00
-
 #define PCI_CLASS_DISPLAY               0x03
+#define PCI_CLASS_DISPLAY_OTHER         0x0380
 
-#define PCI_CLASS_MULTIMEDIA            0x04
-#define PCI_SUBCLASS_MULTIMEDIA_VIDEO   0x00
-
-#define PCI_CLASS_PROCESSOR             0x0b
-#define PCI_SUBCLASS_PROCESSOR_COPROC   0x40
-
-#define PCIINFOCLASSES(c)                                               \
-    ( (((c) & 0x00ff0000) == (PCI_CLASS_PREHISTORIC << 16))             \
-      || (((c) & 0x00ff0000) == (PCI_CLASS_DISPLAY << 16))              \
-      || ((((c) & 0x00ffff00)                                           \
-           == ((PCI_CLASS_MULTIMEDIA << 16) | (PCI_SUBCLASS_MULTIMEDIA_VIDEO << 8)))) \
-      || ((((c) & 0x00ffff00)                                           \
-           == ((PCI_CLASS_PROCESSOR << 16) | (PCI_SUBCLASS_PROCESSOR_COPROC << 8)))) )
+#define PCIINFOCLASSES(c) \
+    ( (((c) & 0x00ff0000) \
+     == (PCI_CLASS_DISPLAY << 16))  \
+     && (((c) & 0x00ffff00) != (PCI_CLASS_DISPLAY_OTHER << 8)) )
 
 #define LAST_BOOT "/var/lib/ubuntu-drivers-common/last_gfx_boot"
 #define XORG_CONF "/etc/X11/xorg.conf"
