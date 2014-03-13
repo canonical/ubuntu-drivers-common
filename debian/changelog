@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.90) UNRELEASED; urgency=low
+ubuntu-drivers-common (1:0.2.90) trusty; urgency=low
 
   * gpu-manager.c, gpu-manager.py:
     - Match only PCI_CLASS_DISPLAY, except for PCI_CLASS_DISPLAY_OTHER.
@@ -8,7 +8,7 @@ ubuntu-drivers-common (1:0.2.90) UNRELEASED; urgency=low
       from last boot.
     - Clean up and make get_output() more robust (LP: #1290831).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 12 Mar 2014 17:45:27 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 13 Mar 2014 10:15:06 +0100
 
 ubuntu-drivers-common (1:0.2.89.6) trusty; urgency=low
 
