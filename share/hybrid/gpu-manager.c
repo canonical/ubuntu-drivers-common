@@ -832,17 +832,8 @@ static int is_pxpress_dgpu_disabled() {
     FILE *file;
     struct stat stbuf;
 
-    /* If file doesn't exist */
-    if (stat(amd_pcsdb_file, &stbuf) == -1) {
-        fprintf(log_handle, "can't access %s\n", amd_pcsdb_file);
+    if (!exists_not_empty(amd_pcsdb_file))
         return 0;
-    }
-    /* If file is empty */
-    if ((stbuf.st_mode & S_IFMT) && ! stbuf.st_size) {
-        fprintf(log_handle, "%s is empty\n", amd_pcsdb_file);
-        return 0;
-    }
-
 
     file = fopen(amd_pcsdb_file, "r");
 
@@ -1087,17 +1078,9 @@ static int check_vendor_bus_id_xorg_conf(struct device **devices, int cards_n,
     FILE *file;
     struct stat stbuf;
 
-    /* If file doesn't exist */
-    if (stat(xorg_conf_file, &stbuf) == -1) {
-        fprintf(log_handle, "can't access %s\n", xorg_conf_file);
+    /* If file doesn't exist or is empty */
+    if (!exists_not_empty(xorg_conf_file))
         return 0;
-    }
-    /* If file is empty */
-    if ((stbuf.st_mode & S_IFMT) && ! stbuf.st_size) {
-        fprintf(log_handle, "%s is empty\n", xorg_conf_file);
-        return 0;
-    }
-
 
     file = fopen(xorg_conf_file, "r");
 
@@ -1606,16 +1589,9 @@ static int add_gpu_bus_from_dmesg(const char *pattern, struct device **devices,
     if (dry_run && fake_dmesg_path) {
         struct stat stbuf;
 
-        /* If file doesn't exist */
-        if (stat(fake_dmesg_path, &stbuf) == -1) {
-            fprintf(log_handle, "can't access %s\n", fake_dmesg_path);
+        /* If file doesn't exist or is empty */
+        if (!exists_not_empty(fake_dmesg_path))
             return 0;
-        }
-        /* If file is empty */
-        if ((stbuf.st_mode & S_IFMT) && ! stbuf.st_size) {
-            fprintf(log_handle, "%s is empty\n", fake_dmesg_path);
-            return 0;
-        }
 
         sprintf(command, "grep %s %s",
                 pattern, fake_dmesg_path);
