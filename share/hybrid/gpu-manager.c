@@ -66,6 +66,7 @@
      && (((c) & 0x00ffff00) != (PCI_CLASS_DISPLAY_OTHER << 8)) )
 
 #define LAST_BOOT "/var/lib/ubuntu-drivers-common/last_gfx_boot"
+#define OFFLOADING_CONF "/var/lib/ubuntu-drivers-common/requires_offloading"
 #define XORG_CONF "/etc/X11/xorg.conf"
 #define KERN_PARAM "nogpumanager"
 
@@ -1863,6 +1864,25 @@ static int requires_offloading(void) {
 }
 
 
+/* Set permanent settings for offloading */
+static int set_offloading(void) {
+    FILE *file;
+
+    if (dry_run)
+        return 1;
+
+    file = fopen(OFFLOADING_CONF, "w");
+    if (file != NULL) {
+        fprintf(file, "ON\n");
+        fflush(file);
+        fclose(file);
+        return 1;
+    }
+
+    return 0;
+}
+
+
 /* Make a backup and remove xorg.conf */
 static int remove_xorg_conf(void) {
     int status;
@@ -2502,6 +2522,12 @@ int main(int argc, char *argv[]) {
 
     fprintf(log_handle, "Does it require offloading? %s\n", (offloading ? "yes" : "no"));
 
+    /* Remove a file that will tell other apps such as
+     * nvidia-prime if we need to offload rendering.
+     */
+    if (!offloading && !dry_run)
+        unlink(OFFLOADING_CONF);
+
     bbswitch_loaded = is_module_loaded("bbswitch");
     nvidia_loaded = is_module_loaded("nvidia");
     nvidia_unloaded = has_unloaded_module("nvidia");
@@ -2719,6 +2745,10 @@ int main(int argc, char *argv[]) {
                 enable_prime(prime_settings, bbswitch_loaded,
                              discrete_vendor_id, alternative,
                              current_devices, cards_n);
+
+                /* Write permanent settings about offloading */
+                set_offloading();
+
                 goto end;
             }
             else {
@@ -2847,6 +2877,10 @@ int main(int argc, char *argv[]) {
                 enable_prime(prime_settings, bbswitch_loaded,
                              discrete_vendor_id, alternative,
                              current_devices, cards_n);
+
+                /* Write permanent settings about offloading */
+                set_offloading();
+
                 goto end;
             }
             else {
