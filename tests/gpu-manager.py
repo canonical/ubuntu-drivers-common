@@ -28,7 +28,7 @@ class GpuTest(object):
 
     def __init__(self,
                  has_single_card=False,
-                 is_laptop=False,
+                 requires_offloading=False,
                  has_intel=False,
                  intel_loaded=False,
                  intel_unloaded=False,
@@ -57,7 +57,7 @@ class GpuTest(object):
                  matched_quirk=False,
                  loaded_with_args=False):
         self.has_single_card = has_single_card
-        self.is_laptop = is_laptop
+        self.requires_offloading = requires_offloading
         self.has_intel = has_intel
         self.intel_loaded = intel_loaded
         self.intel_unloaded = intel_unloaded
@@ -128,7 +128,7 @@ class GpuManagerTest(unittest.TestCase):
         klass.is_driver_enabled_pt = re.compile('Is (.+) enabled\? (.+)')
         klass.has_card_pt = re.compile('Has (.+)\? (.+)')
         klass.single_card_pt = re.compile('Single card detected.*')
-        klass.is_laptop_pt = re.compile('Is laptop\? (.+)')
+        klass.requires_offloading_pt = re.compile('Does it require offloading\? (.+)')
         klass.no_change_stop_pt = re.compile('No change - nothing to do')
         klass.has_changed_pt = re.compile('Has the system changed\? (.+)')
 
@@ -242,8 +242,8 @@ class GpuManagerTest(unittest.TestCase):
                 except:
                     pass
 
-    def exec_manager(self, is_laptop=False, uses_lightdm=True):
-        fake_laptop_arg = is_laptop and '--fake-laptop' or '--fake-desktop'
+    def exec_manager(self, requires_offloading=False, uses_lightdm=True):
+        fake_requires_offloading = requires_offloading and '--fake-requires-offloading' or '--fake-no-requires-offloading'
         if with_valgrind:
             valgrind = ['valgrind', '--tool=memcheck', '--leak-check=full',
                         '--show-reachable=yes', '--log-file=%s' % self.valgrind_log.name,
@@ -279,7 +279,7 @@ class GpuManagerTest(unittest.TestCase):
                    self.dmi_product_version_path.name,
                    '--new-boot-file',
                    self.new_boot_file.name,
-                   fake_laptop_arg,
+                   fake_requires_offloading,
                    '--log',
                    self.log.name]
 
@@ -338,7 +338,7 @@ class GpuManagerTest(unittest.TestCase):
             loaded_with_args = self.loaded_with_args_pt.match(line)
 
             single_card = self.single_card_pt.match(line)
-            laptop = self.is_laptop_pt.match(line)
+            offloading = self.requires_offloading_pt.match(line)
 
             no_change_stop = self.no_change_stop_pt.match(line)
             has_changed = self.has_changed_pt.match(line)
@@ -398,8 +398,8 @@ class GpuManagerTest(unittest.TestCase):
                     gpu_test.pxpress_enabled = (is_driver_enabled.group(2).strip().lower() == 'yes')
             elif single_card:
                 gpu_test.has_single_card = True
-            elif laptop:
-                gpu_test.is_laptop = (laptop.group(1).strip().lower() == 'yes')
+            elif offloading:
+                gpu_test.requires_offloading = (offloading.group(1).strip().lower() == 'yes')
             elif no_change_stop:
                 #gpu_test.has_changed = False
                 gpu_test.has_not_acted = True
@@ -655,7 +655,7 @@ class GpuManagerTest(unittest.TestCase):
                    loaded_modules, available_drivers,
                    enabled_driver,
                    unloaded_module='',
-                   is_laptop=False,
+                   requires_offloading=False,
                    proprietary_installer=False,
                    matched_quirk=False,
                    loaded_with_quirk=False,
@@ -673,7 +673,7 @@ class GpuManagerTest(unittest.TestCase):
                    bump_discrete_device_id)
 
         # Call the program
-        self.exec_manager(is_laptop=is_laptop)
+        self.exec_manager(requires_offloading=requires_offloading)
 
         # Return data
         return self.check_vars()
@@ -693,7 +693,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
         self.assertTrue(gpu_test.has_intel)
@@ -727,13 +727,13 @@ class GpuManagerTest(unittest.TestCase):
                                       ['nvidia'],
                                       ['mesa', 'nvidia'],
                                       'nvidia',
-                                      is_laptop=True)
+                                      requires_offloading=True)
 
         # Check the variables
         self.assertTrue(gpu_test.has_single_card)
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -917,7 +917,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
         self.assertFalse(gpu_test.has_intel)
@@ -957,7 +957,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
         self.assertFalse(gpu_test.has_intel)
@@ -1002,7 +1002,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1047,7 +1047,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
         self.assertFalse(gpu_test.has_intel)
@@ -1087,7 +1087,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1129,7 +1129,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
         self.assertFalse(gpu_test.has_intel)
@@ -1171,7 +1171,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
         self.assertFalse(gpu_test.has_intel)
@@ -1216,7 +1216,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
         self.assertFalse(gpu_test.has_intel)
@@ -1258,7 +1258,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1300,7 +1300,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1343,7 +1343,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1385,7 +1385,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1430,7 +1430,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1479,7 +1479,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1523,7 +1523,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1573,7 +1573,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1618,7 +1618,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1668,7 +1668,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1712,7 +1712,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1754,7 +1754,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1796,7 +1796,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1840,7 +1840,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1883,7 +1883,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1935,7 +1935,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1978,7 +1978,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2022,7 +2022,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2064,7 +2064,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2108,7 +2108,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2151,7 +2151,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2196,7 +2196,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2238,7 +2238,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2281,7 +2281,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2325,7 +2325,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2370,7 +2370,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
         self.assertTrue(gpu_test.has_intel)
@@ -2411,7 +2411,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
         self.assertTrue(gpu_test.has_intel)
@@ -2451,7 +2451,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
         self.assertTrue(gpu_test.has_intel)
@@ -2491,7 +2491,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
         self.assertTrue(gpu_test.has_intel)
@@ -2535,7 +2535,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
         # No Intel
@@ -2577,7 +2577,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
         # No Intel
@@ -2618,7 +2618,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
         # No Intel
@@ -2659,7 +2659,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
         #No Intel
@@ -2707,7 +2707,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2751,7 +2751,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2795,7 +2795,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2839,7 +2839,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2879,12 +2879,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['i915', 'radeon'],
                                                  ['mesa'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -2921,12 +2921,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['i915', 'radeon'],
                                                  ['mesa'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -2963,12 +2963,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['i915'],
                                                  ['mesa'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -3012,7 +3012,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -3053,7 +3053,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -3094,7 +3094,7 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -3136,12 +3136,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['i915', 'fglrx'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -3187,7 +3187,7 @@ FAKEGPUSETTINGS=BLAHBLAH''')
                                                  ['i915', 'fglrx'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Has changed
         self.assertTrue(gpu_test.has_changed)
@@ -3255,7 +3255,7 @@ EndSection
                                                  ['i915', 'fglrx'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Has changed
         self.assertTrue(gpu_test.has_changed)
@@ -3325,7 +3325,7 @@ EndSection
                                                  ['i915', 'fglrx'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Has changed
         self.assertTrue(gpu_test.has_changed)
@@ -3396,7 +3396,7 @@ EndSection
                                                  ['i915', 'fglrx'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Has changed
         self.assertTrue(gpu_test.has_changed)
@@ -3466,7 +3466,7 @@ EndSection
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
                                                  unloaded_module='fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check that fglrx was unloaded
         self.assertTrue(gpu_test.fglrx_unloaded)
@@ -3533,7 +3533,7 @@ EndSection
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
                                                  unloaded_module='fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check that fglrx was unloaded
         self.assertTrue(gpu_test.fglrx_unloaded)
@@ -3562,12 +3562,12 @@ EndSection
                                                  ['i915', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -3607,12 +3607,12 @@ EndSection
                                                  ['i915', 'fglrx'],
                                                  ['mesa', 'fglrx'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -3654,12 +3654,12 @@ EndSection
                                                  ['i915', 'fglrx'],
                                                  ['mesa', 'fglrx'],
                                                  'pxpress',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -3704,12 +3704,12 @@ EndSection
                                                  ['i915', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'pxpress',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -3750,12 +3750,12 @@ EndSection
                                                  ['i915', 'fglrx'],
                                                  ['mesa', 'fglrx'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -3798,12 +3798,12 @@ EndSection
                                                  ['i915', 'fglrx'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -3844,12 +3844,12 @@ EndSection
                                                  ['i915', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -3890,12 +3890,12 @@ EndSection
                                                  ['i915', 'fglrx'],
                                                  ['mesa', 'fglrx'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -3938,12 +3938,12 @@ EndSection
                                                  ['i915', 'fglrx'],
                                                  ['mesa', 'fglrx'],
                                                  'pxpress',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -3986,12 +3986,12 @@ EndSection
                                                  ['i915', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'pxpress',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -4032,12 +4032,12 @@ EndSection
                                                  ['i915', 'fglrx'],
                                                  ['mesa', 'fglrx'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -4080,12 +4080,12 @@ EndSection
                                                  ['i915', 'fglrx'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -4125,12 +4125,12 @@ EndSection
                                                  ['i915', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -4170,12 +4170,12 @@ EndSection
                                                  ['i915', 'fglrx'],
                                                  ['mesa', 'fglrx'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -4217,13 +4217,13 @@ EndSection
                                                  ['i915', 'fglrx'],
                                                  ['mesa', 'fglrx'],
                                                  'pxpress',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -4263,12 +4263,12 @@ EndSection
                                                  ['i915', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'pxpress',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -4308,12 +4308,12 @@ EndSection
                                                  ['i915', 'fglrx'],
                                                  ['mesa', 'fglrx'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -4360,7 +4360,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -4404,7 +4404,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -4448,7 +4448,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -4492,7 +4492,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -4539,7 +4539,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -4584,7 +4584,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -4629,7 +4629,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -4673,7 +4673,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -4717,7 +4717,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -4761,7 +4761,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -4805,7 +4805,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -4849,7 +4849,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -4893,7 +4893,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -4936,7 +4936,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -4979,7 +4979,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -5022,7 +5022,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -5065,7 +5065,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -5108,7 +5108,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -5148,12 +5148,12 @@ EndSection
                                                  ['i915', 'nouveau'],
                                                  ['mesa'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -5190,12 +5190,12 @@ EndSection
                                                  ['i915', 'nouveau'],
                                                  ['mesa'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -5232,12 +5232,12 @@ EndSection
                                                  ['i915'],
                                                  ['mesa'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -5279,7 +5279,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -5320,7 +5320,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -5361,7 +5361,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -5413,7 +5413,7 @@ EndSection
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
                                                  'nvidia',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
@@ -5422,7 +5422,7 @@ EndSection
         self.assertTrue(gpu_test.loaded_with_args)
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -5473,7 +5473,7 @@ EndSection
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
                                                  'nvidia',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
@@ -5496,11 +5496,11 @@ EndSection
                                                  ['i915', 'fake'],
                                                  ['mesa', 'nvidia'],
                                                  'nvidia',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -5546,12 +5546,12 @@ EndSection
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -5596,12 +5596,12 @@ EndSection
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
                                                  'prime',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -5647,12 +5647,12 @@ EndSection
                                                  ['i915', 'fake'],
                                                  ['mesa', 'nvidia'],
                                                  'prime',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -5699,12 +5699,12 @@ EndSection
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -5750,12 +5750,12 @@ EndSection
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
                                                  'nvidia',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -5803,12 +5803,12 @@ EndSection
                                                  ['i915', 'fake'],
                                                  ['mesa', 'nvidia'],
                                                  'nvidia',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -5854,12 +5854,12 @@ EndSection
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -5905,12 +5905,12 @@ EndSection
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
                                                  'prime',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -5956,12 +5956,12 @@ EndSection
                                                  ['i915', 'fake'],
                                                  ['mesa', 'nvidia'],
                                                  'prime',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -6008,12 +6008,12 @@ EndSection
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -6053,12 +6053,12 @@ EndSection
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
                                                  'nvidia',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -6096,11 +6096,11 @@ EndSection
                                                  ['i915', 'fake'],
                                                  ['mesa', 'nvidia'],
                                                  'nvidia',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -6146,12 +6146,12 @@ EndSection
                                                  ['mesa', 'nvidia'],
                                                  'prime',
                                                  unloaded_module='nvidia',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -6198,12 +6198,12 @@ EndSection
                                                  ['mesa', 'nvidia'],
                                                  'prime',
                                                  unloaded_module='nvidia',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -6241,12 +6241,12 @@ EndSection
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -6284,12 +6284,12 @@ EndSection
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
                                                  'prime',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -6327,12 +6327,12 @@ EndSection
                                                  ['i915'],
                                                  ['mesa', 'nvidia'],
                                                  'prime',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -6370,12 +6370,12 @@ EndSection
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -6420,7 +6420,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -6461,7 +6461,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -6504,7 +6504,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -6548,7 +6548,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -6591,7 +6591,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -6634,7 +6634,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -6677,7 +6677,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -6799,7 +6799,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -6842,7 +6842,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -6885,7 +6885,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -6928,7 +6928,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -6976,7 +6976,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -7018,7 +7018,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -7060,7 +7060,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -7102,7 +7102,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -7144,7 +7144,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -7186,7 +7186,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -7231,7 +7231,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -7272,7 +7272,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -7313,7 +7313,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -7356,7 +7356,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -7399,7 +7399,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -7442,7 +7442,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -7485,7 +7485,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -7612,7 +7612,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -7655,7 +7655,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -7698,7 +7698,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -7741,7 +7741,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -7789,7 +7789,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -7831,7 +7831,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -7873,7 +7873,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -7915,7 +7915,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -7957,7 +7957,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -7999,7 +7999,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -8041,12 +8041,12 @@ EndSection
                                                  ['fglrx', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -8083,12 +8083,12 @@ EndSection
                                                  ['fake_old', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -8125,12 +8125,12 @@ EndSection
                                                  ['fglrx', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -8169,12 +8169,12 @@ EndSection
                                                  ['fglrx', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'pxpress',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -8213,12 +8213,12 @@ EndSection
                                                  ['fake_old', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'pxpress',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -8257,12 +8257,12 @@ EndSection
                                                  ['fglrx', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -8301,12 +8301,12 @@ EndSection
                                                  ['fglrx', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -8359,7 +8359,7 @@ EndSection
                                                  ['fglrx', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # AMD
         self.assertTrue(gpu_test.has_amd)
@@ -8400,7 +8400,7 @@ EndSection
                                                  ['fglrx', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # AMD
         self.assertTrue(gpu_test.has_amd)
@@ -8431,12 +8431,12 @@ EndSection
                                                  ['fake_old', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -8475,12 +8475,12 @@ EndSection
                                                  ['fglrx', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -8519,12 +8519,12 @@ EndSection
                                                  ['fglrx', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'pxpress',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -8563,12 +8563,12 @@ EndSection
                                                  ['fake_old', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'pxpress',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -8612,12 +8612,12 @@ EndSection
                                                  ['fglrx', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -8655,12 +8655,12 @@ EndSection
                                                  ['fake_old', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'fglrx',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -8698,12 +8698,12 @@ EndSection
                                                  ['fglrx', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -8741,12 +8741,12 @@ EndSection
                                                  ['fglrx', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'pxpress',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -8784,12 +8784,12 @@ EndSection
                                                  ['fake_old', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'pxpress',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -8827,12 +8827,12 @@ EndSection
                                                  ['fglrx', 'fake'],
                                                  ['mesa', 'fglrx'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -8877,7 +8877,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -8917,7 +8917,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -8959,12 +8959,12 @@ EndSection
                                                  ['radeon', 'fake'],
                                                  ['mesa'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -9000,12 +9000,12 @@ EndSection
                                                  ['fake_old', 'fake'],
                                                  ['mesa'],
                                                  'mesa',
-                                                 is_laptop=True)
+                                                 requires_offloading=True)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.is_laptop)
+        self.assertTrue(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -9048,7 +9048,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -9182,7 +9182,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -9223,7 +9223,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -9358,7 +9358,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -9494,7 +9494,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -9537,7 +9537,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -9580,7 +9580,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -9623,7 +9623,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -9666,7 +9666,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -9709,7 +9709,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -9752,7 +9752,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -9798,7 +9798,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -9839,7 +9839,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -9880,7 +9880,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -9923,7 +9923,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -9966,7 +9966,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -10009,7 +10009,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -10052,7 +10052,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -10174,7 +10174,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -10217,7 +10217,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -10260,7 +10260,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -10303,7 +10303,7 @@ EndSection
         # Check the variables
 
         # Check if laptop
-        self.assertFalse(gpu_test.is_laptop)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -10389,7 +10389,7 @@ EndSection
         # no selected alternative
         self.fake_alternative = ''
 
-        self.exec_manager(is_laptop=False)
+        self.exec_manager(requires_offloading=False)
 
         # Return data
         gpu_test = self.check_vars()
@@ -10433,7 +10433,7 @@ EndSection
         # no selected alternative
         self.fake_alternative = ''
 
-        self.exec_manager(is_laptop=False)
+        self.exec_manager(requires_offloading=False)
 
         # Return data
         gpu_test = self.check_vars()
