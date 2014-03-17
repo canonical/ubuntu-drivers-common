@@ -1713,8 +1713,8 @@ int count_connected_outputs(int fd, drmModeResPtr res) {
         if (connector) {
             switch (connector->connection) {
             case DRM_MODE_CONNECTED:
-                connected_outputs += 1;
                 fprintf(log_handle, "output %d:\n", connected_outputs);
+                connected_outputs += 1;
 
                 switch (connector->connector_type) {
                 case DRM_MODE_CONNECTOR_Unknown:
@@ -1788,63 +1788,66 @@ int count_connected_outputs(int fd, drmModeResPtr res) {
 }
 
 
-/* See if card "card_number" has any connected outputs.
- *
- * If "driver" is not NULL, then "card_number" will be
- * ignored if it's not driven by the specified "driver".
- */
-static int has_card_connected_outputs(int card_number, const char *driver) {
+/* See if the drm device created by a driver has any connected outputs. */
+static int has_driver_connected_outputs(const char *driver) {
     char path[20];
-    int fd;
+    int fd = 1;
     drmModeResPtr res;
     drmVersionPtr version;
     int connected_outputs = 0;
-    int driver_match = 1;
+    int driver_match = 0;
+    int it;
 
-    sprintf(path, "/dev/dri/card%d", card_number);
-
-    fd = open(path, O_RDWR);
-
-    if (fd) {
-        if ((version = drmGetVersion(fd))) {
-            fprintf(log_handle, "Driver in use: \"%s\"\n", version->name);
-            /* Let's use strstr to catch the different backported
-             * kernel modules
-             */
-            if (driver && strstr(version->name, driver) == NULL) {
-                fprintf(log_handle, "No driver match for \"%s\", on \"%s\", "
-                       "which uses the \"%s\" driver\n",
-                       driver, path, version->name);
-                driver_match = 0;
+    /* Keep looking until we find the device for the driver */
+    for (it = 0; fd != -1; it++) {
+        sprintf(path, "/dev/dri/card%d", it);
+        fd = open(path, O_RDWR);
+        if (fd) {
+            if ((version = drmGetVersion(fd))) {
+                /* Let's use strstr to catch the different backported
+                 * kernel modules
+                 */
+                if (driver && strstr(version->name, driver) != NULL) {
+                    fprintf(log_handle, "Found \"%s\", driven by \"%s\"\n",
+                           path, version->name);
+                    driver_match = 1;
+                    drmFreeVersion(version);
+                    break;
+                }
+                else {
+                    fprintf(log_handle, "Skipping \"%s\", driven by \"%s\"\n",
+                            path, version->name);
+                    drmFreeVersion(version);
+                    close(fd);
+                }
             }
-            drmFreeVersion(version);
+        }
+        else {
+            fprintf(log_handle, "Error: can't open fd for %s\n", path);
+            break;
         }
     }
-    else {
-        fprintf(log_handle, "Error: can't open fd for %s\n", path);
+
+    if (!driver_match)
+        return 0;
+
+    res = drmModeGetResources(fd);
+    if (!res) {
+        fprintf(log_handle, "Error: can't get drm resources.\n");
+        drmClose(fd);
         return 0;
     }
 
-    if (driver_match) {
-        res = drmModeGetResources(fd);
-        if (!res) {
-            fprintf(log_handle, "Error: can't get drm resources.\n");
-            drmClose(fd);
-            return 0;
-        }
 
-        connected_outputs = count_connected_outputs(fd, res);
+    connected_outputs = count_connected_outputs(fd, res);
 
-        fprintf(log_handle, "Number of connected outputs for card%d: %d\n", card_number, connected_outputs);
+    fprintf(log_handle, "Number of connected outputs for %s: %d\n", path, connected_outputs);
 
-        drmModeFreeResources(res);
-    }
-
+    drmModeFreeResources(res);
 
     close(fd);
 
     return (connected_outputs > 0);
-
 }
 
 
@@ -1860,7 +1863,7 @@ static int requires_offloading(void) {
      * offloading to any other driver, as results
      * may be unpredictable
      */
-    return(has_card_connected_outputs(0, "i915"));
+    return(has_driver_connected_outputs("i915"));
 }
 
 
