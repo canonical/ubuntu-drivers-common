@@ -28,10 +28,15 @@ override_dh_install:
 	mkdir -p debian/dh-modaliases/usr/share/man/man1
 	pod2man -c Debhelper -r "$(DEB_VERSION)" debhelper/dh_modaliases debian/dh-modaliases/usr/share/man/man1/dh_modaliases.1
 
-	# clean up upstart conffile on upgrade on architectures which do not
-	# ship hybrid-detect
+	# clean up old upstart conffile for hybrid-detect
 	if [ ! -e debian/ubuntu-drivers-common/usr/bin/hybrid-detect ]; then \
-	    echo "rm_conffile /etc/init/hybrid-gfx.conf 1:0.2.69~" > debian/ubuntu-drivers-common.maintscript; \
+	    echo "rm_conffile /etc/init/hybrid-gfx.conf 1:0.2.91~" > debian/ubuntu-drivers-common.maintscript; \
+	fi
+
+	# clean up upstart conffile on upgrade on architectures which do not
+	# ship gpu-manager
+	if [ ! -e debian/ubuntu-drivers-common/usr/bin/gpu-manager ]; then \
+	    echo "rm_conffile /etc/init/gpu-manager.conf 1:0.2.91~" >> debian/ubuntu-drivers-common.maintscript; \
 	fi
 
 override_dh_python3:
@@ -39,6 +44,7 @@ override_dh_python3:
 
 override_dh_clean:
 	rm -f share/hybrid/hybrid-detect
+	rm -f share/hybrid/gpu-manager
 	rm -f quirksreader_test*.txt
 	rm -rf build
 	rm -rf *.egg-info
