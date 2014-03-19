@@ -1,8 +1,24 @@
-ubuntu-drivers-common (1:0.2.91) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.91) trusty; urgency=medium
 
-  * 
+  * debian/control:
+    - Add build dependency on libdrm-dev.
+  * debian/rules:
+    - Remove /etc/init/hybrid-gfx.conf.
+    - Also remove the current upstart job from the architectures
+      that don't ship gpu-manager.
+  * gpu-manager.c, tests/gpu-manager.py:
+    - Replace laptop specific hack to detect the need to offload
+      rendering to the discrete card with code that opens the
+      available drm devices and checks the connected outputs.
+      If any outputs are connected to the Intel card, then we
+      choose offloading. This also helps when the monitor is
+      still connected to Intel on desktop systems with Intel +
+      NVIDIA systems.
+    - Preliminary work to reduce code duplication in nvidia-prime.
+  * tests/ubuntu_drivers.py:
+    - Do not abort if test_auto_install_system fails.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 13 Mar 2014 11:55:46 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 19 Mar 2014 14:49:04 +0100
 
 ubuntu-drivers-common (1:0.2.90) trusty; urgency=low
 
