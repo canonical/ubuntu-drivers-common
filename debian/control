@@ -99,3 +99,12 @@ Depends: ubuntu-drivers-common, ${misc:Depends}
 Description: transitional package for ubuntu-drivers-common
  This is a transitional package for ubuntu-drivers-common. You can remove it
  after upgrading.
+
+Package: fglrx-pxpress
+Section: oldlibs
+Priority: extra
+Architecture: i386 amd64
+Depends: ubuntu-drivers-common, ${misc:Depends}
+Description: transitional package for ubuntu-drivers-common
+ This is a transitional package for ubuntu-drivers-common. You can remove it
+ after upgrading.
