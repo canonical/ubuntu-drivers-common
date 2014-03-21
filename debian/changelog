@@ -1,8 +1,10 @@
-ubuntu-drivers-common (1:0.2.91.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.91.1) trusty; urgency=medium
 
-  * 
+  * debian/control, debian/rules:
+    - Obsolete and replace fglrx-pxpress. The gpu-manager
+      already deals with AMD GPUs.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 21 Mar 2014 17:30:40 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 21 Mar 2014 19:03:20 +0100
 
 ubuntu-drivers-common (1:0.2.91) trusty; urgency=medium
 
