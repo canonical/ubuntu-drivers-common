@@ -831,7 +831,6 @@ static int is_pxpress_dgpu_disabled() {
     /* We don't need a huge buffer */
     char line[100];
     FILE *file;
-    struct stat stbuf;
 
     if (!exists_not_empty(amd_pcsdb_file))
         return 0;
@@ -1077,7 +1076,6 @@ static int check_vendor_bus_id_xorg_conf(struct device **devices, int cards_n,
     char line[4096];
     char bus_id[256];
     FILE *file;
-    struct stat stbuf;
 
     /* If file doesn't exist or is empty */
     if (!exists_not_empty(xorg_conf_file))
@@ -1588,8 +1586,6 @@ static int add_gpu_bus_from_dmesg(const char *pattern, struct device **devices,
     FILE *pfile = NULL;
 
     if (dry_run && fake_dmesg_path) {
-        struct stat stbuf;
-
         /* If file doesn't exist or is empty */
         if (!exists_not_empty(fake_dmesg_path))
             return 0;
