@@ -858,6 +858,44 @@ static int is_pxpress_dgpu_disabled() {
 }
 
 
+/* Check if binary drivers are still set in xorg.conf */
+static int has_xorg_conf_binary_drivers(struct device **devices,
+                                 int cards_n) {
+    int found_binary = 0;
+    char line[2048];
+    FILE *file;
+
+    if (!exists_not_empty(xorg_conf_file))
+        return 0;
+
+    file = fopen(xorg_conf_file, "r");
+
+    if (!file) {
+        fprintf(log_handle, "Error: I couldn't open %s for reading.\n",
+                xorg_conf_file);
+        return 0;
+    }
+
+    while (fgets(line, sizeof(line), file)) {
+        /* Ignore comments */
+        if (strstr(line, "#") == NULL) {
+            /* Parse drivers here */
+            if (istrstr(line, "Driver") != NULL) {
+                if ((istrstr(line, "fglrx") != NULL) || (istrstr(line, "nvidia") != NULL)) {
+                    found_binary = 1;
+                    fprintf(log_handle, "Found binary driver in %s\n", xorg_conf_file);
+                    break;
+                }
+            }
+        }
+    }
+
+    fclose(file);
+
+    return found_binary;
+}
+
+
 /* Check xorg.conf to see if it's all properly set */
 static int check_prime_xorg_conf(struct device **devices,
                                  int cards_n) {
@@ -2949,7 +2987,9 @@ int main(int argc, char *argv[]) {
                             status = enable_mesa();
                         }
                         else {
-                            if (has_changed) {
+                            /* If the system has changed or a binary driver is still
+                             * in the xorg.conf, then move the xorg.conf away */
+                            if (has_changed || has_xorg_conf_binary_drivers(current_devices, cards_n)) {
                                 fprintf(log_handle, "System configuration has changed\n");
                                 /* Remove xorg.conf */
                                 remove_xorg_conf();
@@ -2989,7 +3029,9 @@ int main(int argc, char *argv[]) {
                             status = enable_mesa();
                         }
                         else {
-                            if (has_changed) {
+                            /* If the system has changed or a binary driver is still
+                             * in the xorg.conf, then move the xorg.conf away */
+                            if (has_changed || has_xorg_conf_binary_drivers(current_devices, cards_n)) {
                                 fprintf(log_handle, "System configuration has changed\n");
                                 /* Remove xorg.conf */
                                 remove_xorg_conf();
@@ -3038,7 +3080,9 @@ int main(int argc, char *argv[]) {
                         status = enable_mesa();
                     }
                     else {
-                        if (has_changed) {
+                        /* If the system has changed or a binary driver is still
+                         * in the xorg.conf, then move the xorg.conf away */
+                        if (has_changed || has_xorg_conf_binary_drivers(current_devices, cards_n)) {
                             fprintf(log_handle, "System configuration has changed\n");
                             /* Remove xorg.conf */
                             remove_xorg_conf();
@@ -3086,7 +3130,9 @@ int main(int argc, char *argv[]) {
                             enable_mesa();
                         }
                         else {
-                            if (has_changed) {
+                            /* If the system has changed or a binary driver is still
+                             * in the xorg.conf, then move the xorg.conf away */
+                            if (has_changed || has_xorg_conf_binary_drivers(current_devices, cards_n)) {
                                 fprintf(log_handle, "System configuration has changed\n");
                                 /* Remove xorg.conf */
                                 remove_xorg_conf();
