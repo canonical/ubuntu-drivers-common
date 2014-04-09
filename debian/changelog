@@ -1,8 +1,12 @@
-ubuntu-drivers-common (1:0.2.91.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.91.3) trusty; urgency=medium
 
-  * 
+  * gpu-manager.c:
+    - Move away the xorg.conf if mesa is selected as a
+      fallback and binary drivers are still in use in the
+      xorg.conf. This will prevent X from failing when
+      users on hybrid systems uninstall a binary driver.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 09 Apr 2014 17:05:48 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 09 Apr 2014 17:06:53 +0200
 
 ubuntu-drivers-common (1:0.2.91.2) trusty; urgency=medium
 
