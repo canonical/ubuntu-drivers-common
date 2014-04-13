@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.91.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.91.3) trusty; urgency=medium
 
   * gpu-manager.c:
     - Move away the xorg.conf if mesa is selected as a
