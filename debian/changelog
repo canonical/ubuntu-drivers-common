@@ -1,10 +1,10 @@
-ubuntu-drivers-common (1:0.2.91.4) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.91.4) trusty; urgency=medium
 
   * Force removal of jockey on upgrades. It has been replaced with
     ubuntu-drivers-common two cycles ago, removed from trusty, and now just
     crashes due to API changes in aptdaemon. (LP: #1216193)
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Sun, 13 Apr 2014 13:30:40 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Sun, 13 Apr 2014 13:31:11 +0200
 
 ubuntu-drivers-common (1:0.2.91.3) trusty; urgency=medium
 
