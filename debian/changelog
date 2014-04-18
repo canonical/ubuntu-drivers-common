@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.2.91.5) UNRELEASED; urgency=medium
+
+  * During first boot, don't remove existing xorg.conf. (LP: #1307546)
+
+ -- Mario Limonciello <superm1@ubuntu.com>  Fri, 18 Apr 2014 11:35:27 -0500
+
 ubuntu-drivers-common (1:0.2.91.4) trusty; urgency=medium
 
   * Force removal of jockey on upgrades. It has been replaced with
