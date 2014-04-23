@@ -603,10 +603,17 @@ class GpuManagerTest(unittest.TestCase):
                    matched_quirk=False,
                    loaded_with_quirk=False,
                    bump_boot_vga_device_id=False,
-                   bump_discrete_device_id=False):
+                   bump_discrete_device_id=False,
+                   first_boot=False):
 
         # Last boot
-        self.set_cards_from_last_boot(last_boot)
+        if first_boot:
+            try:
+                os.unlink(self.last_boot_file)
+            except:
+                pass
+        else:
+            self.set_cards_from_last_boot(last_boot)
 
         # Current boot
         self.set_current_cards(current_boot,
@@ -660,7 +667,8 @@ class GpuManagerTest(unittest.TestCase):
                    matched_quirk=False,
                    loaded_with_quirk=False,
                    bump_boot_vga_device_id=False,
-                   bump_discrete_device_id=False):
+                   bump_discrete_device_id=False,
+                   first_boot=False):
 
         self.set_params(last_boot, current_boot,
                    loaded_modules, available_drivers,
@@ -670,7 +678,8 @@ class GpuManagerTest(unittest.TestCase):
                    matched_quirk,
                    loaded_with_quirk,
                    bump_boot_vga_device_id,
-                   bump_discrete_device_id)
+                   bump_discrete_device_id,
+                   first_boot)
 
         # Call the program
         self.exec_manager(requires_offloading=requires_offloading)
@@ -10442,6 +10451,59 @@ EndSection
         self.assertFalse(gpu_test.has_changed)
 
         self.assertFalse(gpu_test.has_selected_driver)
+
+
+    def test_desktop_one_nvidia_binary_preserve_xorg_conf(self):
+        self.this_function_name = sys._getframe().f_code.co_name
+
+        # Make sure that xorg.conf is not removed on first boot
+        # i.e. the first time (ever) gpu-manager runs
+        self.xorg_file = open(self.xorg_file.name, 'w')
+        self.xorg_file.write('''
+Section "Device"
+    Identifier "Default Card 1"
+    BusID "PCI:1@0:0:0"
+EndSection
+''');
+        self.xorg_file.close()
+
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                                 ['nvidia'],
+                                                 ['nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 first_boot=True)
+
+
+        # Check if laptop
+        self.assertFalse(gpu_test.requires_offloading)
+
+        self.assertTrue(gpu_test.has_single_card)
+
+        # Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        # AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertTrue(gpu_test.has_not_acted)
 
 
 
