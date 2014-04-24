@@ -950,7 +950,9 @@ static int check_prime_xorg_conf(struct device **devices,
                 if ((istrstr(line, "AllowEmptyInitialConfiguration") != NULL &&
                     istrstr(line, "on") != NULL) ||
                     (istrstr(line, "ConstrainCursor") != NULL &&
-                    istrstr(line, "off") != NULL)) {
+                    istrstr(line, "off") != NULL) ||
+                    (istrstr(line, "IgnoreDisplayDevices") != NULL &&
+                    istrstr(line, "CRT") != NULL)) {
                     x_options_matches += 1;
                 }
             }
@@ -1249,6 +1251,7 @@ static int write_prime_xorg_conf(struct device **devices, int cards_n) {
                 "    Identifier \"nvidia\"\n"
                 "    Device \"nvidia\"\n"
                 "    Option \"AllowEmptyInitialConfiguration\" \"on\"\n"
+                "    Option \"IgnoreDisplayDevices\" \"CRT\"\n"
                 "EndSection\n\n",
                (int)(devices[i]->bus),
                (int)(devices[i]->domain),
