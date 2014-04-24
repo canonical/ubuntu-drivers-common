@@ -1,6 +1,20 @@
 ubuntu-drivers-common (1:0.2.91.5) UNRELEASED; urgency=medium
 
-  * During first boot, don't remove existing xorg.conf. (LP: #1307546)
+  [ Alberto Milone ]
+  * gpu-manager.c:
+    - Ignore CRT displays when using PRIME. This works around
+      systems whose BIOS provides a ghost output (LP: #1296020).
+  * tests/gpu-manager.py:
+    - Check that we don't remove xorg.confs on 1st boot.
+  * UbuntuDrivers/detect.py:
+    - Do not autoinstall the broadcom driver. The open driver
+      should be a better solution now (LP: #1306928).
+    - Autoinstall linux-firmware-nonfree. This will help now
+      that we no longer autoinstall Broadcom's binary driver.
+
+  [ Mario Limonciello ]
+  * gpu-manager.c:
+    - During first boot, don't remove existing xorg.conf (LP: #1307546).
 
  -- Mario Limonciello <superm1@ubuntu.com>  Fri, 18 Apr 2014 11:35:27 -0500
 
