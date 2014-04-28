@@ -1,9 +1,10 @@
-ubuntu-drivers-common (1:0.2.91.5) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.92) utopic; urgency=medium
 
   [ Alberto Milone ]
   * gpu-manager.c:
     - Ignore CRT displays when using PRIME. This works around
       systems whose BIOS provides a ghost output (LP: #1296020).
+    - Switch from modesetting to intel for PRIME.
   * tests/gpu-manager.py:
     - Check that we don't remove xorg.confs on 1st boot.
   * UbuntuDrivers/detect.py:
@@ -16,7 +17,7 @@ ubuntu-drivers-common (1:0.2.91.5) UNRELEASED; urgency=medium
   * gpu-manager.c:
     - During first boot, don't remove existing xorg.conf (LP: #1307546).
 
- -- Mario Limonciello <superm1@ubuntu.com>  Fri, 18 Apr 2014 11:35:27 -0500
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 28 Apr 2014 10:15:11 +0200
 
 ubuntu-drivers-common (1:0.2.91.4) trusty; urgency=medium
 
