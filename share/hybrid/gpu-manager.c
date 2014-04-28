@@ -964,7 +964,7 @@ static int check_prime_xorg_conf(struct device **devices,
             }
             /* The driver has to be either intel or nvidia */
             else if (istrstr(line, "Driver") != NULL) {
-                if (istrstr(line, "intel") != NULL){
+                if (istrstr(line, "modesetting") != NULL){
                     intel_set += 1;
                 }
                 else if (istrstr(line, "nvidia") != NULL) {
@@ -1227,7 +1227,7 @@ static int write_prime_xorg_conf(struct device **devices, int cards_n) {
             fprintf(pfile,
                 "Section \"Device\"\n"
                 "    Identifier \"intel\"\n"
-                "    Driver \"intel\"\n"
+                "    Driver \"modesetting\"\n"
                 "    BusID \"PCI:%d@%d:%d:%d\"\n"
                 "EndSection\n\n"
                 "Section \"Screen\"\n"
