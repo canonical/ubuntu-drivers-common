@@ -88,6 +88,7 @@ static char *fake_dmesg_path = NULL;
 static char *prime_settings = NULL;
 static char *bbswitch_path = NULL;
 static char *bbswitch_quirks_path = NULL;
+static char *dmi_product_name_path = NULL;
 static char *dmi_product_version_path = NULL;
 static char *main_arch_path = NULL;
 static char *other_arch_path = NULL;
@@ -180,56 +181,53 @@ static int exists_not_empty(const char *file) {
 }
 
 
-/* Get parameters we may need to pass to bbswitch */
-static char * get_params_from_quirks() {
-    char *dmi_product_version = NULL;
+/* Get parameters that match a specific dmi resource */
+static char * get_params_from_dmi_resource(const char* dmi_resource_path) {
     FILE *file;
     char *params = NULL;
     char line[1035];
     size_t len = 0;
     char *tok;
+    char *dmi_resource = NULL;
 
-    if (!exists_not_empty(dmi_product_version_path)) {
-        fprintf(log_handle, "Error: %s does not exist or is empty.\n", dmi_product_version_path);
-    }
-
-    if (!exists_not_empty(bbswitch_quirks_path)) {
-        fprintf(log_handle, "Error: %s does not exist or is empty.\n", bbswitch_quirks_path);
+    if (!exists_not_empty(dmi_resource_path)) {
+        fprintf(log_handle, "Error: %s does not exist or is empty.\n", dmi_resource_path);
+        return NULL;
     }
 
     /* get dmi product version */
-    file = fopen(dmi_product_version_path, "r");
+    file = fopen(dmi_resource_path, "r");
     if (file == NULL) {
-        fprintf(log_handle, "can't open %s\n", dmi_product_version_path);
+        fprintf(log_handle, "can't open %s\n", dmi_resource_path);
         return NULL;
     }
-    if (getline(&dmi_product_version, &len, file) == -1) {
-        fprintf(log_handle, "can't get line from %s\n", dmi_product_version_path);
+    if (getline(&dmi_resource, &len, file) == -1) {
+        fprintf(log_handle, "can't get line from %s\n", dmi_resource_path);
         return NULL;
     }
     fclose(file);
 
-    if (dmi_product_version) {
+    if (dmi_resource) {
         /* Remove newline */
-        len = strlen(dmi_product_version);
-        if(dmi_product_version[len-1] == '\n' )
-           dmi_product_version[len-1] = 0;
+        len = strlen(dmi_resource);
+        if(dmi_resource[len-1] == '\n' )
+           dmi_resource[len-1] = 0;
 
-        /* Look for zero-length dmi_product_version */
-        if (strlen(dmi_product_version) == 0) {
-            fprintf(log_handle, "Invalid dmi_product_version=\"%s\"\n",
-                    dmi_product_version);
+        /* Look for zero-length dmi_resource */
+        if (strlen(dmi_resource) == 0) {
+            fprintf(log_handle, "Invalid %s=\"%s\"\n",
+                    dmi_resource_path, dmi_resource);
 
-            free(dmi_product_version);
+            free(dmi_resource);
             return params;
         }
 
-        fprintf(log_handle, "dmi_product_version=\"%s\"\n", dmi_product_version);
+        fprintf(log_handle, "%s=\"%s\"\n", dmi_resource_path, dmi_resource);
 
         file = fopen(bbswitch_quirks_path, "r");
         if (file == NULL) {
             fprintf(log_handle, "can't open %s\n", bbswitch_quirks_path);
-            free(dmi_product_version);
+            free(dmi_resource);
             return NULL;
         }
 
@@ -239,7 +237,7 @@ static char * get_params_from_quirks() {
                 continue;
             }
 
-            if (istrstr(line, dmi_product_version) != NULL) {
+            if (istrstr(line, dmi_resource) != NULL) {
                 fprintf(log_handle, "Found matching quirk\n");
 
                 tok = strtok(line, "\"");
@@ -257,8 +255,29 @@ static char * get_params_from_quirks() {
         }
         fclose(file);
 
-        free(dmi_product_version);
+        free(dmi_resource);
     }
+
+    return params;
+}
+
+
+/* Get parameters we may need to pass to bbswitch */
+static char * get_params_from_quirks() {
+    char *params = NULL;
+
+    /* No quirks file or an empty file means no quirks to apply */
+    if (!exists_not_empty(bbswitch_quirks_path)) {
+        fprintf(log_handle, "Error: %s does not exist or is empty.\n", bbswitch_quirks_path);
+        return NULL;
+    }
+
+    /* get parameters that match the dmi product version */
+    params = get_params_from_dmi_resource(dmi_product_version_path);
+
+    /* get parameters that match the dmi product name */
+    if (!params)
+        params = get_params_from_dmi_resource(dmi_product_name_path);
 
     return params;
 }
@@ -2333,6 +2352,7 @@ int main(int argc, char *argv[]) {
         {"bbswitch-path", required_argument, 0, 'y'},
         {"bbswitch-quirks-path", required_argument, 0, 'g'},
         {"dmi-product-version-path", required_argument, 0, 'h'},
+        {"dmi-product-name-path", required_argument, 0, 'i'},
         {0, 0, 0, 0}
         };
         /* getopt_long stores the option index here. */
@@ -2464,6 +2484,12 @@ int main(int argc, char *argv[]) {
                 if (!dmi_product_version_path)
                     abort();
                 break;
+            case 'i':
+                /* printf("option -p with value '%s'\n", optarg); */
+                dmi_product_name_path = strdup(optarg);
+                if (!dmi_product_name_path)
+                    abort();
+                break;
             case '?':
                 /* getopt_long already printed an error message. */
                 exit(1);
@@ -2556,8 +2582,18 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    if (dmi_product_name_path)
+        fprintf(log_handle, "dmi_product_name_path file: %s\n", dmi_product_name_path);
+    else {
+        dmi_product_name_path = strdup("/sys/class/dmi/id/product_name");
+        if (!dmi_product_name_path) {
+            fprintf(log_handle, "Couldn't allocate dmi_product_name_path\n");
+            goto end;
+        }
+    }
+
     if (dmi_product_version_path)
-        fprintf(log_handle, "bbswitch_path file: %s\n", dmi_product_version_path);
+        fprintf(log_handle, "dmi_product_version_path file: %s\n", dmi_product_version_path);
     else {
         dmi_product_version_path = strdup("/sys/class/dmi/id/product_version");
         if (!dmi_product_version_path) {
@@ -3217,6 +3253,9 @@ end:
 
     if (bbswitch_quirks_path)
         free(bbswitch_quirks_path);
+
+    if (dmi_product_name_path)
+        free(dmi_product_name_path);
 
     if (dmi_product_version_path)
         free(dmi_product_version_path);

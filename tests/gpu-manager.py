@@ -115,6 +115,8 @@ class GpuManagerTest(unittest.TestCase):
         klass.bbswitch_quirks_path.close()
         klass.dmi_product_version_path = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.dmi_product_version_path.close()
+        klass.dmi_product_name_path = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.dmi_product_name_path.close()
 
         klass.log = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.log.close()
@@ -186,7 +188,8 @@ class GpuManagerTest(unittest.TestCase):
         for elem in (self.prime_settings,
                      self.bbswitch_path,
                      self.bbswitch_quirks_path,
-                     self.dmi_product_version_path):
+                     self.dmi_product_version_path,
+                     self.dmi_product_name_path):
             try:
                 os.unlink(elem.name)
             except:
@@ -222,6 +225,7 @@ class GpuManagerTest(unittest.TestCase):
             self.bbswitch_path,
             self.bbswitch_quirks_path,
             self.dmi_product_version_path,
+            self.dmi_product_name_path,
             self.log,
             self.xorg_file,
             self.amd_pcsdb_file,
@@ -277,6 +281,8 @@ class GpuManagerTest(unittest.TestCase):
                    self.bbswitch_quirks_path.name,
                    '--dmi-product-version-path',
                    self.dmi_product_version_path.name,
+                   '--dmi-product-name-path',
+                   self.dmi_product_name_path.name,
                    '--new-boot-file',
                    self.new_boot_file.name,
                    fake_requires_offloading,
@@ -550,12 +556,19 @@ class GpuManagerTest(unittest.TestCase):
         self.dmi_product_version_path.write('%s\n' % label)
         self.dmi_product_version_path.close()
 
+    def set_dmi_product_name(self, label):
+        '''Set dmi product name'''
+        self.dmi_product_name_path = open(self.dmi_product_name_path.name, 'w')
+        self.dmi_product_name_path.write('%s\n' % label)
+        self.dmi_product_name_path.close()
+
     def set_bbswitch_quirks(self):
         '''Set bbswitch quirks'''
         self.bbswitch_quirks_path = open(self.bbswitch_quirks_path.name, 'w')
         self.bbswitch_quirks_path.write('''
 "ThinkPad T410" "skip_optimus_dsm=1"
 "ThinkPad T410s" "skip_optimus_dsm=1"
+"Vostro 20 3015" "skip_optimus_dsm=1"
         ''')
         self.bbswitch_quirks_path.close()
 
@@ -5488,6 +5501,38 @@ EndSection
 
         # Check quirks
         self.assertFalse(gpu_test.matched_quirk)
+        self.assertTrue(gpu_test.loaded_with_args)
+
+
+        # What if dmi product version is invalid but dmi product
+        # name is not?
+
+        # Set dmi product version
+        self.set_dmi_product_version('')
+
+        # Set dmi product name
+        self.set_dmi_product_name('Vostro 20 3015')
+
+        # Set default quirks
+        self.set_bbswitch_quirks()
+
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
+
+        # Request action from bbswitch
+        self.request_prime_discrete_on(False)
+
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 requires_offloading=True)
+
+        # Check the variables
+
+        # Check quirks
+        self.assertTrue(gpu_test.matched_quirk)
         self.assertTrue(gpu_test.loaded_with_args)
 
 
