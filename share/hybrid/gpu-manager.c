@@ -864,10 +864,18 @@ static int is_pxpress_dgpu_disabled() {
 
 
     while (fgets(line, sizeof(line), file)) {
-        /* This means that a GPU has to be disabled */
-        if (istrstr(line, "PX_GPUDOWN=") != NULL) {
-            disabled = 1;
-            break;
+        /* EnabledFlags=V0 means off
+         * EnabledFlags=V4 means on
+         */
+        if (istrstr(line, "EnabledFlags=") != NULL) {
+            if (istrstr(line, "V0") != NULL) {
+                disabled = 1;
+                break;
+            }
+            else if (istrstr(line, "V4") != NULL) {
+                disabled = 0;
+                break;
+            }
         }
     }
 
@@ -2208,26 +2216,10 @@ static int enable_fglrx(struct alternatives *alternative,
 }
 
 
-static int enable_pxpress(struct device **devices,
+static int enable_pxpress(struct alternatives *alternative,
+                          struct device **devices,
                           int cards_n) {
     int status = 0;
-
-    /* FIXME: check only xorg.conf for now */
-    if (!check_pxpress_xorg_conf(devices, cards_n)) {
-        fprintf(log_handle, "Check failed\n");
-
-        /* Remove xorg.conf */
-        remove_xorg_conf();
-        /* Write xorg.conf */
-        status = write_pxpress_xorg_conf(devices, cards_n);
-    }
-    else {
-        fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
-        status = 1;
-    }
-
-    /* Reenable this when we know more about amdpcsdb */
-#if 0
     /* See if the discrete GPU is disabled */
     if (is_pxpress_dgpu_disabled()) {
         if (!alternative->pxpress_enabled) {
@@ -2254,13 +2246,13 @@ static int enable_pxpress(struct device **devices,
         /* If xorg.conf exists, make sure it contains
          * the right BusId and the correct drivers. If it doesn't, create a
          * xorg.conf from scratch */
-        if (!check_pxpress_xorg_conf(current_devices, cards_n)) {
+        if (!check_pxpress_xorg_conf(devices, cards_n)) {
             fprintf(log_handle, "Check failed\n");
 
             /* Remove xorg.conf */
             remove_xorg_conf();
             /* Write xorg.conf */
-            write_pxpress_xorg_conf(current_devices, cards_n);
+            write_pxpress_xorg_conf(devices, cards_n);
         }
         else {
             fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
@@ -2276,7 +2268,7 @@ static int enable_pxpress(struct device **devices,
         /* Remove xorg.conf */
         remove_xorg_conf();
     }
-#endif
+
 
     return status;
 }
@@ -2834,7 +2826,7 @@ int main(int argc, char *argv[]) {
                                    &discrete_vendor_id,
                                    &discrete_device_id);
 
-                enable_pxpress(current_devices, cards_n);
+                enable_pxpress(alternative, current_devices, cards_n);
                 /* No further action */
                 goto end;
             }
@@ -2974,7 +2966,7 @@ int main(int argc, char *argv[]) {
             if (offloading && intel_loaded && fglrx_loaded && !radeon_loaded) {
                 fprintf(log_handle, "PowerXpress detected\n");
 
-                enable_pxpress(current_devices, cards_n);
+                enable_pxpress(alternative, current_devices, cards_n);
             }
             /* NVIDIA Optimus */
             else if (offloading && (intel_loaded && !nouveau_loaded &&
