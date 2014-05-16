@@ -1,8 +1,11 @@
-ubuntu-drivers-common (1:0.2.94) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.94) utopic; urgency=medium
 
-  * 
+  * gpu-manager.c, tests/gpu-manager.py:
+    - Trim dmi resources or matching will give false positives.
+      This should fix LP: #1310516 for good.
+    - Re-enable checking alternatives for pxpress.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 14 May 2014 12:34:01 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 16 May 2014 13:28:31 +0200
 
 ubuntu-drivers-common (1:0.2.93) utopic; urgency=medium
 
