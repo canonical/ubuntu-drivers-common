@@ -131,6 +131,24 @@ struct alternatives {
 };
 
 
+/* Trim string in place */
+static void trim(char *str)
+{
+    char *pointer = str;
+    int len = strlen(pointer);
+
+    while(isspace(pointer[len - 1]))
+        pointer[--len] = 0;
+
+    while(* pointer && isspace(* pointer)) {
+        ++pointer;
+        --len;
+    }
+
+    memmove(str, pointer, len + 1);
+}
+
+
 /* Case insensitive equivalent of strstr */
 static const char *istrstr(const char *str1, const char *str2)
 {
@@ -211,7 +229,10 @@ static char * get_params_from_dmi_resource(const char* dmi_resource_path) {
         /* Remove newline */
         len = strlen(dmi_resource);
         if(dmi_resource[len-1] == '\n' )
-           dmi_resource[len-1] = 0;
+            dmi_resource[len-1] = 0;
+
+        /* Trim string white space */
+        trim(dmi_resource);
 
         /* Look for zero-length dmi_resource */
         if (strlen(dmi_resource) == 0) {

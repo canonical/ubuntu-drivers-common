@@ -568,7 +568,6 @@ class GpuManagerTest(unittest.TestCase):
         self.bbswitch_quirks_path.write('''
 "ThinkPad T410" "skip_optimus_dsm=1"
 "ThinkPad T410s" "skip_optimus_dsm=1"
-"Vostro 20 3015" "skip_optimus_dsm=1"
         ''')
         self.bbswitch_quirks_path.close()
 
@@ -5515,7 +5514,7 @@ EnabledFlags=V4''')
         # What if dmi product version is invalid?
 
         # Set dmi product version
-        self.set_dmi_product_version('')
+        self.set_dmi_product_version(' ')
 
         # Set default quirks
         self.set_bbswitch_quirks()
@@ -5544,10 +5543,10 @@ EnabledFlags=V4''')
         # name is not?
 
         # Set dmi product version
-        self.set_dmi_product_version('')
+        self.set_dmi_product_version(' ')
 
         # Set dmi product name
-        self.set_dmi_product_name('Vostro 20 3015')
+        self.set_dmi_product_name('ThinkPad T410s')
 
         # Set default quirks
         self.set_bbswitch_quirks()
