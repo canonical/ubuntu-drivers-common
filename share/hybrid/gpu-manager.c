@@ -551,6 +551,13 @@ static int is_lightdm_default() {
             "lightdm"));
 }
 
+/* Check if gdm is the default login manager */
+static int is_gdm_default() {
+
+    return (find_string_in_file("/etc/X11/default-display-manager",
+            "gdm"));
+}
+
 
 static void detect_available_alternatives(struct alternatives *info, char *pattern) {
     if (strstr(pattern, "mesa")) {
@@ -2099,9 +2106,9 @@ static int enable_prime(const char *prime_settings,
     int prime_discrete_on = 0;
     int prime_action_on = 0;
 
-    /* We only support Lightdm at this time */
-    if (!is_lightdm_default()) {
-        fprintf(log_handle, "Lightdm is not the default display "
+    /* We only support Lightdm and GDM at this time */
+    if (!(is_lightdm_default() || is_gdm_default())) {
+        fprintf(log_handle, "Neither Lightdm nor GDM is the default display "
                             "manager. Nothing to do\n");
         return 0;
     }
