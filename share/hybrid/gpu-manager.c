@@ -2106,9 +2106,9 @@ static int enable_prime(const char *prime_settings,
     int prime_discrete_on = 0;
     int prime_action_on = 0;
 
-    /* We only support Lightdm at this time */
+    /* We only support Lightdm and GDM at this time */
     if (!(is_lightdm_default() || is_gdm_default())) {
-        fprintf(log_handle, "Lightdm is not the default display "
+        fprintf(log_handle, "Neither Lightdm nor GDM is the default display "
                             "manager. Nothing to do\n");
         return 0;
     }
