@@ -1,8 +1,11 @@
-ubuntu-drivers-common (1:0.2.95) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.95) utopic; urgency=medium
 
-  * 
+  [ Tim Lunn ]
+  * gpu-manager.c, gpu-manager.conf:
+    - Use the gpu-manager with GDM too now that support for
+      it has landed in Utopic (LP: #1262068).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 28 May 2014 16:03:04 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 30 May 2014 14:09:31 +0200
 
 ubuntu-drivers-common (1:0.2.94) utopic; urgency=medium
 
