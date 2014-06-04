@@ -1047,7 +1047,9 @@ static int check_prime_xorg_conf(struct device **devices,
                     (istrstr(line, "ConstrainCursor") != NULL &&
                     istrstr(line, "off") != NULL) ||
                     (istrstr(line, "IgnoreDisplayDevices") != NULL &&
-                    istrstr(line, "CRT") != NULL)) {
+                    istrstr(line, "CRT") != NULL) ||
+                    (istrstr(line, "AccelMethod") != NULL &&
+                    istrstr(line, "SNA") != NULL)) {
                     x_options_matches += 1;
                 }
             }
@@ -1059,7 +1061,7 @@ static int check_prime_xorg_conf(struct device **devices,
             }
             /* The driver has to be either intel or nvidia */
             else if (istrstr(line, "Driver") != NULL) {
-                if (istrstr(line, "modesetting") != NULL){
+                if (istrstr(line, "intel") != NULL){
                     intel_set += 1;
                 }
                 else if (istrstr(line, "nvidia") != NULL) {
@@ -1322,8 +1324,9 @@ static int write_prime_xorg_conf(struct device **devices, int cards_n) {
             fprintf(pfile,
                 "Section \"Device\"\n"
                 "    Identifier \"intel\"\n"
-                "    Driver \"modesetting\"\n"
+                "    Driver \"intel\"\n"
                 "    BusID \"PCI:%d@%d:%d:%d\"\n"
+                "    Option \"AccelMethod\" \"SNA\"\n"
                 "EndSection\n\n"
                 "Section \"Screen\"\n"
                 "    Identifier \"intel\"\n"
