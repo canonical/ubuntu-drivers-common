@@ -1,8 +1,12 @@
-ubuntu-drivers-common (1:0.2.96) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.96) utopic; urgency=medium
 
-  * 
+  * gpu-manager.c:
+    - Try harder when loading bbswitch (LP: #1310023).
+      If loading bbswitch fails try with or without the
+      "skip_optimus_dsm=1" option.
+    - Switch to intel/SNA for optimus systems (LP: #1326257).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 30 May 2014 16:36:34 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 04 Jun 2014 15:59:24 +0200
 
 ubuntu-drivers-common (1:0.2.95) utopic; urgency=medium
 
