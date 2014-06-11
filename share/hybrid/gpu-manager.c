@@ -1461,6 +1461,9 @@ static int prime_disable_discrete() {
     if (!dry_run)
         system("/sbin/initctl emit nvidia-off");
 
+    /* Unload nvidia-uvm or nvidia won't be unloaded */
+    unload_module("nvidia-uvm");
+
     /* Unload the module */
     status = unload_module("nvidia");
 
