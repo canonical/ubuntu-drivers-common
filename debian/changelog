@@ -1,8 +1,14 @@
-ubuntu-drivers-common (1:0.2.96.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.96.1) utopic; urgency=medium
 
-  * 
+  * gpu-manager.c:
+    - Make sure to unload nvidia-uvm or nvidia won't be
+      unloaded.
+    - Make sure to walk properly the /dev/dri dir. This
+      prevents the program from stopping when, for example
+      /dev/dri/card1 is available while /dev/dri/card0 is
+      not.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 11 Jun 2014 14:16:29 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 11 Jun 2014 17:29:38 +0200
 
 ubuntu-drivers-common (1:0.2.96) utopic; urgency=medium
 
