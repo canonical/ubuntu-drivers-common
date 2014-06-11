@@ -149,6 +149,13 @@ static void trim(char *str)
 }
 
 
+static int starts_with(const char *string, const char *prefix) {
+    size_t prefix_len = strlen(prefix);
+    size_t string_len = strlen(string);
+    return string_len < prefix_len ? 0 : strncmp(prefix, string, prefix_len) == 0;
+}
+
+
 /* Case insensitive equivalent of strstr */
 static const char *istrstr(const char *str1, const char *str2)
 {
@@ -1949,17 +1956,27 @@ int count_connected_outputs(int fd, drmModeResPtr res) {
 
 /* See if the drm device created by a driver has any connected outputs. */
 static int has_driver_connected_outputs(const char *driver) {
+    DIR *dir;
+    struct dirent* dir_entry;
     char path[20];
     int fd = 1;
     drmModeResPtr res;
     drmVersionPtr version;
     int connected_outputs = 0;
     int driver_match = 0;
-    int it;
+    char dri_dir[] = "/dev/dri";
+
+    if (NULL == (dir = opendir(dri_dir))) {
+        fprintf(log_handle, "Error : Failed to open %s\n", dri_dir);
+        return 0;
+    }
 
     /* Keep looking until we find the device for the driver */
-    for (it = 0; fd != -1; it++) {
-        sprintf(path, "/dev/dri/card%d", it);
+    while ((dir_entry = readdir(dir))) {
+        if (!starts_with(dir_entry->d_name, "card"))
+            continue;
+
+        sprintf(path, "%s/%s", dri_dir, dir_entry->d_name);
         fd = open(path, O_RDWR);
         if (fd) {
             if ((version = drmGetVersion(fd))) {
@@ -1983,9 +2000,11 @@ static int has_driver_connected_outputs(const char *driver) {
         }
         else {
             fprintf(log_handle, "Error: can't open fd for %s\n", path);
-            break;
+            continue;
         }
     }
+
+    closedir(dir);
 
     if (!driver_match)
         return 0;
