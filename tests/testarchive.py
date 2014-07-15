@@ -13,6 +13,7 @@ import os
 import subprocess
 import atexit
 
+
 class Archive:
     def __init__(self):
         '''Construct a local package test archive.
@@ -20,7 +21,7 @@ class Archive:
         The archive is initially empty. You can create new packages with
         create_deb(). self.path contains the path of the archive, and
         self.apt_source provides an apt source "deb" line.
-        
+
         It is kept in a temporary directory which gets removed when the Archive
         object gets deleted.
         '''
@@ -29,19 +30,19 @@ class Archive:
         self.apt_source = 'deb file://%s /' % self.path
 
     def create_deb(self, name, version='1', architecture='all',
-            dependencies={}, description='test package', extra_tags={},
-            files={}, update_index=True):
+                   dependencies={}, description='test package', extra_tags={},
+                   files={}, update_index=True):
         '''Build a deb package and add it to the archive.
 
-        The only mandatory argument is the package name. You can additionall
+        The only mandatory argument is the package name. You can additionally
         specify the package version (default '1'), architecture (default
         'all'), a dictionary with dependencies (empty by default; for example
         {'Depends': 'foo, bar', 'Conflicts: baz'}, a short description
         (default: 'test package'), and arbitrary extra tags.
 
-        By default the package is empty. It can get files by specifying a path ->
-        contents dictionary in 'files'. Paths must be relative. Example: 
-          files={'etc/foo.conf': 'enable=true'}
+        By default the package is empty. It can get files by specifying a
+        path -> contents dictionary in 'files'. Paths must be relative.
+        Example: files={'etc/foo.conf': 'enable=true'}
 
         The newly created deb automatically gets added to the "Packages" index,
         unless update_index is False.
@@ -81,11 +82,10 @@ Architecture: %s
             with open(os.path.join(d, path), mode) as f:
                 f.write(contents)
 
-        debpath = os.path.join(self.path, '%s_%s_%s.deb' % (name, version, architecture))
-        dpkg = subprocess.Popen(['dpkg', '-b', d, debpath],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        dpkg.communicate()
-        assert dpkg.returncode == 0
+        debpath = os.path.join(self.path, '%s_%s_%s.deb' % (name, version,
+                                                            architecture))
+        subprocess.check_call(['dpkg', '-b', d, debpath],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         shutil.rmtree(d)
         assert os.path.exists(debpath)
@@ -106,14 +106,15 @@ Architecture: %s
         try:
             os.chdir(self.path)
             with open('Packages', 'w') as f:
-                subprocess.check_call(['apt-ftparchive', 'packages', '.'], stdout=f)
+                subprocess.check_call(['apt-ftparchive', 'packages', '.'],
+                                      stdout=f)
         finally:
             os.chdir(old_cwd)
 
-#a = Archive()
-#a.create_deb('vanilla')
-#a.create_deb('chocolate', dependencies={'Depends': 'foo'}, 
-#    extra_tags={'Modaliases': 'pci-1'},
-#    files={'usr/share/doc/chocolate/README': 'hello'})
-#print(a.apt_source)
-#subprocess.call(['bash', '-i'], cwd=a.path)
+# a = Archive()
+# a.create_deb('vanilla')
+# a.create_deb('chocolate', dependencies={'Depends': 'foo'},
+#     extra_tags={'Modaliases': 'pci-1'},
+#     files={'usr/share/doc/chocolate/README': 'hello'})
+# print(a.apt_source)
+# subprocess.call(['bash', '-i'], cwd=a.path)
