@@ -347,7 +347,6 @@ class DetectTest(unittest.TestCase):
         sys.stderr.write('[%.2f s] ' % sec)
         self.assertLess(sec, 30.0)
 
-    @unittest.expectedFailure
     def test_system_driver_packages_chroot(self):
         '''system_driver_packages() for test package repository'''
 
@@ -790,7 +789,6 @@ APT::Get::AllowUnauthenticated "true";
                      'nvidia-current', 'special', 'picky']))
         self.assertEqual(ud.returncode, 0)
 
-    @unittest.expectedFailure
     def test_list_system(self):
         '''ubuntu-drivers list for fake sysfs and system apt'''
 
@@ -846,7 +844,6 @@ APT::Get::AllowUnauthenticated "true";
         self.assertTrue('special - third-party free' in out, out)
         self.assertEqual(ud.returncode, 0)
 
-    @unittest.expectedFailure
     def test_devices_system(self):
         '''ubuntu-drivers devices for fake sysfs and system apt'''
 
@@ -900,7 +897,6 @@ APT::Get::AllowUnauthenticated "true";
         with open(listfile) as f:
             self.assertEqual(f.read(), 'linux-firmware-nonfree\n')
 
-    @unittest.expectedFailure
     def test_auto_install_system(self):
         '''ubuntu-drivers autoinstall for fake sysfs and system apt'''
 
