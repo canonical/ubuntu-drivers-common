@@ -1,3 +1,10 @@
+ubuntu-drivers-common (1:0.2.97) UNRELEASED; urgency=medium
+
+  * tests/testarchive.py: Organize debs in pool/ structure, for better
+    reusability.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 15 Jul 2014 07:44:12 +0200
+
 ubuntu-drivers-common (1:0.2.96.1) utopic; urgency=medium
 
   * gpu-manager.c:

@@ -31,7 +31,7 @@ class Archive:
 
     def create_deb(self, name, version='1', architecture='all',
                    dependencies={}, description='test package', extra_tags={},
-                   files={}, update_index=True):
+                   files={}, component='main', srcpkg=None, update_index=True):
         '''Build a deb package and add it to the archive.
 
         The only mandatory argument is the package name. You can additionally
@@ -82,8 +82,18 @@ Architecture: %s
             with open(os.path.join(d, path), mode) as f:
                 f.write(contents)
 
-        debpath = os.path.join(self.path, '%s_%s_%s.deb' % (name, version,
-                                                            architecture))
+        if srcpkg is None:
+            srcpkg = name
+        if srcpkg.startswith('lib'):
+            prefix = srcpkg[:4]
+        else:
+            prefix = srcpkg[0]
+        dir = os.path.join(self.path, 'pool', component, prefix, srcpkg)
+        if not os.path.isdir(dir):
+            os.makedirs(dir)
+
+        debpath = os.path.join(dir, '%s_%s_%s.deb' % (name, version,
+                                                      architecture))
         subprocess.check_call(['dpkg', '-b', d, debpath],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
