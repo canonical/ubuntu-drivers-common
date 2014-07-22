@@ -2723,9 +2723,9 @@ int main(int argc, char *argv[]) {
 
     bbswitch_loaded = is_module_loaded("bbswitch");
     nvidia_loaded = is_module_loaded("nvidia");
-    nvidia_unloaded = has_unloaded_module("nvidia");
+    nvidia_unloaded = nvidia_loaded ? false : has_unloaded_module("nvidia");
     fglrx_loaded = is_module_loaded("fglrx");
-    fglrx_unloaded = has_unloaded_module("fglrx");
+    fglrx_unloaded = fglrx_loaded ? false : has_unloaded_module("fglrx");
     intel_loaded = is_module_loaded("i915") || is_module_loaded("i810");
     radeon_loaded = is_module_loaded("radeon");
     nouveau_loaded = is_module_loaded("nouveau");
