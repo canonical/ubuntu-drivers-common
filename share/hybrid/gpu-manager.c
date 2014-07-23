@@ -60,9 +60,11 @@
 
 static inline void freep(void *);
 static inline void fclosep(FILE **);
+static inline void pclosep(FILE **);
 
 #define _cleanup_free_ __attribute__((cleanup(freep)))
 #define _cleanup_fclose_ __attribute__((cleanup(fclosep)))
+#define _cleanup_pclose_ __attribute__((cleanup(pclosep)))
 
 #define PCI_CLASS_DISPLAY               0x03
 #define PCI_CLASS_DISPLAY_OTHER         0x0380
@@ -147,6 +149,12 @@ static inline void freep(void *p) {
 static inline void fclosep(FILE **file) {
     if (*file != NULL && *file >= 0)
         fclose(*file);
+}
+
+
+static inline void pclosep(FILE **file) {
+    if (*file != NULL)
+        pclose(*file);
 }
 
 
@@ -262,12 +270,13 @@ static int get_module_refcount(const char* module) {
 
 /* Get parameters that match a specific dmi resource */
 static char * get_params_from_dmi_resource(const char* dmi_resource_path) {
-    FILE *file;
     char *params = NULL;
     char line[1035];
     size_t len = 0;
     char *tok;
-    char *dmi_resource = NULL;
+    _cleanup_free_ char *dmi_resource = NULL;
+    _cleanup_fclose_ FILE *dmi_file = NULL;
+    _cleanup_fclose_ FILE *bbswitch_file = NULL;
 
     if (!exists_not_empty(dmi_resource_path)) {
         fprintf(log_handle, "Error: %s does not exist or is empty.\n", dmi_resource_path);
@@ -275,16 +284,15 @@ static char * get_params_from_dmi_resource(const char* dmi_resource_path) {
     }
 
     /* get dmi product version */
-    file = fopen(dmi_resource_path, "r");
-    if (file == NULL) {
+    dmi_file = fopen(dmi_resource_path, "r");
+    if (dmi_file == NULL) {
         fprintf(log_handle, "can't open %s\n", dmi_resource_path);
         return NULL;
     }
-    if (getline(&dmi_resource, &len, file) == -1) {
+    if (getline(&dmi_resource, &len, dmi_file) == -1) {
         fprintf(log_handle, "can't get line from %s\n", dmi_resource_path);
         return NULL;
     }
-    fclose(file);
 
     if (dmi_resource) {
         /* Remove newline */
@@ -299,21 +307,18 @@ static char * get_params_from_dmi_resource(const char* dmi_resource_path) {
         if (strlen(dmi_resource) == 0) {
             fprintf(log_handle, "Invalid %s=\"%s\"\n",
                     dmi_resource_path, dmi_resource);
-
-            free(dmi_resource);
             return params;
         }
 
         fprintf(log_handle, "%s=\"%s\"\n", dmi_resource_path, dmi_resource);
 
-        file = fopen(bbswitch_quirks_path, "r");
-        if (file == NULL) {
+        bbswitch_file = fopen(bbswitch_quirks_path, "r");
+        if (bbswitch_file == NULL) {
             fprintf(log_handle, "can't open %s\n", bbswitch_quirks_path);
-            free(dmi_resource);
             return NULL;
         }
 
-        while (fgets(line, sizeof(line), file)) {
+        while (fgets(line, sizeof(line), bbswitch_file)) {
             /* Ignore comments */
             if (strstr(line, "#") != NULL) {
                 continue;
@@ -335,9 +340,6 @@ static char * get_params_from_dmi_resource(const char* dmi_resource_path) {
                 break;
             }
         }
-        fclose(file);
-
-        free(dmi_resource);
     }
 
     return params;
@@ -485,7 +487,7 @@ static char* get_output(char *command, char *pattern, char *ignore) {
     int len;
     char buffer[1035];
     char *output = NULL;
-    FILE *pfile = NULL;
+    _cleanup_pclose_ FILE *pfile = NULL;
     pfile = popen(command, "r");
     if (pfile == NULL) {
         fprintf(stderr, "Failed to run command %s\n", command);
@@ -513,7 +515,6 @@ static char* get_output(char *command, char *pattern, char *ignore) {
             }
         }
     }
-    pclose(pfile);
 
     if (output) {
         /* Remove newline */
@@ -546,7 +547,7 @@ static bool is_module_blacklisted(const char* module) {
 
 static void get_architecture_paths(char **main_arch_path,
                                   char **other_arch_path) {
-    char *main_arch = NULL;
+    _cleanup_free_ char *main_arch = NULL;
 
     main_arch = get_output("dpkg --print-architecture", NULL, NULL);
     if (strcmp(main_arch, "amd64") == 0) {
@@ -557,7 +558,6 @@ static void get_architecture_paths(char **main_arch_path,
         *main_arch_path = strdup("i386-linux-gnu");
         *other_arch_path = strdup("x86_64-linux-gnu");
     }
-    free(main_arch);
 }
 
 
@@ -565,16 +565,16 @@ static void get_architecture_paths(char **main_arch_path,
 static char* get_alternative_link(char *arch_path, char *pattern) {
     char *alternative = NULL;
     char command[300];
-    FILE *pfile = NULL;
+    _cleanup_fclose_ FILE *file = NULL;
 
     if (dry_run && fake_alternatives_path) {
-        pfile = fopen(fake_alternatives_path, "r");
-        if (pfile == NULL) {
+        file = fopen(fake_alternatives_path, "r");
+        if (file == NULL) {
             fprintf(stderr, "I couldn't open %s for reading.\n",
                     fake_alternatives_path);
             return NULL;
         }
-        while (fgets(command, sizeof(command), pfile)) {
+        while (fgets(command, sizeof(command), file)) {
             /* Make sure we don't catch prime by mistake when
              * looking for nvidia
              */
@@ -591,7 +591,6 @@ static char* get_alternative_link(char *arch_path, char *pattern) {
                 }
             }
         }
-        fclose(pfile);
     }
     else {
         snprintf(command, sizeof(command),
@@ -642,25 +641,22 @@ static bool has_unloaded_module(char *module) {
 
 
 static bool find_string_in_file(const char *path, const char *pattern) {
-    FILE *pfile = NULL;
-    char  *line = NULL;
+    _cleanup_free_ char *line = NULL;
+    _cleanup_fclose_ FILE *file = NULL;
     size_t len = 0;
     size_t read;
 
     bool found = false;
 
-    pfile = fopen(path, "r");
-    if (pfile == NULL)
+    file = fopen(path, "r");
+    if (file == NULL)
          return found;
-    while ((read = getline(&line, &len, pfile)) != -1) {
+    while ((read = getline(&line, &len, file)) != -1) {
         if (istrstr(line, pattern) != NULL) {
             found = true;
             break;
         }
     }
-    fclose(pfile);
-    if (line)
-        free(line);
 
     return found;
 }
@@ -728,7 +724,7 @@ static bool get_alternatives(struct alternatives *info, const char *master_link)
     int len;
     char command[200];
     char buffer[1035];
-    FILE *pfile = NULL;
+    _cleanup_pclose_ FILE *pfile = NULL;
     char *value = NULL;
     char *other = NULL;
     const char ch = '/';
@@ -780,12 +776,8 @@ static bool get_alternatives(struct alternatives *info, const char *master_link)
                 /* Set the available alternatives in the struct */
                 detect_available_alternatives(info, other);
             }
-
-
         }
     }
-
-    pclose(pfile);
 
     return true;
 }
@@ -828,7 +820,7 @@ static bool set_alternative(char *arch_path, char *alternative) {
 
 static bool select_driver(char *driver) {
     bool status = false;
-    char *alternative = NULL;
+    _cleanup_free_ char *alternative = NULL;
     alternative = get_alternative_link(main_arch_path, driver);
 
     if (alternative == NULL) {
@@ -849,14 +841,7 @@ static bool select_driver(char *driver) {
             if (alternative) {
                 /* No need to check its status */
                 set_alternative(other_arch_path, alternative);
-
-                /* Free the alternative */
-                free(alternative);
             }
-        }
-        else {
-            /* Free the alternative */
-            free(alternative);
         }
     }
     return status;
@@ -893,13 +878,13 @@ static bool is_disabled_in_cmdline() {
 static bool write_to_xorg_conf(struct device **devices, int cards_n,
                               unsigned int vendor_id, const char *driver) {
     int i;
-    FILE *pfile = NULL;
+    _cleanup_fclose_ FILE *file = NULL;
     char driver_line[100];
 
     fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
 
-    pfile = fopen(xorg_conf_file, "w");
-    if (pfile == NULL) {
+    file = fopen(xorg_conf_file, "w");
+    if (file == NULL) {
         fprintf(log_handle, "I couldn't open %s for writing.\n",
                 xorg_conf_file);
         return false;
@@ -912,7 +897,7 @@ static bool write_to_xorg_conf(struct device **devices, int cards_n,
 
     for(i = 0; i < cards_n; i++) {
         if (devices[i]->vendor_id == vendor_id) {
-            fprintf(pfile,
+            fprintf(file,
                "Section \"Device\"\n"
                "    Identifier \"Default Card %d\"\n"
                "    BusID \"PCI:%d@%d:%d:%d\"\n"
@@ -927,26 +912,26 @@ static bool write_to_xorg_conf(struct device **devices, int cards_n,
         }
     }
 
-    fflush(pfile);
-    fclose(pfile);
+    fflush(file);
+
     return true;
 }
 
 
 static bool write_pxpress_xorg_conf(struct device **devices, int cards_n) {
     int i;
-    FILE *pfile = NULL;
+    _cleanup_fclose_ FILE *file = NULL;
 
     fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
 
-    pfile = fopen(xorg_conf_file, "w");
-    if (pfile == NULL) {
+    file = fopen(xorg_conf_file, "w");
+    if (file == NULL) {
         fprintf(log_handle, "I couldn't open %s for writing.\n",
                 xorg_conf_file);
         return false;
     }
 
-    fprintf(pfile,
+    fprintf(file,
             "Section \"ServerLayout\"\n"
             "    Identifier \"amd-layout\"\n"
             "    Screen 0 \"amd-screen\" 0 0\n"
@@ -954,7 +939,7 @@ static bool write_pxpress_xorg_conf(struct device **devices, int cards_n) {
 
     for(i = 0; i < cards_n; i++) {
         if (devices[i]->vendor_id == INTEL) {
-            fprintf(pfile,
+            fprintf(file,
                 "Section \"Device\"\n"
                 "    Identifier \"intel\"\n"
                 "    Driver \"intel\"\n"
@@ -971,7 +956,7 @@ static bool write_pxpress_xorg_conf(struct device **devices, int cards_n) {
              *        the domain, so we only use
              *        bus, dev, and func
              */
-            fprintf(pfile,
+            fprintf(file,
                 "Section \"Device\"\n"
                 "    Identifier \"amd-device\"\n"
                 "    Driver \"fglrx\"\n"
@@ -1001,8 +986,8 @@ static bool write_pxpress_xorg_conf(struct device **devices, int cards_n) {
         }
     }
 
-    fflush(pfile);
-    fclose(pfile);
+    fflush(file);
+
     return true;
 }
 
@@ -1014,7 +999,7 @@ static bool is_pxpress_dgpu_disabled() {
     bool disabled = false;
     /* We don't need a huge buffer */
     char line[100];
-    FILE *file;
+    _cleanup_fclose_ FILE *file = NULL;
 
     if (!exists_not_empty(amd_pcsdb_file))
         return false;
@@ -1026,7 +1011,6 @@ static bool is_pxpress_dgpu_disabled() {
                 amd_pcsdb_file);
         return false;
     }
-
 
     while (fgets(line, sizeof(line), file)) {
         /* EnabledFlags=V0 means off
@@ -1044,8 +1028,6 @@ static bool is_pxpress_dgpu_disabled() {
         }
     }
 
-    fclose(file);
-
     return disabled;
 }
 
@@ -1055,7 +1037,7 @@ static bool has_xorg_conf_binary_drivers(struct device **devices,
                                  int cards_n) {
     bool found_binary = false;
     char line[2048];
-    FILE *file;
+    _cleanup_fclose_ FILE *file = NULL;
 
     if (!exists_not_empty(xorg_conf_file))
         return false;
@@ -1082,8 +1064,6 @@ static bool has_xorg_conf_binary_drivers(struct device **devices,
         }
     }
 
-    fclose(file);
-
     return found_binary;
 }
 
@@ -1100,8 +1080,7 @@ static bool check_prime_xorg_conf(struct device **devices,
     char line[2048];
     char intel_bus_id[100];
     char nvidia_bus_id[100];
-    FILE *file;
-
+    _cleanup_fclose_ FILE *file = NULL;
 
     if (!exists_not_empty(xorg_conf_file))
         return false;
@@ -1171,8 +1150,6 @@ static bool check_prime_xorg_conf(struct device **devices,
         }
     }
 
-    fclose(file);
-
     fprintf(log_handle,
             "intel_matches: %d, nvidia_matches: %d, "
             "intel_set: %d, nvidia_set: %d "
@@ -1209,7 +1186,7 @@ static bool check_pxpress_xorg_conf(struct device **devices,
     char line[2048];
     char intel_bus_id[100];
     char amd_bus_id[100];
-    FILE *file;
+    _cleanup_fclose_ FILE *file = NULL;
 
 
     if (!exists_not_empty(xorg_conf_file))
@@ -1279,8 +1256,6 @@ static bool check_pxpress_xorg_conf(struct device **devices,
         }
     }
 
-    fclose(file);
-
     fprintf(log_handle,
             "intel_matches: %d, amd_matches: %d, "
             "intel_set: %d, fglrx_set: %d "
@@ -1313,7 +1288,7 @@ static bool check_vendor_bus_id_xorg_conf(struct device **devices, int cards_n,
     int expected_matches = 0;
     char line[4096];
     char bus_id[256];
-    FILE *file;
+    _cleanup_fclose_ FILE *file = NULL;
 
     /* If file doesn't exist or is empty */
     if (!exists_not_empty(xorg_conf_file))
@@ -1360,8 +1335,6 @@ static bool check_vendor_bus_id_xorg_conf(struct device **devices, int cards_n,
         }
     }
 
-    fclose(file);
-
     return (matches == expected_matches && !failure);
 }
 
@@ -1371,7 +1344,7 @@ static bool check_all_bus_ids_xorg_conf(struct device **devices, int cards_n) {
     int matches = 0;
     char line[4096];
     char bus_id[256];
-    FILE *file;
+    _cleanup_fclose_ FILE *file = NULL;
 
     file = fopen(xorg_conf_file, "r");
 
@@ -1395,26 +1368,24 @@ static bool check_all_bus_ids_xorg_conf(struct device **devices, int cards_n) {
         }
     }
 
-    fclose(file);
-
     return (matches == cards_n);
 }
 
 
 static bool write_prime_xorg_conf(struct device **devices, int cards_n) {
     int i;
-    FILE *pfile = NULL;
+    _cleanup_fclose_ FILE *file = NULL;
 
     fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
 
-    pfile = fopen(xorg_conf_file, "w");
-    if (pfile == NULL) {
+    file = fopen(xorg_conf_file, "w");
+    if (file == NULL) {
         fprintf(log_handle, "I couldn't open %s for writing.\n",
                 xorg_conf_file);
         return false;
     }
 
-    fprintf(pfile,
+    fprintf(file,
             "Section \"ServerLayout\"\n"
             "    Identifier \"layout\"\n"
             "    Screen 0 \"nvidia\"\n"
@@ -1423,7 +1394,7 @@ static bool write_prime_xorg_conf(struct device **devices, int cards_n) {
 
     for(i = 0; i < cards_n; i++) {
         if (devices[i]->vendor_id == INTEL) {
-            fprintf(pfile,
+            fprintf(file,
                 "Section \"Device\"\n"
                 "    Identifier \"intel\"\n"
                 "    Driver \"intel\"\n"
@@ -1440,7 +1411,7 @@ static bool write_prime_xorg_conf(struct device **devices, int cards_n) {
                (int)(devices[i]->func));
         }
         else if (devices[i]->vendor_id == NVIDIA) {
-            fprintf(pfile,
+            fprintf(file,
                 "Section \"Device\"\n"
                 "    Identifier \"nvidia\"\n"
                 "    Driver \"nvidia\"\n"
@@ -1460,8 +1431,8 @@ static bool write_prime_xorg_conf(struct device **devices, int cards_n) {
         }
     }
 
-    fflush(pfile);
-    fclose(pfile);
+    fflush(file);
+
     return true;
 }
 
@@ -1474,7 +1445,7 @@ static bool write_prime_xorg_conf(struct device **devices, int cards_n) {
 static bool check_on_off(const char *path) {
     bool status = false;
     char line[100];
-    FILE *file;
+    _cleanup_fclose_ FILE *file = NULL;
 
     file = fopen(path, "r");
 
@@ -1489,8 +1460,6 @@ static bool check_on_off(const char *path) {
             break;
         }
     }
-
-    fclose(file);
 
     return status;
 }
@@ -1517,14 +1486,13 @@ static bool prime_is_action_on() {
 
 
 static bool prime_set_discrete(int mode) {
-    FILE *file;
+    _cleanup_fclose_ FILE *file = NULL;
 
     file = fopen(bbswitch_path, "w");
     if (!file)
         return false;
 
     fprintf(file, "%s\n", mode ? "ON" : "OFF");
-    fclose(file);
 
     return true;
 }
@@ -1632,16 +1600,16 @@ static bool write_data_to_file(struct device **devices,
                               int cards_number,
                               char *filename) {
     int i;
-    FILE *pfile = NULL;
-    pfile = fopen(filename, "w");
-    if (pfile == NULL) {
+    _cleanup_fclose_ FILE *file = NULL;
+    file = fopen(filename, "w");
+    if (file == NULL) {
         fprintf(log_handle, "I couldn't open %s for writing.\n",
                 filename);
         return false;
     }
 
     for(i = 0; i < cards_number; i++) {
-        fprintf(pfile, "%04x:%04x;%04x:%02x:%02x:%d;%d\n",
+        fprintf(file, "%04x:%04x;%04x:%02x:%02x:%d;%d\n",
                 devices[i]->vendor_id,
                 devices[i]->device_id,
                 devices[i]->domain,
@@ -1650,8 +1618,8 @@ static bool write_data_to_file(struct device **devices,
                 devices[i]->func,
                 devices[i]->boot_vga);
     }
-    fflush(pfile);
-    fclose(pfile);
+    fflush(file);
+
     return true;
 }
 
@@ -1690,38 +1658,38 @@ static int read_data_from_file(struct device **devices,
                                char *filename) {
     /* Read from last boot gfx */
     char line[100];
-    FILE *pfile = NULL;
+    _cleanup_fclose_ FILE *file = NULL;
     /* The number of digits we expect to match per line */
     int desired_matches = 7;
     int created = 1;
 
-    pfile = fopen(filename, "r");
-    if (pfile == NULL) {
+    file = fopen(filename, "r");
+    if (file == NULL) {
         created = 2;
         fprintf(log_handle, "I couldn't open %s for reading.\n", filename);
         /* Create the file for the 1st time */
-        pfile = fopen(filename, "w");
+        file = fopen(filename, "w");
         fprintf(log_handle, "Create %s for the 1st time\n", filename);
-        if (pfile == NULL) {
+        if (file == NULL) {
             fprintf(log_handle, "I couldn't open %s for writing.\n",
                     filename);
             return 0;
         }
-        fprintf(pfile, "%04x:%04x;%04x:%02x:%02x:%d;%d\n",
+        fprintf(file, "%04x:%04x;%04x:%02x:%02x:%d;%d\n",
                 0, 0, 0, 0, 0, 0, 0);
-        fflush(pfile);
-        fclose(pfile);
+        fflush(file);
+        fclose(file);
         /* Try again */
-        pfile = fopen(filename, "r");
+        file = fopen(filename, "r");
     }
 
-    if (pfile == NULL) {
+    if (file == NULL) {
         fprintf(log_handle, "I couldn't open %s for reading.\n", filename);
         return 0;
     }
     else {
         /* Use fgets so as to limit the buffer length */
-        while (fgets(line, sizeof(line), pfile) && (*cards_number < MAX_CARDS_N)) {
+        while (fgets(line, sizeof(line), file) && (*cards_number < MAX_CARDS_N)) {
             if (strlen(line) > 0) {
                 /* See if we actually get all the desired digits,
                  * as per "desired_matches"
@@ -1733,7 +1701,6 @@ static int read_data_from_file(struct device **devices,
         }
     }
 
-    fclose(pfile);
     return created;
 }
 
@@ -1769,14 +1736,14 @@ static char * find_pci_pattern(char *line, const char *pattern) {
 
 
 /* Parse part of dmesg to extract the PCI BusID */
-static int add_gpu_from_stream(FILE *pfile, const char *pattern, struct device **devices, int *num) {
+static int add_gpu_from_stream(FILE *file, const char *pattern, struct device **devices, int *num) {
     int status = EOF;
     char line[1035];
-    char *match = NULL;
+    _cleanup_free_ char *match = NULL;
     /* The number of digits we expect to match per line */
     int desired_matches = 4;
 
-    if (!pfile) {
+    if (!file) {
         fprintf(log_handle, "Error: passed invalid stream.\n");
         return 0;
     }
@@ -1786,7 +1753,7 @@ static int add_gpu_from_stream(FILE *pfile, const char *pattern, struct device *
     if (!devices[*num])
         return 0;
 
-    while (fgets(line, sizeof(line), pfile)) {
+    while (fgets(line, sizeof(line), file)) {
         match = find_pci_pattern(line, pattern);
         if (match) {
             /* Extract the data from the string */
@@ -1795,7 +1762,6 @@ static int add_gpu_from_stream(FILE *pfile, const char *pattern, struct device *
                             &devices[*num]->bus,
                             &devices[*num]->dev,
                             &devices[*num]->func);
-            free(match);
             break;
         }
     }
@@ -1833,7 +1799,7 @@ static int add_gpu_bus_from_dmesg(const char *pattern, struct device **devices,
                                   int *cards_number) {
     int status = 0;
     char command[100];
-    FILE *pfile = NULL;
+    _cleanup_pclose_ FILE *pfile = NULL;
 
     if (dry_run && fake_dmesg_path) {
         /* If file doesn't exist or is empty */
@@ -1856,8 +1822,6 @@ static int add_gpu_bus_from_dmesg(const char *pattern, struct device **devices,
 
     /* Extract ID from the stream */
     status = add_gpu_from_stream(pfile, pattern, devices, cards_number);
-
-    pclose(pfile);
 
     fprintf(log_handle, "pci bus from dmesg status %d\n", status);
 
@@ -1882,7 +1846,8 @@ static bool add_nvidia_gpu_bus_from_dmesg(struct device **devices,
 static bool is_module_loaded(const char *module) {
     bool status = false;
     char line[4096];
-    FILE *file;
+    _cleanup_fclose_ FILE *file = NULL;
+
     if (!fake_modules_path)
         file = fopen("/proc/modules", "r");
     else
@@ -1901,8 +1866,6 @@ static bool is_module_loaded(const char *module) {
             break;
         }
     }
-
-    fclose(file);
 
     return status;
 }
@@ -2158,7 +2121,7 @@ static bool requires_offloading(void) {
 
 /* Set permanent settings for offloading */
 static bool set_offloading(void) {
-    FILE *file;
+    _cleanup_fclose_ FILE *file = NULL;
 
     if (dry_run)
         return true;
@@ -2167,7 +2130,6 @@ static bool set_offloading(void) {
     if (file != NULL) {
         fprintf(file, "ON\n");
         fflush(file);
-        fclose(file);
         return true;
     }
 
@@ -2295,19 +2257,15 @@ static bool get_nvidia_driver_version(int *major, int *minor) {
     size_t len = 0;
     _cleanup_free_ char *driver_version = NULL;
     _cleanup_fclose_ FILE *file = NULL;
-    char *driver_version_path = NULL;
-    driver_version_path = nvidia_driver_version_path ?
-                          nvidia_driver_version_path :
-                          "/sys/module/nvidia/version";
 
     /* Check the driver version */
-    file = fopen(driver_version_path, "r");
+    file = fopen(nvidia_driver_version_path, "r");
     if (file == NULL) {
-        fprintf(log_handle, "can't open %s\n", driver_version_path);
+        fprintf(log_handle, "can't open %s\n", nvidia_driver_version_path);
         return false;
     }
     if (getline(&driver_version, &len, file) == -1) {
-        fprintf(log_handle, "can't get line from %s\n", driver_version_path);
+        fprintf(log_handle, "can't get line from %s\n", nvidia_driver_version_path);
         return false;
     }
 
@@ -2316,7 +2274,7 @@ static bool get_nvidia_driver_version(int *major, int *minor) {
     /* Make sure that we match "desired_matches" */
     if (status == EOF || status != 2) {
         fprintf(log_handle, "Warning: couldn't get the driver version from %s\n",
-                driver_version_path);
+                nvidia_driver_version_path);
         return false;
     }
 
@@ -2334,8 +2292,6 @@ static bool enable_prime(const char *prime_settings,
     bool bbswitch_status = true, has_version = false;
     bool prime_discrete_on = false;
     bool prime_action_on = false;
-    _cleanup_free_ char *driver_version = NULL;
-    _cleanup_fclose_ FILE *file = NULL;
 
     /* We only support Lightdm and GDM at this time */
     if (!(is_lightdm_default() || is_gdm_default())) {
@@ -2887,6 +2843,17 @@ int main(int argc, char *argv[]) {
             goto end;
         }
     }
+
+    if (nvidia_driver_version_path)
+        fprintf(log_handle, "nvidia_driver_version_path file: %s\n", nvidia_driver_version_path);
+    else {
+        nvidia_driver_version_path = strdup("/sys/module/nvidia/version");
+        if (!nvidia_driver_version_path) {
+            fprintf(log_handle, "Couldn't allocate nvidia_driver_version_path\n");
+            goto end;
+        }
+    }
+
 
     /* Either simulate or check if dealing with a system than requires RandR offloading */
     if (fake_lspci_file)
