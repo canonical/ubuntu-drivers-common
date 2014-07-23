@@ -97,6 +97,7 @@ static char *bbswitch_path = NULL;
 static char *bbswitch_quirks_path = NULL;
 static char *dmi_product_name_path = NULL;
 static char *dmi_product_version_path = NULL;
+static char *nvidia_driver_version_path = NULL;
 static char *main_arch_path = NULL;
 static char *other_arch_path = NULL;
 
@@ -2212,10 +2213,13 @@ static bool get_nvidia_driver_version(int *major, int *minor) {
     size_t len = 0;
     _cleanup_free_ char *driver_version = NULL;
     _cleanup_fclose_ FILE *file = NULL;
-    char driver_version_path[] = "/sys/module/nvidia/version";
+    char *driver_version_path = NULL;
+    driver_version_path = nvidia_driver_version_path ?
+                          nvidia_driver_version_path :
+                          "/sys/module/nvidia/version";
 
     /* Check the driver version */
-    file = fopen("/sys/module/nvidia/version", "r");
+    file = fopen(driver_version_path, "r");
     if (file == NULL) {
         fprintf(log_handle, "can't open %s\n", driver_version_path);
         return false;
@@ -2538,12 +2542,13 @@ int main(int argc, char *argv[]) {
         {"bbswitch-quirks-path", required_argument, 0, 'g'},
         {"dmi-product-version-path", required_argument, 0, 'h'},
         {"dmi-product-name-path", required_argument, 0, 'i'},
+        {"nvidia-driver-version-path", required_argument, 0, 'j'},
         {0, 0, 0, 0}
         };
         /* getopt_long stores the option index here. */
         int option_index = 0;
 
-        opt = getopt_long (argc, argv, "lbnfxdampzy:::",
+        opt = getopt_long (argc, argv, "lbnfxdampzyghij:::",
                         long_options, &option_index);
 
         /* Detect the end of the options. */
@@ -2673,6 +2678,11 @@ int main(int argc, char *argv[]) {
                 /* printf("option -p with value '%s'\n", optarg); */
                 dmi_product_name_path = strdup(optarg);
                 if (!dmi_product_name_path)
+                    abort();
+                break;
+            case 'j':
+                nvidia_driver_version_path = strdup(optarg);
+                if (!nvidia_driver_version_path)
                     abort();
                 break;
             case '?':
@@ -3036,12 +3046,17 @@ int main(int argc, char *argv[]) {
                                    &discrete_device_id);
 
                 /* Try to enable prime */
-                enable_prime(prime_settings, bbswitch_loaded,
+                if (enable_prime(prime_settings, bbswitch_loaded,
                              discrete_vendor_id, alternative,
-                             current_devices, cards_n);
+                             current_devices, cards_n)) {
 
-                /* Write permanent settings about offloading */
-                set_offloading();
+                    /* Write permanent settings about offloading */
+                    set_offloading();
+                }
+                else {
+                    /* Select mesa as a fallback */
+                    status = enable_mesa();
+                }
 
                 goto end;
             }
@@ -3168,12 +3183,18 @@ int main(int argc, char *argv[]) {
                                  nvidia_loaded)) {
                 fprintf(log_handle, "Intel hybrid system\n");
 
-                enable_prime(prime_settings, bbswitch_loaded,
+                /* Try to enable prime */
+                if (enable_prime(prime_settings, bbswitch_loaded,
                              discrete_vendor_id, alternative,
-                             current_devices, cards_n);
+                             current_devices, cards_n)) {
 
-                /* Write permanent settings about offloading */
-                set_offloading();
+                    /* Write permanent settings about offloading */
+                    set_offloading();
+                }
+                else {
+                    /* Select mesa as a fallback */
+                    enable_mesa();
+                }
 
                 goto end;
             }
@@ -3444,6 +3465,9 @@ end:
 
     if (dmi_product_version_path)
         free(dmi_product_version_path);
+
+    if (nvidia_driver_version_path)
+        free(nvidia_driver_version_path);
 
     /* Free the devices structs */
     for(i = 0; i < cards_n; i++) {

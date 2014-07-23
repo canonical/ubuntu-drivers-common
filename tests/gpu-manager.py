@@ -117,6 +117,8 @@ class GpuManagerTest(unittest.TestCase):
         klass.dmi_product_version_path.close()
         klass.dmi_product_name_path = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.dmi_product_name_path.close()
+        klass.nvidia_driver_version_path = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.nvidia_driver_version_path.close()
 
         klass.log = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.log.close()
@@ -189,7 +191,8 @@ class GpuManagerTest(unittest.TestCase):
                      self.bbswitch_path,
                      self.bbswitch_quirks_path,
                      self.dmi_product_version_path,
-                     self.dmi_product_name_path):
+                     self.dmi_product_name_path,
+                     self.nvidia_driver_version_path):
             try:
                 os.unlink(elem.name)
             except:
@@ -226,6 +229,7 @@ class GpuManagerTest(unittest.TestCase):
             self.bbswitch_quirks_path,
             self.dmi_product_version_path,
             self.dmi_product_name_path,
+            self.nvidia_driver_version_path,
             self.log,
             self.xorg_file,
             self.amd_pcsdb_file,
@@ -283,6 +287,8 @@ class GpuManagerTest(unittest.TestCase):
                    self.dmi_product_version_path.name,
                    '--dmi-product-name-path',
                    self.dmi_product_name_path.name,
+                   '--nvidia-driver-version-path',
+                   self.nvidia_driver_version_path.name,
                    '--new-boot-file',
                    self.new_boot_file.name,
                    fake_requires_offloading,
@@ -571,6 +577,12 @@ class GpuManagerTest(unittest.TestCase):
         ''')
         self.bbswitch_quirks_path.close()
 
+    def set_nvidia_version(self, nvidia_version):
+        '''Set the nvidia kernel module version'''
+        self.nvidia_driver_version_path = open(self.nvidia_driver_version_path.name, 'w')
+        self.nvidia_driver_version_path.write('%s\n' % nvidia_version)
+        self.nvidia_driver_version_path.close()
+
 
     def set_unloaded_module_in_dmesg(self, module):
         if module:
@@ -616,7 +628,8 @@ class GpuManagerTest(unittest.TestCase):
                    loaded_with_quirk=False,
                    bump_boot_vga_device_id=False,
                    bump_discrete_device_id=False,
-                   first_boot=False):
+                   first_boot=False,
+                   nvidia_version=''):
 
         # Last boot
         if first_boot:
@@ -670,6 +683,9 @@ class GpuManagerTest(unittest.TestCase):
         else:
             self.fake_alternative = '/usr/lib/x86_64-linux-gnu/%s/ld.so.conf' % (enabled_driver)
 
+        if nvidia_version:
+            self.set_nvidia_version(nvidia_version)
+
     def run_manager_and_get_data(self, last_boot, current_boot,
                    loaded_modules, available_drivers,
                    enabled_driver,
@@ -680,7 +696,8 @@ class GpuManagerTest(unittest.TestCase):
                    loaded_with_quirk=False,
                    bump_boot_vga_device_id=False,
                    bump_discrete_device_id=False,
-                   first_boot=False):
+                   first_boot=False,
+                   nvidia_version=''):
 
         self.set_params(last_boot, current_boot,
                    loaded_modules, available_drivers,
@@ -691,7 +708,8 @@ class GpuManagerTest(unittest.TestCase):
                    loaded_with_quirk,
                    bump_boot_vga_device_id,
                    bump_discrete_device_id,
-                   first_boot)
+                   first_boot,
+                   nvidia_version)
 
         # Call the program
         self.exec_manager(requires_offloading=requires_offloading)
@@ -5825,6 +5843,54 @@ EnabledFlags=V4''')
         self.assertFalse(gpu_test.has_not_acted)
 
 
+        # Case 1g: the discrete card is now available (BIOS)
+        #          the driver is enabled and the module is loaded
+        #          the nvidia driver version is too old to support
+        #          prime offloading, so we fall back to Mesa.
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 requires_offloading=True,
+                                                 nvidia_version="304.123")
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
+        # Has changed
+        # Enable when we support hybrid laptops
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.prime_enabled)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
         # Case 2a: the discrete card was already available (BIOS)
         #          the driver is enabled and the module is loaded
 
@@ -6493,6 +6559,7 @@ EnabledFlags=V4''')
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
+
 
     def test_desktop_one_intel_one_nvidia_binary(self):
         '''desktop: intel + nvidia'''
