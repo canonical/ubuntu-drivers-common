@@ -58,6 +58,12 @@
 #include "xf86drm.h"
 #include "xf86drmMode.h"
 
+static inline void freep(void *);
+static inline void fclosep(FILE **);
+
+#define _cleanup_free_ __attribute__((cleanup(freep)))
+#define _cleanup_fclose_ __attribute__((cleanup(fclosep)))
+
 #define PCI_CLASS_DISPLAY               0x03
 #define PCI_CLASS_DISPLAY_OTHER         0x0380
 
@@ -132,9 +138,19 @@ struct alternatives {
 };
 
 
+static inline void freep(void *p) {
+    free(*(void**) p);
+}
+
+
+static inline void fclosep(FILE **file) {
+    if (*file)
+        fclose(*file);
+}
+
+
 /* Trim string in place */
-static void trim(char *str)
-{
+static void trim(char *str) {
     char *pointer = str;
     int len = strlen(pointer);
 
@@ -158,8 +174,7 @@ static bool starts_with(const char *string, const char *prefix) {
 
 
 /* Case insensitive equivalent of strstr */
-static const char *istrstr(const char *str1, const char *str2)
-{
+static const char *istrstr(const char *str1, const char *str2) {
     if (!*str2)
     {
       return str1;
@@ -2171,15 +2186,70 @@ static bool enable_nvidia(struct alternatives *alternative,
 }
 
 
+static bool create_prime_settings(const char *prime_settings) {
+    _cleanup_fclose_ FILE *file = NULL;
+
+    fprintf(log_handle, "Trying to create new settings for prime. Path: %s\n",
+            prime_settings);
+
+    file = fopen(prime_settings, "w");
+    if (file == NULL) {
+        fprintf(log_handle, "I couldn't open %s for writing.\n",
+                prime_settings);
+        return false;
+    }
+    /* Set prime to "on" */
+    fprintf(file, "on\n");
+    fflush(file);
+
+    return true;
+}
+
+
+static bool get_nvidia_driver_version(int *major, int *minor) {
+
+    int status;
+    size_t len = 0;
+    _cleanup_free_ char *driver_version = NULL;
+    _cleanup_fclose_ FILE *file = NULL;
+    char driver_version_path[] = "/sys/module/nvidia/version";
+
+    /* Check the driver version */
+    file = fopen("/sys/module/nvidia/version", "r");
+    if (file == NULL) {
+        fprintf(log_handle, "can't open %s\n", driver_version_path);
+        return false;
+    }
+    if (getline(&driver_version, &len, file) == -1) {
+        fprintf(log_handle, "can't get line from %s\n", driver_version_path);
+        return false;
+    }
+
+    status = sscanf(driver_version, "%d.%d\n", major, minor);
+
+    /* Make sure that we match "desired_matches" */
+    if (status == EOF || status != 2) {
+        fprintf(log_handle, "Warning: couldn't get the driver version from %s\n",
+                driver_version_path);
+        return false;
+    }
+
+    return true;
+}
+
+
 static bool enable_prime(const char *prime_settings,
                         int bbswitch_loaded,
                         unsigned int vendor_id,
                         struct alternatives *alternative,
                         struct device **devices,
                         int cards_n) {
-    bool status = false;
+    int major, minor;
+    bool status = false, has_version = false;
     bool prime_discrete_on = false;
     bool prime_action_on = false;
+    _cleanup_free_ char *driver_version = NULL;
+    _cleanup_fclose_ FILE *file = NULL;
 
     /* We only support Lightdm and GDM at this time */
     if (!(is_lightdm_default() || is_gdm_default())) {
@@ -2188,13 +2258,36 @@ static bool enable_prime(const char *prime_settings,
         return false;
     }
 
+    /* Check the driver version
+     * Note: this won't be available when the discrete GPU
+     *       is disabled, so don't error out if we cannot
+     *       determine the version.
+     */
+    has_version = get_nvidia_driver_version(&major, &minor);
+    if (has_version) {
+        fprintf(log_handle, "Nvidia driver version %d.%d detected\n",
+                major, minor);
+
+        if (major < 331) {
+            fprintf(log_handle, "Error: hybrid graphics is not supported "
+                                "with driver releases older than 331\n");
+            return false;
+        }
+    }
+
     /* Check if prime_settings is available
      * File doesn't exist or empty
      */
     if (!exists_not_empty(prime_settings)) {
-        fprintf(log_handle, "Error: no settings for prime can be found in %s\n",
+        fprintf(log_handle, "Warning: no settings for prime can be found in %s.\n",
                 prime_settings);
-        return false;
+
+       /* Try to create the file */
+        if (!create_prime_settings(prime_settings)) {
+            fprintf(log_handle, "Error: failed to create %s\n",
+                    prime_settings);
+            return false;
+        }
     }
 
     if (!bbswitch_loaded) {
