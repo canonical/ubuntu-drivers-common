@@ -339,13 +339,15 @@ static bool act_upon_module_with_params(const char *module,
             module, params ? params : "no");
 
     if (params) {
-        sprintf(command, "%s %s %s", mode ? "/sbin/modprobe" : "/sbin/rmmod",
-                module, params);
+        snprintf(command, sizeof(command), "%s %s %s",
+                 mode ? "/sbin/modprobe" : "/sbin/rmmod",
+                 module, params);
         free(params);
     }
     else {
-        sprintf(command, "%s %s", mode ? "/sbin/modprobe" : "/sbin/rmmod",
-                module);
+        snprintf(command, sizeof(command), "%s %s",
+                 mode ? "/sbin/modprobe" : "/sbin/rmmod",
+                 module);
     }
 
     if (dry_run)
@@ -536,8 +538,9 @@ static char* get_alternative_link(char *arch_path, char *pattern) {
         fclose(pfile);
     }
     else {
-        sprintf(command, "update-alternatives --list %s_gl_conf",
-                arch_path);
+        snprintf(command, sizeof(command),
+                 "update-alternatives --list %s_gl_conf",
+                 arch_path);
 
         /* Make sure we don't catch prime by mistake when
          * looking for nvidia
@@ -563,19 +566,20 @@ static bool has_unloaded_module(char *module) {
             return false;
         }
 
-        sprintf(command, "grep -q \"%s: module\" %s",
-                module, fake_dmesg_path);
+        snprintf(command, sizeof(command), "grep -q \"%s: module\" %s",
+                 module, fake_dmesg_path);
         status = system(command);
         fprintf(log_handle, "grep fake dmesg status %d\n", status);
     }
     else {
-        sprintf(command, "dmesg | grep -q \"%s: module\"",
-                module);
+        snprintf(command, sizeof(command), "dmesg | grep -q \"%s: module\"",
+                 module);
         status = system(command);
         fprintf(log_handle, "grep dmesg status %d\n", status);
     }
 
-    fprintf(log_handle, "dmesg status %d == 0? %s\n", status, (status == 0) ? "Yes" : "No");
+    fprintf(log_handle, "dmesg status %d == 0? %s\n", status,
+            (status == 0) ? "Yes" : "No");
 
     return (status == 0);
 }
@@ -680,7 +684,9 @@ static bool get_alternatives(struct alternatives *info, const char *master_link)
         detect_enabled_alternatives(info);
     }
     else {
-        sprintf(command, "/usr/bin/update-alternatives --query %s_gl_conf", master_link);
+        snprintf(command, sizeof(command),
+                 "/usr/bin/update-alternatives --query %s_gl_conf",
+                 master_link);
 
         pfile = popen(command, "r");
         if (pfile == NULL) {
@@ -729,8 +735,9 @@ static bool get_alternatives(struct alternatives *info, const char *master_link)
 static bool set_alternative(char *arch_path, char *alternative) {
     int status = -1;
     char command[200];
-    sprintf(command, "/usr/bin/update-alternatives --set %s_gl_conf %s",
-            arch_path, alternative);
+    snprintf(command, sizeof(command),
+             "/usr/bin/update-alternatives --set %s_gl_conf %s",
+             arch_path, alternative);
 
     if (dry_run) {
         status = 1;
@@ -1045,18 +1052,20 @@ static bool check_prime_xorg_conf(struct device **devices,
      */
     for (i=0; i < cards_n; i++) {
         if (devices[i]->vendor_id == INTEL) {
-            sprintf(intel_bus_id, "\"PCI:%d@%d:%d:%d\"",
-                                  (int)(devices[i]->bus),
-                                  (int)(devices[i]->domain),
-                                  (int)(devices[i]->dev),
-                                  (int)(devices[i]->func));
+            snprintf(intel_bus_id, sizeof(intel_bus_id),
+                     "\"PCI:%d@%d:%d:%d\"",
+                     (int)(devices[i]->bus),
+                     (int)(devices[i]->domain),
+                     (int)(devices[i]->dev),
+                     (int)(devices[i]->func));
         }
         else if (devices[i]->vendor_id == NVIDIA) {
-            sprintf(nvidia_bus_id, "\"PCI:%d@%d:%d:%d\"",
-                                (int)(devices[i]->bus),
-                                (int)(devices[i]->domain),
-                                (int)(devices[i]->dev),
-                                (int)(devices[i]->func));
+            snprintf(nvidia_bus_id, sizeof(nvidia_bus_id),
+                     "\"PCI:%d@%d:%d:%d\"",
+                     (int)(devices[i]->bus),
+                     (int)(devices[i]->domain),
+                     (int)(devices[i]->dev),
+                     (int)(devices[i]->func));
         }
     }
 
@@ -1152,23 +1161,25 @@ static bool check_pxpress_xorg_conf(struct device **devices,
      */
     for (i=0; i < cards_n; i++) {
         if (devices[i]->vendor_id == INTEL) {
-            sprintf(intel_bus_id, "\"PCI:%d@%d:%d:%d\"",
-                                  (int)(devices[i]->bus),
-                                  (int)(devices[i]->domain),
-                                  (int)(devices[i]->dev),
-                                  (int)(devices[i]->func));
+            snprintf(intel_bus_id, sizeof(intel_bus_id),
+                     "\"PCI:%d@%d:%d:%d\"",
+                     (int)(devices[i]->bus),
+                     (int)(devices[i]->domain),
+                     (int)(devices[i]->dev),
+                     (int)(devices[i]->func));
         }
         else if (devices[i]->vendor_id == AMD) {
             /* FIXME: fglrx doesn't seem to support
              *        the domain, so we only use
              *        bus, dev, and func
              */
-            /* sprintf(amd_bus_id, "\"PCI:%d@%d:%d:%d\"", */
-            sprintf(amd_bus_id, "\"PCI:%d:%d:%d\"",
-                                (int)(devices[i]->bus),
-                                /*(int)(devices[i]->domain),*/
-                                (int)(devices[i]->dev),
-                                (int)(devices[i]->func));
+            /* snprintf(amd_bus_id, sizeof(amd_bus_id), "\"PCI:%d@%d:%d:%d\"", */
+            snprintf(amd_bus_id, sizeof(amd_bus_id),
+                     "\"PCI:%d:%d:%d\"",
+                     (int)(devices[i]->bus),
+                     /*(int)(devices[i]->domain),*/
+                     (int)(devices[i]->dev),
+                     (int)(devices[i]->func));
         }
     }
 
@@ -1263,10 +1274,12 @@ static bool check_vendor_bus_id_xorg_conf(struct device **devices, int cards_n,
                 for (i=0; i < cards_n; i++) {
                     /* BusID \"PCI:%d@%d:%d:%d\" */
                     if (devices[i]->vendor_id == vendor_id) {
-                        sprintf(bus_id, "\"PCI:%d@%d:%d:%d\"", (int)(devices[i]->bus),
-                                                               (int)(devices[i]->domain),
-                                                               (int)(devices[i]->dev),
-                                                               (int)(devices[i]->func));
+                        snprintf(bus_id, sizeof(bus_id),
+                                 "\"PCI:%d@%d:%d:%d\"",
+                                 (int)(devices[i]->bus),
+                                 (int)(devices[i]->domain),
+                                 (int)(devices[i]->dev),
+                                 (int)(devices[i]->func));
                         if (strstr(line, bus_id) != NULL) {
                             matches += 1;
                         }
@@ -1304,10 +1317,11 @@ static bool check_all_bus_ids_xorg_conf(struct device **devices, int cards_n) {
     while (fgets(line, sizeof(line), file)) {
         for (i=0; i < cards_n; i++) {
             /* BusID \"PCI:%d@%d:%d:%d\" */
-            sprintf(bus_id, "\"PCI:%d@%d:%d:%d\"", (int)(devices[i]->bus),
-                                                   (int)(devices[i]->domain),
-                                                   (int)(devices[i]->dev),
-                                                   (int)(devices[i]->func));
+            snprintf(bus_id, sizeof(bus_id), "\"PCI:%d@%d:%d:%d\"",
+                     (int)(devices[i]->bus),
+                     (int)(devices[i]->domain),
+                     (int)(devices[i]->dev),
+                     (int)(devices[i]->func));
             if (strstr(line, bus_id) != NULL) {
                 matches += 1;
             }
@@ -1759,11 +1773,11 @@ static int add_gpu_bus_from_dmesg(const char *pattern, struct device **devices,
         if (!exists_not_empty(fake_dmesg_path))
             return 1;
 
-        sprintf(command, "grep %s %s",
-                pattern, fake_dmesg_path);
+        snprintf(command, sizeof(command), "grep %s %s",
+                 pattern, fake_dmesg_path);
     }
     else {
-        sprintf(command, "dmesg | grep %s", pattern);
+        snprintf(command, sizeof(command), "dmesg | grep %s", pattern);
     }
 
     pfile = popen(command, "r");
@@ -1889,8 +1903,9 @@ static bool is_link(char *file) {
 /* See if the device is bound to a driver */
 static bool is_device_bound_to_driver(struct pci_device *info) {
     char sysfs_path[256];
-    sprintf(sysfs_path, "/sys/bus/pci/devices/%04x:%02x:%02x.%d/driver",
-            info->domain, info->bus, info->dev, info->func);
+    snprintf(sysfs_path, sizeof(sysfs_path),
+             "/sys/bus/pci/devices/%04x:%02x:%02x.%d/driver",
+             info->domain, info->bus, info->dev, info->func);
 
     return(is_link(sysfs_path));
 }
@@ -2005,7 +2020,7 @@ static bool has_driver_connected_outputs(const char *driver) {
         if (!starts_with(dir_entry->d_name, "card"))
             continue;
 
-        sprintf(path, "%s/%s", dri_dir, dir_entry->d_name);
+        snprintf(path, sizeof(path), "%s/%s", dri_dir, dir_entry->d_name);
         fd = open(path, O_RDWR);
         if (fd) {
             if ((version = drmGetVersion(fd))) {
@@ -2107,7 +2122,7 @@ static bool remove_xorg_conf(void) {
     info = localtime(&rawtime);
 
     strftime(buffer, 80, "%m%d%Y", info);
-    sprintf(backup, "%s.%s", xorg_conf_file, buffer);
+    snprintf(backup, sizeof(backup), "%s.%s", xorg_conf_file, buffer);
 
     status = rename(xorg_conf_file, backup);
     if (!status) {
