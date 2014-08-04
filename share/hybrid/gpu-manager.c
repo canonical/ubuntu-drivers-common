@@ -2258,13 +2258,13 @@ static bool get_nvidia_driver_version(int *major, int *minor) {
 
 
 static bool enable_prime(const char *prime_settings,
-                        int bbswitch_loaded,
+                        bool bbswitch_loaded,
                         unsigned int vendor_id,
                         struct alternatives *alternative,
                         struct device **devices,
                         int cards_n) {
     int major, minor;
-    bool status = false, has_version = false;
+    bool bbswitch_status = true, has_version = false;
     bool prime_discrete_on = false;
     bool prime_action_on = false;
     _cleanup_free_ char *driver_version = NULL;
@@ -2313,20 +2313,14 @@ static bool enable_prime(const char *prime_settings,
         /* Try to load bbswitch */
         /* opts="`/sbin/get-quirk-options`"
         /sbin/modprobe bbswitch load_state=-1 unload_state=1 "$opts" || true */
-        status = load_bbswitch();
-        if (!status) {
-            fprintf(log_handle, "Error: can't load bbswitch\n");
-            /* Select mesa as a fallback */
-            enable_mesa();
-
-            /* Remove xorg.conf */
-            remove_xorg_conf();
-            return false;
-        }
+        bbswitch_status = load_bbswitch();
+        if (!bbswitch_status)
+            fprintf(log_handle,
+                    "Warning: can't load bbswitch, switching between GPUs won't work\n");
     }
 
     /* Get the current status from bbswitch */
-    prime_discrete_on = prime_is_discrete_nvidia_on();
+    prime_discrete_on = !bbswitch_status ? true : prime_is_discrete_nvidia_on();
     /* Get the current settings for discrete */
     prime_action_on = prime_is_action_on();
 
@@ -2367,13 +2361,16 @@ static bool enable_prime(const char *prime_settings,
         return true;
     }
 
-    if (prime_action_on) {
-        fprintf(log_handle, "Powering on the discrete card\n");
-        prime_enable_discrete();
-    }
-    else {
-        fprintf(log_handle, "Powering off the discrete card\n");
-        prime_disable_discrete();
+    /* Enable or disable the GPU only if bbswitch is available */
+    if (bbswitch_status) {
+        if (prime_action_on) {
+            fprintf(log_handle, "Powering on the discrete card\n");
+            prime_enable_discrete();
+        }
+        else {
+            fprintf(log_handle, "Powering off the discrete card\n");
+            prime_disable_discrete();
+        }
     }
 
     return true;
