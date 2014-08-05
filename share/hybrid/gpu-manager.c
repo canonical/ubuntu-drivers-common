@@ -145,7 +145,7 @@ static inline void freep(void *p) {
 
 
 static inline void fclosep(FILE **file) {
-    if (*file)
+    if (*file != NULL && *file >= 0)
         fclose(*file);
 }
 
@@ -220,6 +220,43 @@ static bool exists_not_empty(const char *file) {
         return false;
     }
     return true;
+}
+
+
+/* Get reference count from module */
+static int get_module_refcount(const char* module) {
+    _cleanup_fclose_ FILE *file = NULL;
+    _cleanup_free_ char *line = NULL;
+    size_t len = 0;
+    char refcount_path[50];
+    int refcount = 0;
+    int status = 0;
+
+    snprintf(refcount_path, sizeof(refcount_path), "/sys/module/%s/refcnt", module);
+
+    if (!exists_not_empty(refcount_path)) {
+        fprintf(log_handle, "Error: %s does not exist or is empty.\n", refcount_path);
+        return 0;
+    }
+
+    /* get dmi product version */
+    file = fopen(refcount_path, "r");
+    if (file == NULL) {
+        fprintf(log_handle, "can't open %s\n", refcount_path);
+        return 0;
+    }
+    if (getline(&line, &len, file) == -1) {
+        fprintf(log_handle, "can't get line from %s\n", refcount_path);
+        return 0;
+    }
+
+    status = sscanf(line, "%d\n", &refcount);
+
+    /* Make sure that we match 1 time */
+    if (status == EOF || status != 1)
+        refcount = 0;
+
+    return refcount;
 }
 
 
@@ -488,6 +525,25 @@ static char* get_output(char *command, char *pattern, char *ignore) {
 }
 
 
+static bool is_module_blacklisted(const char* module) {
+    _cleanup_free_ char *match = NULL;
+    char command[100];
+
+    if (dry_run)
+        return false;
+
+    snprintf(command, sizeof(command),
+             "grep -G \"blacklist.*%s\" /etc/modprobe.d/*",
+             module);
+
+    match = get_output(command, NULL, NULL);
+
+    if (!match)
+        return false;
+    return true;
+}
+
+
 static void get_architecture_paths(char **main_arch_path,
                                   char **other_arch_path) {
     char *main_arch = NULL;
@@ -680,6 +736,10 @@ static bool get_alternatives(struct alternatives *info, const char *master_link)
     /* Test */
     if (fake_alternatives_path) {
         pfile = fopen(fake_alternatives_path, "r");
+        if (pfile == NULL) {
+            fprintf(log_handle, "Error: can't open fake_alternatives_path %s\n", fake_alternatives_path);
+            return false;
+        }
         /* Set the enabled alternatives in the struct */
         detect_enabled_alternatives(info);
     }
@@ -831,9 +891,10 @@ static bool is_disabled_in_cmdline() {
  * card
  */
 static bool write_to_xorg_conf(struct device **devices, int cards_n,
-                              unsigned int vendor_id) {
+                              unsigned int vendor_id, const char *driver) {
     int i;
     FILE *pfile = NULL;
+    char driver_line[100];
 
     fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
 
@@ -844,6 +905,10 @@ static bool write_to_xorg_conf(struct device **devices, int cards_n,
         return false;
     }
 
+    if (driver != NULL)
+        snprintf(driver_line, sizeof(driver_line), "    Driver \"%s\"\n", driver);
+    else
+        driver_line[0] = 0;
 
     for(i = 0; i < cards_n; i++) {
         if (devices[i]->vendor_id == vendor_id) {
@@ -851,12 +916,14 @@ static bool write_to_xorg_conf(struct device **devices, int cards_n,
                "Section \"Device\"\n"
                "    Identifier \"Default Card %d\"\n"
                "    BusID \"PCI:%d@%d:%d:%d\"\n"
+               "%s"
                "EndSection\n\n",
                i,
                (int)(devices[i]->bus),
                (int)(devices[i]->domain),
                (int)(devices[i]->dev),
-               (int)(devices[i]->func));
+               (int)(devices[i]->func),
+               driver_line);
         }
     }
 
@@ -2184,7 +2251,7 @@ static bool enable_nvidia(struct alternatives *alternative,
             /* Only useful if more than one card is available */
             if (cards_n > 1) {
                 /* Write xorg.conf */
-                write_to_xorg_conf(devices, cards_n, vendor_id);
+                write_to_xorg_conf(devices, cards_n, vendor_id, NULL);
             }
         }
         else {
@@ -2407,11 +2474,8 @@ static bool enable_fglrx(struct alternatives *alternative,
             /* Remove xorg.conf */
             remove_xorg_conf();
 
-            /* Only useful if more than one card is available */
-            if (cards_n > 1) {
-                /* Write xorg.conf */
-                write_to_xorg_conf(devices, cards_n, vendor_id);
-            }
+            /* Write xorg.conf */
+            write_to_xorg_conf(devices, cards_n, vendor_id, "fglrx");
         }
         else {
             fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
@@ -2500,7 +2564,9 @@ int main(int argc, char *argv[]) {
     bool nvidia_loaded = false, fglrx_loaded = false,
         intel_loaded = false, radeon_loaded = false,
         nouveau_loaded = false, bbswitch_loaded = false;
-    int fglrx_unloaded = false, nvidia_unloaded = false;
+    bool fglrx_unloaded = false, nvidia_unloaded = false;
+    bool fglrx_blacklisted = false, nvidia_blacklisted = false,
+         radeon_blacklisted = false, nouveau_blacklisted = false;
     int offloading = false;
     int status = 0;
 
@@ -2839,11 +2905,15 @@ int main(int argc, char *argv[]) {
     bbswitch_loaded = is_module_loaded("bbswitch");
     nvidia_loaded = is_module_loaded("nvidia");
     nvidia_unloaded = nvidia_loaded ? false : has_unloaded_module("nvidia");
+    nvidia_blacklisted = is_module_blacklisted("nvidia");
     fglrx_loaded = is_module_loaded("fglrx");
     fglrx_unloaded = fglrx_loaded ? false : has_unloaded_module("fglrx");
+    fglrx_blacklisted = is_module_blacklisted("fglrx");
     intel_loaded = is_module_loaded("i915") || is_module_loaded("i810");
     radeon_loaded = is_module_loaded("radeon");
+    radeon_blacklisted = is_module_blacklisted("radeon");
     nouveau_loaded = is_module_loaded("nouveau");
+    nouveau_blacklisted = is_module_blacklisted("nouveau");
 
     fprintf(log_handle, "Is nvidia loaded? %s\n", (nvidia_loaded ? "yes" : "no"));
     fprintf(log_handle, "Was nvidia unloaded? %s\n", (nvidia_unloaded ? "yes" : "no"));
@@ -3085,7 +3155,7 @@ int main(int argc, char *argv[]) {
         }
         else if (boot_vga_vendor_id == AMD) {
             /* if fglrx is loaded enable fglrx alternative */
-            if (fglrx_loaded && !radeon_loaded) {
+            if (fglrx_loaded && (!radeon_loaded || radeon_blacklisted)) {
                 if (!alternative->fglrx_enabled) {
                     /* Try to enable fglrx */
                     enable_fglrx(alternative, discrete_vendor_id, current_devices, cards_n);
@@ -3120,7 +3190,7 @@ int main(int argc, char *argv[]) {
         }
         else if (boot_vga_vendor_id == NVIDIA) {
             /* if nvidia is loaded enable nvidia alternative */
-            if (nvidia_loaded && !nouveau_loaded) {
+            if (nvidia_loaded && (!nouveau_loaded || nouveau_blacklisted)) {
                 if (!alternative->nvidia_enabled) {
                     /* Try to enable nvidia */
                     enable_nvidia(alternative, discrete_vendor_id, current_devices, cards_n);
@@ -3183,7 +3253,7 @@ int main(int argc, char *argv[]) {
         if (boot_vga_vendor_id == INTEL) {
             fprintf(log_handle, "Intel IGP detected\n");
             /* AMD PowerXpress */
-            if (offloading && intel_loaded && fglrx_loaded && !radeon_loaded) {
+            if (offloading && intel_loaded && fglrx_loaded && (!radeon_loaded || radeon_blacklisted)) {
                 fprintf(log_handle, "PowerXpress detected\n");
 
                 enable_pxpress(alternative, current_devices, cards_n);
@@ -3226,7 +3296,7 @@ int main(int argc, char *argv[]) {
                     fprintf(log_handle, "Discrete NVIDIA card detected\n");
 
                     /* Kernel module is available */
-                    if (nvidia_loaded && !nouveau_loaded) {
+                    if (nvidia_loaded && (!nouveau_loaded || nouveau_blacklisted)) {
                         /* Try to enable nvidia */
                         enable_nvidia(alternative, discrete_vendor_id, current_devices, cards_n);
                     }
@@ -3268,7 +3338,7 @@ int main(int argc, char *argv[]) {
                     fprintf(log_handle, "Discrete AMD card detected\n");
 
                     /* Kernel module is available */
-                    if (fglrx_loaded && !radeon_loaded) {
+                    if (fglrx_loaded && (!radeon_loaded || radeon_blacklisted)) {
                         /* Try to enable fglrx */
                         enable_fglrx(alternative, discrete_vendor_id, current_devices, cards_n);
                     }
@@ -3320,7 +3390,7 @@ int main(int argc, char *argv[]) {
 
 
                 /* Kernel module is available */
-                if (fglrx_loaded && !radeon_loaded) {
+                if (fglrx_loaded && (!radeon_loaded || radeon_blacklisted)) {
                     /* Try to enable fglrx */
                     enable_fglrx(alternative, discrete_vendor_id, current_devices, cards_n);
                 }
@@ -3360,7 +3430,7 @@ int main(int argc, char *argv[]) {
                 fprintf(log_handle, "Discrete NVIDIA card detected\n");
 
                 /* Kernel module is available */
-                if (nvidia_loaded && !nouveau_loaded) {
+                if (nvidia_loaded && (!nouveau_loaded || nouveau_blacklisted)) {
                     /* Try to enable nvidia */
                     enable_nvidia(alternative, discrete_vendor_id, current_devices, cards_n);
                 }
@@ -3368,7 +3438,7 @@ int main(int argc, char *argv[]) {
                 else {
                     /* See if fglrx is in use */
                     /* Kernel module is available */
-                    if (fglrx_loaded && !radeon_loaded) {
+                    if (fglrx_loaded && (!radeon_loaded || radeon_blacklisted)) {
                         /* Try to enable fglrx */
                         enable_fglrx(alternative, boot_vga_vendor_id, current_devices, cards_n);
                     }
