@@ -18,11 +18,14 @@ import shutil
 import logging
 import re
 import argparse
+import copy
 
 # Global path to save logs
 tests_path = None
 # Global path to use valgrind
 with_valgrind = False
+# Global path to use gdb
+with_gdb = False
 
 class GpuTest(object):
 
@@ -259,6 +262,12 @@ class GpuManagerTest(unittest.TestCase):
         else:
             valgrind = []
 
+        if with_gdb:
+            gdb = ['gdb', '-batch', '--args']
+        else:
+            gdb = []
+
+
         command = ['share/hybrid/gpu-manager',
                    '--dry-run',
                    '--last-boot-file',
@@ -301,6 +310,11 @@ class GpuManagerTest(unittest.TestCase):
         if valgrind:
             # Prepend the valgrind arguments
             command[:0] = valgrind
+        elif gdb:
+            command_ = copy.deepcopy(command)
+            command_[:0] = gdb
+            print("\n%s" % self.this_function_name)
+            print(command_)
 
         #devnull = open('/dev/null', 'w')
 
@@ -10664,15 +10678,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--save-logs-to', help='Path to save logs to')
     parser.add_argument('--with-valgrind', action="store_true", help='Run the app within valgrind')
+    parser.add_argument('--with-gdb', action="store_true", help='Run the app within gdb')
 
     args = parser.parse_args()
     tests_path = args.save_logs_to
     with_valgrind = args.with_valgrind
+    with_gdb = args.with_gdb
 
     new_argv = []
     for elem in sys.argv:
         if ((elem != '--save-logs-to' and elem != args.save_logs_to) and
-            (elem != '--with-valgrind' and elem != args.with_valgrind)):
+            (elem != '--with-valgrind' and elem != args.with_valgrind) and
+            (elem != '--with-gdb' and elem != args.with_gdb)):
             new_argv.append(elem)
     unittest.main(argv=new_argv)
 
