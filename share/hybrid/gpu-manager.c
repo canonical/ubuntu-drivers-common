@@ -117,6 +117,7 @@ struct device {
     unsigned int bus;
     unsigned int dev;
     unsigned int func;
+    int has_connected_outputs;
 };
 
 
@@ -900,15 +901,15 @@ static bool write_to_xorg_conf(struct device **devices, int cards_n,
             fprintf(file,
                "Section \"Device\"\n"
                "    Identifier \"Default Card %d\"\n"
-               "    BusID \"PCI:%d@%d:%d:%d\"\n"
                "%s"
+               "    BusID \"PCI:%d@%d:%d:%d\"\n"
                "EndSection\n\n",
                i,
+               driver_line,
                (int)(devices[i]->bus),
                (int)(devices[i]->domain),
                (int)(devices[i]->dev),
-               (int)(devices[i]->func),
-               driver_line);
+               (int)(devices[i]->func));
         }
     }
 
@@ -1785,6 +1786,8 @@ static int add_gpu_from_stream(FILE *file, const char *pattern, struct device **
         devices[*num]->device_id = 0x68d8;
     }
 
+    devices[*num]->has_connected_outputs = -1;
+
     /* Increment number of cards */
     *num += 1;
 
@@ -2028,8 +2031,10 @@ int count_connected_outputs(int fd, drmModeResPtr res) {
 }
 
 
-/* See if the drm device created by a driver has any connected outputs. */
-static bool has_driver_connected_outputs(const char *driver) {
+/* See if the drm device created by a driver has any connected outputs.
+ * Return 1 if outputs are connected, 0 if they're not, -1 if unknown
+ */
+static int has_driver_connected_outputs(const char *driver) {
     DIR *dir;
     struct dirent* dir_entry;
     char path[20];
@@ -2042,7 +2047,7 @@ static bool has_driver_connected_outputs(const char *driver) {
 
     if (NULL == (dir = opendir(dri_dir))) {
         fprintf(log_handle, "Error : Failed to open %s\n", dri_dir);
-        return false;
+        return -1;
     }
 
     /* Keep looking until we find the device for the driver */
@@ -2081,13 +2086,13 @@ static bool has_driver_connected_outputs(const char *driver) {
     closedir(dir);
 
     if (!driver_match)
-        return false;
+        return -1;
 
     res = drmModeGetResources(fd);
     if (!res) {
         fprintf(log_handle, "Error: can't get drm resources.\n");
         drmClose(fd);
-        return false;
+        return -1;
     }
 
 
@@ -2103,19 +2108,50 @@ static bool has_driver_connected_outputs(const char *driver) {
 }
 
 
+/* Add information on connected outputs */
+static void add_connected_outputs_info(struct device **devices,
+                                       int cards_n) {
+    int i;
+    int radeon_has_outputs = has_driver_connected_outputs("radeon");
+    int nouveau_has_outputs = has_driver_connected_outputs("nouveau");
+    int intel_has_outputs = has_driver_connected_outputs("i915");
+
+    for(i = 0; i < cards_n; i++) {
+        if (devices[i]->vendor_id == INTEL)
+            devices[i]->has_connected_outputs = intel_has_outputs;
+        else if (devices[i]->vendor_id == AMD)
+            devices[i]->has_connected_outputs = radeon_has_outputs;
+        else if (devices[i]->vendor_id == NVIDIA)
+            devices[i]->has_connected_outputs = nouveau_has_outputs;
+        else
+            devices[i]->has_connected_outputs = -1;
+    }
+}
+
+
 /* Check if any outputs are still connected to card0.
  *
  * By default we only check cards driver by i915.
  * If so, then claim support for RandR offloading
  */
-static bool requires_offloading(void) {
+static bool requires_offloading(struct device **devices,
+                                int cards_n) {
 
     /* Let's check only /dev/dri/card0 and look
      * for driver i915. We don't want to enable
      * offloading to any other driver, as results
      * may be unpredictable
      */
-    return(has_driver_connected_outputs("i915"));
+    int i;
+    bool status = false;
+    for(i = 0; i < cards_n; i++) {
+        if (devices[i]->vendor_id == INTEL) {
+            status = (devices[i]->has_connected_outputs == 1);
+            break;
+        }
+    }
+
+    return status;
 }
 
 
@@ -2168,13 +2204,68 @@ static bool remove_xorg_conf(void) {
 }
 
 
-static bool enable_mesa() {
+/* Write xorg.conf entries only for gpus connected to outputs */
+static bool write_only_connected_to_xorg_conf(struct device **devices,
+                                              int cards_n) {
+    int i;
+    bool needs_conf = false;
+    _cleanup_fclose_ FILE *file = NULL;
+
+
+    for(i = 0; i < cards_n; i++) {
+        if (devices[i]->has_connected_outputs == 1) {
+            needs_conf = true;
+            break;
+        }
+    }
+
+    if (!needs_conf) {
+        fprintf(log_handle, "No need to regenerate xorg.conf.\n");
+        return true;
+    }
+
+    fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
+
+    file = fopen(xorg_conf_file, "w");
+    if (file == NULL) {
+        fprintf(log_handle, "I couldn't open %s for writing.\n",
+                xorg_conf_file);
+        return false;
+    }
+
+    for(i = 0; i < cards_n; i++) {
+        if (devices[i]->has_connected_outputs == 1) {
+            fprintf(file,
+               "Section \"Device\"\n"
+               "    Identifier \"Default Card %d\"\n"
+               "    BusID \"PCI:%d@%d:%d:%d\"\n"
+               "EndSection\n\n",
+               i,
+               (int)(devices[i]->bus),
+               (int)(devices[i]->domain),
+               (int)(devices[i]->dev),
+               (int)(devices[i]->func));
+        }
+    }
+
+    fflush(file);
+
+    return true;
+}
+
+static bool enable_mesa(struct device **devices,
+                        int cards_n) {
     bool status = false;
     fprintf(log_handle, "Selecting mesa\n");
     status = select_driver("mesa");
 
     /* Remove xorg.conf */
     remove_xorg_conf();
+
+    /* Enable only the cards that are actually connected
+     * to outputs */
+    if (cards_n > 1)
+        write_only_connected_to_xorg_conf(devices, cards_n);
 
     return status;
 }
@@ -2224,7 +2315,7 @@ static bool enable_nvidia(struct alternatives *alternative,
         /* For some reason we failed to select the
          * driver. Let's select Mesa here */
         fprintf(log_handle, "Error: failed to enable the driver\n");
-        enable_mesa();
+        enable_mesa(devices, cards_n);
     }
 
     return status;
@@ -2430,8 +2521,11 @@ static bool enable_fglrx(struct alternatives *alternative,
             /* Remove xorg.conf */
             remove_xorg_conf();
 
-            /* Write xorg.conf */
-            write_to_xorg_conf(devices, cards_n, vendor_id, "fglrx");
+            /* Only useful if more than one card is available */
+            if (cards_n > 1) {
+                /* Write xorg.conf */
+                write_to_xorg_conf(devices, cards_n, vendor_id, "fglrx");
+            }
         }
         else {
             fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
@@ -2441,7 +2535,7 @@ static bool enable_fglrx(struct alternatives *alternative,
         /* For some reason we failed to select the
          * driver. Let's select Mesa here */
         fprintf(log_handle, "Error: failed to enable the driver\n");
-        enable_mesa();
+        enable_mesa(devices, cards_n);
     }
 
     return status;
@@ -2854,21 +2948,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-
-    /* Either simulate or check if dealing with a system than requires RandR offloading */
-    if (fake_lspci_file)
-        offloading = fake_offloading;
-    else
-        offloading = requires_offloading();
-
-    fprintf(log_handle, "Does it require offloading? %s\n", (offloading ? "yes" : "no"));
-
-    /* Remove a file that will tell other apps such as
-     * nvidia-prime if we need to offload rendering.
-     */
-    if (!offloading && !dry_run)
-        unlink(OFFLOADING_CONF);
-
     bbswitch_loaded = is_module_loaded("bbswitch");
     nvidia_loaded = is_module_loaded("nvidia");
     nvidia_unloaded = nvidia_loaded ? false : has_unloaded_module("nvidia");
@@ -2909,7 +2988,11 @@ int main(int argc, char *argv[]) {
             else if (current_devices[i]->vendor_id == INTEL) {
                 has_intel = true;
             }
+            /* Set unavailable fake outputs */
+            current_devices[i]->has_connected_outputs = -1;
         }
+        /* Set fake offloading */
+        offloading = fake_offloading;
     }
     else {
         /* Get the current system data */
@@ -2972,7 +3055,21 @@ int main(int argc, char *argv[]) {
                 cards_n++;
             }
         }
+        /* Add information about connected outputs */
+        add_connected_outputs_info(current_devices, cards_n);
+
+        /* See if it requires RandR offloading */
+        offloading = requires_offloading(current_devices, cards_n);
     }
+
+    fprintf(log_handle, "Does it require offloading? %s\n", (offloading ? "yes" : "no"));
+
+    /* Remove a file that will tell other apps such as
+     * nvidia-prime if we need to offload rendering.
+     */
+    if (!offloading && !dry_run)
+        unlink(OFFLOADING_CONF);
+
 
     /* Read the data from last boot */
     status = read_data_from_file(old_devices, &last_cards_n,
@@ -3104,7 +3201,7 @@ int main(int argc, char *argv[]) {
                 }
                 else {
                     /* Select mesa as a fallback */
-                    status = enable_mesa();
+                    status = enable_mesa(current_devices, cards_n);
                 }
 
                 goto end;
@@ -3112,7 +3209,7 @@ int main(int argc, char *argv[]) {
             else {
                 if (!alternative->mesa_enabled) {
                     /* Select mesa */
-                    status = enable_mesa();
+                    status = enable_mesa(current_devices, cards_n);
                     has_moved_xorg_conf = true;
                 }
                 else {
@@ -3125,7 +3222,7 @@ int main(int argc, char *argv[]) {
             if (fglrx_loaded && (!radeon_loaded || radeon_blacklisted)) {
                 if (!alternative->fglrx_enabled) {
                     /* Try to enable fglrx */
-                    enable_fglrx(alternative, discrete_vendor_id, current_devices, cards_n);
+                    enable_fglrx(alternative, boot_vga_vendor_id, current_devices, cards_n);
                     has_moved_xorg_conf = true;
                 }
                 else {
@@ -3147,7 +3244,7 @@ int main(int argc, char *argv[]) {
                 /* Select mesa as a fallback */
                 fprintf(log_handle, "Kernel Module is not loaded\n");
                 if (!alternative->mesa_enabled) {
-                    status = enable_mesa();
+                    status = enable_mesa(current_devices, cards_n);
                     has_moved_xorg_conf = true;
                 }
                 else {
@@ -3160,7 +3257,7 @@ int main(int argc, char *argv[]) {
             if (nvidia_loaded && (!nouveau_loaded || nouveau_blacklisted)) {
                 if (!alternative->nvidia_enabled) {
                     /* Try to enable nvidia */
-                    enable_nvidia(alternative, discrete_vendor_id, current_devices, cards_n);
+                    enable_nvidia(alternative, boot_vga_vendor_id, current_devices, cards_n);
                     has_moved_xorg_conf = true;
                 }
                 else {
@@ -3182,7 +3279,7 @@ int main(int argc, char *argv[]) {
                 /* Select mesa as a fallback */
                 fprintf(log_handle, "Kernel Module is not loaded\n");
                 if (!alternative->mesa_enabled) {
-                    status = enable_mesa();
+                    status = enable_mesa(current_devices, cards_n);
                     has_moved_xorg_conf = true;
                 }
                 else {
@@ -3242,7 +3339,7 @@ int main(int argc, char *argv[]) {
                 }
                 else {
                     /* Select mesa as a fallback */
-                    enable_mesa();
+                    enable_mesa(current_devices, cards_n);
                 }
 
                 goto end;
@@ -3283,7 +3380,7 @@ int main(int argc, char *argv[]) {
                         if (!alternative->mesa_enabled) {
                             /* Select mesa as a fallback */
                             fprintf(log_handle, "Kernel Module is not loaded\n");
-                            status = enable_mesa();
+                            status = enable_mesa(current_devices, cards_n);
                         }
                         else {
                             /* If the system has changed or a binary driver is still
@@ -3325,7 +3422,7 @@ int main(int argc, char *argv[]) {
                         if (!alternative->mesa_enabled) {
                             /* Select mesa as a fallback */
                             fprintf(log_handle, "Kernel Module is not loaded\n");
-                            status = enable_mesa();
+                            status = enable_mesa(current_devices, cards_n);
                         }
                         else {
                             /* If the system has changed or a binary driver is still
@@ -3376,7 +3473,7 @@ int main(int argc, char *argv[]) {
                     if (!alternative->mesa_enabled) {
                         /* Select mesa as a fallback */
                         fprintf(log_handle, "Kernel Module is not loaded\n");
-                        status = enable_mesa();
+                        status = enable_mesa(current_devices, cards_n);
                     }
                     else {
                         /* If the system has changed or a binary driver is still
@@ -3426,7 +3523,7 @@ int main(int argc, char *argv[]) {
                         if (!alternative->mesa_enabled) {
                             /* Select mesa as a fallback */
                             fprintf(log_handle, "Kernel Module is not loaded\n");
-                            enable_mesa();
+                            enable_mesa(current_devices, cards_n);
                         }
                         else {
                             /* If the system has changed or a binary driver is still
