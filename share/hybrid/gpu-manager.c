@@ -3219,7 +3219,7 @@ int main(int argc, char *argv[]) {
         }
         else if (boot_vga_vendor_id == AMD) {
             /* if fglrx is loaded enable fglrx alternative */
-            if (fglrx_loaded && (!radeon_loaded || radeon_blacklisted)) {
+            if ((fglrx_loaded && !fglrx_blacklisted) && (!radeon_loaded || radeon_blacklisted)) {
                 if (!alternative->fglrx_enabled) {
                     /* Try to enable fglrx */
                     enable_fglrx(alternative, boot_vga_vendor_id, current_devices, cards_n);
@@ -3254,7 +3254,7 @@ int main(int argc, char *argv[]) {
         }
         else if (boot_vga_vendor_id == NVIDIA) {
             /* if nvidia is loaded enable nvidia alternative */
-            if (nvidia_loaded && (!nouveau_loaded || nouveau_blacklisted)) {
+            if ((nvidia_loaded && !nvidia_blacklisted) && (!nouveau_loaded || nouveau_blacklisted)) {
                 if (!alternative->nvidia_enabled) {
                     /* Try to enable nvidia */
                     enable_nvidia(alternative, boot_vga_vendor_id, current_devices, cards_n);
@@ -3360,7 +3360,7 @@ int main(int argc, char *argv[]) {
                     fprintf(log_handle, "Discrete NVIDIA card detected\n");
 
                     /* Kernel module is available */
-                    if (nvidia_loaded && (!nouveau_loaded || nouveau_blacklisted)) {
+                    if ((nvidia_loaded && !nvidia_blacklisted) && (!nouveau_loaded || nouveau_blacklisted)) {
                         /* Try to enable nvidia */
                         enable_nvidia(alternative, discrete_vendor_id, current_devices, cards_n);
                     }
@@ -3402,7 +3402,7 @@ int main(int argc, char *argv[]) {
                     fprintf(log_handle, "Discrete AMD card detected\n");
 
                     /* Kernel module is available */
-                    if (fglrx_loaded && (!radeon_loaded || radeon_blacklisted)) {
+                    if ((fglrx_loaded && !fglrx_blacklisted) && (!radeon_loaded || radeon_blacklisted)) {
                         /* Try to enable fglrx */
                         enable_fglrx(alternative, discrete_vendor_id, current_devices, cards_n);
                     }
@@ -3454,7 +3454,7 @@ int main(int argc, char *argv[]) {
 
 
                 /* Kernel module is available */
-                if (fglrx_loaded && (!radeon_loaded || radeon_blacklisted)) {
+                if ((fglrx_loaded && !fglrx_blacklisted) && (!radeon_loaded || radeon_blacklisted)) {
                     /* Try to enable fglrx */
                     enable_fglrx(alternative, discrete_vendor_id, current_devices, cards_n);
                 }
@@ -3494,7 +3494,7 @@ int main(int argc, char *argv[]) {
                 fprintf(log_handle, "Discrete NVIDIA card detected\n");
 
                 /* Kernel module is available */
-                if (nvidia_loaded && (!nouveau_loaded || nouveau_blacklisted)) {
+                if ((nvidia_loaded && !nvidia_blacklisted) && (!nouveau_loaded || nouveau_blacklisted)) {
                     /* Try to enable nvidia */
                     enable_nvidia(alternative, discrete_vendor_id, current_devices, cards_n);
                 }
@@ -3502,7 +3502,7 @@ int main(int argc, char *argv[]) {
                 else {
                     /* See if fglrx is in use */
                     /* Kernel module is available */
-                    if (fglrx_loaded && (!radeon_loaded || radeon_blacklisted)) {
+                    if ((fglrx_loaded && !fglrx_blacklisted) && (!radeon_loaded || radeon_blacklisted)) {
                         /* Try to enable fglrx */
                         enable_fglrx(alternative, boot_vga_vendor_id, current_devices, cards_n);
                     }
