@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.97) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.97) utopic; urgency=medium
 
   * tests/testarchive.py: Organize debs in pool/ structure, for better
     reusability.
@@ -10,7 +10,7 @@ ubuntu-drivers-common (1:0.2.97) UNRELEASED; urgency=medium
     any firmware dependencies and linux-firmware-nonfree does not declare
     modaliases, so it either just works now, or the driver needs fixing first.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 15 Jul 2014 07:44:12 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 18 Aug 2014 10:13:11 +0200
 
 ubuntu-drivers-common (1:0.2.96.1) utopic; urgency=medium
 
