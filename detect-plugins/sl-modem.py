@@ -3,6 +3,7 @@
 # (C) 2012 Canonical Ltd.
 # Author: Martin Pitt <martin.pitt@ubuntu.com>
 
+import os
 import re
 import logging
 import subprocess
@@ -24,7 +25,13 @@ def detect(apt_cache):
 
     # Check aplay -l
     try:
-        aplay = subprocess.Popen(['aplay', '-l'], env={},
+        env = os.environ.copy()
+        try:
+            del env['LANGUAGE']
+        except KeyError:
+            pass
+        env['LC_ALL'] = 'C'
+        aplay = subprocess.Popen(['aplay', '-l'], env=env,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 universal_newlines=True)
         (aplay_out, aplay_err) = aplay.communicate()
