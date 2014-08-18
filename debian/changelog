@@ -6,6 +6,9 @@ ubuntu-drivers-common (1:0.2.97) UNRELEASED; urgency=medium
     long time. This needs to be fixed properly if there's a bug.
   * sl-modem plugin: Keep environment for aplay, just ensure it's using the C
     locale. (LP: #1296425)
+  * Disable linux-firmware-nonfree autopkgtest for now. bcma does not declare
+    any firmware dependencies and linux-firmware-nonfree does not declare
+    modaliases, so it either just works now, or the driver needs fixing first.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 15 Jul 2014 07:44:12 +0200
 
