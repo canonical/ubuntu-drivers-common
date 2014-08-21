@@ -122,6 +122,8 @@ class GpuManagerTest(unittest.TestCase):
         klass.dmi_product_name_path.close()
         klass.nvidia_driver_version_path = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.nvidia_driver_version_path.close()
+        klass.modprobe_d_path = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.modprobe_d_path.close()
 
         klass.log = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.log.close()
@@ -132,6 +134,7 @@ class GpuManagerTest(unittest.TestCase):
         # Patterns
         klass.is_driver_loaded_pt = re.compile('Is (.+) loaded\? (.+)')
         klass.is_driver_unloaded_pt = re.compile('Was (.+) unloaded\? (.+)')
+        klass.is_driver_blacklisted_pt = re.compile('Is (.+) blacklisted\? (.+)')
         klass.is_driver_enabled_pt = re.compile('Is (.+) enabled\? (.+)')
         klass.has_card_pt = re.compile('Has (.+)\? (.+)')
         klass.single_card_pt = re.compile('Single card detected.*')
@@ -195,7 +198,8 @@ class GpuManagerTest(unittest.TestCase):
                      self.bbswitch_quirks_path,
                      self.dmi_product_version_path,
                      self.dmi_product_name_path,
-                     self.nvidia_driver_version_path):
+                     self.nvidia_driver_version_path,
+                     self.modprobe_d_path):
             try:
                 os.unlink(elem.name)
             except:
@@ -233,6 +237,7 @@ class GpuManagerTest(unittest.TestCase):
             self.dmi_product_version_path,
             self.dmi_product_name_path,
             self.nvidia_driver_version_path,
+            self.modprobe_d_path,
             self.log,
             self.xorg_file,
             self.amd_pcsdb_file,
@@ -298,6 +303,8 @@ class GpuManagerTest(unittest.TestCase):
                    self.dmi_product_name_path.name,
                    '--nvidia-driver-version-path',
                    self.nvidia_driver_version_path.name,
+                   '--modprobe-d-path',
+                   self.modprobe_d_path.name,
                    '--new-boot-file',
                    self.new_boot_file.name,
                    fake_requires_offloading,
@@ -314,7 +321,7 @@ class GpuManagerTest(unittest.TestCase):
             command_ = copy.deepcopy(command)
             command_[:0] = gdb
             print("\n%s" % self.this_function_name)
-            print(command_)
+            print(' '.join(command_))
 
         #devnull = open('/dev/null', 'w')
 
@@ -357,6 +364,7 @@ class GpuManagerTest(unittest.TestCase):
             has_card = self.has_card_pt.match(line)
             is_driver_loaded = self.is_driver_loaded_pt.match(line)
             is_driver_unloaded = self.is_driver_unloaded_pt.match(line)
+            is_driver_blacklisted = self.is_driver_blacklisted_pt.match(line)
             is_driver_enabled = self.is_driver_enabled_pt.match(line)
             loaded_and_enabled = self.loaded_and_enabled_pt.match(line)
 
@@ -597,6 +605,11 @@ class GpuManagerTest(unittest.TestCase):
         self.nvidia_driver_version_path.write('%s\n' % nvidia_version)
         self.nvidia_driver_version_path.close()
 
+    def blacklist_module(self, module):
+        '''Set the nvidia kernel module version'''
+        self.modprobe_d_path = open(self.modprobe_d_path.name, 'a')
+        self.modprobe_d_path.write('blacklist %s\n' % module)
+        self.modprobe_d_path.close()
 
     def set_unloaded_module_in_dmesg(self, module):
         if module:
@@ -919,6 +932,47 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_selected_driver)
         # Fallback action
         self.assertFalse(gpu_test.has_not_acted)
+
+
+    def test_one_amd_binary_from_radeon(self):
+        '''radeon -> fglrx'''
+        self.this_function_name = sys._getframe().f_code.co_name
+
+        self.blacklist_module('fglrx')
+
+        # Collect data
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                      ['amd'],
+                                      ['fglrx', 'radeon'],
+                                      ['mesa', 'fglrx'],
+                                      'fglrx')
+
+        # Check the variables
+        self.assertTrue(gpu_test.has_single_card)
+
+        # No Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        # No radeon
+        self.assertTrue(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        # No change
+        self.assertFalse(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+        # No action
+        self.assertTrue(gpu_test.has_not_acted)
+
 
     def test_one_amd_open_no_change(self):
         '''radeon -> radeon'''

@@ -93,6 +93,7 @@ static int dry_run = 0;
 static int fake_lightdm = 0;
 static char *fake_modules_path = NULL;
 static char *fake_alternatives_path = NULL;
+static char *fake_core_alternatives_path = NULL;
 static char *fake_dmesg_path = NULL;
 static char *prime_settings = NULL;
 static char *bbswitch_path = NULL;
@@ -100,6 +101,7 @@ static char *bbswitch_quirks_path = NULL;
 static char *dmi_product_name_path = NULL;
 static char *dmi_product_version_path = NULL;
 static char *nvidia_driver_version_path = NULL;
+static char *modprobe_d_path = NULL;
 static char *main_arch_path = NULL;
 static char *other_arch_path = NULL;
 
@@ -535,8 +537,10 @@ static bool is_module_blacklisted(const char* module) {
         return false;
 
     snprintf(command, sizeof(command),
-             "grep -G \"blacklist.*%s\" /etc/modprobe.d/*",
-             module);
+             "grep -G \"blacklist.*%s\" %s/*",
+             module, modprobe_d_path);
+
+    fprintf(log_handle, "command: %s\n", command);
 
     match = get_output(command, NULL, NULL);
 
@@ -562,8 +566,8 @@ static void get_architecture_paths(char **main_arch_path,
 }
 
 
-/* Get the master link of an alternative */
-static char* get_alternative_link(char *arch_path, char *pattern) {
+/* Get the master link of a GL alternative */
+static char* get_gl_alternative_link(char *arch_path, char *pattern) {
     char *alternative = NULL;
     char command[300];
     _cleanup_fclose_ FILE *file = NULL;
@@ -605,6 +609,56 @@ static char* get_alternative_link(char *arch_path, char *pattern) {
             alternative = get_output(command, pattern, "prime");
         else
             alternative = get_output(command, pattern, NULL);
+    }
+
+    return alternative;
+}
+
+
+/* Get the master link of a core alternative */
+static char* get_core_alternative_link(char *arch_path, char *pattern) {
+    char *alternative = NULL;
+    char command[300];
+    _cleanup_fclose_ FILE *file = NULL;
+
+    if (dry_run && fake_core_alternatives_path) {
+        file = fopen(fake_core_alternatives_path, "r");
+        if (file == NULL) {
+            fprintf(stderr, "I couldn't open %s for reading.\n",
+                    fake_core_alternatives_path);
+            return NULL;
+        }
+        while (fgets(command, sizeof(command), file)) {
+            /* Make sure we don't catch unblacklist by mistake when
+             * looking for the main core alternative
+             */
+            if (strcmp(pattern, "fglrx") == 0) {
+                if (strstr(command, pattern) != NULL) {
+                    alternative = strdup(command);
+                    break;
+                }
+            }
+            else {
+                if (strstr(command, pattern) != NULL) {
+                alternative = strdup(command);
+                break;
+                }
+            }
+        }
+    }
+    else {
+        snprintf(command, sizeof(command),
+                 "update-alternatives --list %s_gfxcore_conf",
+                 arch_path);
+
+        /* Make sure we don't catch unblacklist by mistake when
+         * looking for the main core alternative
+         */
+        if (strcmp(pattern, "fglrx") == 0)
+            alternative = get_output(command, pattern, "unblacklist");
+        else
+            alternative = get_output(command, pattern, NULL);
+
     }
 
     return alternative;
@@ -721,7 +775,7 @@ static void detect_enabled_alternatives(struct alternatives *info) {
 }
 
 
-static bool get_alternatives(struct alternatives *info, const char *master_link) {
+static bool get_gl_alternatives(struct alternatives *info, const char *master_link) {
     int len;
     char command[200];
     char buffer[1035];
@@ -785,12 +839,12 @@ static bool get_alternatives(struct alternatives *info, const char *master_link)
 
 
 /* Get the master link of an alternative */
-static bool set_alternative(char *arch_path, char *alternative) {
+static bool set_alternative(char *arch_path, char *alternative, char *link_name) {
     int status = -1;
     char command[200];
     snprintf(command, sizeof(command),
-             "/usr/bin/update-alternatives --set %s_gl_conf %s",
-             arch_path, alternative);
+             "/usr/bin/update-alternatives --set %s_%s_conf %s",
+             arch_path, link_name, alternative);
 
     if (dry_run) {
         status = 1;
@@ -818,18 +872,29 @@ static bool set_alternative(char *arch_path, char *alternative) {
     return (status != -1);
 }
 
+/* Get the master link of a gl alternative */
+static bool set_gl_alternative(char *arch_path, char *alternative) {
+    return set_alternative(arch_path, alternative, "gl");
+}
+
+
+/* Get the master link of a core alternative */
+static bool set_core_alternative(char *arch_path, char *alternative) {
+    return set_alternative(arch_path, alternative, "gfxcore");
+}
+
 
 static bool select_driver(char *driver) {
     bool status = false;
     _cleanup_free_ char *alternative = NULL;
-    alternative = get_alternative_link(main_arch_path, driver);
+    alternative = get_gl_alternative_link(main_arch_path, driver);
 
     if (alternative == NULL) {
         fprintf(log_handle, "Error: no alternative found for %s\n", driver);
     }
     else {
         /* Set the alternative */
-        status = set_alternative(main_arch_path, alternative);
+        status = set_gl_alternative(main_arch_path, alternative);
 
         /* Only for amd64 */
         if (status && strcmp(main_arch_path, "x86_64-linux-gnu") == 0) {
@@ -838,12 +903,28 @@ static bool select_driver(char *driver) {
             alternative = NULL;
 
             /* Try to get the alternative for the other architecture */
-            alternative = get_alternative_link(other_arch_path, driver);
+            alternative = get_gl_alternative_link(other_arch_path, driver);
             if (alternative) {
                 /* No need to check its status */
-                set_alternative(other_arch_path, alternative);
+                set_gl_alternative(other_arch_path, alternative);
             }
         }
+    }
+    return status;
+}
+
+
+static bool select_core_driver(char *driver) {
+    bool status = false;
+    _cleanup_free_ char *alternative = NULL;
+    alternative = get_core_alternative_link(main_arch_path, driver);
+
+    if (alternative == NULL) {
+        fprintf(log_handle, "Error: no alternative found for %s\n", driver);
+    }
+    else {
+        /* Set the alternative */
+        status = set_core_alternative(main_arch_path, alternative);
     }
     return status;
 }
@@ -2259,6 +2340,9 @@ static bool enable_mesa(struct device **devices,
     fprintf(log_handle, "Selecting mesa\n");
     status = select_driver("mesa");
 
+    /* No need ot check the other arch for core */
+    select_core_driver("unblacklist");
+
     /* Remove xorg.conf */
     remove_xorg_conf();
 
@@ -2502,6 +2586,8 @@ static bool enable_fglrx(struct alternatives *alternative,
         /* Select fglrx */
         fprintf(log_handle, "Selecting fglrx\n");
         status = select_driver("fglrx");
+        /* No need ot check the other arch for core */
+        select_core_driver("fglrx");
         /* select_driver(other_arch_path, "nvidia"); */
     }
     /* Alternative in use */
@@ -2664,6 +2750,7 @@ int main(int argc, char *argv[]) {
         {"fake-alternative", required_argument, 0, 'a'},
         {"fake-modules-path", required_argument, 0, 'm'},
         {"fake-alternatives-path", required_argument, 0, 'p'},
+        {"fake-core-alternatives-path", required_argument, 0, 'o'},
         {"fake-dmesg-path", required_argument, 0, 's'},
         {"prime-settings", required_argument, 0, 'z'},
         {"bbswitch-path", required_argument, 0, 'y'},
@@ -2671,6 +2758,7 @@ int main(int argc, char *argv[]) {
         {"dmi-product-version-path", required_argument, 0, 'h'},
         {"dmi-product-name-path", required_argument, 0, 'i'},
         {"nvidia-driver-version-path", required_argument, 0, 'j'},
+        {"modprobe-d-path", required_argument, 0, 'k'},
         {0, 0, 0, 0}
         };
         /* getopt_long stores the option index here. */
@@ -2770,6 +2858,14 @@ int main(int argc, char *argv[]) {
                 else
                     abort();
                 break;
+            case 'o':
+                /* printf("option -p with value '%s'\n", optarg); */
+                fake_core_alternatives_path = malloc(strlen(optarg) + 1);
+                if (fake_core_alternatives_path)
+                    strcpy(fake_core_alternatives_path, optarg);
+                else
+                    abort();
+                break;
             case 's':
                 /* printf("option -p with value '%s'\n", optarg); */
                 fake_dmesg_path = malloc(strlen(optarg) + 1);
@@ -2811,6 +2907,11 @@ int main(int argc, char *argv[]) {
             case 'j':
                 nvidia_driver_version_path = strdup(optarg);
                 if (!nvidia_driver_version_path)
+                    abort();
+                break;
+            case 'k':
+                modprobe_d_path = strdup(optarg);
+                if (!modprobe_d_path)
                     abort();
                 break;
             case '?':
@@ -2948,6 +3049,16 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    if (modprobe_d_path)
+        fprintf(log_handle, "modprobe_d_path file: %s\n", modprobe_d_path);
+    else {
+        modprobe_d_path = strdup("/etc/modprobe.d");
+        if (!modprobe_d_path) {
+            fprintf(log_handle, "Couldn't allocate modprobe_d_path\n");
+            goto end;
+        }
+    }
+
     bbswitch_loaded = is_module_loaded("bbswitch");
     nvidia_loaded = is_module_loaded("nvidia");
     nvidia_unloaded = nvidia_loaded ? false : has_unloaded_module("nvidia");
@@ -2963,11 +3074,15 @@ int main(int argc, char *argv[]) {
 
     fprintf(log_handle, "Is nvidia loaded? %s\n", (nvidia_loaded ? "yes" : "no"));
     fprintf(log_handle, "Was nvidia unloaded? %s\n", (nvidia_unloaded ? "yes" : "no"));
+    fprintf(log_handle, "Is nvidia blacklisted? %s\n", (nvidia_blacklisted ? "yes" : "no"));
     fprintf(log_handle, "Is fglrx loaded? %s\n", (fglrx_loaded ? "yes" : "no"));
     fprintf(log_handle, "Was fglrx unloaded? %s\n", (fglrx_unloaded ? "yes" : "no"));
+    fprintf(log_handle, "Is fglrx blacklisted? %s\n", (fglrx_blacklisted ? "yes" : "no"));
     fprintf(log_handle, "Is intel loaded? %s\n", (intel_loaded ? "yes" : "no"));
     fprintf(log_handle, "Is radeon loaded? %s\n", (radeon_loaded ? "yes" : "no"));
+    fprintf(log_handle, "Is radeon blacklisted? %s\n", (radeon_blacklisted ? "yes" : "no"));
     fprintf(log_handle, "Is nouveau loaded? %s\n", (nouveau_loaded ? "yes" : "no"));
+    fprintf(log_handle, "Is nouveau blacklisted? %s\n", (nouveau_blacklisted ? "yes" : "no"));
 
     if (fake_lspci_file) {
         /* Get the current system data from a file */
@@ -3120,7 +3235,7 @@ int main(int argc, char *argv[]) {
     /* If alternative is not NULL, then it's a test */
     if (!alternative)
         alternative = calloc(1, sizeof(struct alternatives));
-    get_alternatives(alternative, main_arch_path);
+    get_gl_alternatives(alternative, main_arch_path);
 
     if (!alternative->current) {
         fprintf(stderr, "Error: no alternative found\n");
@@ -3591,6 +3706,9 @@ end:
     if (fake_alternatives_path)
         free(fake_alternatives_path);
 
+    if (fake_core_alternatives_path)
+        free(fake_core_alternatives_path);
+
     if (fake_dmesg_path)
         free(fake_dmesg_path);
 
@@ -3614,6 +3732,9 @@ end:
 
     if (nvidia_driver_version_path)
         free(nvidia_driver_version_path);
+
+    if (modprobe_d_path)
+        free(modprobe_d_path);
 
     /* Free the devices structs */
     for(i = 0; i < cards_n; i++) {
