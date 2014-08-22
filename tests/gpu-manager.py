@@ -720,6 +720,7 @@ class GpuManagerTest(unittest.TestCase):
                    enabled_driver,
                    unloaded_module='',
                    requires_offloading=False,
+                   module_is_available=False,
                    proprietary_installer=False,
                    matched_quirk=False,
                    loaded_with_quirk=False,
@@ -741,7 +742,8 @@ class GpuManagerTest(unittest.TestCase):
                    nvidia_version)
 
         # Call the program
-        self.exec_manager(requires_offloading=requires_offloading)
+        self.exec_manager(requires_offloading=requires_offloading,
+                          module_is_available=module_is_available)
 
         # Return data
         return self.check_vars()
@@ -972,6 +974,50 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.has_changed)
         self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+        # No action
+        self.assertFalse(gpu_test.has_not_acted)
+
+    def test_one_amd_binary_from_radeon_lp1310489(self):
+        '''radeon -> fglrx LP: #1310489'''
+        self.this_function_name = sys._getframe().f_code.co_name
+
+        # Blacklist radeon
+        self.blacklist_module('radeon')
+
+        # The module is not loaded but it's available
+        self.remove_xorg_conf()
+
+        # Collect data
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                      ['amd'],
+                                      ['radeon'],
+                                      ['mesa', 'fglrx'],
+                                      'fglrx',
+                                      module_is_available=True)
+
+        # Check the variables
+        self.assertTrue(gpu_test.has_single_card)
+
+        # No Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        # No radeon
+        self.assertTrue(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        # No change
+        self.assertFalse(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertTrue(gpu_test.has_selected_driver)
         # No action
         self.assertFalse(gpu_test.has_not_acted)
