@@ -940,6 +940,7 @@ class GpuManagerTest(unittest.TestCase):
         '''radeon -> fglrx'''
         self.this_function_name = sys._getframe().f_code.co_name
 
+        # Let's try to enable fglrx when fglrx is blacklisted
         self.blacklist_module('fglrx')
 
         # Collect data
@@ -969,11 +970,11 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.nouveau_loaded)
         # No change
         self.assertFalse(gpu_test.has_changed)
-        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_removed_xorg)
         self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.has_selected_driver)
         # No action
-        self.assertTrue(gpu_test.has_not_acted)
+        self.assertFalse(gpu_test.has_not_acted)
 
 
     def test_one_amd_open_no_change(self):
@@ -6941,6 +6942,7 @@ EnabledFlags=V4''')
         self.xorg_file.write('''
 Section "Device"
     Identifier "Default Card 1"
+    Driver "nvidia"
     BusID "PCI:1@0:0:0"
 EndSection
 ''');
@@ -7749,11 +7751,13 @@ EndSection
         self.xorg_file.write('''
 Section "Device"
     Identifier "Default Card 0"
+    Driver "fglrx"
     BusID "PCI:0@0:1:0"
 EndSection
 
 Section "Device"
     Identifier "Default Card 1"
+    Driver "fglrx"
     BusID "PCI:1@0:0:0"
 EndSection
 ''');
@@ -8570,11 +8574,13 @@ EndSection
         self.xorg_file.write('''
 Section "Device"
     Identifier "Default Card 0"
+    Driver "fglrx"
     BusID "PCI:0@0:1:0"
 EndSection
 
 Section "Device"
     Identifier "Default Card 1"
+    Driver "fglrx"
     BusID "PCI:1@0:0:0"
 EndSection
 ''');
@@ -9309,6 +9315,7 @@ EndSection
         self.xorg_file.write('''
 Section "Device"
     Identifier "Default Card 1"
+    Driver "nvidia"
     BusID "PCI:1@0:0:0"
 EndSection
 ''');
@@ -9485,6 +9492,7 @@ EndSection
         self.xorg_file.write('''
 Section "Device"
     Identifier "Default Card 1"
+    Driver "nvidia"
     BusID "PCI:1@0:0:0"
 EndSection
 ''');
@@ -9621,6 +9629,7 @@ EndSection
         self.xorg_file.write('''
 Section "Device"
     Identifier "Default Card 1"
+    Driver "nvidia"
     BusID "PCI:1@0:0:0"
 EndSection
 ''');
@@ -10316,6 +10325,7 @@ EndSection
         self.xorg_file.write('''
 Section "Device"
     Identifier "Default Card 0"
+    Driver "fglrx"
     BusID "PCI:0@0:1:0"
 EndSection
 ''');
