@@ -977,6 +977,8 @@ static bool write_to_xorg_conf(struct device **devices, int cards_n,
     else
         driver_line[0] = 0;
 
+    fprintf(log_handle, "Driver line:\n%s\n", driver_line);
+
     for(i = 0; i < cards_n; i++) {
         if (devices[i]->vendor_id == vendor_id) {
             fprintf(file,
@@ -1365,6 +1367,7 @@ static bool check_pxpress_xorg_conf(struct device **devices,
 static bool check_vendor_bus_id_xorg_conf(struct device **devices, int cards_n,
                                          unsigned int vendor_id, char *driver) {
     bool failure = false;
+    bool driver_is_set = false;
     int i;
     int matches = 0;
     int expected_matches = 0;
@@ -1410,11 +1413,20 @@ static bool check_vendor_bus_id_xorg_conf(struct device **devices, int cards_n,
                     }
                 }
             }
-            else if ((istrstr(line, "Driver") != NULL) &&
-                     (strstr(line, driver) == NULL)) {
-                failure = true;
+            else if (istrstr(line, "Driver") != NULL) {
+                driver_is_set = true;
+                if (strstr(line, driver) == NULL) {
+                    failure = true;
+                }
             }
         }
+    }
+
+    /* We need the driver to be set when deadling with a binary driver */
+    if (!driver_is_set && ((strcmp(driver, "fglrx") == 0) ||
+                           (strcmp(driver, "nvidia") == 0))) {
+        fprintf(log_handle, "%s driver should be set in xorg.conf. Setting as failure.\n", driver);
+        failure = true;
     }
 
     return (matches == expected_matches && !failure);
