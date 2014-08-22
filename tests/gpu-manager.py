@@ -258,8 +258,9 @@ class GpuManagerTest(unittest.TestCase):
                 except:
                     pass
 
-    def exec_manager(self, requires_offloading=False, uses_lightdm=True):
+    def exec_manager(self, requires_offloading=False, module_is_available=False, uses_lightdm=True):
         fake_requires_offloading = requires_offloading and '--fake-requires-offloading' or '--fake-no-requires-offloading'
+        fake_module_available = module_is_available and '--fake-module-is-available' or '--fake-module-is-not-available'
         if with_valgrind:
             valgrind = ['valgrind', '--tool=memcheck', '--leak-check=full',
                         '--show-reachable=yes', '--log-file=%s' % self.valgrind_log.name,
@@ -308,6 +309,7 @@ class GpuManagerTest(unittest.TestCase):
                    '--new-boot-file',
                    self.new_boot_file.name,
                    fake_requires_offloading,
+                   fake_module_available,
                    '--log',
                    self.log.name]
 

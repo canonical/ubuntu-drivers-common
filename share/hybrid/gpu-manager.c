@@ -2747,6 +2747,7 @@ int main(int argc, char *argv[]) {
     char *new_boot_file = NULL;
 
     static int fake_offloading = 0;
+    static int fake_module_available = 0;
 
     bool has_intel = false, has_amd = false, has_nvidia = false;
     bool has_changed = false;
@@ -2795,6 +2796,8 @@ int main(int argc, char *argv[]) {
         {"fake-requires-offloading", no_argument, &fake_offloading, 1},
         {"fake-no-requires-offloading", no_argument, &fake_offloading, 0},
         {"fake-lightdm", no_argument, &fake_lightdm, 1},
+        {"fake-module-is-available", no_argument, &fake_module_available, 1},
+        {"fake-module-is-not-available", no_argument, &fake_module_available, 0},
         /* These options don't set a flag.
           We distinguish them by their indices. */
         {"log",  required_argument, 0, 'l'},
@@ -3129,8 +3132,16 @@ int main(int argc, char *argv[]) {
     radeon_blacklisted = is_module_blacklisted("radeon");
     nouveau_loaded = is_module_loaded("nouveau");
     nouveau_blacklisted = is_module_blacklisted("nouveau");
-    fglrx_kmod_available = is_module_available("fglrx");
-    nvidia_kmod_available = is_module_available("nvidia");
+
+    if (fake_lspci_file) {
+        fglrx_kmod_available = fake_module_available;
+        nvidia_kmod_available = fake_module_available;
+    }
+    else {
+        fglrx_kmod_available = is_module_available("fglrx");
+        nvidia_kmod_available = is_module_available("nvidia");
+    }
+
 
     fprintf(log_handle, "Is nvidia loaded? %s\n", (nvidia_loaded ? "yes" : "no"));
     fprintf(log_handle, "Was nvidia unloaded? %s\n", (nvidia_unloaded ? "yes" : "no"));
