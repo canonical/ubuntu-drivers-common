@@ -2266,6 +2266,33 @@ static bool set_offloading(void) {
 }
 
 
+/* Move the log */
+static bool move_log(void) {
+    int status;
+    char backup[200];
+    char buffer[80];
+    time_t rawtime;
+    struct tm *info;
+
+    time(&rawtime);
+    info = localtime(&rawtime);
+
+    strftime(buffer, 80, "%H%M%m%d%Y", info);
+    snprintf(backup, sizeof(backup), "%s.%s", log_file, buffer);
+
+    status = rename(log_file, backup);
+    if (!status) {
+        status = unlink(log_file);
+        if (!status)
+            return false;
+        else
+            return true;
+    }
+
+    return true;
+}
+
+
 /* Make a backup and remove xorg.conf */
 static bool remove_xorg_conf(void) {
     int status;
@@ -2943,6 +2970,8 @@ int main(int argc, char *argv[]) {
 
     /* Send messages to the log or to stdout */
     if (log_file) {
+        /* Move the old log away */
+        move_log();
         log_handle = fopen(log_file, "w");
     }
     else {
