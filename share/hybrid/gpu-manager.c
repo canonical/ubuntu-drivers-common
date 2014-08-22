@@ -533,9 +533,6 @@ static bool is_module_blacklisted(const char* module) {
     _cleanup_free_ char *match = NULL;
     char command[100];
 
-    if (dry_run)
-        return false;
-
     snprintf(command, sizeof(command),
              "grep -G \"blacklist.*%s\" %s/*",
              module, modprobe_d_path);
@@ -1940,9 +1937,6 @@ static bool add_nvidia_gpu_bus_from_dmesg(struct device **devices,
 static bool is_module_available(const char *module) {
     _cleanup_free_ char *match = NULL;
     char command[100];
-
-    if (dry_run)
-        return true;
 
     snprintf(command, sizeof(command),
              "find /lib/modules/$(uname -r) -name '%s*.ko' -print",
