@@ -143,6 +143,7 @@ struct alternatives {
     char *current;
 };
 
+static bool is_file(char *file);
 
 static inline void freep(void *p) {
     free(*(void**) p);
@@ -533,10 +534,23 @@ static bool is_module_blacklisted(const char* module) {
     _cleanup_free_ char *match = NULL;
     char command[100];
 
-    snprintf(command, sizeof(command),
-             "grep -G \"blacklist.*%s\" %s/*",
-             module, modprobe_d_path);
-    match = get_output(command, NULL, NULL);
+    /* It will be a file if it's a test */
+    if (dry_run) {
+        snprintf(command, sizeof(command),
+                 "grep -G \"blacklist.*%s\" %s",
+                 module, modprobe_d_path);
+
+        if (exists_not_empty(modprobe_d_path))
+            match = get_output(command, NULL, NULL);
+    }
+    else {
+        fprintf(stderr, "%s is not a file\n", modprobe_d_path);
+        snprintf(command, sizeof(command),
+                 "grep -G \"blacklist.*%s\" %s/*",
+                 module, modprobe_d_path);
+
+        match = get_output(command, NULL, NULL);
+    }
 
     if (!match)
         return false;
@@ -1981,7 +1995,7 @@ static bool is_file(char *file) {
     struct stat stbuf;
 
     if (stat(file, &stbuf) == -1) {
-        fprintf(log_handle, "Error: can't access %s\n", file);
+        fprintf(log_handle, "can't access %s file\n", file);
         return false;
     }
     if (stbuf.st_mode & S_IFMT)

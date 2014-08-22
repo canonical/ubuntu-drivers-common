@@ -167,6 +167,7 @@ class GpuManagerTest(unittest.TestCase):
         self.fake_alternatives = open(self.fake_alternatives.name, 'w')
         '''
         self.remove_xorg_conf()
+        self.remove_modprobe_d_path()
         #self.remove_amd_pcsdb_file()
 
     def tearDown(self):
@@ -186,6 +187,12 @@ class GpuManagerTest(unittest.TestCase):
         except:
             pass
 
+    def remove_modprobe_d_path(self):
+        try:
+            os.unlink(self.modprobe_d_path)
+        except:
+            pass
+
     def remove_amd_pcsdb_file(self):
         try:
             os.unlink(self.amd_pcsdb_file.name)
@@ -198,8 +205,7 @@ class GpuManagerTest(unittest.TestCase):
                      self.bbswitch_quirks_path,
                      self.dmi_product_version_path,
                      self.dmi_product_name_path,
-                     self.nvidia_driver_version_path,
-                     self.modprobe_d_path):
+                     self.nvidia_driver_version_path):
             try:
                 os.unlink(elem.name)
             except:
@@ -497,6 +503,9 @@ class GpuManagerTest(unittest.TestCase):
 
         # Remove the valgrind log
         self.remove_valgrind_log()
+
+        # Remove the modprobe.d path
+        self.remove_modprobe_d_path()
 
         return gpu_test
 
@@ -982,6 +991,10 @@ class GpuManagerTest(unittest.TestCase):
         '''radeon -> fglrx LP: #1310489'''
         self.this_function_name = sys._getframe().f_code.co_name
 
+        # This simultates the test case where users install
+        # fglrx and reboot. No changes should happen before
+        # reboot.
+
         # Blacklist radeon
         self.blacklist_module('radeon')
 
@@ -1016,11 +1029,11 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.nouveau_loaded)
         # No change
         self.assertFalse(gpu_test.has_changed)
-        self.assertTrue(gpu_test.has_removed_xorg)
-        self.assertTrue(gpu_test.has_regenerated_xorg)
-        self.assertTrue(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
         # No action
-        self.assertFalse(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
 
     def test_one_amd_open_no_change(self):
