@@ -2756,6 +2756,7 @@ int main(int argc, char *argv[]) {
 
     static int fake_offloading = 0;
     static int fake_module_available = 0;
+    static int backup_log = 0;
 
     bool has_intel = false, has_amd = false, has_nvidia = false;
     bool has_changed = false;
@@ -2806,6 +2807,7 @@ int main(int argc, char *argv[]) {
         {"fake-lightdm", no_argument, &fake_lightdm, 1},
         {"fake-module-is-available", no_argument, &fake_module_available, 1},
         {"fake-module-is-not-available", no_argument, &fake_module_available, 0},
+        {"backup-log", no_argument, &backup_log, 1},
         /* These options don't set a flag.
           We distinguish them by their indices. */
         {"log",  required_argument, 0, 'l'},
@@ -2998,8 +3000,10 @@ int main(int argc, char *argv[]) {
 
     /* Send messages to the log or to stdout */
     if (log_file) {
-        /* Move the old log away */
-        move_log();
+        if (backup_log) {
+            /* Move the old log away */
+            move_log();
+        }
         log_handle = fopen(log_file, "w");
     }
     else {
