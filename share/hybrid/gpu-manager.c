@@ -129,6 +129,7 @@ struct alternatives {
      */
     int nvidia_available;
     int fglrx_available;
+    int fglrx_core_available;
     int mesa_available;
     int pxpress_available;
     int prime_available;
@@ -136,11 +137,13 @@ struct alternatives {
     /* The ones that may be enabled */
     int nvidia_enabled;
     int fglrx_enabled;
+    int fglrx_core_enabled;
     int mesa_enabled;
     int pxpress_enabled;
     int prime_enabled;
 
     char *current;
+    char *current_core;
 };
 
 static bool is_file(char *file);
@@ -583,7 +586,7 @@ static char* get_gl_alternative_link(char *arch_path, char *pattern) {
     if (dry_run && fake_alternatives_path) {
         file = fopen(fake_alternatives_path, "r");
         if (file == NULL) {
-            fprintf(stderr, "I couldn't open %s for reading.\n",
+            fprintf(stderr, "I couldn't open %s (fake_alternatives_path) for reading.\n",
                     fake_alternatives_path);
             return NULL;
         }
@@ -632,7 +635,7 @@ static char* get_core_alternative_link(char *arch_path, char *pattern) {
     if (dry_run && fake_core_alternatives_path) {
         file = fopen(fake_core_alternatives_path, "r");
         if (file == NULL) {
-            fprintf(stderr, "I couldn't open %s for reading.\n",
+            fprintf(stderr, "Warning: I couldn't open %s (fake_core_alternatives_path) for reading.\n",
                     fake_core_alternatives_path);
             return NULL;
         }
@@ -762,6 +765,14 @@ static void detect_available_alternatives(struct alternatives *info, char *patte
     }
 }
 
+
+static void detect_available_core_alternatives(struct alternatives *info, char *pattern) {
+    /* Currently only fglrx has a core alternative */
+    if (strstr(pattern, "fglrx"))
+        info->fglrx_core_available = 1;
+}
+
+
 static void detect_enabled_alternatives(struct alternatives *info) {
     if (strstr(info->current, "mesa") != NULL) {
         info->mesa_enabled = 1;
@@ -783,6 +794,13 @@ static void detect_enabled_alternatives(struct alternatives *info) {
 }
 
 
+static void detect_enabled_core_alternatives(struct alternatives *info) {
+    /* Currently only fglrx has a core alternative */
+    if (info->current_core && strstr(info->current_core, "fglrx") != NULL)
+        info->fglrx_core_enabled = 1;
+}
+
+
 static bool get_gl_alternatives(struct alternatives *info, const char *master_link) {
     int len;
     char command[200];
@@ -796,7 +814,7 @@ static bool get_gl_alternatives(struct alternatives *info, const char *master_li
     if (fake_alternatives_path) {
         pfile = fopen(fake_alternatives_path, "r");
         if (pfile == NULL) {
-            fprintf(log_handle, "Error: can't open fake_alternatives_path %s\n", fake_alternatives_path);
+            fprintf(log_handle, "Warning: can't open fake_alternatives_path %s\n", fake_alternatives_path);
             return false;
         }
         /* Set the enabled alternatives in the struct */
@@ -838,6 +856,74 @@ static bool get_gl_alternatives(struct alternatives *info, const char *master_li
             if (other != NULL) {
                 /* Set the available alternatives in the struct */
                 detect_available_alternatives(info, other);
+            }
+        }
+    }
+
+    return true;
+}
+
+
+static bool get_core_alternatives(struct alternatives *info, const char *master_link) {
+    int len;
+    char command[200];
+    char buffer[1035];
+    _cleanup_pclose_ FILE *pfile = NULL;
+    char *value = NULL;
+    char *other = NULL;
+    const char ch = '/';
+
+    /* Initialise optional values */
+    info->current_core = NULL;
+    info->fglrx_core_available = 0;
+    info->fglrx_core_enabled = 0;
+
+    /* Test */
+    if (fake_core_alternatives_path) {
+        pfile = fopen(fake_core_alternatives_path, "r");
+        if (pfile == NULL) {
+            fprintf(log_handle, "Warning: can't open fake_core_alternatives_path %s\n", fake_core_alternatives_path);
+            return false;
+        }
+        /* Set the enabled alternatives in the struct */
+        detect_enabled_core_alternatives(info);
+    }
+    else {
+        snprintf(command, sizeof(command),
+                 "/usr/bin/update-alternatives --query %s_gfxcore_conf",
+                 master_link);
+
+        pfile = popen(command, "r");
+        if (pfile == NULL) {
+            fprintf(stderr, "Failed to run command: %s\n", command);
+            return false;
+        }
+    }
+
+    while (fgets(buffer, sizeof(buffer), pfile) != NULL) {
+        if (strstr(buffer, "Value:")) {
+            value = strchr(buffer, ch);
+            if (value != NULL) {
+                /* If info->current is not NULL, then it's a fake
+                 * alternative, which we won't override
+                 */
+                if (!info->current_core) {
+                    info->current_core = strdup(value);
+                    /* Remove newline */
+                    len = strlen(info->current_core);
+                    if(info->current_core[len-1] == '\n' )
+                       info->current_core[len-1] = 0;
+                }
+                /* Set the enabled alternatives in the struct */
+                detect_enabled_core_alternatives(info);
+            }
+
+        }
+        else if (strstr(buffer, "Alternative:") || fake_core_alternatives_path) {
+            other = strchr(buffer, ch);
+            if (other != NULL) {
+                /* Set the available alternatives in the struct */
+                detect_available_core_alternatives(info, other);
             }
         }
     }
@@ -2817,6 +2903,7 @@ int main(int argc, char *argv[]) {
         {"xorg-conf-file", required_argument, 0, 'x'},
         {"amd-pcsdb-file", required_argument, 0, 'd'},
         {"fake-alternative", required_argument, 0, 'a'},
+        {"fake-core-alternative", required_argument, 0, 'q'},
         {"fake-modules-path", required_argument, 0, 'm'},
         {"fake-alternatives-path", required_argument, 0, 'p'},
         {"fake-core-alternatives-path", required_argument, 0, 'o'},
@@ -2906,6 +2993,15 @@ int main(int argc, char *argv[]) {
                 else {
                     alternative->current = strdup(optarg);
                     if (!alternative->current) {
+                        free(alternative);
+                        abort();
+                    }
+                }
+                break;
+            case 'q':
+                if (alternative) {
+                    alternative->current_core = strdup(optarg);
+                    if (!alternative->current_core) {
                         free(alternative);
                         abort();
                     }
@@ -3132,6 +3228,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    if (fake_modules_path)
+        fprintf(log_handle, "fake_modules_path file: %s\n", fake_modules_path);
+
     bbswitch_loaded = is_module_loaded("bbswitch");
     nvidia_loaded = is_module_loaded("nvidia");
     nvidia_unloaded = nvidia_loaded ? false : has_unloaded_module("nvidia");
@@ -3321,6 +3420,7 @@ int main(int argc, char *argv[]) {
     if (!alternative)
         alternative = calloc(1, sizeof(struct alternatives));
     get_gl_alternatives(alternative, main_arch_path);
+    get_core_alternatives(alternative, main_arch_path);
 
     if (!alternative->current) {
         fprintf(stderr, "Error: no alternative found\n");
@@ -3328,6 +3428,7 @@ int main(int argc, char *argv[]) {
     }
 
     fprintf(log_handle, "Current alternative: %s\n", alternative->current);
+    fprintf(log_handle, "Current core alternative: %s\n", alternative->current_core);
 
     fprintf(log_handle, "Is nvidia enabled? %s\n", alternative->nvidia_enabled ? "yes" : "no");
     fprintf(log_handle, "Is fglrx enabled? %s\n", alternative->fglrx_enabled ? "yes" : "no");
@@ -3337,6 +3438,7 @@ int main(int argc, char *argv[]) {
 
     fprintf(log_handle, "Is nvidia available? %s\n", alternative->nvidia_available ? "yes" : "no");
     fprintf(log_handle, "Is fglrx available? %s\n", alternative->fglrx_available ? "yes" : "no");
+    fprintf(log_handle, "Is fglrx-core available? %s\n", alternative->fglrx_core_available ? "yes" : "no");
     fprintf(log_handle, "Is mesa available? %s\n", alternative->mesa_available ? "yes" : "no");
     fprintf(log_handle, "Is pxpress available? %s\n", alternative->pxpress_available ? "yes" : "no");
     fprintf(log_handle, "Is prime available? %s\n", alternative->prime_available ? "yes" : "no");

@@ -108,6 +108,8 @@ class GpuManagerTest(unittest.TestCase):
         klass.fake_modules.close()
         klass.fake_alternatives = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.fake_alternatives.close()
+        klass.fake_core_alternatives = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.fake_core_alternatives.close()
         klass.fake_dmesg = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
         klass.fake_dmesg.close()
         klass.prime_settings = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
@@ -157,6 +159,7 @@ class GpuManagerTest(unittest.TestCase):
                         'intel': 0x8086, 'unknown': 0x1016}
 
         klass.fake_alternative = ''
+        klass.fake_core_alternative = 'null'
 
 
     def setUp(self):
@@ -236,6 +239,7 @@ class GpuManagerTest(unittest.TestCase):
             self.fake_lspci,
             self.fake_modules,
             self.fake_alternatives,
+            self.fake_core_alternatives,
             self.fake_dmesg,
             self.prime_settings,
             self.bbswitch_path,
@@ -292,10 +296,14 @@ class GpuManagerTest(unittest.TestCase):
                    self.amd_pcsdb_file.name,
                    '--fake-alternative',
                    self.fake_alternative,
+                   '--fake-core-alternative',
+                   self.fake_core_alternative,
                    '--fake-modules-path',
                    self.fake_modules.name,
                    '--fake-alternatives-path',
                    self.fake_alternatives.name,
+                   '--fake-core-alternatives-path',
+                   self.fake_core_alternatives.name,
                    '--fake-dmesg-path',
                    self.fake_dmesg.name,
                    '--prime-settings',
@@ -667,7 +675,8 @@ class GpuManagerTest(unittest.TestCase):
                    bump_boot_vga_device_id=False,
                    bump_discrete_device_id=False,
                    first_boot=False,
-                   nvidia_version=''):
+                   nvidia_version='',
+                   core_alternatives=False):
 
         # Last boot
         if first_boot:
@@ -724,6 +733,19 @@ class GpuManagerTest(unittest.TestCase):
         if nvidia_version:
             self.set_nvidia_version(nvidia_version)
 
+        # Core alternatives
+        if core_alternatives:
+            self.fake_core_alternatives = open(self.fake_core_alternatives.name, 'w')
+            if 'fglrx' in available_drivers:
+                self.fake_core_alternatives.write('/usr/lib/fglrx-core/ld.so.conf\n')
+                self.fake_core_alternatives.write('/usr/lib/fglrx-core/unblacklist_ld.so.conf\n')
+                # Set the current alternative
+                self.fake_core_alternative = '/usr/lib/fglrx-core/ld.so.conf'
+            #else:
+            #    for driver in available_drivers:
+            #        self.fake_alternatives.write('/usr/lib/x86_64-linux-gnu/%s/ld.so.conf\n' % (driver))
+            self.fake_core_alternatives.close()
+
     def run_manager_and_get_data(self, last_boot, current_boot,
                    loaded_modules, available_drivers,
                    enabled_driver,
@@ -736,7 +758,8 @@ class GpuManagerTest(unittest.TestCase):
                    bump_boot_vga_device_id=False,
                    bump_discrete_device_id=False,
                    first_boot=False,
-                   nvidia_version=''):
+                   nvidia_version='',
+                   core_alternatives=False):
 
         self.set_params(last_boot, current_boot,
                    loaded_modules, available_drivers,
@@ -748,7 +771,8 @@ class GpuManagerTest(unittest.TestCase):
                    bump_boot_vga_device_id,
                    bump_discrete_device_id,
                    first_boot,
-                   nvidia_version)
+                   nvidia_version,
+                   core_alternatives)
 
         # Call the program
         self.exec_manager(requires_offloading=requires_offloading,
@@ -1035,6 +1059,49 @@ class GpuManagerTest(unittest.TestCase):
         # No action
         self.assertTrue(gpu_test.has_not_acted)
 
+
+        # Let's do the same only with the added core alternatives
+        # this time
+        # Blacklist radeon
+        self.blacklist_module('radeon')
+
+        # The module is not loaded but it's available
+        self.remove_xorg_conf()
+
+        # Collect data
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                      ['amd'],
+                                      ['radeon'],
+                                      ['mesa', 'fglrx'],
+                                      'fglrx',
+                                      module_is_available=True,
+                                      core_alternatives=True)
+
+        # Check the variables
+        self.assertTrue(gpu_test.has_single_card)
+
+        # No Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        # No radeon
+        self.assertTrue(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        # No change
+        self.assertFalse(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+        # No action
+        self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_amd_open_no_change(self):
         '''radeon -> radeon'''
