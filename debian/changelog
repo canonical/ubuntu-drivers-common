@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.2.98) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 27 Aug 2014 10:28:58 +0200
+
 ubuntu-drivers-common (1:0.2.97) utopic; urgency=medium
 
   * tests/testarchive.py: Organize debs in pool/ structure, for better
