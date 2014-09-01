@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.2.98.1) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 01 Sep 2014 17:23:12 +0200
+
 ubuntu-drivers-common (1:0.2.98) utopic; urgency=medium
 
   * gpu-manager.c, gpu-manager.py:
