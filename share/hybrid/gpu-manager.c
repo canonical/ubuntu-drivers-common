@@ -540,7 +540,7 @@ static bool is_module_blacklisted(const char* module) {
     /* It will be a file if it's a test */
     if (dry_run) {
         snprintf(command, sizeof(command),
-                 "grep -G \"blacklist.*%s\" %s",
+                 "grep -G \"blacklist.*%s[[:space:]]*$\" %s",
                  module, modprobe_d_path);
 
         if (exists_not_empty(modprobe_d_path))
@@ -549,7 +549,7 @@ static bool is_module_blacklisted(const char* module) {
     else {
         fprintf(stderr, "%s is not a file\n", modprobe_d_path);
         snprintf(command, sizeof(command),
-                 "grep -G \"blacklist.*%s\" %s/*",
+                 "grep -G \"blacklist.*%s[[:space:]]*$\" %s/*",
                  module, modprobe_d_path);
 
         match = get_output(command, NULL, NULL);

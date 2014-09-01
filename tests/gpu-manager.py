@@ -46,7 +46,9 @@ class GpuTest(object):
                  nvidia_loaded=False,
                  nvidia_unloaded=False,
                  nvidia_enabled=False,
+                 nvidia_blacklisted=False,
                  fglrx_enabled=False,
+                 fglrx_blacklisted=False,
                  mesa_enabled=False,
                  prime_enabled=False,
                  pxpress_enabled=False,
@@ -75,7 +77,9 @@ class GpuTest(object):
         self.nvidia_loaded = nvidia_loaded
         self.nvidia_unloaded = nvidia_unloaded
         self.nvidia_enabled = nvidia_enabled
+        self.nvidia_blacklisted = nvidia_blacklisted
         self.fglrx_enabled = fglrx_enabled
+        self.fglrx_blacklisted = fglrx_blacklisted
         self.mesa_enabled = mesa_enabled
         self.prime_enabled = prime_enabled
         self.pxpress_enabled = pxpress_enabled
@@ -446,6 +450,11 @@ class GpuManagerTest(unittest.TestCase):
                     gpu_test.prime_enabled = (is_driver_enabled.group(2).strip().lower() == 'yes')
                 elif is_driver_enabled.group(1).strip().lower() == 'pxpress':
                     gpu_test.pxpress_enabled = (is_driver_enabled.group(2).strip().lower() == 'yes')
+            elif is_driver_blacklisted:
+                if is_driver_blacklisted.group(1).strip().lower() == 'nvidia':
+                    gpu_test.nvidia_blacklisted = (is_driver_blacklisted.group(2).strip().lower() == 'yes')
+                elif is_driver_blacklisted.group(1).strip().lower() == 'fglrx':
+                    gpu_test.fglrx_blacklisted = (is_driver_blacklisted.group(2).strip().lower() == 'yes')
             elif single_card:
                 gpu_test.has_single_card = True
             elif offloading:
@@ -1103,6 +1112,102 @@ class GpuManagerTest(unittest.TestCase):
         # No action
         self.assertTrue(gpu_test.has_not_acted)
 
+
+    def test_one_amd_binary_from_radeon_lp1363675(self):
+        '''false positives with blacklisted modules LP: #1363675'''
+        self.this_function_name = sys._getframe().f_code.co_name
+
+        # This simultates the test case where a driver whose
+        # name is similar to the one of the binary driver is
+        # blacklisted.
+
+        # Blacklist nvidiafb
+        self.blacklist_module('nvidiafb')
+
+        # The module is not loaded but it's available
+        self.remove_xorg_conf()
+
+        # Collect data
+        gpu_test = self.run_manager_and_get_data(['nvidia'],
+                                      ['nvidia'],
+                                      ['nvidia'],
+                                      ['mesa', 'nvidia'],
+                                      'nvidia',
+                                      module_is_available=True)
+
+        # Check the variables
+        self.assertTrue(gpu_test.has_single_card)
+
+        # No Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.mesa_enabled)
+        # AMD
+        self.assertFalse(gpu_test.has_amd)
+        # No radeon
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        # No NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_blacklisted)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        # No change
+        self.assertFalse(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+        # No action
+        self.assertTrue(gpu_test.has_not_acted)
+
+
+        # Let's do the same only with the added core alternatives
+        # this time
+        # Blacklist fglrxsomething
+        self.blacklist_module('fglrxsomething')
+
+        # The module is not loaded but it's available
+        self.remove_xorg_conf()
+
+        # Collect data
+        gpu_test = self.run_manager_and_get_data(['amd'],
+                                      ['amd'],
+                                      ['fglrx'],
+                                      ['mesa', 'fglrx'],
+                                      'fglrx',
+                                      module_is_available=True,
+                                      core_alternatives=True)
+
+        # Check the variables
+        self.assertTrue(gpu_test.has_single_card)
+
+        # No Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+        self.assertFalse(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        # No radeon
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.fglrx_blacklisted)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        # No change
+        self.assertFalse(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+        # No action
+        self.assertTrue(gpu_test.has_not_acted)
+
+
     def test_one_amd_open_no_change(self):
         '''radeon -> radeon'''
         self.this_function_name = sys._getframe().f_code.co_name
@@ -1261,6 +1366,7 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.nvidia_loaded)
         # The driver is enabled
         self.assertTrue(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_blacklisted)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
         self.assertTrue(gpu_test.has_removed_xorg)
@@ -1426,6 +1532,7 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.nvidia_enabled)
         # We don't need to enable fglrx again
         self.assertTrue(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.fglrx_blacklisted)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
         self.assertTrue(gpu_test.has_removed_xorg)
