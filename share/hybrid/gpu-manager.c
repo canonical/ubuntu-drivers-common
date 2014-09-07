@@ -1071,8 +1071,6 @@ static bool write_to_xorg_conf(struct device **devices, int cards_n,
     else
         driver_line[0] = 0;
 
-    fprintf(log_handle, "Driver line:\n%s\n", driver_line);
-
     for(i = 0; i < cards_n; i++) {
         if (devices[i]->vendor_id == vendor_id) {
             fprintf(file,
@@ -1460,13 +1458,14 @@ static bool check_pxpress_xorg_conf(struct device **devices,
 
 static bool check_vendor_bus_id_xorg_conf(struct device **devices, int cards_n,
                                          unsigned int vendor_id, char *driver) {
-    bool failure = false;
+    bool failure = true;
     bool driver_is_set = false;
     int i;
     int matches = 0;
     int expected_matches = 0;
     char line[4096];
     char bus_id[256];
+    char bus_id_no_domain[256];
     _cleanup_fclose_ FILE *file = NULL;
 
     /* If file doesn't exist or is empty */
@@ -1501,7 +1500,14 @@ static bool check_vendor_bus_id_xorg_conf(struct device **devices, int cards_n,
                                  (int)(devices[i]->domain),
                                  (int)(devices[i]->dev),
                                  (int)(devices[i]->func));
-                        if (strstr(line, bus_id) != NULL) {
+                        /* Compatibility mode if no domain is specified */
+                        snprintf(bus_id_no_domain, sizeof(bus_id_no_domain),
+                                 "\"PCI:%d:%d:%d\"",
+                                 (int)(devices[i]->bus),
+                                 (int)(devices[i]->dev),
+                                 (int)(devices[i]->func));
+                        if ((strstr(line, bus_id) != NULL) ||
+                            (strstr(line, bus_id_no_domain) != NULL)) {
                             matches += 1;
                         }
                     }
@@ -1509,8 +1515,8 @@ static bool check_vendor_bus_id_xorg_conf(struct device **devices, int cards_n,
             }
             else if (istrstr(line, "Driver") != NULL) {
                 driver_is_set = true;
-                if (strstr(line, driver) == NULL) {
-                    failure = true;
+                if (strstr(line, driver) != NULL) {
+                    failure = false;
                 }
             }
         }
@@ -1532,6 +1538,7 @@ static bool check_all_bus_ids_xorg_conf(struct device **devices, int cards_n) {
     int matches = 0;
     char line[4096];
     char bus_id[256];
+    char bus_id_no_domain[256];
     _cleanup_fclose_ FILE *file = NULL;
 
     file = fopen(xorg_conf_file, "r");
@@ -1550,7 +1557,14 @@ static bool check_all_bus_ids_xorg_conf(struct device **devices, int cards_n) {
                      (int)(devices[i]->domain),
                      (int)(devices[i]->dev),
                      (int)(devices[i]->func));
-            if (strstr(line, bus_id) != NULL) {
+
+            /* Compatibility mode if no domain is specified */
+            snprintf(bus_id_no_domain, sizeof(bus_id_no_domain), "\"PCI:%d:%d:%d\"",
+                     (int)(devices[i]->bus),
+                     (int)(devices[i]->dev),
+                     (int)(devices[i]->func));
+
+            if ((strstr(line, bus_id) != NULL) || (strstr(line, bus_id_no_domain) != NULL)) {
                 matches += 1;
             }
         }
