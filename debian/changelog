@@ -1,8 +1,13 @@
-ubuntu-drivers-common (1:0.2.98.2) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.98.2) utopic; urgency=medium
 
-  * 
+  * gpu-manager.c, gpu-manager.py:
+    - Be more tolerant with xorg.confs. This fixes the multi AMD
+      GPU use case where aticonfig insists on not setting the
+      PCI domain in the xorg.conf (LP: #1310489). Also add a test
+      with one of the xorg.confs from the bug report so that we
+      do not regress in the future.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Sun, 07 Sep 2014 09:27:04 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Sun, 07 Sep 2014 09:28:20 +0200
 
 ubuntu-drivers-common (1:0.2.98.1) utopic; urgency=medium
 
