@@ -84,6 +84,12 @@ static inline void pclosep(FILE **);
 
 #define MAX_CARDS_N 10
 
+typedef enum {
+    SNA,
+    MODESETTING,
+    UXA
+} prime_intel_drv;
+
 static char *log_file = NULL;
 static FILE *log_handle = NULL;
 static char *last_boot_file = NULL;
@@ -104,7 +110,7 @@ static char *nvidia_driver_version_path = NULL;
 static char *modprobe_d_path = NULL;
 static char *main_arch_path = NULL;
 static char *other_arch_path = NULL;
-
+static prime_intel_drv prime_intel_driver = SNA;
 
 static struct pci_slot_match match = {
     PCI_MATCH_ANY, PCI_MATCH_ANY, PCI_MATCH_ANY, PCI_MATCH_ANY, 0
@@ -1048,6 +1054,24 @@ static bool is_disabled_in_cmdline() {
     return has_cmdline_option(KERN_PARAM);
 }
 
+static prime_intel_drv get_prime_intel_driver() {
+    prime_intel_drv driver;
+    if (has_cmdline_option("gpumanager_modesetting")) {
+        driver = MODESETTING;
+        fprintf(log_handle, "Detected boot parameter to force the modesetting driver\n");
+    }
+    else if (has_cmdline_option("gpumanager_uxa")) {
+        driver = UXA;
+        fprintf(log_handle, "Detected boot parameter to force Intel/UXA\n");
+    }
+    else {
+        driver = SNA;
+    }
+
+    return driver;
+}
+
+
 /* This is just for writing the BusID of the discrete
  * card
  */
@@ -1253,6 +1277,7 @@ static bool check_prime_xorg_conf(struct device **devices,
     int nvidia_set = 0;
     int intel_set = 0;
     int x_options_matches = 0;
+    bool accel_method_matches = true;
     char line[2048];
     char intel_bus_id[100];
     char nvidia_bus_id[100];
@@ -1301,10 +1326,21 @@ static bool check_prime_xorg_conf(struct device **devices,
                     (istrstr(line, "ConstrainCursor") != NULL &&
                     istrstr(line, "off") != NULL) ||
                     (istrstr(line, "IgnoreDisplayDevices") != NULL &&
-                    istrstr(line, "CRT") != NULL) ||
-                    (istrstr(line, "AccelMethod") != NULL &&
-                    istrstr(line, "SNA") != NULL)) {
+                    istrstr(line, "CRT") != NULL)) {
                     x_options_matches += 1;
+                }
+                else if (istrstr(line, "AccelMethod") != NULL) {
+                    if ((prime_intel_driver == SNA) &&
+                        (istrstr(line, "SNA") == NULL)) {
+                        accel_method_matches = false;
+                    }
+                    else if ((prime_intel_driver == UXA) &&
+                        (istrstr(line, "UXA") == NULL)) {
+                        accel_method_matches = false;
+                    }
+                    else {
+                        x_options_matches += 1;
+                    }
                 }
             }
             else if (strstr(line, intel_bus_id) != NULL) {
@@ -1315,24 +1351,30 @@ static bool check_prime_xorg_conf(struct device **devices,
             }
             /* The driver has to be either intel or nvidia */
             else if (istrstr(line, "Driver") != NULL) {
-                if (istrstr(line, "intel") != NULL){
+                if (((prime_intel_driver == MODESETTING) &&
+                     (istrstr(line, "modesetting") != NULL)) ||
+                    ((prime_intel_driver != MODESETTING) &&
+                     (istrstr(line, "intel") != NULL))) {
                     intel_set += 1;
                 }
                 else if (istrstr(line, "nvidia") != NULL) {
                     nvidia_set += 1;
                 }
             }
-
         }
     }
 
     fprintf(log_handle,
             "intel_matches: %d, nvidia_matches: %d, "
             "intel_set: %d, nvidia_set: %d "
-            "x_options_matches: %d\n",
+            "x_options_matches: %d, accel_method_matches: %d\n",
             intel_matches, nvidia_matches,
             intel_set, nvidia_set,
-            x_options_matches);
+            x_options_matches,
+            accel_method_matches);
+
+    if (!accel_method_matches)
+        return false;
 
     if (cards_n == 1) {
         /* The module was probably unloaded when
@@ -1577,6 +1619,24 @@ static bool check_all_bus_ids_xorg_conf(struct device **devices, int cards_n) {
 static bool write_prime_xorg_conf(struct device **devices, int cards_n) {
     int i;
     _cleanup_fclose_ FILE *file = NULL;
+    _cleanup_free_ char *accel_method = NULL;
+
+    switch (prime_intel_driver) {
+    case MODESETTING:
+        accel_method = strdup("");
+        break;
+    case UXA:
+        accel_method = strdup("    Option \"AccelMethod\" \"UXA\"\n");
+        break;
+    default:
+        accel_method = strdup("    Option \"AccelMethod\" \"SNA\"\n");
+        break;
+    }
+
+    if (!accel_method) {
+        fprintf(log_handle, "Error: failed to allocate accel_method.\n");
+        return false;
+    }
 
     fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
 
@@ -1599,18 +1659,20 @@ static bool write_prime_xorg_conf(struct device **devices, int cards_n) {
             fprintf(file,
                 "Section \"Device\"\n"
                 "    Identifier \"intel\"\n"
-                "    Driver \"intel\"\n"
+                "    Driver \"%s\"\n"
                 "    BusID \"PCI:%d@%d:%d:%d\"\n"
-                "    Option \"AccelMethod\" \"SNA\"\n"
+                "%s"
                 "EndSection\n\n"
                 "Section \"Screen\"\n"
                 "    Identifier \"intel\"\n"
                 "    Device \"intel\"\n"
                 "EndSection\n\n",
+               (prime_intel_driver == MODESETTING) ? "modesetting" : "intel",
                (int)(devices[i]->bus),
                (int)(devices[i]->domain),
                (int)(devices[i]->dev),
-               (int)(devices[i]->func));
+               (int)(devices[i]->func),
+               accel_method);
         }
         else if (devices[i]->vendor_id == NVIDIA) {
             fprintf(file,
@@ -3281,6 +3343,9 @@ int main(int argc, char *argv[]) {
     fprintf(log_handle, "Is nouveau blacklisted? %s\n", (nouveau_blacklisted ? "yes" : "no"));
     fprintf(log_handle, "Is fglrx kernel module available? %s\n", (fglrx_kmod_available ? "yes" : "no"));
     fprintf(log_handle, "Is nvidia kernel module available? %s\n", (nvidia_kmod_available ? "yes" : "no"));
+
+    /* Get the driver to use for intel in an optimus system */
+    prime_intel_driver = get_prime_intel_driver();
 
     if (fake_lspci_file) {
         /* Get the current system data from a file */
