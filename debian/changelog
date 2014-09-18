@@ -1,8 +1,12 @@
-ubuntu-drivers-common (1:0.2.98.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.98.3) utopic; urgency=medium
 
-  * 
+  * gpu-manager.c:
+    - Add support for "gpumanager_uxa" and "gpumanager_modesetting"
+      boot parameters, so that there is an option to force NVIDIA
+      Optimus systems (that don't work well with Intel/SNA) to use
+      either Intel/UXA or modesetting (LP: #1365695).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 18 Sep 2014 12:13:57 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 18 Sep 2014 12:15:34 +0200
 
 ubuntu-drivers-common (1:0.2.98.2) utopic; urgency=medium
 
