@@ -426,7 +426,7 @@ def auto_install_filter(packages):
     KMS).
     '''
     # any package which matches any of those globs will be accepted
-    whitelist = ['linux-firmware-*', 'pvr-omap*', 'virtualbox-guest*', 'nvidia-*']
+    whitelist = ['pvr-omap*', 'virtualbox-guest*', 'nvidia-*']
     allow = []
     for pattern in whitelist:
         allow.extend(fnmatch.filter(packages, pattern))
