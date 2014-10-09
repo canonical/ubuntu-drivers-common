@@ -1,6 +1,11 @@
-ubuntu-drivers-common (1:0.2.98.4) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.98.4) utopic; urgency=medium
 
-  * 
+  * debian/tests/system, tests/ubuntu_drivers.py,
+    UbuntuDrivers/detect.py:
+    - Revert the previous changes that made us switch from bcmwl to
+      the open driver, as the latter (in order to be a full replacement)
+      seems to require firmware that we cannot include in the Ubuntu
+      image because of licensing issues (LP: #1374126).
 
  -- Alberto Milone <alberto.milone@canonical.com>  Thu, 09 Oct 2014 16:42:53 +0200
 
