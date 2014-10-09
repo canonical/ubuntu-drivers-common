@@ -71,11 +71,11 @@ class TestUbuntuDrivers(unittest.TestCase):
         self.testbed = UMockdev.Testbed.new()
 
     @unittest.skip('Unclear which driver handles these now')
-    def test_linux_firmware_nonfree(self):
-        '''linux-firmware-nonfree'''
+    def test_bcmwl(self):
+        '''bcmwl-kernel-source'''
 
         self.do_test_driver('pci:v000014E4d00004353sv00sd01bc02sc80i00',
-                'linux-firmware-nonfree', 'wl', auto_install=True, allow_errors=True)
+                'bcmwl-kernel-source', 'wl', auto_install=True, allow_errors=True)
 
     def test_nvidia_304(self):
         '''nvidia-304'''

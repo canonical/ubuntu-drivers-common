@@ -553,20 +553,20 @@ exec /sbin/modinfo "$@"
 
         self.assertEqual(UbuntuDrivers.detect.auto_install_filter({}), {})
 
-        pkgs = {'linux-firmware-nonfree': {}, 
+        pkgs = {'bcmwl-kernel-source': {}, 
                 'nvidia-current': {},
                 'fglrx-updates': {},
                 'pvr-omap4-egl': {}}
 
         self.assertEqual(set(UbuntuDrivers.detect.auto_install_filter(pkgs)),
-            set(['linux-firmware-nonfree', 'pvr-omap4-egl', 'nvidia-current']))
+            set(['bcmwl-kernel-source', 'pvr-omap4-egl', 'nvidia-current']))
 
         # should not include non-recommended variants
-        pkgs = {'linux-firmware-nonfree': {}, 
+        pkgs = {'bcmwl-kernel-source': {}, 
                 'nvidia-current': {'recommended': False},
                 'nvidia-173': {'recommended': True}}
         self.assertEqual(set(UbuntuDrivers.detect.auto_install_filter(pkgs)),
-                         set(['linux-firmware-nonfree', 'nvidia-173']))
+                         set(['bcmwl-kernel-source', 'nvidia-173']))
 
     def test_detect_plugin_packages(self):
         '''detect_plugin_packages()'''
@@ -718,7 +718,7 @@ class ToolTest(unittest.TestCase):
     def setUpClass(klass):
         klass.archive = gen_fakearchive()
         klass.archive.create_deb('noalias')
-        klass.archive.create_deb('linux-firmware-nonfree', extra_tags={'Modaliases': 
+        klass.archive.create_deb('bcmwl-kernel-source', extra_tags={'Modaliases': 
             'wl(usb:v9876dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'}) 
 
         # set up a test chroot
@@ -753,7 +753,7 @@ APT::Get::AllowUnauthenticated "true";
 
     def tearDown(self):
         # some tests install this package
-        apt = subprocess.Popen(['apt-get', 'purge', '-y', 'linux-firmware-nonfree'],
+        apt = subprocess.Popen(['apt-get', 'purge', '-y', 'bcmwl-kernel-source'],
                 stdout=subprocess.PIPE)
         apt.communicate()
         self.assertEqual(apt.returncode, 0)
@@ -767,7 +767,7 @@ APT::Get::AllowUnauthenticated "true";
         out, err = ud.communicate()
         self.assertEqual(err, '')
         self.assertEqual(set(out.splitlines()), 
-                set(['vanilla', 'chocolate', 'linux-firmware-nonfree', 'nvidia-current']))
+                set(['vanilla', 'chocolate', 'bcmwl-kernel-source', 'nvidia-current']))
         self.assertEqual(ud.returncode, 0)
 
     def test_list_detect_plugins(self):
@@ -785,7 +785,7 @@ APT::Get::AllowUnauthenticated "true";
         out, err = ud.communicate()
         self.assertEqual(err, '')
         self.assertEqual(set(out.splitlines()), 
-                set(['vanilla', 'chocolate', 'linux-firmware-nonfree',
+                set(['vanilla', 'chocolate', 'bcmwl-kernel-source',
                      'nvidia-current', 'special', 'picky']))
         self.assertEqual(ud.returncode, 0)
 
@@ -867,7 +867,7 @@ APT::Get::AllowUnauthenticated "true";
                 stderr=subprocess.PIPE)
         out, err = ud.communicate()
         self.assertEqual(err, '')
-        self.assertTrue('linux-firmware-nonfree' in out, out)
+        self.assertTrue('bcmwl-kernel-source' in out, out)
         self.assertFalse('vanilla' in out, out)
         self.assertFalse('noalias' in out, out)
         self.assertEqual(ud.returncode, 0)
@@ -878,7 +878,7 @@ APT::Get::AllowUnauthenticated "true";
                 stderr=subprocess.PIPE)
         out, err = ud.communicate()
         self.assertEqual(err, '')
-        self.assertFalse('linux-firmware-nonfree' in out, out)
+        self.assertFalse('bcmwl-kernel-source' in out, out)
         self.assertEqual(ud.returncode, 0)
 
     def test_auto_install_packagelist(self):
@@ -895,7 +895,7 @@ APT::Get::AllowUnauthenticated "true";
         self.assertEqual(ud.returncode, 0)
 
         with open(listfile) as f:
-            self.assertEqual(f.read(), 'linux-firmware-nonfree\n')
+            self.assertEqual(f.read(), 'bcmwl-kernel-source\n')
 
     def test_auto_install_system(self):
         '''ubuntu-drivers autoinstall for fake sysfs and system apt'''
