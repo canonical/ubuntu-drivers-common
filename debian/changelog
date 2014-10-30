@@ -1,8 +1,11 @@
-ubuntu-drivers-common (1:0.2.98.5) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.98.5) vivid; urgency=medium
 
-  * 
+  * gpu-manager.c:
+    - Refine checks for blacklisted modules, so that we don't end up
+      catching false positives (LP: 1376966).
+      Thanks to Pär Lindfors for the patch.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 30 Oct 2014 11:24:16 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 30 Oct 2014 11:36:55 +0100
 
 ubuntu-drivers-common (1:0.2.98.4) utopic; urgency=medium
 
