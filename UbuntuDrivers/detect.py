@@ -426,7 +426,7 @@ def auto_install_filter(packages):
     KMS).
     '''
     # any package which matches any of those globs will be accepted
-    whitelist = ['bcmwl*', 'pvr-omap*', 'virtualbox-guest*', 'nvidia-*']
+    whitelist = ['bcmwl*', 'pvr-omap*', 'virtualbox-guest*', 'nvidia-*', '*-microcode']
     allow = []
     for pattern in whitelist:
         allow.extend(fnmatch.filter(packages, pattern))
