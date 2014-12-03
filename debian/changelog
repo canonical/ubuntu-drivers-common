@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.2.98.6) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.98.6) vivid; urgency=medium
 
   * setup.py: Drop unnecessary glob().
   * tests/ubuntu_drivers.py: Set SYSTEMD_LOG_LEVEL to avoid failing on
@@ -6,7 +6,7 @@ ubuntu-drivers-common (1:0.2.98.6) UNRELEASED; urgency=medium
     Fixes FTBFS on our arm64 builders.
   * Add systemd unit for gpu-manager.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 03 Dec 2014 13:14:23 +0100
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 03 Dec 2014 13:36:11 +0100
 
 ubuntu-drivers-common (1:0.2.98.5) vivid; urgency=medium
 
