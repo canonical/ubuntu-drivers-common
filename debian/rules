@@ -42,6 +42,10 @@ override_dh_install:
 	# Remove fglrx-pxpress' upstart job
 	echo "rm_conffile /etc/init/amd-config.conf 1:0.2.91.1~" >> debian/ubuntu-drivers-common.maintscript
 
+override_dh_installinit:
+	dh_systemd_enable
+	dh_installinit
+
 override_dh_python3:
 	dh_python3 --shebang=/usr/bin/python3
 

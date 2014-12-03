@@ -1,0 +1,10 @@
+[Unit]
+Description=Detect the available GPUs and deal with any system changes
+Before=display-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/gpu-manager
+
+[Install]
+WantedBy=display-manager.service
