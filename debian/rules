@@ -22,7 +22,13 @@ override_dh_auto_clean:
 	$(call py3sdo, setup.py clean)
 
 override_dh_install:
-	dh_install --fail-missing
+	dh_install --fail-missing -Xlib/systemd
+
+	# on architectures where we build gpu-manager, install the systemd unit
+	if [ -d debian/tmp/lib/systemd ]; then \
+		dh_systemd_enable; \
+		dh_install -p ubuntu-drivers-common lib/systemd; \
+	fi
 
 	# build dh_modaliases manpage
 	mkdir -p debian/dh-modaliases/usr/share/man/man1
@@ -41,10 +47,6 @@ override_dh_install:
 
 	# Remove fglrx-pxpress' upstart job
 	echo "rm_conffile /etc/init/amd-config.conf 1:0.2.91.1~" >> debian/ubuntu-drivers-common.maintscript
-
-override_dh_installinit:
-	dh_systemd_enable
-	dh_installinit
 
 override_dh_python3:
 	dh_python3 --shebang=/usr/bin/python3

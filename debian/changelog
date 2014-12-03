@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.2.98.7) UNRELEASED; urgency=medium
+
+  * Only install systemd unit on architectures where gpu-manager gets built.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 03 Dec 2014 14:58:58 +0100
+
 ubuntu-drivers-common (1:0.2.98.6) vivid; urgency=medium
 
   * setup.py: Drop unnecessary glob().
