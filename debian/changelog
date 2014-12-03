@@ -1,9 +1,9 @@
-ubuntu-drivers-common (1:0.2.98.8) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.98.8) vivid; urgency=medium
 
   * gpu-manager.service: Log into /var/log/gpu-manager.log so that we can pick
     this up from apport.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 03 Dec 2014 15:28:01 +0100
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 03 Dec 2014 15:28:24 +0100
 
 ubuntu-drivers-common (1:0.2.98.7) vivid; urgency=medium
 
