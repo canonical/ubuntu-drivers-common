@@ -4,7 +4,7 @@ Before=display-manager.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/gpu-manager
+ExecStart=/usr/bin/gpu-manager --log /var/log/gpu-manager.log
 
 [Install]
 WantedBy=display-manager.service
