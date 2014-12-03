@@ -1,6 +1,9 @@
 ubuntu-drivers-common (1:0.2.98.6) UNRELEASED; urgency=medium
 
   * setup.py: Drop unnecessary glob().
+  * tests/ubuntu_drivers.py: Set SYSTEMD_LOG_LEVEL to avoid failing on
+    unexpected udevadm debug spew if the kernel gets booted with "debug".
+    Fixes FTBFS on our arm64 builders.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 03 Dec 2014 13:14:23 +0100
 

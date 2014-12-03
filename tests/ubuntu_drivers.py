@@ -742,6 +742,10 @@ APT::Get::AllowUnauthenticated "true";
         klass.plugin_dir = os.path.join(klass.chroot.path, 'detect')
         os.environ['UBUNTU_DRIVERS_DETECT_DIR'] = klass.plugin_dir
 
+        # avoid failures due to unexpected udevadm debug messages if kernel is
+        # booted with "debug"
+        os.environ['SYSTEMD_LOG_LEVEL'] = 'warning'
+
     @classmethod
     def tearDownClass(klass):
         klass.chroot.remove()
