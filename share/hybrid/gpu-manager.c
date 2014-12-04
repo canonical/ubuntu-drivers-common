@@ -2214,12 +2214,41 @@ static bool is_link(char *file) {
 
 /* See if the device is bound to a driver */
 static bool is_device_bound_to_driver(struct pci_device *info) {
-    char sysfs_path[256];
+    char sysfs_path[1024];
     snprintf(sysfs_path, sizeof(sysfs_path),
              "/sys/bus/pci/devices/%04x:%02x:%02x.%d/driver",
              info->domain, info->bus, info->dev, info->func);
 
     return(is_link(sysfs_path));
+}
+
+
+/* See if the device is a pci passthrough */
+static bool is_device_pci_passthrough(struct pci_device *info) {
+    enum { BUFFER_SIZE = 1024 };
+    char buf[BUFFER_SIZE], sysfs_path[BUFFER_SIZE], *drv, *name;
+    ssize_t length;
+
+    length = snprintf(sysfs_path, sizeof(sysfs_path),
+                      "/sys/bus/pci/devices/%04x:%02x:%02x.%d/driver",
+                      info->domain, info->bus, info->dev, info->func);
+    if (length < 0 || length >= sizeof(sysfs_path))
+        return false;
+
+    length = readlink(sysfs_path, buf, sizeof(buf)-1);
+
+    if (length != -1) {
+        buf[length] = '\0';
+
+        if ((drv = strrchr(buf, '/')))
+            name = drv+1;
+        else
+            name = buf;
+
+        if (strcmp(name, "pci-stub") == 0 || strcmp(name, "pciback") == 0)
+            return true;
+    }
+    return false;
 }
 
 
@@ -3391,6 +3420,11 @@ int main(int argc, char *argv[]) {
 
                 if (!is_device_bound_to_driver(info)) {
                     fprintf(log_handle, "The device is not bound to any driver. Skipping...\n");
+                    continue;
+                }
+
+                if (is_device_pci_passthrough(info)) {
+                    fprintf(log_handle, "The device is a pci passthrough. Skipping...\n");
                     continue;
                 }
 
