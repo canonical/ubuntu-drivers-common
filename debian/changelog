@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.2.98.9) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.2.98.9) vivid; urgency=medium
 
-  * 
+  * gpu-manager.c:
+    - Ignore pci passthroughs (LP: #1397124).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 08 Dec 2014 10:54:06 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 08 Dec 2014 10:56:17 +0100
 
 ubuntu-drivers-common (1:0.2.98.8) vivid; urgency=medium
 
