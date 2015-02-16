@@ -1,9 +1,9 @@
-ubuntu-drivers-common (1:0.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.3) vivid; urgency=medium
 
   * debian/tests/system: nvidia-331 is transitional now, so adjust tests to
     use nvidia-340.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 16 Feb 2015 09:45:31 +0100
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 16 Feb 2015 10:38:48 +0100
 
 ubuntu-drivers-common (1:0.2.98.9) vivid; urgency=medium
 
