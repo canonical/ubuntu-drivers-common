@@ -1,9 +1,9 @@
-ubuntu-drivers-common (1:0.4) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4) vivid; urgency=medium
 
   [ Dimitri John Ledkov ]
   * Add cpu-microcode detect-plugin. (LP: #1386257)
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 19 Feb 2015 14:50:25 +0100
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 19 Feb 2015 14:52:28 +0100
 
 ubuntu-drivers-common (1:0.3) vivid; urgency=medium
 
