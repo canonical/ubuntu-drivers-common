@@ -24,8 +24,7 @@ def detect(apt_cache):
             for line in file:
                 if line.startswith('vendor_id'):
                     cpu = line.split(':')[1].strip()
-                    return [db.get(cpu)]
+                    if cpu in db:
+                        return [db.get(cpu)]
     except IOError as err:
         logging.debug('could not open /proc/cpuinfo: %s', err)
-
-    return None
