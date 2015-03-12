@@ -94,14 +94,27 @@ class TestUbuntuDrivers(unittest.TestCase):
         '''nvidia-340'''
 
         # we have two matches here, only install nvidia-current, not -updates
-        self.do_test_driver('pci:v000010DEd000010C3sv00sd01bc03sc00i00',
+        self.do_test_driver('pci:v000010DEd0000042Esv00sd01bc03sc00i00',
                 'nvidia-340', 'nvidia_340', auto_install=False)
 
     def test_nvidia_340_updates(self):
         '''nvidia-340-updates'''
 
-        self.do_test_driver('pci:v000010DEd000010C3sv00sd01bc03sc00i00',
+        self.do_test_driver('pci:v000010DEd0000042Esv00sd01bc03sc00i00',
                 'nvidia-340-updates', 'nvidia_340_updates', auto_install=False)
+
+    def test_nvidia_346(self):
+        '''nvidia-346'''
+
+        # we have two matches here, only install nvidia-$version, not -updates
+        self.do_test_driver('pci:v000010DEd000011B4sv00sd01bc03sc00i00',
+                'nvidia-346', 'nvidia_346', auto_install=False)
+
+    def test_nvidia_346_updates(self):
+        '''nvidia-346-updates'''
+
+        self.do_test_driver('pci:v000010DEd000011B4sv00sd01bc03sc00i00',
+                'nvidia-346-updates', 'nvidia_346_updates', auto_install=False)
 
     def test_fglrx(self):
         '''fglrx'''
