@@ -1,8 +1,11 @@
-ubuntu-drivers-common (1:0.4.2) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.2) vivid; urgency=medium
 
-  * 
+  * gpu-manager.c:
+    - Do not abort when dealing with sddm. This allows users to get
+      partial support for hybrid graphics when using sddm instead of
+      lightdm.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 03 Apr 2015 18:35:58 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 09 Apr 2015 12:51:23 +0200
 
 ubuntu-drivers-common (1:0.4.1) vivid; urgency=medium
 
