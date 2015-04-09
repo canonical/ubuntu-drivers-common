@@ -750,6 +750,13 @@ static bool is_gdm_default() {
             "gdm"));
 }
 
+/* Check if sddm is the default login manager */
+static bool is_sddm_default() {
+
+    return (find_string_in_file("/etc/X11/default-display-manager",
+            "sddm"));
+}
+
 
 static void detect_available_alternatives(struct alternatives *info, char *pattern) {
     if (strstr(pattern, "mesa")) {
@@ -2723,7 +2730,7 @@ static bool enable_prime(const char *prime_settings,
     bool prime_action_on = false;
 
     /* We only support Lightdm and GDM at this time */
-    if (!(is_lightdm_default() || is_gdm_default())) {
+    if (!(is_lightdm_default() || is_gdm_default() || is_sddm_default())) {
         fprintf(log_handle, "Neither Lightdm nor GDM is the default display "
                             "manager. Nothing to do\n");
         return false;
