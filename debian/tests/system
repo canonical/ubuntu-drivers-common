@@ -180,6 +180,9 @@ class TestUbuntuDrivers(unittest.TestCase):
 if 'umockdev' not in os.environ.get('LD_PRELOAD', ''):
     os.execvp('umockdev-wrapper', ['umockdev-wrapper'] + sys.argv)
 
+# avoid debconf errors
+os.environ['DEBIAN_FRONTEND'] = 'noninteractive'
+
 # for autopkgtest we must write to stdout, not stderr, and have an appropriate
 # exit code
 unittest.main(testRunner=unittest.TextTestRunner(stream=sys.stdout, verbosity=2))
