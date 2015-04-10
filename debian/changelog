@@ -4,6 +4,8 @@ ubuntu-drivers-common (1:0.4.3) UNRELEASED; urgency=medium
     our test dependencies.
   * debian/tests/system: Set noninteractive debconf frontend, to avoid debconf
     error messages.
+  * debian/tests/system: Mark fglrx tests as expected failures, the current
+    fglrx driver is known to be incompatible with current X.org.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 10 Apr 2015 11:04:07 +0200
 

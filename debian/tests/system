@@ -116,6 +116,8 @@ class TestUbuntuDrivers(unittest.TestCase):
         self.do_test_driver('pci:v000010DEd000011B4sv00sd01bc03sc00i00',
                 'nvidia-346-updates', 'nvidia_346_updates', auto_install=False)
 
+    # fglrx known-broken with current X.org
+    @unittest.expectedFailure
     def test_fglrx(self):
         '''fglrx'''
 
@@ -123,6 +125,8 @@ class TestUbuntuDrivers(unittest.TestCase):
         self.do_test_driver('pci:v00001002d0000990Fsv00sd00bc03sc00i00',
                 'fglrx', 'fglrx', auto_install=False)
 
+    # fglrx known-broken with current X.org
+    @unittest.expectedFailure
     def test_fglrx_updates(self):
         '''fglrx-updates'''
 
