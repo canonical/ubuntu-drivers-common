@@ -1,9 +1,9 @@
-ubuntu-drivers-common (1:0.4.4) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.4) vivid; urgency=medium
 
   * debian/tests/system: Re-enable fglrx tests and update them for the
     fglrx-core split.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 10 Apr 2015 12:42:53 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 10 Apr 2015 12:47:48 +0200
 
 ubuntu-drivers-common (1:0.4.3) vivid; urgency=medium
 
