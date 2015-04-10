@@ -167,7 +167,7 @@ class TestUbuntuDrivers(unittest.TestCase):
                 self.assertTrue('filename:' in o)
         finally:
             # clean up
-            program_out(['apt-get', 'purge', '--auto-remove', '-y', package])
+            program_out(['apt-get', 'purge', '-y', package])
 
             if module:
                 (c, o, e) = program_out(['modinfo', module])
