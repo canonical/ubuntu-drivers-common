@@ -116,22 +116,18 @@ class TestUbuntuDrivers(unittest.TestCase):
         self.do_test_driver('pci:v000010DEd000011B4sv00sd01bc03sc00i00',
                 'nvidia-346-updates', 'nvidia_346_updates', auto_install=False)
 
-    # fglrx known-broken with current X.org
-    @unittest.expectedFailure
     def test_fglrx(self):
         '''fglrx'''
 
         # we have two matches here, only install fglrx, not -updates
         self.do_test_driver('pci:v00001002d0000990Fsv00sd00bc03sc00i00',
-                'fglrx', 'fglrx', auto_install=False)
+                'fglrx', 'fglrx', auto_install=False, extra_purge=['fglrx-core'])
 
-    # fglrx known-broken with current X.org
-    @unittest.expectedFailure
     def test_fglrx_updates(self):
         '''fglrx-updates'''
 
         self.do_test_driver('pci:v00001002d0000990Fsv00sd00bc03sc00i00',
-                'fglrx-updates', 'fglrx_updates', auto_install=False)
+                'fglrx-updates', 'fglrx_updates', auto_install=False, extra_purge=['fglrx-updates-core'])
 
     def test_virtualbox(self):
         '''virtualbox-dkms'''
@@ -139,7 +135,7 @@ class TestUbuntuDrivers(unittest.TestCase):
         self.do_test_driver(None, 'virtualbox-dkms', 'vboxdrv', auto_install=False)
 
     def do_test_driver(self, alias, package, module, auto_install=True,
-                       allow_errors=False):
+                       allow_errors=False, extra_purge=[]):
         if alias:
             self.testbed.add_device('pci', 'mydev', None, ['modalias', alias], [])
 
@@ -171,7 +167,7 @@ class TestUbuntuDrivers(unittest.TestCase):
                 self.assertTrue('filename:' in o)
         finally:
             # clean up
-            program_out(['apt-get', 'purge', '-y', package])
+            program_out(['apt-get', 'purge', '-y', package] + extra_purge)
 
             if module:
                 (c, o, e) = program_out(['modinfo', module])
