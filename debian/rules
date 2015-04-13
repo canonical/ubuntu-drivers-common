@@ -26,8 +26,8 @@ override_dh_install:
 
 	# on architectures where we build gpu-manager, install the systemd unit
 	if [ -d debian/tmp/lib/systemd ]; then \
-		dh_systemd_enable; \
 		dh_install -p ubuntu-drivers-common lib/systemd; \
+		dh_systemd_enable -p ubuntu-drivers-common; \
 	fi
 
 	# build dh_modaliases manpage

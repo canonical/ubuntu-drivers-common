@@ -1,3 +1,11 @@
+ubuntu-drivers-common (1:0.4.5) UNRELEASED; urgency=medium
+
+  * Call dh_systemd_enable after installing gpu-manager.service, so that the
+    unit actually gets enabled. Also quiesce the confusing error messages
+    about nonexisting binary package directories. (LP: #1443364)
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 13 Apr 2015 06:59:02 -0500
+
 ubuntu-drivers-common (1:0.4.4) vivid; urgency=medium
 
   * debian/tests/system: Re-enable fglrx tests and update them for the
