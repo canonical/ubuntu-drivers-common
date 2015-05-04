@@ -153,6 +153,9 @@ struct alternatives {
 };
 
 static bool is_file(char *file);
+static bool is_dir(char *directory);
+static bool is_dir_empty(char *directory);
+static bool is_link(char *file);
 
 static inline void freep(void *p) {
     free(*(void**) p);
@@ -1061,6 +1064,7 @@ static bool is_disabled_in_cmdline() {
     return has_cmdline_option(KERN_PARAM);
 }
 
+
 static prime_intel_drv get_prime_intel_driver() {
     prime_intel_drv driver;
     if (has_cmdline_option("gpumanager_modesetting")) {
@@ -1079,16 +1083,62 @@ static prime_intel_drv get_prime_intel_driver() {
 }
 
 
+/* Write the xorg.conf for a multiamd system
+ * using fglrx
+ */
+static bool write_multiamd_pxpress_xorg_conf() {
+    int status = -1;
+    char command[50] = "/usr/bin/amdconfig";
+
+    fprintf(log_handle, "Calling amdconfig\n");
+
+    /* call amdconfig */
+    if (dry_run) {
+        status = 0;
+        fprintf(log_handle, "amdconfig status %d\n", status);
+    }
+    else {
+        if (is_link(command) || is_file(command)) {
+            /* Recreate the xorg.conf from scratch */
+            strcat(command, " --initial");
+            status = system(command);
+            fprintf(log_handle, "amdconfig status %d\n", status);
+        }
+        else {
+            fprintf(log_handle, "amdconfig is not available\n");
+        }
+    }
+
+    return (status != -1);
+}
+
+
 /* This is just for writing the BusID of the discrete
  * card
  */
 static bool write_to_xorg_conf(struct device **devices, int cards_n,
                               unsigned int vendor_id, const char *driver) {
-    int i;
+    int i, amd_devices;
     _cleanup_fclose_ FILE *file = NULL;
     char driver_line[100];
 
     fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
+
+    /* See if we are dealing with a multiamd system */
+    amd_devices = 0;
+    if (vendor_id == AMD && cards_n > 1) {
+        for(i = 0; i < cards_n; i++) {
+            if (devices[i]->vendor_id == AMD) {
+                amd_devices++;
+            }
+        }
+    }
+
+    if (amd_devices > 1) {
+        /* Rely on amdconfig (see LP: #1410801) */
+        if (write_multiamd_pxpress_xorg_conf())
+            return true;
+    }
 
     file = fopen(xorg_conf_file, "w");
     if (file == NULL) {
@@ -1509,6 +1559,8 @@ static bool check_vendor_bus_id_xorg_conf(struct device **devices, int cards_n,
                                          unsigned int vendor_id, char *driver) {
     bool failure = true;
     bool driver_is_set = false;
+    bool has_fglrx = (strcmp(driver, "fglrx") == 0);
+    bool fglrx_special_case = false;
     int i;
     int matches = 0;
     int expected_matches = 0;
@@ -1534,6 +1586,13 @@ static bool check_vendor_bus_id_xorg_conf(struct device **devices, int cards_n,
         if (devices[i]->vendor_id == vendor_id)
             expected_matches += 1;
     }
+
+    /* Be more relaxed on multi AMD systems with fglrx
+     * The BusID of the 1st device seems to be enough.
+     * fglrx will handle the rest.
+     */
+    if (has_fglrx && expected_matches > 1)
+        expected_matches = 1;
 
     while (fgets(line, sizeof(line), file)) {
         /* Ignore comments */
@@ -1571,14 +1630,19 @@ static bool check_vendor_bus_id_xorg_conf(struct device **devices, int cards_n,
         }
     }
 
-    /* We need the driver to be set when deadling with a binary driver */
+    /* We need the driver to be set when dealing with a binary driver */
     if (!driver_is_set && ((strcmp(driver, "fglrx") == 0) ||
                            (strcmp(driver, "nvidia") == 0))) {
         fprintf(log_handle, "%s driver should be set in xorg.conf. Setting as failure.\n", driver);
         failure = true;
     }
 
-    return (matches == expected_matches && !failure);
+    /* It's ok to have more matches than what we expected in the case of
+     * amd+amd with fglrx
+     */
+    fglrx_special_case = (has_fglrx && matches > expected_matches);
+
+    return ((matches == expected_matches || fglrx_special_case) && !failure);
 }
 
 

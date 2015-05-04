@@ -8080,6 +8080,46 @@ Section "Device"
     Driver "fglrx"
     BusID "PCI:0@0:1:0"
 EndSection
+''');
+        self.xorg_file.close()
+
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx')
+
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        # Has changed
+        self.assertFalse(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertTrue(gpu_test.has_not_acted)
+
+
+        # See if it still regenerates xorg.conf if the
+        # file is in place and unsupported (multiple xscreens)
+        self.xorg_file = open(self.xorg_file.name, 'w')
+        self.xorg_file.write('''
+Section "Device"
+    Identifier "Default Card 1"
+    Driver "fglrx"
+    BusID "PCI:1@0:0:0"
+EndSection
 
 Section "Device"
     Identifier "Default Card 1"
@@ -8115,46 +8155,6 @@ EndSection
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
-
-        # See if it still regenerates xorg.conf if the
-        # file is in place and incorrect
-        self.xorg_file = open(self.xorg_file.name, 'w')
-        self.xorg_file.write('''
-Section "Device"
-    Identifier "Default Card 1"
-    Driver "fglrx"
-    BusID "PCI:1@0:0:0"
-EndSection
-''');
-        self.xorg_file.close()
-
-        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
-                                                 ['amd', 'amd'],
-                                                 ['fglrx', 'fake'],
-                                                 ['mesa', 'fglrx'],
-                                                 'fglrx')
-
-        # AMD
-        self.assertTrue(gpu_test.has_amd)
-        self.assertFalse(gpu_test.radeon_loaded)
-        self.assertTrue(gpu_test.fglrx_loaded)
-        self.assertTrue(gpu_test.fglrx_enabled)
-        self.assertFalse(gpu_test.pxpress_enabled)
-        # No NVIDIA
-        self.assertFalse(gpu_test.has_nvidia)
-        self.assertFalse(gpu_test.nouveau_loaded)
-        self.assertFalse(gpu_test.nvidia_loaded)
-        self.assertFalse(gpu_test.nvidia_enabled)
-        self.assertFalse(gpu_test.prime_enabled)
-        # Has changed
-        self.assertFalse(gpu_test.has_changed)
-        self.assertTrue(gpu_test.has_removed_xorg)
-        self.assertTrue(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 2b: the discrete card was already available (BIOS)
@@ -8903,6 +8903,47 @@ Section "Device"
     Driver "fglrx"
     BusID "PCI:0@0:1:0"
 EndSection
+''');
+        self.xorg_file.close()
+
+        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
+                                                 ['amd', 'amd'],
+                                                 ['fglrx', 'fake'],
+                                                 ['mesa', 'fglrx'],
+                                                 'fglrx',
+                                                 requires_offloading=True)
+
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.fglrx_loaded)
+        self.assertTrue(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        # Has changed
+        self.assertFalse(gpu_test.has_changed)
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertTrue(gpu_test.has_not_acted)
+
+
+        # See if it still regenerates xorg.conf if the
+        # file is in place and unsupported (multiple xscreens)
+        self.xorg_file = open(self.xorg_file.name, 'w')
+        self.xorg_file.write('''
+Section "Device"
+    Identifier "Default Card 1"
+    Driver "fglrx"
+    BusID "PCI:1@0:0:0"
+EndSection
 
 Section "Device"
     Identifier "Default Card 1"
@@ -8939,47 +8980,6 @@ EndSection
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
-
-        # See if it still regenerates xorg.conf if the
-        # file is in place and incorrect
-        self.xorg_file = open(self.xorg_file.name, 'w')
-        self.xorg_file.write('''
-Section "Device"
-    Identifier "Default Card 1"
-    Driver "fglrx"
-    BusID "PCI:1@0:0:0"
-EndSection
-''');
-        self.xorg_file.close()
-
-        gpu_test = self.run_manager_and_get_data(['amd', 'amd'],
-                                                 ['amd', 'amd'],
-                                                 ['fglrx', 'fake'],
-                                                 ['mesa', 'fglrx'],
-                                                 'fglrx',
-                                                 requires_offloading=True)
-
-        # AMD
-        self.assertTrue(gpu_test.has_amd)
-        self.assertFalse(gpu_test.radeon_loaded)
-        self.assertTrue(gpu_test.fglrx_loaded)
-        self.assertTrue(gpu_test.fglrx_enabled)
-        self.assertFalse(gpu_test.pxpress_enabled)
-        # No NVIDIA
-        self.assertFalse(gpu_test.has_nvidia)
-        self.assertFalse(gpu_test.nouveau_loaded)
-        self.assertFalse(gpu_test.nvidia_loaded)
-        self.assertFalse(gpu_test.nvidia_enabled)
-        self.assertFalse(gpu_test.prime_enabled)
-        # Has changed
-        self.assertFalse(gpu_test.has_changed)
-        self.assertTrue(gpu_test.has_removed_xorg)
-        self.assertTrue(gpu_test.has_regenerated_xorg)
-        self.assertFalse(gpu_test.has_selected_driver)
-
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
 
 
         # Case 2b: the discrete card was already available (BIOS)
