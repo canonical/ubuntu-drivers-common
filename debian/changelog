@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.4.6) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 08 May 2015 16:38:00 +0200
+
 ubuntu-drivers-common (1:0.4.5) vivid; urgency=medium
 
   * Call dh_systemd_enable after installing gpu-manager.service, so that the
