@@ -1,8 +1,15 @@
-ubuntu-drivers-common (1:0.4.6) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.6) wily; urgency=medium
 
-  * 
+  * gpu-manager.c, gpu-manager.py:
+    - Use the amdconfig tool to configure multi-amd PXpress. This
+      fixes a problem where the AMD control panel won't show an
+      option to switch between power saving mode and performance
+      mode on AMD+AMD hybrid systems (LP: #1410801).
+    - The tests now reflect a more relaxed approach so that we
+      do not overwrite configurations that are not supported (such
+      as multiple xscreens set in the xorg.conf).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 08 May 2015 16:38:00 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 08 May 2015 16:42:32 +0200
 
 ubuntu-drivers-common (1:0.4.5) vivid; urgency=medium
 
