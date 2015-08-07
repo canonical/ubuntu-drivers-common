@@ -55,6 +55,7 @@
 #include <getopt.h>
 #include <time.h>
 #include <fcntl.h>
+#include <errno.h>
 #include "xf86drm.h"
 #include "xf86drmMode.h"
 
@@ -3277,6 +3278,13 @@ int main(int argc, char *argv[]) {
             move_log();
         }
         log_handle = fopen(log_file, "w");
+
+        if (!log_handle) {
+            /* Use stdout */
+            log_handle = stdout;
+            fprintf(log_handle, "Warning: writing to %s failed (%s)\n",
+                    log_file, strerror(errno));
+        }
     }
     else {
         log_handle = stdout;
