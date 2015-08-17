@@ -157,6 +157,8 @@ static bool is_file(char *file);
 static bool is_dir(char *directory);
 static bool is_dir_empty(char *directory);
 static bool is_link(char *file);
+static bool is_pxpress_dgpu_disabled();
+static void enable_pxpress_amd_settings(bool discrete_enabled);
 
 static inline void freep(void *p) {
     free(*(void**) p);
@@ -1179,6 +1181,14 @@ static bool write_to_xorg_conf(struct device **devices, int cards_n,
 static bool write_pxpress_xorg_conf(struct device **devices, int cards_n) {
     int i;
     _cleanup_fclose_ FILE *file = NULL;
+    _cleanup_free_ char *accel_method = NULL;
+
+    accel_method = strdup(is_pxpress_dgpu_disabled() ? "sna" : "uxa");
+
+    if (!accel_method) {
+        fprintf(log_handle, "Error: couldn't allocate memory for accel_method\n");
+        return false;
+    }
 
     fprintf(log_handle, "Regenerating xorg.conf. Path: %s\n", xorg_conf_file);
 
@@ -1201,9 +1211,10 @@ static bool write_pxpress_xorg_conf(struct device **devices, int cards_n) {
                 "Section \"Device\"\n"
                 "    Identifier \"intel\"\n"
                 "    Driver \"intel\"\n"
-                "    Option \"AccelMethod\" \"uxa\"\n"
+                "    Option \"AccelMethod\" \"%s\"\n"
                 "    BusID \"PCI:%d@%d:%d:%d\"\n"
                 "EndSection\n\n",
+                accel_method,
                 (int)(devices[i]->bus),
                 (int)(devices[i]->domain),
                 (int)(devices[i]->dev),
@@ -1287,6 +1298,25 @@ static bool is_pxpress_dgpu_disabled() {
     }
 
     return disabled;
+}
+
+
+/* Modify amdpcsdb enabling or disabling the discrete GPU
+ *
+ * EnabledFlags=V0 means off
+ * EnabledFlags=V4 means on
+ */
+static void enable_pxpress_amd_settings(bool discrete_enabled) {
+    unsigned int old_status = discrete_enabled ? 0 : 4;
+    unsigned int new_status = discrete_enabled ? 4 : 0;
+    char command[200];
+
+    snprintf(command, sizeof(command), "sed -i s/EnabledFlags=V%d/EnabledFlags=V%d/g %s",
+             old_status, new_status, amd_pcsdb_file);
+
+    fprintf(log_handle, "Setting EnabledFlags to %d\n", new_status);
+
+    system(command);
 }
 
 
@@ -1463,7 +1493,14 @@ static bool check_pxpress_xorg_conf(struct device **devices,
     char intel_bus_id[100];
     char amd_bus_id[100];
     _cleanup_fclose_ FILE *file = NULL;
+    _cleanup_free_ char *accel_method = NULL;
 
+    accel_method = strdup(is_pxpress_dgpu_disabled() ? "sna" : "uxa");
+
+    if (!accel_method) {
+        fprintf(log_handle, "Error: couldn't allocate memory for accel_method\n");
+        return false;
+    }
 
     if (!exists_not_empty(xorg_conf_file))
         return false;
@@ -1509,7 +1546,7 @@ static bool check_pxpress_xorg_conf(struct device **devices,
             /* Parse options here */
             if (istrstr(line, "Option") != NULL) {
                 if (istrstr(line, "AccelMethod") != NULL &&
-                    istrstr(line, "UXA") != NULL) {
+                    istrstr(line, accel_method) != NULL) {
                     x_options_matches += 1;
                 }
             }
@@ -2963,6 +3000,7 @@ static bool enable_pxpress(struct alternatives *alternative,
         if (!alternative->pxpress_enabled) {
             fprintf(log_handle, "Selecting pxpress\n");
             status = select_driver("pxpress");
+            enable_pxpress_amd_settings(false);
         }
         else {
             fprintf(log_handle, "Driver is already loaded and enabled\n");
@@ -2973,6 +3011,7 @@ static bool enable_pxpress(struct alternatives *alternative,
         if (!alternative->fglrx_enabled) {
             fprintf(log_handle, "Selecting fglrx\n");
             status = select_driver("fglrx");
+            enable_pxpress_amd_settings(true);
         }
         else {
             fprintf(log_handle, "Driver is already loaded and enabled\n");
