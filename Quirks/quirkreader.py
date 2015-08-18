@@ -45,7 +45,7 @@ class ReadQuirk:
             lines_list = []
         else:
             if not hasattr(file, 'write'):#it is a file
-                myfile = open(file, 'r')
+                myfile = open(file, 'r', encoding='utf-8')
                 lines_list = myfile.readlines()
                 myfile.close()
             else:#it is a file object
