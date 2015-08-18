@@ -3808,7 +3808,7 @@ EndSection
 Section "Device"
     Identifier  "intel"
     Driver      "intel"
-    Option      "AccelMethod" "uxa"
+    Option      "AccelMethod" "sna"
     BusID       "PCI:0@0:1:0"
 EndSection
 
@@ -3915,8 +3915,10 @@ EndSection
 
         # Has changed
         self.assertFalse(gpu_test.has_changed)
-        self.assertFalse(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
+        # Selecting a different alternative
+        # triggers a xorg.conf rewrite
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         # We should select pxpress here
         self.assertTrue(gpu_test.has_selected_driver)
 
