@@ -1,6 +1,12 @@
 ubuntu-drivers-common (1:0.4.8) UNRELEASED; urgency=medium
 
-  * 
+  * share/hybrid/gpu-manager.c, tests/gpu-manager.py:
+    - Use SNA in powersaving mode for pxpress, and keep UXA
+      only for performance mode (where it's required). This
+      fixes a number of HWE issues (e.g. LP: #1472972).
+  * Quirks/quirkreader.py:
+    - Set the encoding when opening the file. This fixes a
+      crash in Wily.
 
  -- Alberto Milone <alberto.milone@canonical.com>  Tue, 18 Aug 2015 12:20:26 +0200
 
