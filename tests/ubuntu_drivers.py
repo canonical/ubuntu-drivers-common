@@ -313,6 +313,10 @@ class DetectTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.plugin_dir)
 
+        # most test cases switch the apt root, so the apt.Cache() cache becomes
+        # unreliable; reset it
+        UbuntuDrivers.detect.packages_for_modalias.cache_maps = {}
+
     @unittest.skipUnless(os.path.isdir('/sys/devices'), 'no /sys dir on this system')
     def test_system_modaliases_system(self):
         '''system_modaliases() for current system'''
