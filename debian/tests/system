@@ -52,7 +52,7 @@ class TestSystem(unittest.TestCase):
         self.assertTrue('=== matching driver packages ===' in o, o)
 
 class TestUbuntuDrivers(unittest.TestCase):
-    '''Check that we can detect and install the most common drivers'''
+    '''Check that we can detect and install an actual driver packge'''
 
     @classmethod
     def setUpClass(cls):
@@ -70,69 +70,12 @@ class TestUbuntuDrivers(unittest.TestCase):
     def setUp(self):
         self.testbed = UMockdev.Testbed.new()
 
-    @unittest.skip('Unclear which driver handles these now')
-    def test_bcmwl(self):
-        '''bcmwl-kernel-source'''
-
-        self.do_test_driver('pci:v000014E4d00004353sv00sd01bc02sc80i00',
-                'bcmwl-kernel-source', 'wl', auto_install=True, allow_errors=True)
-
-    def test_nvidia_304(self):
-        '''nvidia-304'''
-
-        # we have two matches here, only install nvidia-current, not -updates
-        self.do_test_driver('pci:v000010DEd000010C3sv00sd01bc03sc00i00',
-                'nvidia-304', 'nvidia_304', auto_install=False)
-
-    def test_nvidia_304_updates(self):
-        '''nvidia-304-updates'''
-
-        self.do_test_driver('pci:v000010DEd000010C3sv00sd01bc03sc00i00',
-                'nvidia-304-updates', 'nvidia_304_updates', auto_install=False)
-
-    def test_nvidia_340(self):
-        '''nvidia-340'''
-
-        # we have two matches here, only install nvidia-current, not -updates
-        self.do_test_driver('pci:v000010DEd0000042Esv00sd01bc03sc00i00',
-                'nvidia-340', 'nvidia_340', auto_install=False)
-
-    def test_nvidia_340_updates(self):
-        '''nvidia-340-updates'''
-
-        self.do_test_driver('pci:v000010DEd0000042Esv00sd01bc03sc00i00',
-                'nvidia-340-updates', 'nvidia_340_updates', auto_install=False)
-
-    def test_nvidia_346(self):
-        '''nvidia-346'''
-
-        # we have two matches here, only install nvidia-$version, not -updates
-        self.do_test_driver('pci:v000010DEd000011B4sv00sd01bc03sc00i00',
-                'nvidia-346', 'nvidia_346', auto_install=False)
-
-    def test_nvidia_346_updates(self):
-        '''nvidia-346-updates'''
-
-        self.do_test_driver('pci:v000010DEd000011B4sv00sd01bc03sc00i00',
-                'nvidia-346-updates', 'nvidia_346_updates', auto_install=False)
-
     def test_fglrx(self):
         '''fglrx'''
 
         # we have two matches here, only install fglrx, not -updates
         self.do_test_driver('pci:v00001002d0000990Fsv00sd00bc03sc00i00',
                 'fglrx', 'fglrx', auto_install=False, extra_purge=['fglrx-core'])
-
-    def test_fglrx_updates(self):
-        '''fglrx-updates'''
-
-        self.do_test_driver('pci:v00001002d0000990Fsv00sd00bc03sc00i00',
-                'fglrx-updates', 'fglrx_updates', auto_install=False, extra_purge=['fglrx-updates-core'])
-
-    def test_virtualbox(self):
-        '''virtualbox-dkms'''
-
-        self.do_test_driver(None, 'virtualbox-dkms', 'vboxdrv', auto_install=False)
 
     def do_test_driver(self, alias, package, module, auto_install=True,
                        allow_errors=False, extra_purge=[]):

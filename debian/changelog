@@ -1,3 +1,13 @@
+ubuntu-drivers-common (1:0.4.10) UNRELEASED; urgency=medium
+
+  * debian/tests/system: Drop the nvidia package tests; they are now tested
+    through autodep8 on every kernel and dkms change, so we don't have to rely
+    on this hard to maintain autopkgtest any more. Also drop most other driver
+    package tests for the same reason; just keep the "fglrx" test to get a
+    full end-to-end test with "ubuntu-drivers".
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 03 Sep 2015 11:25:08 +0200
+
 ubuntu-drivers-common (1:0.4.9) wily; urgency=medium
 
   * tests/ubuntu_drivers.py: Reset the apt.Cache() cache between tests, as
