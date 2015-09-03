@@ -3,6 +3,7 @@ ubuntu-drivers-common (1:0.4.9) UNRELEASED; urgency=medium
   * tests/ubuntu_drivers.py: Reset the apt.Cache() cache between tests, as
     this is unreliable with tests that keep switching apt's root directory.
     (LP: #1487223)
+  * Bump Standards-Version to 3.9.6 (no changes necessary).
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 03 Sep 2015 07:43:36 +0200
 
