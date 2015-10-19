@@ -705,7 +705,7 @@ static bool has_unloaded_module(char *module) {
         fprintf(log_handle, "grep fake dmesg status %d\n", status);
     }
     else {
-        snprintf(command, sizeof(command), "dmesg | grep -q \"%s: module\"",
+        snprintf(command, sizeof(command), "grep -q \"%s: module\" /var/log/syslog",
                  module);
         status = system(command);
         fprintf(log_handle, "grep dmesg status %d\n", status);
@@ -2185,7 +2185,7 @@ static int add_gpu_bus_from_dmesg(const char *pattern, struct device **devices,
                  pattern, fake_dmesg_path);
     }
     else {
-        snprintf(command, sizeof(command), "dmesg | grep %s", pattern);
+        snprintf(command, sizeof(command), "grep %s /var/log/syslog", pattern);
     }
 
     pfile = popen(command, "r");
