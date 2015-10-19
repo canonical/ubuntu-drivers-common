@@ -1078,8 +1078,12 @@ static prime_intel_drv get_prime_intel_driver() {
         driver = UXA;
         fprintf(log_handle, "Detected boot parameter to force Intel/UXA\n");
     }
-    else {
+    else if (has_cmdline_option("gpumanager_sna")) {
         driver = SNA;
+        fprintf(log_handle, "Detected boot parameter to force Intel/SNA\n");
+    }
+    else {
+        driver = MODESETTING;
     }
 
     return driver;
