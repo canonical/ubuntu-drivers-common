@@ -1,8 +1,13 @@
-ubuntu-drivers-common (1:0.4.11) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.11) wily; urgency=medium
 
-  * 
+  * gpu-manager.c:
+    - Rely on /var/log/syslog to get information about unloaded modules.
+      This should minimise the current slowdown on boot (LP: #1307069).
+    - Switch from intel to modesetting as the default driver on hybrid
+      intel/nvidia systems because of a regression in the intel driver
+      (LP: #1507676).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 14 Oct 2015 17:12:07 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 19 Oct 2015 17:35:12 +0200
 
 ubuntu-drivers-common (1:0.4.10) wily; urgency=medium
 
