@@ -1426,6 +1426,10 @@ static bool check_prime_xorg_conf(struct device **devices,
                         (istrstr(line, "UXA") == NULL)) {
                         accel_method_matches = false;
                     }
+                    else if ((prime_intel_driver == MODESETTING) &&
+                        (istrstr(line, "None") == NULL)) {
+                        accel_method_matches = false;
+                    }
                     else {
                         x_options_matches += 1;
                     }
@@ -1732,7 +1736,8 @@ static bool write_prime_xorg_conf(struct device **devices, int cards_n) {
 
     switch (prime_intel_driver) {
     case MODESETTING:
-        accel_method = strdup("");
+        /* glamor seems to fail. Set to "none" instead */
+        accel_method = strdup("    Option \"AccelMethod\" \"None\"\n");
         break;
     case UXA:
         accel_method = strdup("    Option \"AccelMethod\" \"UXA\"\n");
