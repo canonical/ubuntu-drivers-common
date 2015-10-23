@@ -152,7 +152,7 @@ def packages_for_modalias(apt_cache, modalias):
 
     bus_map = cache_map.get(modalias.split(':', 1)[0], {})
     for alias in bus_map:
-        if fnmatch.fnmatch(modalias, alias):
+        if fnmatch.fnmatch(modalias.lower(), alias.lower()):
             for p in bus_map[alias]:
                 pkgs.add(p)
 
