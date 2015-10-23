@@ -1,6 +1,7 @@
 ubuntu-drivers-common (1:0.4.12) UNRELEASED; urgency=medium
 
-  * 
+  * UbuntuDrivers/detect.py:
+    - Make modalias matching case insensitive (LP: #1500591).
 
  -- Alberto Milone <alberto.milone@canonical.com>  Fri, 23 Oct 2015 10:51:39 +0200
 
