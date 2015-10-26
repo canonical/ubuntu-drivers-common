@@ -5,6 +5,8 @@ import os.path
 import unittest
 import subprocess
 
+import gi
+gi.require_version('UMockdev', '1.0')
 from gi.repository import UMockdev
 
 srcdir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
