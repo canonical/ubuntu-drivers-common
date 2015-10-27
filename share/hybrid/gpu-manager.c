@@ -154,8 +154,6 @@ struct alternatives {
 };
 
 static bool is_file(char *file);
-static bool is_dir(char *directory);
-static bool is_dir_empty(char *directory);
 static bool is_link(char *file);
 static bool is_pxpress_dgpu_disabled();
 static void enable_pxpress_amd_settings(bool discrete_enabled);
@@ -247,43 +245,6 @@ static bool exists_not_empty(const char *file) {
         return false;
     }
     return true;
-}
-
-
-/* Get reference count from module */
-static int get_module_refcount(const char* module) {
-    _cleanup_fclose_ FILE *file = NULL;
-    _cleanup_free_ char *line = NULL;
-    size_t len = 0;
-    char refcount_path[50];
-    int refcount = 0;
-    int status = 0;
-
-    snprintf(refcount_path, sizeof(refcount_path), "/sys/module/%s/refcnt", module);
-
-    if (!exists_not_empty(refcount_path)) {
-        fprintf(log_handle, "Error: %s does not exist or is empty.\n", refcount_path);
-        return 0;
-    }
-
-    /* get dmi product version */
-    file = fopen(refcount_path, "r");
-    if (file == NULL) {
-        fprintf(log_handle, "can't open %s\n", refcount_path);
-        return 0;
-    }
-    if (getline(&line, &len, file) == -1) {
-        fprintf(log_handle, "can't get line from %s\n", refcount_path);
-        return 0;
-    }
-
-    status = sscanf(line, "%d\n", &refcount);
-
-    /* Make sure that we match 1 time */
-    if (status == EOF || status != 1)
-        refcount = 0;
-
-    return refcount;
 }
 
 
@@ -1043,20 +1004,6 @@ static bool select_core_driver(char *driver) {
 }
 
 
-static bool is_file_empty(const char *file) {
-    struct stat stbuf;
-
-    if (stat(file, &stbuf) == -1) {
-        fprintf(log_handle, "can't access %s\n", file);
-        return false;
-    }
-    if ((stbuf.st_mode & S_IFMT) && ! stbuf.st_size)
-        return true;
-
-    return false;
-}
-
-
 static bool has_cmdline_option(const char *option)
 {
     return (find_string_in_file("/proc/cmdline", option));
@@ -1692,47 +1639,6 @@ static bool check_vendor_bus_id_xorg_conf(struct device **devices, int cards_n,
 }
 
 
-static bool check_all_bus_ids_xorg_conf(struct device **devices, int cards_n) {
-    int i;
-    int matches = 0;
-    char line[4096];
-    char bus_id[256];
-    char bus_id_no_domain[256];
-    _cleanup_fclose_ FILE *file = NULL;
-
-    file = fopen(xorg_conf_file, "r");
-
-    if (!file) {
-        fprintf(log_handle, "Error: I couldn't open %s for reading.\n",
-                xorg_conf_file);
-        return false;
-    }
-
-    while (fgets(line, sizeof(line), file)) {
-        for (i=0; i < cards_n; i++) {
-            /* BusID \"PCI:%d@%d:%d:%d\" */
-            snprintf(bus_id, sizeof(bus_id), "\"PCI:%d@%d:%d:%d\"",
-                     (int)(devices[i]->bus),
-                     (int)(devices[i]->domain),
-                     (int)(devices[i]->dev),
-                     (int)(devices[i]->func));
-
-            /* Compatibility mode if no domain is specified */
-            snprintf(bus_id_no_domain, sizeof(bus_id_no_domain), "\"PCI:%d:%d:%d\"",
-                     (int)(devices[i]->bus),
-                     (int)(devices[i]->dev),
-                     (int)(devices[i]->func));
-
-            if ((strstr(line, bus_id) != NULL) || (strstr(line, bus_id_no_domain) != NULL)) {
-                matches += 1;
-            }
-        }
-    }
-
-    return (matches == cards_n);
-}
-
-
 static bool write_prime_xorg_conf(struct device **devices, int cards_n) {
     int i;
     _cleanup_fclose_ FILE *file = NULL;
@@ -2282,37 +2188,6 @@ static bool is_file(char *file) {
         return true;
 
     return false;
-}
-
-
-static bool is_dir(char *directory) {
-    struct stat stbuf;
-
-    if (stat(directory, &stbuf) == -1) {
-        fprintf(log_handle, "Error: can't access %s\n", directory);
-        return false;
-    }
-    if ((stbuf.st_mode & S_IFMT) == S_IFDIR)
-        return true;
-    return false;
-}
-
-
-static bool is_dir_empty(char *directory) {
-    int n = 0;
-    struct dirent *d;
-    DIR *dir = opendir(directory);
-    if (dir == NULL)
-        return true;
-    while ((d = readdir(dir)) != NULL) {
-        if(++n > 2)
-        break;
-    }
-    closedir(dir);
-    if (n <= 2)
-        return true;
-    else
-        return false;
 }
 
 
