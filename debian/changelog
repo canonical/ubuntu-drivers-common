@@ -1,10 +1,10 @@
-ubuntu-drivers-common (1:0.4.13) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.13) xenial; urgency=medium
 
   * Depend on liblocale-gettext-perl for autopkgtest, forcing it not to be
     dropped during Perl transitions (thereby breaking the fglrx test) due to
     pinning only necessary packages from -proposed.
 
- -- Colin Watson <cjwatson@ubuntu.com>  Tue, 29 Dec 2015 05:20:08 +0000
+ -- Colin Watson <cjwatson@ubuntu.com>  Tue, 29 Dec 2015 05:22:18 +0000
 
 ubuntu-drivers-common (1:0.4.12) xenial; urgency=medium
 
