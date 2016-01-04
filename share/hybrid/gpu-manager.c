@@ -2538,6 +2538,7 @@ static int has_driver_connected_outputs(const char *driver) {
 static void add_connected_outputs_info(struct device **devices,
                                        int cards_n) {
     int i;
+    int amdgpu_has_outputs = has_driver_connected_outputs("amdgpu");
     int radeon_has_outputs = has_driver_connected_outputs("radeon");
     int nouveau_has_outputs = has_driver_connected_outputs("nouveau");
     int intel_has_outputs = has_driver_connected_outputs("i915");
@@ -2546,7 +2547,8 @@ static void add_connected_outputs_info(struct device **devices,
         if (devices[i]->vendor_id == INTEL)
             devices[i]->has_connected_outputs = intel_has_outputs;
         else if (devices[i]->vendor_id == AMD)
-            devices[i]->has_connected_outputs = radeon_has_outputs;
+            devices[i]->has_connected_outputs = ((radeon_has_outputs != -1) ? radeon_has_outputs
+                                                 : amdgpu_has_outputs);
         else if (devices[i]->vendor_id == NVIDIA)
             devices[i]->has_connected_outputs = nouveau_has_outputs;
         else
@@ -3075,10 +3077,12 @@ int main(int argc, char *argv[]) {
     bool has_moved_xorg_conf = false;
     bool nvidia_loaded = false, fglrx_loaded = false,
         intel_loaded = false, radeon_loaded = false,
-        nouveau_loaded = false, bbswitch_loaded = false;
+        amdgpu_loaded = false, nouveau_loaded = false,
+        bbswitch_loaded = false;
     bool fglrx_unloaded = false, nvidia_unloaded = false;
     bool fglrx_blacklisted = false, nvidia_blacklisted = false,
-         radeon_blacklisted = false, nouveau_blacklisted = false;
+         radeon_blacklisted = false, amdgpu_blacklisted = false,
+         nouveau_blacklisted = false;
     bool fglrx_kmod_available = false, nvidia_kmod_available = false;
     int offloading = false;
     int status = 0;
@@ -3473,6 +3477,8 @@ int main(int argc, char *argv[]) {
     intel_loaded = is_module_loaded("i915") || is_module_loaded("i810");
     radeon_loaded = is_module_loaded("radeon");
     radeon_blacklisted = is_module_blacklisted("radeon");
+    amdgpu_loaded = is_module_loaded("amdgpu");
+    amdgpu_blacklisted = is_module_blacklisted("amdgpu");
     nouveau_loaded = is_module_loaded("nouveau");
     nouveau_blacklisted = is_module_blacklisted("nouveau");
 
@@ -3495,6 +3501,8 @@ int main(int argc, char *argv[]) {
     fprintf(log_handle, "Is intel loaded? %s\n", (intel_loaded ? "yes" : "no"));
     fprintf(log_handle, "Is radeon loaded? %s\n", (radeon_loaded ? "yes" : "no"));
     fprintf(log_handle, "Is radeon blacklisted? %s\n", (radeon_blacklisted ? "yes" : "no"));
+    fprintf(log_handle, "Is amdgpu loaded? %s\n", (amdgpu_loaded ? "yes" : "no"));
+    fprintf(log_handle, "Is amdgpu blacklisted? %s\n", (amdgpu_blacklisted ? "yes" : "no"));
     fprintf(log_handle, "Is nouveau loaded? %s\n", (nouveau_loaded ? "yes" : "no"));
     fprintf(log_handle, "Is nouveau blacklisted? %s\n", (nouveau_blacklisted ? "yes" : "no"));
     fprintf(log_handle, "Is fglrx kernel module available? %s\n", (fglrx_kmod_available ? "yes" : "no"));
@@ -3761,7 +3769,8 @@ int main(int argc, char *argv[]) {
         }
         else if (boot_vga_vendor_id == AMD) {
             /* if fglrx is loaded enable fglrx alternative */
-            if (((fglrx_loaded || fglrx_kmod_available) && !fglrx_blacklisted) && (!radeon_loaded || radeon_blacklisted)) {
+            if (((fglrx_loaded || fglrx_kmod_available) && !fglrx_blacklisted) &&
+                (!radeon_loaded || radeon_blacklisted) && (!amdgpu_loaded || amdgpu_blacklisted)) {
                 if (!alternative->fglrx_enabled) {
                     /* Try to enable fglrx */
                     enable_fglrx(alternative, boot_vga_vendor_id, current_devices, cards_n);
@@ -3776,7 +3785,7 @@ int main(int argc, char *argv[]) {
                 /* If both the closed kernel module and the open
                  * kernel module are loaded, then we're in trouble
                  */
-                if (fglrx_loaded && radeon_loaded) {
+                if (fglrx_loaded && (radeon_loaded || amdgpu_loaded)) {
                     /* Fake a system change to trigger
                      * a reconfiguration
                      */
@@ -3859,7 +3868,8 @@ int main(int argc, char *argv[]) {
         if (boot_vga_vendor_id == INTEL) {
             fprintf(log_handle, "Intel IGP detected\n");
             /* AMD PowerXpress */
-            if (offloading && intel_loaded && (fglrx_loaded || fglrx_kmod_available) && (!radeon_loaded || radeon_blacklisted)) {
+            if (offloading && intel_loaded && (fglrx_loaded || fglrx_kmod_available) &&
+                (!radeon_loaded || radeon_blacklisted) && (!amdgpu_loaded || amdgpu_blacklisted)) {
                 fprintf(log_handle, "PowerXpress detected\n");
 
                 enable_pxpress(alternative, current_devices, cards_n);
@@ -3944,7 +3954,8 @@ int main(int argc, char *argv[]) {
                     fprintf(log_handle, "Discrete AMD card detected\n");
 
                     /* Kernel module is available */
-                    if (((fglrx_loaded || fglrx_kmod_available) && !fglrx_blacklisted) && (!radeon_loaded || radeon_blacklisted)) {
+                    if (((fglrx_loaded || fglrx_kmod_available) && !fglrx_blacklisted) &&
+                        (!radeon_loaded || radeon_blacklisted) && (!amdgpu_loaded || amdgpu_blacklisted)) {
                         /* Try to enable fglrx */
                         enable_fglrx(alternative, discrete_vendor_id, current_devices, cards_n);
                     }
@@ -3953,7 +3964,7 @@ int main(int argc, char *argv[]) {
                         /* If both the closed kernel module and the open
                          * kernel module are loaded, then we're in trouble
                          */
-                        if (fglrx_loaded && radeon_loaded) {
+                        if (fglrx_loaded && (radeon_loaded || amdgpu_loaded)) {
                             /* Fake a system change to trigger
                              * a reconfiguration
                              */
@@ -3996,7 +4007,8 @@ int main(int argc, char *argv[]) {
 
 
                 /* Kernel module is available */
-                if (((fglrx_loaded || fglrx_kmod_available) && !fglrx_blacklisted) && (!radeon_loaded || radeon_blacklisted)) {
+                if (((fglrx_loaded || fglrx_kmod_available) && !fglrx_blacklisted) &&
+                    (!radeon_loaded || radeon_blacklisted) && (!amdgpu_loaded || amdgpu_blacklisted)) {
                     /* Try to enable fglrx */
                     enable_fglrx(alternative, discrete_vendor_id, current_devices, cards_n);
                 }
@@ -4005,7 +4017,7 @@ int main(int argc, char *argv[]) {
                     /* If both the closed kernel module and the open
                      * kernel module are loaded, then we're in trouble
                      */
-                    if (fglrx_loaded && radeon_loaded) {
+                    if (fglrx_loaded && (radeon_loaded || amdgpu_loaded)) {
                         /* Fake a system change to trigger
                          * a reconfiguration
                          */
@@ -4044,7 +4056,8 @@ int main(int argc, char *argv[]) {
                 else {
                     /* See if fglrx is in use */
                     /* Kernel module is available */
-                    if (((fglrx_loaded || fglrx_kmod_available) && !fglrx_blacklisted) && (!radeon_loaded || radeon_blacklisted)) {
+                    if (((fglrx_loaded || fglrx_kmod_available) && !fglrx_blacklisted) &&
+                        (!radeon_loaded || radeon_blacklisted) && (!amdgpu_loaded || amdgpu_blacklisted)) {
                         /* Try to enable fglrx */
                         enable_fglrx(alternative, boot_vga_vendor_id, current_devices, cards_n);
                     }
@@ -4053,7 +4066,7 @@ int main(int argc, char *argv[]) {
                         /* If both the closed kernel module and the open
                          * kernel module are loaded, then we're in trouble
                          */
-                        if ((fglrx_loaded && radeon_loaded) ||
+                        if ((fglrx_loaded && (radeon_loaded || amdgpu_loaded)) ||
                             (nvidia_loaded && nouveau_loaded)) {
                             /* Fake a system change to trigger
                              * a reconfiguration
