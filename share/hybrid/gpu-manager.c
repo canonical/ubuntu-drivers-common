@@ -57,6 +57,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <linux/limits.h>
+#include <sys/utsname.h>
 #include "xf86drm.h"
 #include "xf86drmMode.h"
 
@@ -2161,18 +2162,39 @@ void find_disabled_cards(char *dir, struct device **devices,
 
 
 /* Check if a kernel module is available for the current kernel */
-static bool is_module_available(const char *module) {
-    _cleanup_free_ char *match = NULL;
-    char command[100];
+static bool is_module_available(const char *module)
+{
+    char dir[PATH_MAX];
+    struct dirent *dp;
+    DIR *dfd;
+    struct utsname uname_data;
+    bool status = false;
 
-    snprintf(command, sizeof(command),
-             "find /lib/modules/$(uname -r) -name '%s*.ko' -print",
-             module);
-    match = get_output(command, module, "fb");
-
-    if (!match)
+    if (uname(&uname_data) < 0) {
+        fprintf(stderr, "Error: uname failed\n");
         return false;
-    return true;
+    }
+
+    sprintf(dir, "/lib/modules/%s/updates/dkms", uname_data.release);
+
+    fprintf(log_handle, "Looking for %s modules in %s\n", module, dir);
+
+    if ((dfd = opendir(dir)) == NULL) {
+        fprintf(stderr, "Error: can't open %s\n", dir);
+        return false;
+    }
+
+    while ((dp = readdir(dfd)) != NULL) {
+        if (!starts_with(dp->d_name, module))
+            continue;
+
+        status = true;
+        fprintf(log_handle, "Found %s module: %s\n", module, dp->d_name);
+        break;
+    }
+    closedir(dfd);
+
+    return status;
 }
 
 
