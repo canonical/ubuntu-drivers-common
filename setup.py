@@ -12,6 +12,8 @@ if '86' in os.uname()[4]:
     extra_data.append(("/usr/bin/", ["share/hybrid/gpu-manager"]))
     extra_data.append(("/etc/init/", ["share/hybrid/gpu-manager.conf"]))
     extra_data.append(("/lib/systemd/system/", ["share/hybrid/gpu-manager.service"]))
+    extra_data.append(("/sbin/", ["share/hybrid/u-d-c-print-pci-ids"]))
+    extra_data.append(("/lib/udev/rules.d/", ["share/hybrid/71-u-d-c-gpu-detection.rules"]))
 
 # Make the nvidia-installer hooks executable
 for x in glob.glob("nvidia-installer-hooks/*"):
