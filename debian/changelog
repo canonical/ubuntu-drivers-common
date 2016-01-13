@@ -1,8 +1,17 @@
-ubuntu-drivers-common (1:0.4.14) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.14) xenial; urgency=medium
 
-  * 
+  * gpu-manager.{c|py}:
+    - Rely on udev for card detection. This helps detecting if a module
+      was unloaded or if a card was disabled on a hybrid system.
+      In addition to being more accurate (LP: #1485236), this should also
+      be much faster on boot (LP: #1307069).
+    - Restrict the search for built modules to the dkms directory. This
+      improves performance.
+  * debian/rules, setup.py, 71-u-d-c-gpu-detection.rules,
+    u-d-c-print-pci-ids:
+    - Provide a udev rule to detect cards and modules.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 11 Jan 2016 12:30:02 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 13 Jan 2016 10:35:18 +0100
 
 ubuntu-drivers-common (1:0.4.13) xenial; urgency=medium
 
