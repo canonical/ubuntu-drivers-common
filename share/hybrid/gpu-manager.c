@@ -102,6 +102,7 @@ static int dry_run = 0;
 static int fake_lightdm = 0;
 static char *fake_modules_path = NULL;
 static char *fake_alternatives_path = NULL;
+static char *fake_egl_alternatives_path = NULL;
 static char *fake_core_alternatives_path = NULL;
 static char *gpu_detection_path = NULL;
 static char *prime_settings = NULL;
@@ -137,22 +138,29 @@ struct alternatives {
      *  detect the installer
      */
     int nvidia_available;
+    int nvidia_egl_available;
     int fglrx_available;
     int fglrx_core_available;
     int mesa_available;
+    int mesa_egl_available;
     int pxpress_available;
     int prime_available;
+    int prime_egl_available;
 
     /* The ones that may be enabled */
     int nvidia_enabled;
+    int nvidia_egl_enabled;
     int fglrx_enabled;
     int fglrx_core_enabled;
     int mesa_enabled;
+    int mesa_egl_enabled;
     int pxpress_enabled;
     int prime_enabled;
+    int prime_egl_enabled;
 
     char *current;
     char *current_core;
+    char *current_egl;
 };
 
 static bool is_file(char *file);
@@ -592,6 +600,67 @@ static void get_architecture_paths(char **main_arch_path,
 }
 
 
+/* Get the master link of an alternative */
+static char* get_alternative_link(const char *alternative_pattern, const char *fake_path,
+                                  char *arch_path, char *pattern) {
+    char *alternative = NULL;
+    char command[300];
+    _cleanup_fclose_ FILE *file = NULL;
+
+    if (dry_run && fake_path) {
+        file = fopen(fake_path, "r");
+        if (file == NULL) {
+            fprintf(stderr, "Warning: I couldn't open %s (fake alternatives path) for reading.\n",
+                    fake_path);
+            return NULL;
+        }
+        while (fgets(command, sizeof(command), file)) {
+            /* Make sure we don't catch prime by mistake when
+             * looking for nvidia
+             */
+            if (strcmp(pattern, "nvidia") == 0) {
+                if (strstr(command, pattern) != NULL) {
+                    alternative = strdup(command);
+                    break;
+                }
+            }
+            else {
+                if (strstr(command, pattern) != NULL) {
+                alternative = strdup(command);
+                break;
+                }
+            }
+        }
+    }
+    else {
+        snprintf(command, sizeof(command),
+                 "update-alternatives --list %s_%s_conf",
+                 alternative_pattern, arch_path);
+
+        /* Make sure we don't catch prime by mistake when
+         * looking for nvidia
+         */
+        if (strcmp(pattern, "nvidia") == 0)
+            alternative = get_output(command, pattern, "prime");
+        else
+            alternative = get_output(command, pattern, NULL);
+    }
+
+    return alternative;
+}
+
+
+/* Get the master link of a GL alternative */
+static char* get_gl_alternative_link(char *arch_path, char *pattern) {
+    return get_alternative_link("gl", fake_alternatives_path, arch_path, pattern);
+}
+
+/* Get the master link of an EGL alternative */
+static char* get_egl_alternative_link(char *arch_path, char *pattern) {
+    return get_alternative_link("egl", fake_egl_alternatives_path, arch_path, pattern);
+}
+
+#if 0
 /* Get the master link of a GL alternative */
 static char* get_gl_alternative_link(char *arch_path, char *pattern) {
     char *alternative = NULL;
@@ -639,7 +708,7 @@ static char* get_gl_alternative_link(char *arch_path, char *pattern) {
 
     return alternative;
 }
-
+#endif
 
 /* Get the master link of a core alternative */
 static char* get_core_alternative_link(char *arch_path, char *pattern) {
@@ -754,45 +823,66 @@ static bool is_sddm_default() {
 
 
 static void detect_available_alternatives(struct alternatives *info, char *pattern) {
-    if (strstr(pattern, "mesa")) {
-        info->mesa_available = 1;
-    }
-    else if (strstr(pattern, "fglrx")) {
-        info->fglrx_available = 1;
-    }
-    else if (strstr(pattern, "pxpress")) {
-        info->pxpress_available = 1;
-    }
-    else if (strstr(pattern, "nvidia")) {
-        if (strstr(pattern, "prime") != NULL) {
-            info->prime_available = 1;
+    /* EGL alternatives */
+    if (strstr(pattern, "egl")) {
+        if (strstr(pattern, "mesa")) {
+            info->mesa_egl_available = 1;
         }
-        else {
-            info->nvidia_available = 1;
+        else if (strstr(pattern, "nvidia")) {
+            if (strstr(pattern, "prime")) {
+                info->prime_egl_available = 1;
+            }
+            else {
+                info->nvidia_egl_available = 1;
+            }
         }
     }
-}
-
-
-static void detect_available_core_alternatives(struct alternatives *info, char *pattern) {
-    /* Currently only fglrx has a core alternative */
-    if (strstr(pattern, "fglrx"))
-        info->fglrx_core_available = 1;
+    else {
+        if (strstr(pattern, "mesa")) {
+            info->mesa_available = 1;
+        }
+        else if (strstr(pattern, "fglrx")) {
+            if (strstr(pattern, "core"))
+                info->fglrx_core_available = 1;
+            else
+                info->fglrx_available = 1;
+        }
+        else if (strstr(pattern, "pxpress")) {
+            info->pxpress_available = 1;
+        }
+        else if (strstr(pattern, "nvidia")) {
+            if (strstr(pattern, "prime")) {
+                info->prime_available = 1;
+            }
+            else {
+                info->nvidia_available = 1;
+            }
+        }
+    }
 }
 
 
 static void detect_enabled_alternatives(struct alternatives *info) {
-    if (strstr(info->current, "mesa") != NULL) {
+    if (!info) {
+        fprintf(log_handle, "Warning: invalid alternative struct\n");
+        return;
+    }
+    if (!info->current) {
+        fprintf(log_handle, "Warning: invalid current alternative\n");
+        return;
+    }
+
+    if (strstr(info->current, "mesa")) {
         info->mesa_enabled = 1;
     }
-    else if (strstr(info->current, "fglrx") != NULL) {
+    else if (strstr(info->current, "fglrx")) {
         info->fglrx_enabled = 1;
     }
-    else if (strstr(info->current, "pxpress") != NULL) {
+    else if (strstr(info->current, "pxpress")) {
         info->pxpress_enabled = 1;
     }
-    else if (strstr(info->current, "nvidia") != NULL) {
-        if (strstr(info->current, "prime") != NULL) {
+    else if (strstr(info->current, "nvidia")) {
+        if (strstr(info->current, "prime")) {
             info->prime_enabled = 1;
         }
         else {
@@ -803,14 +893,41 @@ static void detect_enabled_alternatives(struct alternatives *info) {
 
 
 static void detect_enabled_core_alternatives(struct alternatives *info) {
+    if (!info->current_core) {
+        fprintf(log_handle, "Warning: invalid current core alternative\n");
+        return;
+    }
+
     /* Currently only fglrx has a core alternative */
-    if (info->current_core && strstr(info->current_core, "fglrx") != NULL)
+    if (istrstr(info->current_core, "fglrx"))
         info->fglrx_core_enabled = 1;
 }
 
 
-static bool get_gl_alternatives(struct alternatives *info, const char *master_link) {
+static void detect_enabled_egl_alternatives(struct alternatives *info) {
+    if (!info->current) {
+        fprintf(log_handle, "Warning: invalid current egl alternative\n");
+        return;
+    }
+
+    if (strstr(info->current_egl, "mesa")) {
+        info->mesa_egl_enabled = 1;
+    }
+    else if (strstr(info->current_egl, "nvidia")) {
+        if (strstr(info->current_egl, "prime")) {
+            info->prime_egl_enabled = 1;
+        }
+        else {
+            info->nvidia_egl_enabled = 1;
+        }
+    }
+}
+
+
+static bool get_alternatives(const char *pattern, const char * path, void (*fcn)(struct alternatives*),
+                             struct alternatives *info, const char *master_link) {
     int len;
+    char **current_target;
     char command[200];
     char buffer[1035];
     _cleanup_pclose_ FILE *pfile = NULL;
@@ -818,20 +935,33 @@ static bool get_gl_alternatives(struct alternatives *info, const char *master_li
     char *other = NULL;
     const char ch = '/';
 
+
+    if (strcmp(pattern, "egl") == 0)
+        current_target =  &info->current_egl;
+    else if (strcmp(pattern, "gl") == 0)
+        current_target =  &info->current;
+    else if (strcmp(pattern, "gfxcore") == 0)
+        current_target =  &info->current_core;
+    else {
+        fprintf(log_handle, "Error: can't recognise pattern: %s\n", pattern);
+        return false;
+    }
+
     /* Test */
-    if (fake_alternatives_path) {
-        pfile = fopen(fake_alternatives_path, "r");
+    if (path) {
+        pfile = fopen(path, "r");
         if (pfile == NULL) {
-            fprintf(log_handle, "Warning: can't open fake_alternatives_path %s\n", fake_alternatives_path);
+            fprintf(log_handle, "Warning: can't open alternatives path: %s\n", path);
             return false;
         }
         /* Set the enabled alternatives in the struct */
-        detect_enabled_alternatives(info);
+        /* detect_enabled_alternatives(info); */
+        (*fcn)(info);
     }
     else {
         snprintf(command, sizeof(command),
-                 "/usr/bin/update-alternatives --query %s_gl_conf",
-                 master_link);
+                 "/usr/bin/update-alternatives --query %s_%s_conf",
+                 master_link, pattern);
 
         pfile = popen(command, "r");
         if (pfile == NULL) {
@@ -847,19 +977,20 @@ static bool get_gl_alternatives(struct alternatives *info, const char *master_li
                 /* If info->current is not NULL, then it's a fake
                  * alternative, which we won't override
                  */
-                if (!info->current) {
-                    info->current = strdup(value);
+                if (!(*current_target)) {
+                    *current_target = strdup(value);
                     /* Remove newline */
-                    len = strlen(info->current);
-                    if(info->current[len-1] == '\n' )
-                       info->current[len-1] = 0;
+                    len = strlen(*current_target);
+                    if((*current_target)[len-1] == '\n' )
+                       (*current_target)[len-1] = 0;
                 }
                 /* Set the enabled alternatives in the struct */
-                detect_enabled_alternatives(info);
+                /* detect_enabled_alternatives(info); */
+                (*fcn)(info);
             }
 
         }
-        else if (strstr(buffer, "Alternative:") || fake_alternatives_path) {
+        else if (strstr(buffer, "Alternative:") || path) {
             other = strchr(buffer, ch);
             if (other != NULL) {
                 /* Set the available alternatives in the struct */
@@ -868,75 +999,24 @@ static bool get_gl_alternatives(struct alternatives *info, const char *master_li
         }
     }
 
+    current_target = NULL;
+
     return true;
 }
 
 
+static bool get_gl_alternatives(struct alternatives *info, const char *master_link) {
+    return get_alternatives("gl", fake_alternatives_path, detect_enabled_alternatives, info, master_link);
+}
+
+
+static bool get_egl_alternatives(struct alternatives *info, const char *master_link) {
+    return get_alternatives("egl", fake_egl_alternatives_path, detect_enabled_egl_alternatives, info, master_link);
+}
+
+
 static bool get_core_alternatives(struct alternatives *info, const char *master_link) {
-    int len;
-    char command[200];
-    char buffer[1035];
-    _cleanup_pclose_ FILE *pfile = NULL;
-    char *value = NULL;
-    char *other = NULL;
-    const char ch = '/';
-
-    /* Initialise optional values */
-    info->current_core = NULL;
-    info->fglrx_core_available = 0;
-    info->fglrx_core_enabled = 0;
-
-    /* Test */
-    if (fake_core_alternatives_path) {
-        pfile = fopen(fake_core_alternatives_path, "r");
-        if (pfile == NULL) {
-            fprintf(log_handle, "Warning: can't open fake_core_alternatives_path %s\n", fake_core_alternatives_path);
-            return false;
-        }
-        /* Set the enabled alternatives in the struct */
-        detect_enabled_core_alternatives(info);
-    }
-    else {
-        snprintf(command, sizeof(command),
-                 "/usr/bin/update-alternatives --query %s_gfxcore_conf",
-                 master_link);
-
-        pfile = popen(command, "r");
-        if (pfile == NULL) {
-            fprintf(stderr, "Failed to run command: %s\n", command);
-            return false;
-        }
-    }
-
-    while (fgets(buffer, sizeof(buffer), pfile) != NULL) {
-        if (strstr(buffer, "Value:")) {
-            value = strchr(buffer, ch);
-            if (value != NULL) {
-                /* If info->current is not NULL, then it's a fake
-                 * alternative, which we won't override
-                 */
-                if (!info->current_core) {
-                    info->current_core = strdup(value);
-                    /* Remove newline */
-                    len = strlen(info->current_core);
-                    if(info->current_core[len-1] == '\n' )
-                       info->current_core[len-1] = 0;
-                }
-                /* Set the enabled alternatives in the struct */
-                detect_enabled_core_alternatives(info);
-            }
-
-        }
-        else if (strstr(buffer, "Alternative:") || fake_core_alternatives_path) {
-            other = strchr(buffer, ch);
-            if (other != NULL) {
-                /* Set the available alternatives in the struct */
-                detect_available_core_alternatives(info, other);
-            }
-        }
-    }
-
-    return true;
+    return get_alternatives("gfxcore", fake_core_alternatives_path, detect_enabled_core_alternatives, info, master_link);
 }
 
 
@@ -974,9 +1054,16 @@ static bool set_alternative(char *arch_path, char *alternative, char *link_name)
     return (status != -1);
 }
 
+
 /* Get the master link of a gl alternative */
 static bool set_gl_alternative(char *arch_path, char *alternative) {
     return set_alternative(arch_path, alternative, "gl");
+}
+
+
+/* Get the master link of an egl alternative */
+static bool set_egl_alternative(char *arch_path, char *alternative) {
+    return set_alternative(arch_path, alternative, "egl");
 }
 
 
@@ -989,7 +1076,9 @@ static bool set_core_alternative(char *arch_path, char *alternative) {
 static bool select_driver(char *driver) {
     bool status = false;
     _cleanup_free_ char *alternative = NULL;
+    _cleanup_free_ char *egl_alternative = NULL;
     alternative = get_gl_alternative_link(main_arch_path, driver);
+    egl_alternative = get_egl_alternative_link(main_arch_path, driver);
 
     if (alternative == NULL) {
         fprintf(log_handle, "Error: no alternative found for %s\n", driver);
@@ -1012,6 +1101,29 @@ static bool select_driver(char *driver) {
             }
         }
     }
+
+    if (egl_alternative == NULL) {
+        fprintf(log_handle, "Warning: no EGL alternative found for %s\n", driver);
+    }
+    else {
+       /* Set the EGL alternative */
+        status = set_egl_alternative(main_arch_path, egl_alternative);
+
+        /* Only for amd64 */
+        if (status && strcmp(main_arch_path, "x86_64-linux-gnu") == 0) {
+            /* Free the alternative */
+            free(egl_alternative);
+            egl_alternative = NULL;
+
+            /* Try to get the alternative for the other architecture */
+            egl_alternative = get_egl_alternative_link(other_arch_path, driver);
+            if (egl_alternative) {
+                /* No need to check its status */
+                set_egl_alternative(other_arch_path, egl_alternative);
+            }
+        }
+    }
+
     return status;
 }
 
@@ -1304,10 +1416,10 @@ static void enable_pxpress_amd_settings(bool discrete_enabled) {
     unsigned int new_status = discrete_enabled ? 4 : 0;
     char command[200];
 
-    snprintf(command, sizeof(command), "sed -i s/EnabledFlags=V%d/EnabledFlags=V%d/g %s",
+    snprintf(command, sizeof(command), "sed -i s/EnabledFlags=V%u/EnabledFlags=V%u/g %s",
              old_status, new_status, amd_pcsdb_file);
 
-    fprintf(log_handle, "Setting EnabledFlags to %d\n", new_status);
+    fprintf(log_handle, "Setting EnabledFlags to %u\n", new_status);
 
     system(command);
 }
@@ -3093,9 +3205,11 @@ int main(int argc, char *argv[]) {
         {"xorg-conf-file", required_argument, 0, 'x'},
         {"amd-pcsdb-file", required_argument, 0, 'd'},
         {"fake-alternative", required_argument, 0, 'a'},
+        {"fake-egl-alternative", required_argument, 0, 'c'},
         {"fake-core-alternative", required_argument, 0, 'q'},
         {"fake-modules-path", required_argument, 0, 'm'},
         {"fake-alternatives-path", required_argument, 0, 'p'},
+        {"fake-egl-alternatives-path", required_argument, 0, 'r'},
         {"fake-core-alternatives-path", required_argument, 0, 'o'},
         {"gpu-detection-path", required_argument, 0, 's'},
         {"prime-settings", required_argument, 0, 'z'},
@@ -3110,7 +3224,7 @@ int main(int argc, char *argv[]) {
         /* getopt_long stores the option index here. */
         int option_index = 0;
 
-        opt = getopt_long (argc, argv, "lbnfxdampzyghij:::",
+        opt = getopt_long (argc, argv, "a:b:c:d:f:g:h:i:j:k:l:m:n:o:p:q:r:s:x:y:z:",
                         long_options, &option_index);
 
         /* Detect the end of the options. */
@@ -3176,16 +3290,28 @@ int main(int argc, char *argv[]) {
                 break;
             case 'a':
                 /* printf("option -a with value '%s'\n", optarg); */
-                alternative = calloc(1, sizeof(struct alternatives));
                 if (!alternative) {
+                alternative = calloc(1, sizeof(struct alternatives));
+                    if (!alternative)
+                        abort();
+                }
+                alternative->current = strdup(optarg);
+                if (!alternative->current) {
+                    free(alternative);
                     abort();
                 }
-                else {
-                    alternative->current = strdup(optarg);
-                    if (!alternative->current) {
-                        free(alternative);
+                break;
+            case 'c':
+                /* printf("option -a with value '%s'\n", optarg); */
+                if (!alternative) {
+                alternative = calloc(1, sizeof(struct alternatives));
+                    if (!alternative)
                         abort();
-                    }
+                }
+                alternative->current_egl = strdup(optarg);
+                if (!alternative->current_egl) {
+                    free(alternative);
+                    abort();
                 }
                 break;
             case 'q':
@@ -3210,6 +3336,14 @@ int main(int argc, char *argv[]) {
                 fake_alternatives_path = malloc(strlen(optarg) + 1);
                 if (fake_alternatives_path)
                     strcpy(fake_alternatives_path, optarg);
+                else
+                    abort();
+                break;
+            case 'r':
+                /* printf("option -p with value '%s'\n", optarg); */
+                fake_egl_alternatives_path = malloc(strlen(optarg) + 1);
+                if (fake_egl_alternatives_path)
+                    strcpy(fake_egl_alternatives_path, optarg);
                 else
                     abort();
                 break;
@@ -3632,6 +3766,7 @@ int main(int argc, char *argv[]) {
     if (!alternative)
         alternative = calloc(1, sizeof(struct alternatives));
     get_gl_alternatives(alternative, main_arch_path);
+    get_egl_alternatives(alternative, main_arch_path);
     get_core_alternatives(alternative, main_arch_path);
 
     if (!alternative->current) {
@@ -3641,19 +3776,26 @@ int main(int argc, char *argv[]) {
 
     fprintf(log_handle, "Current alternative: %s\n", alternative->current);
     fprintf(log_handle, "Current core alternative: %s\n", alternative->current_core);
+    fprintf(log_handle, "Current egl alternative: %s\n", alternative->current_egl);
 
     fprintf(log_handle, "Is nvidia enabled? %s\n", alternative->nvidia_enabled ? "yes" : "no");
+    fprintf(log_handle, "Is nvidia egl enabled? %s\n", alternative->nvidia_egl_enabled ? "yes" : "no");
     fprintf(log_handle, "Is fglrx enabled? %s\n", alternative->fglrx_enabled ? "yes" : "no");
     fprintf(log_handle, "Is mesa enabled? %s\n", alternative->mesa_enabled ? "yes" : "no");
+    fprintf(log_handle, "Is mesa egl enabled? %s\n", alternative->mesa_egl_enabled ? "yes" : "no");
     fprintf(log_handle, "Is pxpress enabled? %s\n", alternative->pxpress_enabled ? "yes" : "no");
     fprintf(log_handle, "Is prime enabled? %s\n", alternative->prime_enabled ? "yes" : "no");
+    fprintf(log_handle, "Is prime egl enabled? %s\n", alternative->prime_egl_enabled ? "yes" : "no");
 
     fprintf(log_handle, "Is nvidia available? %s\n", alternative->nvidia_available ? "yes" : "no");
+    fprintf(log_handle, "Is nvidia egl available? %s\n", alternative->nvidia_egl_available ? "yes" : "no");
     fprintf(log_handle, "Is fglrx available? %s\n", alternative->fglrx_available ? "yes" : "no");
     fprintf(log_handle, "Is fglrx-core available? %s\n", alternative->fglrx_core_available ? "yes" : "no");
     fprintf(log_handle, "Is mesa available? %s\n", alternative->mesa_available ? "yes" : "no");
+    fprintf(log_handle, "Is mesa egl available? %s\n", alternative->mesa_egl_available ? "yes" : "no");
     fprintf(log_handle, "Is pxpress available? %s\n", alternative->pxpress_available ? "yes" : "no");
     fprintf(log_handle, "Is prime available? %s\n", alternative->prime_available ? "yes" : "no");
+    fprintf(log_handle, "Is prime egl available? %s\n", alternative->prime_egl_available ? "yes" : "no");
 
     /* If the module is loaded but the alternatives are not there
      * we're probably dealing with a proprietary installer
@@ -4111,6 +4253,9 @@ end:
 
     if (fake_alternatives_path)
         free(fake_alternatives_path);
+
+    if (fake_egl_alternatives_path)
+        free(fake_egl_alternatives_path);
 
     if (fake_core_alternatives_path)
         free(fake_core_alternatives_path);

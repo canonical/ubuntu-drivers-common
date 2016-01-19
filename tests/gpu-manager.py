@@ -48,11 +48,14 @@ class GpuTest(object):
                  nvidia_loaded=False,
                  nvidia_unloaded=False,
                  nvidia_enabled=False,
+                 nvidia_egl_enabled=False,
                  nvidia_blacklisted=False,
                  fglrx_enabled=False,
                  fglrx_blacklisted=False,
                  mesa_enabled=False,
+                 mesa_egl_enabled=False,
                  prime_enabled=False,
+                 prime_egl_enabled=False,
                  pxpress_enabled=False,
                  has_changed=False,
                  has_removed_xorg=False,
@@ -82,11 +85,14 @@ class GpuTest(object):
         self.nvidia_loaded = nvidia_loaded
         self.nvidia_unloaded = nvidia_unloaded
         self.nvidia_enabled = nvidia_enabled
+        self.nvidia_egl_enabled = nvidia_egl_enabled
         self.nvidia_blacklisted = nvidia_blacklisted
         self.fglrx_enabled = fglrx_enabled
         self.fglrx_blacklisted = fglrx_blacklisted
         self.mesa_enabled = mesa_enabled
+        self.mesa_egl_enabled = mesa_egl_enabled
         self.prime_enabled = prime_enabled
+        self.prime_egl_enabled = prime_egl_enabled
         self.pxpress_enabled = pxpress_enabled
         self.has_changed = has_changed
         self.has_removed_xorg = has_removed_xorg
@@ -104,44 +110,46 @@ class GpuManagerTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(klass):
-        klass.last_boot_file = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.last_boot_file = tempfile.NamedTemporaryFile(mode='w', prefix='last_boot_file_', dir=tests_path, delete=False)
         klass.last_boot_file.close()
-        klass.new_boot_file = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.new_boot_file = tempfile.NamedTemporaryFile(mode='w', prefix='new_boot_file_', dir=tests_path, delete=False)
         klass.new_boot_file.close()
-        klass.xorg_file = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.xorg_file = tempfile.NamedTemporaryFile(mode='w', prefix='xorg_file_', dir=tests_path, delete=False)
         klass.xorg_file.close()
-        klass.amd_pcsdb_file = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.amd_pcsdb_file = tempfile.NamedTemporaryFile(mode='w', prefix='amd_pcsdb_file_', dir=tests_path, delete=False)
         klass.amd_pcsdb_file.close()
-        klass.fake_lspci = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.fake_lspci = tempfile.NamedTemporaryFile(mode='w', prefix='fake_lspci_', dir=tests_path, delete=False)
         klass.fake_lspci.close()
-        klass.fake_modules = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.fake_modules = tempfile.NamedTemporaryFile(mode='w', prefix='fake_modules_', dir=tests_path, delete=False)
         klass.fake_modules.close()
-        klass.fake_alternatives = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.fake_alternatives = tempfile.NamedTemporaryFile(mode='w', prefix='fake_alternatives_', dir=tests_path, delete=False)
         klass.fake_alternatives.close()
-        klass.fake_core_alternatives = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.fake_egl_alternatives = tempfile.NamedTemporaryFile(mode='w', prefix='fake_egl_alternatives_', dir=tests_path, delete=False)
+        klass.fake_egl_alternatives.close()
+        klass.fake_core_alternatives = tempfile.NamedTemporaryFile(mode='w', prefix='fake_core_alternatives_', dir=tests_path, delete=False)
         klass.fake_core_alternatives.close()
         klass.gpu_detection_path = tests_path or "/tmp"
         klass.module_detection_file = tests_path or "/tmp"
         klass.gpu_detection_file = tests_path or "/tmp"
-        klass.prime_settings = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.prime_settings = tempfile.NamedTemporaryFile(mode='w', prefix='prime_settings_', dir=tests_path, delete=False)
         klass.prime_settings.close()
-        klass.bbswitch_path = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.bbswitch_path = tempfile.NamedTemporaryFile(mode='w', prefix='bbswitch_path_', dir=tests_path, delete=False)
         klass.bbswitch_path.close()
-        klass.bbswitch_quirks_path = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.bbswitch_quirks_path = tempfile.NamedTemporaryFile(mode='w', prefix='bbswitch_quirks_path_', dir=tests_path, delete=False)
         klass.bbswitch_quirks_path.close()
-        klass.dmi_product_version_path = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.dmi_product_version_path = tempfile.NamedTemporaryFile(mode='w', prefix='dmi_product_version_path_', dir=tests_path, delete=False)
         klass.dmi_product_version_path.close()
-        klass.dmi_product_name_path = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.dmi_product_name_path = tempfile.NamedTemporaryFile(mode='w', prefix='dmi_product_name_path_', dir=tests_path, delete=False)
         klass.dmi_product_name_path.close()
-        klass.nvidia_driver_version_path = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.nvidia_driver_version_path = tempfile.NamedTemporaryFile(mode='w', prefix='nvidia_driver_version_path_', dir=tests_path, delete=False)
         klass.nvidia_driver_version_path.close()
-        klass.modprobe_d_path = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.modprobe_d_path = tempfile.NamedTemporaryFile(mode='w', prefix='modprobe_d_path_', dir=tests_path, delete=False)
         klass.modprobe_d_path.close()
 
-        klass.log = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.log = tempfile.NamedTemporaryFile(mode='w', prefix='log_', dir=tests_path, delete=False)
         klass.log.close()
 
-        klass.valgrind_log = tempfile.NamedTemporaryFile(mode='w', dir=tests_path, delete=False)
+        klass.valgrind_log = tempfile.NamedTemporaryFile(mode='w', prefix='valgrind_log_', dir=tests_path, delete=False)
         klass.valgrind_log.close()
 
         # Patterns
@@ -149,6 +157,7 @@ class GpuManagerTest(unittest.TestCase):
         klass.is_driver_unloaded_pt = re.compile('Was (.+) unloaded\? (.+)')
         klass.is_driver_blacklisted_pt = re.compile('Is (.+) blacklisted\? (.+)')
         klass.is_driver_enabled_pt = re.compile('Is (.+) enabled\? (.+)')
+        klass.is_egl_driver_enabled_pt = re.compile('Is (.+) egl enabled\? (.+)')
         klass.has_card_pt = re.compile('Has (.+)\? (.+)')
         klass.single_card_pt = re.compile('Single card detected.*')
         klass.requires_offloading_pt = re.compile('Does it require offloading\? (.+)')
@@ -170,7 +179,8 @@ class GpuManagerTest(unittest.TestCase):
         klass.vendors = {'amd': 0x1002, 'nvidia': 0x10de,
                         'intel': 0x8086, 'unknown': 0x1016}
 
-        klass.fake_alternative = ''
+        klass.fake_alternative = 'null'
+        klass.fake_egl_alternative = 'null'
         klass.fake_core_alternative = 'null'
 
 
@@ -186,7 +196,7 @@ class GpuManagerTest(unittest.TestCase):
         #self.remove_amd_pcsdb_file()
 
     def tearDown(self):
-        print(self.this_function_name, 'over')
+        print('%s over\n' % self.this_function_name)
         # Remove all the logs
         self.handle_logs(delete=True)
 
@@ -252,6 +262,7 @@ class GpuManagerTest(unittest.TestCase):
             self.fake_lspci,
             self.fake_modules,
             self.fake_alternatives,
+            self.fake_egl_alternatives,
             self.fake_core_alternatives,
             self.module_detection_file,
             self.gpu_detection_file,
@@ -314,12 +325,16 @@ class GpuManagerTest(unittest.TestCase):
                    self.amd_pcsdb_file.name,
                    '--fake-alternative',
                    self.fake_alternative,
+                   '--fake-egl-alternative',
+                   self.fake_egl_alternative,
                    '--fake-core-alternative',
                    self.fake_core_alternative,
                    '--fake-modules-path',
                    self.fake_modules.name,
                    '--fake-alternatives-path',
                    self.fake_alternatives.name,
+                   '--fake-egl-alternatives-path',
+                   self.fake_egl_alternatives.name,
                    '--fake-core-alternatives-path',
                    self.fake_core_alternatives.name,
                    '--gpu-detection-path',
@@ -389,6 +404,7 @@ class GpuManagerTest(unittest.TestCase):
             is_driver_unloaded = self.is_driver_unloaded_pt.match(line)
             is_driver_blacklisted = self.is_driver_blacklisted_pt.match(line)
             is_driver_enabled = self.is_driver_enabled_pt.match(line)
+            is_egl_driver_enabled = self.is_egl_driver_enabled_pt.match(line)
             loaded_and_enabled = self.loaded_and_enabled_pt.match(line)
 
             matched_quirk = self.matched_quirk_pt.match(line)
@@ -446,7 +462,15 @@ class GpuManagerTest(unittest.TestCase):
                     gpu_test.amdgpu_unloaded = (is_driver_unloaded.group(2).strip().lower() == 'yes')
                 elif is_driver_unloaded.group(1).strip().lower() == 'fglrx':
                     gpu_test.fglrx_unloaded = (is_driver_unloaded.group(2).strip().lower() == 'yes')
-            # Detect the alternative
+            # Detect the egl alternative
+            elif is_egl_driver_enabled:
+                if is_egl_driver_enabled.group(1).strip().lower() == 'nvidia':
+                    gpu_test.nvidia_egl_enabled = (is_egl_driver_enabled.group(2).strip().lower() == 'yes')
+                elif is_egl_driver_enabled.group(1).strip().lower() == 'mesa':
+                    gpu_test.mesa_egl_enabled = (is_egl_driver_enabled.group(2).strip().lower() == 'yes')
+                elif is_egl_driver_enabled.group(1).strip().lower() == 'prime':
+                    gpu_test.prime_egl_enabled = (is_egl_driver_enabled.group(2).strip().lower() == 'yes')
+            # Detect the gl alternative
             elif is_driver_enabled:
                 if is_driver_enabled.group(1).strip().lower() == 'nvidia':
                     gpu_test.nvidia_enabled = (is_driver_enabled.group(2).strip().lower() == 'yes')
@@ -670,6 +694,7 @@ class GpuManagerTest(unittest.TestCase):
     def set_params(self, last_boot, current_boot,
                    loaded_modules, available_drivers,
                    enabled_driver,
+                   enabled_egl_driver='',
                    unloaded_module='',
                    proprietary_installer=False,
                    matched_quirk=False,
@@ -678,7 +703,8 @@ class GpuManagerTest(unittest.TestCase):
                    bump_discrete_device_id=False,
                    first_boot=False,
                    nvidia_version='',
-                   core_alternatives=False):
+                   core_alternatives=False,
+                   egl_alternatives=False):
 
         # Last boot
         if first_boot:
@@ -732,6 +758,37 @@ class GpuManagerTest(unittest.TestCase):
         else:
             self.fake_alternative = '/usr/lib/x86_64-linux-gnu/%s/ld.so.conf' % (enabled_driver)
 
+
+        if egl_alternatives:
+            self.fake_egl_alternatives = open(self.fake_egl_alternatives.name, 'w')
+
+            if 'mesa' in available_drivers:
+                self.fake_egl_alternatives.write('/usr/lib/x86_64-linux-gnu/mesa-egl/ld.so.conf\n')
+
+            # Only one of these at a time
+            if 'nvidia' in available_drivers:
+                self.fake_egl_alternatives.write('/usr/lib/nvidia-331-updates-prime/ld.so.conf\n')
+                self.fake_egl_alternatives.write('/usr/lib/nvidia-331-updates/ld.so.conf\n')
+            elif 'fglrx' in available_drivers:
+                self.fake_egl_alternatives.write('/usr/lib/pxpress/ld.so.conf\n')
+            else:
+                for driver in available_drivers:
+                    self.fake_egl_alternatives.write('/usr/lib/x86_64-linux-gnu/%s/ld.so.conf\n' % (driver))
+            self.fake_egl_alternatives.close()
+
+            if enabled_egl_driver == 'mesa':
+                self.fake_egl_alternative = '/usr/lib/x86_64-linux-gnu/mesa-egl/ld.so.conf'
+            elif enabled_egl_driver == 'nvidia':
+                self.fake_egl_alternative = '/usr/lib/nvidia-331-updates/ld.so.conf'
+            elif enabled_egl_driver == 'fglrx':
+                self.fake_egl_alternative = '/usr/lib/fglrx/ld.so.conf'
+            elif enabled_egl_driver == 'prime':
+                self.fake_egl_alternative = '/usr/lib/nvidia-331-updates-prime/ld.so.conf'
+            elif enabled_egl_driver == 'pxpress':
+                self.fake_egl_alternative = '/usr/lib/pxpress/ld.so.conf'
+            else:
+                self.fake_egl_alternative = '/usr/lib/x86_64-linux-gnu/%s/ld.so.conf' % (enabled_egl_driver)
+
         if nvidia_version:
             self.set_nvidia_version(nvidia_version)
 
@@ -751,6 +808,7 @@ class GpuManagerTest(unittest.TestCase):
     def run_manager_and_get_data(self, last_boot, current_boot,
                    loaded_modules, available_drivers,
                    enabled_driver,
+                   enabled_egl_driver='',
                    unloaded_module='',
                    requires_offloading=False,
                    module_is_available=False,
@@ -761,11 +819,13 @@ class GpuManagerTest(unittest.TestCase):
                    bump_discrete_device_id=False,
                    first_boot=False,
                    nvidia_version='',
-                   core_alternatives=False):
+                   core_alternatives=False,
+                   egl_alternatives=False):
 
         self.set_params(last_boot, current_boot,
                    loaded_modules, available_drivers,
                    enabled_driver,
+                   enabled_egl_driver,
                    unloaded_module,
                    proprietary_installer,
                    matched_quirk,
@@ -774,7 +834,8 @@ class GpuManagerTest(unittest.TestCase):
                    bump_discrete_device_id,
                    first_boot,
                    nvidia_version,
-                   core_alternatives)
+                   core_alternatives,
+                   egl_alternatives)
 
         # Call the program
         self.exec_manager(requires_offloading=requires_offloading,
@@ -7141,6 +7202,1174 @@ EnabledFlags=V4''')
         self.assertFalse(gpu_test.has_not_acted)
 
 
+    def test_laptop_one_intel_one_nvidia_binary_egl(self):
+        '''laptop: intel + nvidia - EGL'''
+        self.this_function_name = sys._getframe().f_code.co_name
+
+        # Case 1a: the discrete card is now available (BIOS)
+        #          the driver is enabled and the module is loaded
+
+        # Set dmi product version
+        self.set_dmi_product_version('ThinkPad T410s')
+
+        # Set default quirks
+        self.set_bbswitch_quirks()
+
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
+
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
+
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='nvidia',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check quirks
+        self.assertTrue(gpu_test.matched_quirk)
+        self.assertTrue(gpu_test.loaded_with_args)
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_egl_enabled)
+
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_egl_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        self.assertFalse(gpu_test.prime_egl_enabled)
+        # Has changed
+        # Enable when we support hybrid laptops
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 1b: the discrete card is now available (BIOS)
+        #          the driver is enabled but the module is not loaded
+
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
+
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
+
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='nvidia',
+                                                 egl_alternatives=True)
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_egl_enabled)
+
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_unloaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_egl_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        self.assertFalse(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 1c: the discrete card is now available (BIOS)
+        #          the driver is not enabled but the module is loaded
+
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
+
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
+
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='mesa',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is enabled
+        self.assertTrue(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_egl_enabled)
+
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_egl_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        self.assertFalse(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 1d: the discrete card is now available (BIOS)
+        #          prime is enabled and the module is loaded
+
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
+
+        # Request action from bbswitch
+        self.request_prime_discrete_on(False)
+
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='prime',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_egl_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 1e: the discrete card is now available (BIOS)
+        #          prime is enabled but the module is not loaded
+
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
+
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
+
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='prime',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_egl_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        # Fall back to mesa
+        self.assertTrue(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 1f: the discrete card is now available (BIOS)
+        #          prime is not enabled but the module is loaded
+
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
+
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
+
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='mesa',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is enabled
+        self.assertTrue(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_egl_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        self.assertFalse(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 1g: the discrete card is now available (BIOS)
+        #          the driver is enabled and the module is loaded
+        #          the nvidia driver version is too old to support
+        #          prime offloading, so we fall back to Mesa.
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 requires_offloading=True,
+                                                 nvidia_version="304.123",
+                                                 enabled_egl_driver='nvidia',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_egl_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        self.assertFalse(gpu_test.prime_egl_enabled)
+        # Has changed
+        # Enable when we support hybrid laptops
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 2a: the discrete card was already available (BIOS)
+        #          the driver is enabled and the module is loaded
+
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
+
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
+
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='nvidia',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_egl_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        self.assertFalse(gpu_test.prime_egl_enabled)
+        # Has changed
+
+        # Enable when we support hybrid laptops
+        self.assertFalse(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 2b: the discrete card was already available (BIOS)
+        #          the driver is enabled but the module is not loaded
+
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
+
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
+
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='nvidia',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_egl_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        self.assertFalse(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertFalse(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 2c: the discrete card was already available (BIOS)
+        #          the driver is not enabled but the module is loaded
+
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
+
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
+
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='mesa',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is enabled
+        self.assertTrue(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_egl_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        self.assertFalse(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertFalse(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 2d: the discrete card was already available (BIOS)
+        #          prime is enabled and the module is loaded
+
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
+
+        # Request action from bbswitch
+        self.request_prime_discrete_on(False)
+
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='prime',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_egl_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertFalse(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 2e: the discrete card was already available (BIOS)
+        #          prime is enabled but the module is not loaded
+
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
+
+        # Request action from bbswitch
+        self.request_prime_discrete_on(False)
+
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='prime',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_egl_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertFalse(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        # Fallback
+        self.assertTrue(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 2f: the discrete card was already available (BIOS)
+        #          prime is not enabled but the module is loaded
+
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(True)
+
+        # Request action from bbswitch
+        self.request_prime_discrete_on(False)
+
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='mesa',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is enabled
+        self.assertTrue(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_egl_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        self.assertFalse(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertFalse(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        # Select PRIME
+        self.assertTrue(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 3a: the discrete card is no longer available (BIOS)
+        #          the driver is enabled and the module is loaded
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='nvidia',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertTrue(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_egl_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        self.assertFalse(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 3b: the discrete card is no longer available (BIOS)
+        #          the driver is enabled but the module is not loaded
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='nvidia',
+                                                 egl_alternatives=True)
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertTrue(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertTrue(gpu_test.nvidia_enabled)
+        self.assertTrue(gpu_test.nvidia_egl_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        self.assertFalse(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 3c: the discrete card is no longer available (bbswitch)
+        #          prime is enabled and the module is not loaded
+
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(False)
+
+        # Request action from bbswitch
+        self.request_prime_discrete_on(False)
+
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime',
+                                                 unloaded_module='nvidia',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='prime',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertTrue(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_egl_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 3d: the discrete card is no longer available (bbswitch)
+        #          prime is enabled and the module is not loaded and
+        #          we need to select nvidia for better performance
+
+        # Set default bbswitch status
+        self.set_prime_discrete_default_status_on(False)
+
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
+
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'fake'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime',
+                                                 unloaded_module='nvidia',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='prime',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertTrue(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_egl_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 3e: the discrete card is no longer available (BIOS)
+        #          the driver is not enabled but the module is loaded
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='mesa',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertTrue(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is enabled
+        self.assertTrue(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_egl_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        self.assertFalse(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 3f: the discrete card is no longer available (BIOS)
+        #          prime is enabled and the module is loaded
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='prime',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertTrue(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_egl_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 3g: the discrete card is no longer available (BIOS)
+        #          prime is enabled but the module is not loaded
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915'],
+                                                 ['mesa', 'nvidia'],
+                                                 'prime',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='prime',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertTrue(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is not enabled
+        self.assertFalse(gpu_test.mesa_enabled)
+        self.assertFalse(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_egl_enabled)
+        self.assertTrue(gpu_test.prime_enabled)
+        self.assertTrue(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 3h: the discrete card is no longer available (BIOS)
+        #          prime is not enabled but the module is loaded
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'mesa',
+                                                 requires_offloading=True,
+                                                 enabled_egl_driver='mesa',
+                                                 egl_alternatives=True)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertTrue(gpu_test.requires_offloading)
+
+        self.assertTrue(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is enabled
+        self.assertTrue(gpu_test.mesa_enabled)
+        self.assertTrue(gpu_test.mesa_egl_enabled)
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        self.assertFalse(gpu_test.nvidia_egl_enabled)
+        self.assertFalse(gpu_test.prime_enabled)
+        self.assertFalse(gpu_test.prime_egl_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
     def test_desktop_one_intel_one_nvidia_binary(self):
         '''desktop: intel + nvidia'''
         self.this_function_name = sys._getframe().f_code.co_name
@@ -11373,7 +12602,7 @@ EndSection
         self.fake_alternatives.close()
 
         # no selected alternative
-        self.fake_alternative = ''
+        self.fake_alternative = 'null'
 
         self.exec_manager(requires_offloading=False)
 
