@@ -1877,8 +1877,11 @@ static bool prime_enable_discrete() {
     status = prime_set_discrete(1);
 
     /* Load the module */
-    if (status)
+    if (status) {
+        /* This may not be available */
+        load_module("nvidia-modeset");
         status = load_module("nvidia");
+    }
 
     return status;
 }
@@ -1896,6 +1899,9 @@ static bool prime_disable_discrete() {
 
     /* Unload nvidia-uvm or nvidia won't be unloaded */
     unload_module("nvidia-uvm");
+
+    /* Unload nvidia-modeset or nvidia won't be unloaded */
+    unload_module("nvidia-modeset");
 
     /* Unload the module */
     status = unload_module("nvidia");
