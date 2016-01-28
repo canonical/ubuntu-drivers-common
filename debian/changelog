@@ -1,8 +1,13 @@
-ubuntu-drivers-common (1:0.4.15) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.15) xenial; urgency=medium
 
-  * 
+  * gpu-manager.{c|py}:
+    - Add support for managing EGL alternatives.
+    - Make sure to load and to unload the new nvidia-modeset module for
+      prime.
+  * 71-u-d-c-gpu-detection.rules, u-d-c-print-pci-ids:
+    - Fix fglrx detection.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 28 Jan 2016 17:28:06 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 28 Jan 2016 17:29:27 +0100
 
 ubuntu-drivers-common (1:0.4.14) xenial; urgency=medium
 
