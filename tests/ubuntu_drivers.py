@@ -349,7 +349,10 @@ class DetectTest(unittest.TestCase):
 
         sec = (stop.ru_utime + stop.ru_stime) - (start.ru_utime + start.ru_stime)
         sys.stderr.write('[%.2f s] ' % sec)
-        self.assertLess(sec, 30.0)
+        if 'arm' in os.uname().machine:
+            self.assertLess(sec, 90.0)
+        else:
+            self.assertLess(sec, 30.0)
 
     def test_system_driver_packages_chroot(self):
         '''system_driver_packages() for test package repository'''
