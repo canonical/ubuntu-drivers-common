@@ -1,9 +1,9 @@
-ubuntu-drivers-common (1:0.4.17) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.17) xenial; urgency=medium
 
   * tests/ubuntu_drivers.py: Allow test_system_driver_packages_performance()
     90s on ARM, as 30s is not enough on slow buildds.
 
- -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 12 Apr 2016 11:02:26 +0200
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 12 Apr 2016 11:03:37 +0200
 
 ubuntu-drivers-common (1:0.4.16) xenial; urgency=medium
 
