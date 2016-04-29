@@ -635,7 +635,7 @@ static char* get_alternative_link(const char *alternative_pattern, const char *f
     else {
         snprintf(command, sizeof(command),
                  "update-alternatives --list %s_%s_conf",
-                 alternative_pattern, arch_path);
+                 arch_path, alternative_pattern);
 
         /* Make sure we don't catch prime by mistake when
          * looking for nvidia
