@@ -1,8 +1,11 @@
-ubuntu-drivers-common (1:0.4.18) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.18) yakkety; urgency=medium
 
-  * 
+  * gpu-manager.c:
+    - Pass the arguments in the correct order when getting
+      the list of alternatives (LP: #1575960).
+      Thanks to Rafał Cieślak for the fix.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 29 Apr 2016 11:22:48 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 29 Apr 2016 12:29:03 +0200
 
 ubuntu-drivers-common (1:0.4.17) xenial; urgency=medium
 
