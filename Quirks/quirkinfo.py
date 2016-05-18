@@ -44,7 +44,7 @@ class QuirkInfo:
             try:
                 value = open(os.path.join(self.sys_dir,
                     'class', 'dmi', 'id', item)).read().strip()
-            except (OSError, IOError):
+            except (OSError, IOError, UnicodeDecodeError):
                 value = ''
             self._quirk_info[item] = value
         
