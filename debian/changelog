@@ -1,6 +1,10 @@
 ubuntu-drivers-common (1:0.4.19) UNRELEASED; urgency=medium
 
-  * 
+  [ Ying-Chun Liu (PaulLiu) ]
+  * Quirks/quirkinfo.py:
+    - Catch and ignore UnicodeDecodeErrors in dmi info, as some machines
+      may report board_name as ffffffffffff0a to mean empty, and this
+      causes an error in python 3.
 
  -- Alberto Milone <alberto.milone@canonical.com>  Thu, 19 May 2016 13:00:13 +0200
 
