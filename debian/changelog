@@ -1,12 +1,19 @@
-ubuntu-drivers-common (1:0.4.19) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.19) yakkety; urgency=medium
+
+  [ Alberto Milone ]
+  * gpu-manager.c:
+    - Fix memory leak in get_alternatives(). Make sure to always free
+      alternatives->current_core and alternatives->current_egl.
+    - Partially drop the drm code, and get information about connectors
+      from sysf. This fixes a long standing performance issue (LP: #1586933).
 
   [ Ying-Chun Liu (PaulLiu) ]
   * Quirks/quirkinfo.py:
     - Catch and ignore UnicodeDecodeErrors in dmi info, as some machines
       may report board_name as ffffffffffff0a to mean empty, and this
-      causes an error in python 3.
+      causes an error in python 3 (LP: #1320868).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 19 May 2016 13:00:13 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 30 May 2016 16:17:42 +0200
 
 ubuntu-drivers-common (1:0.4.18) yakkety; urgency=medium
 
