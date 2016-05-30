@@ -4216,6 +4216,10 @@ end:
     if (alternative) {
         if (alternative->current)
             free(alternative->current);
+        if (alternative->current_core)
+            free(alternative->current_core);
+        if (alternative->current_egl)
+            free(alternative->current_egl);
         free(alternative);
     }
 
