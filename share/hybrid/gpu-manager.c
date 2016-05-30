@@ -2443,89 +2443,61 @@ static bool is_device_pci_passthrough(struct pci_device *info) {
 }
 
 
-/* Count the number of outputs connected to the card */
-int count_connected_outputs(int fd, drmModeResPtr res) {
-    int i;
-    int connected_outputs = 0;
-    drmModeConnectorPtr connector;
+/* Check the drm connector status */
+static bool is_connector_connected(const char *connector) {
+    bool status = false;
+    char line[50];
+    _cleanup_fclose_ FILE *file = NULL;
 
-    for (i = 0; i < res->count_connectors; i++) {
-        connector = drmModeGetConnector(fd, res->connectors[i]);
+    file = fopen(connector, "r");
 
-        if (connector) {
-            switch (connector->connection) {
-            case DRM_MODE_CONNECTED:
-                fprintf(log_handle, "output %d:\n", connected_outputs);
-                connected_outputs += 1;
+    if (!file)
+        return false;
 
-                switch (connector->connector_type) {
-                case DRM_MODE_CONNECTOR_Unknown:
-                    fprintf(log_handle, "\tunknown connector\n");
-                    break;
-                case DRM_MODE_CONNECTOR_VGA:
-                    fprintf(log_handle, "\tVGA connector\n");
-                    break;
-                case DRM_MODE_CONNECTOR_DVII:
-                    fprintf(log_handle, "\tDVII connector\n");
-                    break;
-                case DRM_MODE_CONNECTOR_DVID:
-                    fprintf(log_handle, "\tDVID connector\n");
-                    break;
-                case DRM_MODE_CONNECTOR_DVIA:
-                    fprintf(log_handle, "\tDVIA connector\n");
-                    break;
-                case DRM_MODE_CONNECTOR_Composite:
-                    fprintf(log_handle, "\tComposite connector\n");
-                    break;
-                case DRM_MODE_CONNECTOR_SVIDEO:
-                    fprintf(log_handle, "\tSVIDEO connector\n");
-                    break;
-                case DRM_MODE_CONNECTOR_LVDS:
-                    fprintf(log_handle, "\tLVDS connector\n");
-                    break;
-                case DRM_MODE_CONNECTOR_Component:
-                    fprintf(log_handle, "\tComponent connector\n");
-                    break;
-                case DRM_MODE_CONNECTOR_9PinDIN:
-                    fprintf(log_handle, "\t9PinDIN connector\n");
-                    break;
-                case DRM_MODE_CONNECTOR_DisplayPort:
-                    fprintf(log_handle, "\tDisplayPort connector\n");
-                    break;
-                case DRM_MODE_CONNECTOR_HDMIA:
-                    fprintf(log_handle, "\tHDMIA connector\n");
-                    break;
-                case DRM_MODE_CONNECTOR_HDMIB:
-                    fprintf(log_handle, "\tHDMIB connector\n");
-                    break;
-                case DRM_MODE_CONNECTOR_TV:
-                    fprintf(log_handle, "\tTV connector\n");
-                    break;
-                case DRM_MODE_CONNECTOR_eDP:
-                    fprintf(log_handle, "\teDP connector\n");
-                    break;
-#if 0
-                case DRM_MODE_CONNECTOR_VIRTUAL:
-                    fprintf(log_handle, "VIRTUAL connector\n");
-                    break;
-                case DRM_MODE_CONNECTOR_DSI:
-                    fprintf(log_handle, "DSI connector\n");
-                    break;
-#endif
-                default:
-                    break;
-                }
-
-
-                break;
-            case DRM_MODE_DISCONNECTED:
-                break;
-            default:
-                break;
-            }
-            drmModeFreeConnector(connector);
+    while (fgets(line, sizeof(line), file)) {
+        char *tok;
+        tok = strtok(line, " \t");
+        if (starts_with(tok, "connected")) {
+            status = true;
+            break;
         }
     }
+
+    return status;
+}
+
+
+/* Count the number of outputs connected to the card */
+int count_connected_outputs(const char *device_name) {
+    char name[50];
+    struct dirent *dp;
+    DIR *dfd;
+    int connected_outputs = 0;
+    char drm_dir[] = "/sys/class/drm";
+
+    if ((dfd = opendir(drm_dir)) == NULL) {
+        fprintf(stderr, "Warning: can't open %s\n", drm_dir);
+        return connected_outputs;
+    }
+
+    while ((dp = readdir(dfd)) != NULL) {
+        if (!starts_with(dp->d_name, device_name))
+            continue;
+        if (strlen(drm_dir)+strlen(dp->d_name)+2 > sizeof(name))
+            fprintf(stderr, "Warning: name %s/%s too long\n",
+                    drm_dir, dp->d_name);
+        else {
+            /* Open the file for the connector */
+            sprintf(name, "%s/%s/status", drm_dir, dp->d_name);
+            if (is_connector_connected(name)) {
+                fprintf(log_handle, "output %d:\n", connected_outputs);
+                fprintf(log_handle, "\t%s\n", dp->d_name);
+                connected_outputs++;
+            }
+        }
+    }
+    closedir(dfd);
+
     return connected_outputs;
 }
 
@@ -2538,11 +2510,11 @@ static int has_driver_connected_outputs(const char *driver) {
     struct dirent* dir_entry;
     char path[20];
     int fd = 1;
-    drmModeResPtr res;
     drmVersionPtr version;
     int connected_outputs = 0;
     int driver_match = 0;
     char dri_dir[] = "/dev/dri";
+    _cleanup_free_ char *device_path= NULL;
 
     if (NULL == (dir = opendir(dri_dir))) {
         fprintf(log_handle, "Error : Failed to open %s\n", dri_dir);
@@ -2565,6 +2537,9 @@ static int has_driver_connected_outputs(const char *driver) {
                     fprintf(log_handle, "Found \"%s\", driven by \"%s\"\n",
                            path, version->name);
                     driver_match = 1;
+                    device_path = malloc(strlen(dir_entry->d_name)+1);
+                    if (device_path)
+                        strcpy(device_path, dir_entry->d_name);
                     drmFreeVersion(version);
                     break;
                 }
@@ -2584,24 +2559,17 @@ static int has_driver_connected_outputs(const char *driver) {
 
     closedir(dir);
 
+    close(fd);
+
     if (!driver_match)
         return -1;
 
-    res = drmModeGetResources(fd);
-    if (!res) {
-        fprintf(log_handle, "Error: can't get drm resources.\n");
-        drmClose(fd);
+    if (!device_path)
         return -1;
-    }
 
-
-    connected_outputs = count_connected_outputs(fd, res);
+    connected_outputs = count_connected_outputs(device_path);
 
     fprintf(log_handle, "Number of connected outputs for %s: %d\n", path, connected_outputs);
-
-    drmModeFreeResources(res);
-
-    close(fd);
 
     return (connected_outputs > 0);
 }
