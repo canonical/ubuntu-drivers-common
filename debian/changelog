@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.4.17.2) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 06 Jun 2016 12:46:48 +0200
+
 ubuntu-drivers-common (1:0.4.17.1) xenial-proposed; urgency=medium
 
   * gpu-manager.c:
