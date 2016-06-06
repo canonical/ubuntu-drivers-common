@@ -1,8 +1,25 @@
-ubuntu-drivers-common (1:0.4.17.2) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.17.2) xenial-proposed; urgency=medium
 
-  * 
+  [ Alberto Milone ]
+  * gpu-manager.c:
+    - Fix memory leak in get_alternatives(). Make sure to always free
+      alternatives->current_core and alternatives->current_egl.
+    - Partially drop the drm code, and get information about connectors
+      from sysf. This fixes a long standing performance issue (LP: #1586933).
+    - Disable persistence mode before powering down the dGPU.
+      If persistence mode is not disabled, gpu-manager will not be able to
+      unload the nvidia module (LP: #1619306).
+    - Make sure to load and unload nvidia-drm. This fixes a problem that
+      prevents the dGPU from being powered off in hybrid systems with
+      recent nvidia drivers (LP: #1619306).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 06 Jun 2016 12:46:48 +0200
+  [ Ying-Chun Liu (PaulLiu) ]
+  * Quirks/quirkinfo.py:
+    - Catch and ignore UnicodeDecodeErrors in dmi info, as some machines
+      may report board_name as ffffffffffff0a to mean empty, and this
+      causes an error in python 3 (LP: #1320868).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 06 Jun 2016 12:49:19 +0200
 
 ubuntu-drivers-common (1:0.4.17.1) xenial-proposed; urgency=medium
 
