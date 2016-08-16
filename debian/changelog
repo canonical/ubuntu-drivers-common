@@ -3,6 +3,7 @@ ubuntu-drivers-common (1:0.4.20) UNRELEASED; urgency=medium
   * Remove PackageKit plugin. This stopped working with packagekit 1.0 as its
     apt backend is gone and aptcc does not support plugins.
   * debian/control: Drop obsolete XS-Testsuite:.
+  * Bump Standards-Version to 3.9.8.
 
  -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 16 Aug 2016 11:41:07 +0200
 
