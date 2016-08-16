@@ -14,11 +14,9 @@ Build-Depends: debhelper (>= 9),
  pkg-config,
  python3-xkit (>= 0.5.0),
  aptdaemon,
- python3-aptdaemon.pkcompat,
  python3-aptdaemon.test (>= 0.43+bzr810-0ubuntu2~),
  python3-gi,
  gir1.2-glib-2.0,
- gir1.2-packagekitglib-1.0,
  gir1.2-umockdev-1.0,
  umockdev,
  alsa-utils,
@@ -54,7 +52,6 @@ Replaces: nvidia-common (<< 1:0.2.46), jockey-common, jockey-gtk, jockey-kde
 Conflicts: nvidia-common (<< 1:0.2.46), jockey-common, jockey-gtk, jockey-kde
 Breaks: nvidia-prime (<< 0.6)
 Provides: nvidia-common, jockey-common, jockey-gtk, jockey-kde
-Enhances: packagekit-system-interface
 Description: Detect and install additional Ubuntu driver packages
  This package aggregates and abstracts Ubuntu specific logic and knowledge
  about third-party driver packages. It provides:
@@ -65,16 +62,9 @@ Description: Detect and install additional Ubuntu driver packages
   - an "ubuntu-drivers" command line tool to list or install driver packages
     (mostly for integration in installers).
  .
-  - a PackageKit plugin for WhatProvides() for types MODALIAS and
-    HARDWARE_DRIVER, to do the same queries as above through the PackageKit API
-    (for using in non-distro specific GUIs). This works with aptdaemon's
-    PackageKit compatibility layer (python3-aptdaemon.pkcompat) and with
-    PackageKit's apt backend, but _not_ with the PackageKit aptcc backend.
- .
   - some NVidia specific support code to find the most appropriate driver
     version, as well as setting up the alternatives symlinks that the
     proprietary NVidia and FGLRX packages use.
-
 
 Package: dh-modaliases
 Architecture: all

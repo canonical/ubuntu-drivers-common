@@ -45,59 +45,6 @@ These functions only use python-apt. They do not need any other dependencies,
 root privileges, D-BUS calls, etc.
 
 
-PackageKit API
---------------
-If you want to integrate driver lookups in software which should not be
-distribution specific, or is not written in Python, you should use the
-PackageKit API instead of the UbuntuDrivers.detect Python module. In
-particular, ubuntu-drivers-common ships PackageKit plugins for the
-"WhatProvides" PackageKit query for the types "MODALIAS" (corresponding to
-UbuntuDrivers.detect.packages_for_modalias()), and "HARDWARE_DRIVER"
-(corresponding to UbuntuDrivers.detect.system_driver_packages()).
-This also works with aptdaemon's PackageKit compatibility layer
-(python-aptdaemon.pkcompat), which is the preferred PackageKit API
-implementation in Ubuntu.
-
-Please see
-
- http://www.packagekit.org/gtk-doc/PackageKit-pk-client-sync.html#pk-client-what-provides
-
-about the WhatProvides() API, and
-
- https://gitorious.org/packagekit/packagekit/blobs/master/docs/provides-component-naming.txt
-
-for details about the various WhatProvides types.
-
-Examples:
-
-From Python:
-
->>> from gi.repository import PackageKitGlib
->>> pk = PackageKitGlib.Client()
-
->>> res = pk.what_provides(PackageKitGlib.FilterEnum.NONE, PackageKitGlib.ProvidesEnum.MODALIAS, ["pci:v000010DEd000007E3sv00sd00bc03sc00i00"], None, lambda p, t, d: True, None)
->>> res.get_exit_code()
-<enum PK_EXIT_ENUM_SUCCESS of type PkExitEnum>
->>> for p in res.get_package_array(): print p.get_id()
-nvidia-current;295.53-0ubuntu1;amd64;Ubuntu
-nvidia-current-updates;295.53-0ubuntu1;amd64;Ubuntu
- 
->>> res = pk.what_provides(PackageKitGlib.FilterEnum.NONE, PackageKitGlib.ProvidesEnum.HARDWARE_DRIVER, ["drivers_for_attached_hardware"], None, lambda p, t, d: True, None)
->>> res.get_exit_code()
-<enum PK_EXIT_ENUM_SUCCESS of type PkExitEnum>
->>> for p in res.get_package_array(): print p.get_id()
-open-vm-dkms;2011.12.20-562307-0ubuntu1;all;Ubuntu
-
-Using the pkcon command line tool:
-
- $ pkcon what-provides "pci:v000010DEd000007E3sv00sd00bc03sc00i00"
- Available     nvidia-current-295.49-0ubuntu1.amd64        NVIDIA binary Xorg driver, kernel module and VDPAU library
- Available     nvidia-current-updates-295.49-0ubuntu1.amd64    NVIDIA binary Xorg driver, kernel module and VDPAU library
-
- $ pkcon what-provides "drivers_for_attached_hardware"
- Available      open-vm-dkms-2011.12.20-562307-0ubuntu1.all     Source for VMware guest systems driver (DKMS)
-  
-
 Detection logic
 ---------------
 The principal method of mapping hardware to driver packages is to use modalias

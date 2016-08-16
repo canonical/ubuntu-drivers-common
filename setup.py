@@ -39,7 +39,4 @@ setup(
                 ("/usr/lib/ubiquity/target-config", glob.glob("ubiquity/target-config/*")),
                ] + extra_data,
     scripts=["nvidia-detector", "quirks-handler", "ubuntu-drivers"],
-    entry_points="""[packagekit.apt.plugins]
-what_provides=UbuntuDrivers.PackageKit:what_provides
-""",
 )
