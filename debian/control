@@ -30,7 +30,6 @@ Standards-Version: 3.9.6
 Vcs-Git: git://github.com/tseliot/ubuntu-drivers-common.git
 Vcs-Browser: https://github.com/tseliot/ubuntu-drivers-common
 X-Python3-Version: >= 3.2
-XS-Testsuite: autopkgtest
 
 Package: ubuntu-drivers-common
 Architecture: any
