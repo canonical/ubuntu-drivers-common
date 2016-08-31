@@ -1992,6 +1992,9 @@ static bool prime_enable_discrete() {
     if (status) {
         /* This may not be available */
         load_module("nvidia-modeset");
+        /* drm depends on modeset */
+        load_module("nvidia-drm");
+
         status = load_module("nvidia");
     }
 
@@ -2003,14 +2006,14 @@ static bool prime_enable_discrete() {
 static bool prime_disable_discrete() {
     bool status = false;
 
-    /* Tell nvidia-persistenced the nvidia card is about
-     * to be switched off
-     */
-    if (!dry_run)
-        system("/sbin/initctl emit nvidia-off");
+    /* Disable persistence mode (just in case) */
+    system("/usr/bin/nvidia-smi -pm 0");
 
     /* Unload nvidia-uvm or nvidia won't be unloaded */
     unload_module("nvidia-uvm");
+
+    /* Unload nvidia-drm or nvidia won't be unloaded */
+    unload_module("nvidia-drm");
 
     /* Unload nvidia-modeset or nvidia won't be unloaded */
     unload_module("nvidia-modeset");
