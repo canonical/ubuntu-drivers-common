@@ -1,8 +1,11 @@
-ubuntu-drivers-common (1:0.4.21) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.21) yakkety; urgency=medium
 
-  * 
+  * gpu-manager.c:
+    - Make sure to load and unload the new nvidia-drm module.
+      This fixes a problem that prevents the dGPU from being powered off
+      in hybrid systems with recent nvidia drivers.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 31 Aug 2016 11:43:23 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 31 Aug 2016 11:47:13 +0200
 
 ubuntu-drivers-common (1:0.4.20) yakkety; urgency=medium
 
