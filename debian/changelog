@@ -1,8 +1,11 @@
-ubuntu-drivers-common (1:0.4.22) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.22) yakkety; urgency=medium
 
-  * 
+  * gpu-manager.c:
+    - Disable persistence mode before powering down the dGPU.
+      If persistence mode is not disabled, gpu-manager will not be able to
+      unload the nvidia module.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 31 Aug 2016 17:42:20 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 31 Aug 2016 18:09:25 +0200
 
 ubuntu-drivers-common (1:0.4.21) yakkety; urgency=medium
 
