@@ -2003,11 +2003,15 @@ static bool prime_enable_discrete() {
 
 
 /* Power off the NVIDIA discrete card */
-static bool prime_disable_discrete() {
+static bool prime_disable_discrete(const int nvidia_version) {
     bool status = false;
+    char command[100];
 
     /* Disable persistence mode (just in case) */
-    system("/usr/bin/nvidia-smi -pm 0");
+    sprintf(command, "LD_LIBRARY_PATH=\"/usr/lib/nvidia-%d\" /usr/bin/nvidia-smi -pm 0",
+            nvidia_version);
+    fprintf(log_handle, "Disabling persistence mode\n");
+    system(command);
 
     /* Unload nvidia-uvm or nvidia won't be unloaded */
     unload_module("nvidia-uvm");
@@ -2881,7 +2885,7 @@ static bool enable_prime(const char *prime_settings,
                         struct alternatives *alternative,
                         struct device **devices,
                         int cards_n) {
-    int major, minor;
+    int major = 0, minor = 0;
     bool bbswitch_status = true, has_version = false;
     bool prime_discrete_on = false;
     bool prime_action_on = false;
@@ -2985,7 +2989,7 @@ static bool enable_prime(const char *prime_settings,
         }
         else {
             fprintf(log_handle, "Powering off the discrete card\n");
-            prime_disable_discrete();
+            prime_disable_discrete(major);
         }
     }
 
