@@ -58,6 +58,7 @@
 #include <errno.h>
 #include <linux/limits.h>
 #include <sys/utsname.h>
+#include <libkmod.h>
 #include "xf86drm.h"
 #include "xf86drmMode.h"
 
@@ -2876,6 +2877,56 @@ static bool get_nvidia_driver_version(int *major, int *minor) {
     }
 
     return true;
+}
+
+
+static char* get_module_version(const char *module_name) {
+    struct kmod_ctx *ctx = NULL;
+    struct kmod_module *mod = NULL;
+    struct kmod_list *l, *list = NULL;
+    int err;
+    char *version = NULL;
+
+    ctx = kmod_new(NULL, NULL);
+    err = kmod_module_new_from_name(ctx, module_name, &mod);
+    if (err < 0) {
+        fprintf(log_handle, "can't acquire module via kmod");
+        goto get_module_version_clean;
+    }
+
+    err = kmod_module_get_info(mod, &list);
+    if (err < 0) {
+        fprintf(log_handle, "can't get module info via kmod");
+        goto get_module_version_clean;
+    }
+
+    kmod_list_foreach(l, list) {
+        const char *key = kmod_module_info_get_key(l);
+
+        if (strcmp(key, "version") == 0) {
+            version = strdup(kmod_module_info_get_value(l));
+            break;
+        }
+    }
+
+get_module_version_clean:
+    if (list)
+        kmod_module_info_free_list(list);
+    if (mod)
+        kmod_module_unref(mod);
+    if (ctx)
+        kmod_unref(ctx);
+
+    return version;
+}
+
+
+static bool has_module_versioned(const char *module_name) {
+    _cleanup_free_ const char *version = NULL;
+
+    version = get_module_version(module_name);
+
+    return version ? true : false;
 }
 
 
