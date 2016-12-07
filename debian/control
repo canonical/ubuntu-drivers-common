@@ -27,7 +27,8 @@ Build-Depends: debhelper (>= 9),
  udev,
  pciutils,
  libdrm-dev,
- python3-dbus
+ python3-dbus,
+ libkmod-dev
 Standards-Version: 3.9.6
 Vcs-Git: git://github.com/tseliot/ubuntu-drivers-common.git
 Vcs-Browser: https://github.com/tseliot/ubuntu-drivers-common
