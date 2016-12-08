@@ -81,6 +81,7 @@ static inline void pclosep(FILE **);
 #define OFFLOADING_CONF "/var/lib/ubuntu-drivers-common/requires_offloading"
 #define XORG_CONF "/etc/X11/xorg.conf"
 #define KERN_PARAM "nogpumanager"
+#define AMDGPU_PRO_PX  "/opt/amdgpu-pro/bin/amdgpu-pro-px"
 
 #define AMD 0x1002
 #define INTEL 0x8086
@@ -93,6 +94,13 @@ typedef enum {
     MODESETTING,
     UXA
 } prime_intel_drv;
+
+typedef enum {
+    MODE_POWERSAVING,
+    MODE_PERFORMANCE,
+    RESET,
+    ISPX,
+} amdgpu_pro_px_action;
 
 static char *log_file = NULL;
 static FILE *log_handle = NULL;
@@ -3071,6 +3079,34 @@ static bool has_module_versioned(const char *module_name) {
 }
 
 
+static bool run_amdgpu_pro_px(amdgpu_pro_px_action action) {
+    int status = 0;
+    char command[100];
+
+    if (dry_run)
+        return true;
+
+    switch (action) {
+    case MODE_POWERSAVING:
+        snprintf(command, sizeof(command), "%s --%s", AMDGPU_PRO_PX, "mode powersaving");
+        break;
+    case MODE_PERFORMANCE:
+        snprintf(command, sizeof(command), "%s --%s", AMDGPU_PRO_PX, "mode performance");
+        break;
+    case RESET:
+        snprintf(command, sizeof(command), "%s --%s", AMDGPU_PRO_PX, "reset");
+        break;
+    case ISPX:
+        snprintf(command, sizeof(command), "%s --%s", AMDGPU_PRO_PX, "ispx");
+        break;
+    }
+
+    status = system(command);
+
+    return (status == 0);
+}
+
+
 static bool enable_prime(const char *prime_settings,
                         bool bbswitch_loaded,
                         unsigned int vendor_id,
@@ -3336,7 +3372,11 @@ int main(int argc, char *argv[]) {
     bool fglrx_blacklisted = false, nvidia_blacklisted = false,
          radeon_blacklisted = false, amdgpu_blacklisted = false,
          nouveau_blacklisted = false;
-    bool fglrx_kmod_available = false, nvidia_kmod_available = false;
+    bool fglrx_kmod_available = false, nvidia_kmod_available = false,
+         amdgpu_kmod_available = false;
+    bool amdgpu_versioned = false;
+    bool amdgpu_pro_px_installed = false;
+    bool amdgpu_is_pro = false;
     int offloading = false;
     int status = 0;
 
@@ -3773,18 +3813,24 @@ int main(int argc, char *argv[]) {
     radeon_blacklisted = is_module_blacklisted("radeon");
     amdgpu_loaded = is_module_loaded("amdgpu");
     amdgpu_blacklisted = is_module_blacklisted("amdgpu");
+    amdgpu_versioned = has_module_versioned("amdgpu");
+    amdgpu_pro_px_installed = exists_not_empty(AMDGPU_PRO_PX);
     nouveau_loaded = is_module_loaded("nouveau");
     nouveau_blacklisted = is_module_blacklisted("nouveau");
+
 
     if (fake_lspci_file) {
         fglrx_kmod_available = fake_module_available;
         nvidia_kmod_available = fake_module_available;
+        amdgpu_kmod_available = fake_module_available;
     }
     else {
         fglrx_kmod_available = is_module_available("fglrx");
         nvidia_kmod_available = is_module_available("nvidia");
+        amdgpu_kmod_available = is_module_available("amdgpu");
     }
 
+    amdgpu_is_pro = amdgpu_kmod_available && amdgpu_versioned;
 
     fprintf(log_handle, "Is nvidia loaded? %s\n", (nvidia_loaded ? "yes" : "no"));
     fprintf(log_handle, "Was nvidia unloaded? %s\n", (nvidia_unloaded ? "yes" : "no"));
@@ -3797,10 +3843,13 @@ int main(int argc, char *argv[]) {
     fprintf(log_handle, "Is radeon blacklisted? %s\n", (radeon_blacklisted ? "yes" : "no"));
     fprintf(log_handle, "Is amdgpu loaded? %s\n", (amdgpu_loaded ? "yes" : "no"));
     fprintf(log_handle, "Is amdgpu blacklisted? %s\n", (amdgpu_blacklisted ? "yes" : "no"));
+    fprintf(log_handle, "Is amdgpu versioned? %s\n", (amdgpu_versioned ? "yes" : "no"));
+    fprintf(log_handle, "Is amdgpu pro stack? %s\n", (amdgpu_is_pro ? "yes" : "no"));
     fprintf(log_handle, "Is nouveau loaded? %s\n", (nouveau_loaded ? "yes" : "no"));
     fprintf(log_handle, "Is nouveau blacklisted? %s\n", (nouveau_blacklisted ? "yes" : "no"));
     fprintf(log_handle, "Is fglrx kernel module available? %s\n", (fglrx_kmod_available ? "yes" : "no"));
     fprintf(log_handle, "Is nvidia kernel module available? %s\n", (nvidia_kmod_available ? "yes" : "no"));
+    fprintf(log_handle, "Is amdgpu kernel module available? %s\n", (amdgpu_kmod_available ? "yes" : "no"));
 
     /* Get the driver to use for intel in an optimus system */
     prime_intel_driver = get_prime_intel_driver();
@@ -4085,6 +4134,15 @@ int main(int argc, char *argv[]) {
                     fprintf(log_handle, "Nothing to do\n");
                 }
             }
+            else if (has_changed && amdgpu_loaded && amdgpu_is_pro && amdgpu_pro_px_installed) {
+                /* If amdgpu-pro-px exists, we can assume it's a pxpress system. But now the
+                 * system has one card only, user probably disabled Switchable Graphics in
+                 * BIOS. So we need to use discrete config file here.
+                 */
+                fprintf(log_handle, "AMDGPU-Pro discrete graphics detected\n");
+
+                run_amdgpu_pro_px(RESET);
+            }
             else {
                 /* If both the closed kernel module and the open
                  * kernel module are loaded, then we're in trouble
@@ -4177,6 +4235,15 @@ int main(int argc, char *argv[]) {
                 fprintf(log_handle, "PowerXpress detected\n");
 
                 enable_pxpress(alternative, current_devices, cards_n);
+            }
+            /* AMDGPU-Pro Switchable */
+            else if (has_changed && amdgpu_loaded && amdgpu_is_pro && amdgpu_pro_px_installed) {
+                /* Similar to switchable enabled -> disabled case, but this time
+                 * to deal with switchable disabled -> enabled change.
+                 */
+                fprintf(log_handle, "AMDGPU-Pro switchable graphics detected\n");
+
+                run_amdgpu_pro_px(MODE_POWERSAVING);
             }
             /* NVIDIA Optimus */
             else if (offloading && (intel_loaded && !nouveau_loaded &&
