@@ -1900,6 +1900,7 @@ static bool write_prime_xorg_conf(struct device **devices, int cards_n) {
                 "    Driver \"nvidia\"\n"
                 "    BusID \"PCI:%d@%d:%d:%d\"\n"
                 "    Option \"ConstrainCursor\" \"off\"\n"
+                "    Option \"nvidiaXineramaInfo\" \"off\"\n"
                 "EndSection\n\n"
                 "Section \"Screen\"\n"
                 "    Identifier \"nvidia\"\n"
