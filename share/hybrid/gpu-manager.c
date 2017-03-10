@@ -112,6 +112,7 @@ static char *dmi_product_name_path = NULL;
 static char *dmi_product_version_path = NULL;
 static char *nvidia_driver_version_path = NULL;
 static char *modprobe_d_path = NULL;
+static char *custom_xorg_conf_path = NULL;
 static char *main_arch_path = NULL;
 static char *other_arch_path = NULL;
 static prime_intel_drv prime_intel_driver = SNA;
@@ -1188,6 +1189,139 @@ static prime_intel_drv get_prime_intel_driver() {
     }
 
     return driver;
+}
+
+
+static bool copy_file(const char *src_path, const char *dst_path)
+{
+    _cleanup_fclose_ FILE *src = NULL;
+    _cleanup_fclose_ FILE *dst = NULL;
+    int src_fd, dst_fd;
+    int n = 0;
+    char buf[BUFSIZ];
+
+    src = fopen(src_path, "r");
+    if (src == NULL) {
+        fprintf(log_handle, "error: can't open %s for reading\n", src_path);
+        return false;
+    }
+
+    dst = fopen(dst_path, "w");
+    if (dst == NULL) {
+        fprintf(log_handle, "error: can't open %s for writing.\n",
+                dst_path);
+        return false;
+    }
+
+    src_fd = fileno(src);
+    dst_fd = fileno(dst);
+
+    fprintf(log_handle, "copying %s to %s...\n", src_path, dst_path);
+
+    while ((n = read(src_fd, buf, BUFSIZ)) > 0)
+        if (write(dst_fd, buf, n) != n) {
+            fprintf(log_handle, "write error on file %s\n", dst_path);
+            return false;
+        }
+
+    fprintf(log_handle, "%s was copied successfully to %s\n", src_path, dst_path);
+    return true;
+}
+
+
+static bool get_custom_xorg_name(const char *pattern, char **path)
+{
+    /* Let's accept non exact names only for testing purposes */
+    if (dry_run) {
+        DIR *dir;
+        struct dirent* dir_entry;
+
+        if (NULL == (dir = opendir(custom_xorg_conf_path))) {
+            fprintf(log_handle, "Error : Failed to open %s\n", custom_xorg_conf_path);
+            return false;
+        }
+
+        /* Keep looking until we find the custom xorg.conf with the same
+         * name pattern
+         */
+        while ((dir_entry = readdir(dir))) {
+            if (!starts_with(dir_entry->d_name, pattern))
+                continue;
+
+            *path = malloc(strlen(custom_xorg_conf_path) + strlen(dir_entry->d_name) + 2);
+            if (!*path)
+                return false;
+            fprintf(log_handle, "dir entry: %s\n", dir_entry->d_name);
+            snprintf(*path, sizeof(char) * (strlen(custom_xorg_conf_path) + strlen(dir_entry->d_name) + 2), "%s/%s", custom_xorg_conf_path, dir_entry->d_name);
+            break;
+        }
+        closedir(dir);
+    }
+    else {
+        *path = malloc(strlen(custom_xorg_conf_path) + strlen(pattern) + 2);
+        if (!*path)
+            return false;
+
+        snprintf(*path, sizeof(char) * (strlen(custom_xorg_conf_path) + strlen(pattern) + 2), "%s/%s",
+             custom_xorg_conf_path, pattern);
+    }
+
+    return true;
+}
+
+static bool has_custom_xorg_conf(const char *filename)
+{
+    _cleanup_free_ char *path = NULL;
+
+    get_custom_xorg_name(filename, &path);
+
+    return exists_not_empty(path);
+}
+
+
+static bool has_non_hybrid_conf_file(void)
+{
+    return has_custom_xorg_conf("non-hybrid");
+}
+
+
+static bool has_hybrid_performance_conf_file(void)
+{
+    return has_custom_xorg_conf("hybrid-performance");
+}
+
+
+static bool has_hybrid_power_saving_conf_file(void)
+{
+    return has_custom_xorg_conf("hybrid-power-saving");
+}
+
+
+static bool copy_custom_xorg_conf(const char *filename)
+{
+    _cleanup_free_ char *path = NULL;
+
+    get_custom_xorg_name(filename, &path);
+
+    return copy_file(path, xorg_conf_file);
+}
+
+
+static bool set_non_hybrid_xorg_conf(void)
+{
+    return copy_custom_xorg_conf("non-hybrid");
+}
+
+
+static bool set_hybrid_performance_xorg_conf(void)
+{
+    return copy_custom_xorg_conf("hybrid-performance");
+}
+
+
+static bool set_hybrid_power_saving_xorg_conf(void)
+{
+    return copy_custom_xorg_conf("hybrid-power-saving");
 }
 
 
@@ -2807,10 +2941,17 @@ static bool enable_nvidia(struct alternatives *alternative,
             /* Remove xorg.conf */
             remove_xorg_conf();
 
-            /* Only useful if more than one card is available */
-            if (cards_n > 1) {
-                /* Write xorg.conf */
-                write_to_xorg_conf(devices, cards_n, vendor_id, NULL);
+            /* Use custom xorg.conf for non hybrid systems */
+            if (has_non_hybrid_conf_file()) {
+                fprintf(log_handle, "Custom non-hybrid xorg.conf detected\n");
+                set_non_hybrid_xorg_conf();
+            }
+            else {
+                /* Only useful if more than one card is available */
+                if (cards_n > 1) {
+                    /* Write xorg.conf */
+                    write_to_xorg_conf(devices, cards_n, vendor_id, NULL);
+                }
             }
         }
         else {
@@ -2950,16 +3091,23 @@ static bool enable_prime(const char *prime_settings,
             enable_nvidia(alternative, vendor_id, devices, cards_n);
         }
 
-        if (!check_prime_xorg_conf(devices, cards_n)) {
-            fprintf(log_handle, "Check failed\n");
-
-            /* Remove xorg.conf */
-            remove_xorg_conf();
-            /* Write xorg.conf */
-            write_prime_xorg_conf(devices, cards_n);
+        /* Use custom xorg.conf for performance mode on hybrid systems */
+        if (has_hybrid_performance_conf_file()) {
+            fprintf(log_handle, "Custom hybrid performance xorg.conf detected\n");
+            set_hybrid_performance_xorg_conf();
         }
         else {
-            fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
+            if (!check_prime_xorg_conf(devices, cards_n)) {
+                fprintf(log_handle, "Check failed\n");
+
+                /* Remove xorg.conf */
+                remove_xorg_conf();
+                /* Write xorg.conf */
+                write_prime_xorg_conf(devices, cards_n);
+            }
+            else {
+                fprintf(log_handle, "No need to modify xorg.conf. Path: %s\n", xorg_conf_file);
+            }
         }
     }
     else {
@@ -2971,6 +3119,12 @@ static bool enable_prime(const char *prime_settings,
 
         /* Remove xorg.conf */
         remove_xorg_conf();
+
+        /* Use custom xorg.conf for power saving mode on hybrid systems */
+        if (has_hybrid_power_saving_conf_file()) {
+            fprintf(log_handle, "Custom hybrid power saving xorg.conf detected\n");
+            set_hybrid_power_saving_xorg_conf();
+        }
     }
 
     /* This means we need to call bbswitch
@@ -3194,12 +3348,13 @@ int main(int argc, char *argv[]) {
         {"dmi-product-name-path", required_argument, 0, 'i'},
         {"nvidia-driver-version-path", required_argument, 0, 'j'},
         {"modprobe-d-path", required_argument, 0, 'k'},
+        {"custom-xorg-conf-path", required_argument, 0, 't'},
         {0, 0, 0, 0}
         };
         /* getopt_long stores the option index here. */
         int option_index = 0;
 
-        opt = getopt_long (argc, argv, "a:b:c:d:f:g:h:i:j:k:l:m:n:o:p:q:r:s:x:y:z:",
+        opt = getopt_long (argc, argv, "a:b:c:d:f:g:h:i:j:k:l:m:n:o:p:q:r:s:t:x:y:z:",
                         long_options, &option_index);
 
         /* Detect the end of the options. */
@@ -3378,6 +3533,11 @@ int main(int argc, char *argv[]) {
                 if (!modprobe_d_path)
                     abort();
                 break;
+            case 't':
+                custom_xorg_conf_path = strdup(optarg);
+                if (!custom_xorg_conf_path)
+                    abort();
+                break;
             case '?':
                 /* getopt_long already printed an error message. */
                 exit(1);
@@ -3533,6 +3693,16 @@ int main(int argc, char *argv[]) {
         modprobe_d_path = strdup("/etc/modprobe.d");
         if (!modprobe_d_path) {
             fprintf(log_handle, "Couldn't allocate modprobe_d_path\n");
+            goto end;
+        }
+    }
+
+    if (custom_xorg_conf_path)
+        fprintf(log_handle, "custom_xorg_conf_path file: %s\n", custom_xorg_conf_path);
+    else {
+        custom_xorg_conf_path = strdup("/usr/share/gpu-manager.d");
+        if (!custom_xorg_conf_path) {
+            fprintf(log_handle, "Couldn't allocate custom_xorg_conf_path\n");
             goto end;
         }
     }
@@ -4265,6 +4435,9 @@ end:
 
     if (modprobe_d_path)
         free(modprobe_d_path);
+
+    if (custom_xorg_conf_path)
+        free(custom_xorg_conf_path);
 
     /* Free the devices structs */
     for(i = 0; i < cards_n; i++) {
