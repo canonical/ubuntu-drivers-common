@@ -70,7 +70,11 @@ class GpuTest(object):
                  has_custom_xorg_non_hybrid=False,
                  has_custom_xorg_hybrid_performance=False,
                  has_custom_xorg_hybrid_power_saving=False,
-                 copied_custom_xorg=False):
+                 copied_custom_xorg=False,
+                 module_is_versioned=False,
+                 amdgpu_pro_powersaving=False,
+                 amdgpu_pro_performance=False,
+                 amdgpu_pro_reset=False):
         self.has_single_card = has_single_card
         self.requires_offloading = requires_offloading
         self.has_intel = has_intel
@@ -112,6 +116,10 @@ class GpuTest(object):
         self.has_custom_xorg_hybrid_performance = has_custom_xorg_hybrid_performance
         self.has_custom_xorg_hybrid_power_saving = has_custom_xorg_hybrid_power_saving
         self.copied_custom_xorg = copied_custom_xorg
+        self.module_is_versioned = module_is_versioned
+        self.amdgpu_pro_powersaving = amdgpu_pro_powersaving
+        self.amdgpu_pro_performance = amdgpu_pro_performance
+        self.amdgpu_pro_reset = amdgpu_pro_reset
 
 
 class GpuManagerTest(unittest.TestCase):
@@ -132,6 +140,8 @@ class GpuManagerTest(unittest.TestCase):
         klass.xorg_hybrid_power_saving_file = tempfile.NamedTemporaryFile(mode='w', prefix='hybrid-power-saving_', dir=tests_path, delete=False)
         klass.xorg_hybrid_power_saving_file.close()
         klass.custom_xorg_path = tests_path or "/tmp"
+
+        klass.amdgpu_pro_px_file = tempfile.NamedTemporaryFile(mode='w', prefix='amdgpu_pro_px_file_', dir=tests_path, delete=False)
 
         klass.amd_pcsdb_file = tempfile.NamedTemporaryFile(mode='w', prefix='amd_pcsdb_file_', dir=tests_path, delete=False)
         klass.amd_pcsdb_file.close()
@@ -174,6 +184,7 @@ class GpuManagerTest(unittest.TestCase):
         klass.is_driver_unloaded_pt = re.compile('Was (.+) unloaded\? (.+)')
         klass.is_driver_blacklisted_pt = re.compile('Is (.+) blacklisted\? (.+)')
         klass.is_driver_enabled_pt = re.compile('Is (.+) enabled\? (.+)')
+        klass.is_driver_versioned_pt = re.compile('Is (.+) versioned\? (.+)')
         klass.is_egl_driver_enabled_pt = re.compile('Is (.+) egl enabled\? (.+)')
         klass.has_card_pt = re.compile('Has (.+)\? (.+)')
         klass.single_card_pt = re.compile('Single card detected.*')
@@ -194,6 +205,9 @@ class GpuManagerTest(unittest.TestCase):
         klass.has_added_gpu_from_file = re.compile('Adding GPU from file: (.+)')
         klass.copied_custom_xorg_pt = re.compile('(.+) was copied successfully to.*')
         klass.has_custom_xorg_pt = re.compile('Custom (.+) xorg.conf detected.*')
+        klass.amdgpu_pro_powersaving_pt = re.compile('Enabling power saving mode for amdgpu-pro.*')
+        klass.amdgpu_pro_performance_pt = re.compile('Enabling performance mode for amdgpu-pro.*')
+        klass.amdgpu_pro_reset_pt = re.compile('Resetting the script changes for amdgpu-pro.*')
 
         klass.vendors = {'amd': 0x1002, 'nvidia': 0x10de,
                         'intel': 0x8086, 'unknown': 0x1016}
@@ -297,6 +311,7 @@ class GpuManagerTest(unittest.TestCase):
             self.xorg_non_hybrid_file,
             self.xorg_hybrid_performance_file,
             self.xorg_hybrid_power_saving_file,
+            self.amdgpu_pro_px_file,
             self.amd_pcsdb_file,
             self.valgrind_log):
             try:
@@ -319,7 +334,8 @@ class GpuManagerTest(unittest.TestCase):
                 except:
                     pass
 
-    def exec_manager(self, requires_offloading=False, module_is_available=False, uses_lightdm=True):
+    def exec_manager(self, requires_offloading=False, module_is_available=False, uses_lightdm=True,
+                     module_is_versioned=False):
         fake_requires_offloading = requires_offloading and '--fake-requires-offloading' or '--fake-no-requires-offloading'
         fake_module_available = module_is_available and '--fake-module-is-available' or '--fake-module-is-not-available'
         if with_valgrind:
@@ -345,6 +361,8 @@ class GpuManagerTest(unittest.TestCase):
                    self.xorg_file.name,
                    '--custom-xorg-conf-path',
                    self.custom_xorg_path,
+                   '--amdgpu-pro-px-file',
+                   self.amdgpu_pro_px_file.name,
                    '--amd-pcsdb-file',
                    self.amd_pcsdb_file.name,
                    '--fake-alternative',
@@ -386,6 +404,9 @@ class GpuManagerTest(unittest.TestCase):
 
         if uses_lightdm:
             command.append('--fake-lightdm')
+
+        if module_is_versioned:
+            command.append('--fake-module-is-versioned')
 
         if valgrind:
             # Prepend the valgrind arguments
@@ -429,6 +450,7 @@ class GpuManagerTest(unittest.TestCase):
             is_driver_blacklisted = self.is_driver_blacklisted_pt.match(line)
             is_driver_enabled = self.is_driver_enabled_pt.match(line)
             is_egl_driver_enabled = self.is_egl_driver_enabled_pt.match(line)
+            is_driver_versioned = self.is_driver_versioned_pt.match(line)
             loaded_and_enabled = self.loaded_and_enabled_pt.match(line)
 
             matched_quirk = self.matched_quirk_pt.match(line)
@@ -450,6 +472,9 @@ class GpuManagerTest(unittest.TestCase):
             has_added_gpu_from_file = self.has_added_gpu_from_file.match(line)
             copied_custom_xorg = self.copied_custom_xorg_pt.match(line)
             has_custom_xorg = self.has_custom_xorg_pt.match(line)
+            amdgpu_pro_powersaving = self.amdgpu_pro_powersaving_pt.match(line)
+            amdgpu_pro_performance = self.amdgpu_pro_performance_pt.match(line)
+            amdgpu_pro_reset = self.amdgpu_pro_reset_pt.match(line)
 
             # Detect the vendor
             if has_changed:
@@ -513,6 +538,10 @@ class GpuManagerTest(unittest.TestCase):
                     gpu_test.nvidia_blacklisted = (is_driver_blacklisted.group(2).strip().lower() == 'yes')
                 elif is_driver_blacklisted.group(1).strip().lower() == 'fglrx':
                     gpu_test.fglrx_blacklisted = (is_driver_blacklisted.group(2).strip().lower() == 'yes')
+            elif is_driver_versioned:
+                if is_driver_versioned.group(1).strip().lower() == 'amdgpu':
+                    # no driver other than amdgpu pro requires this
+                    gpu_test.module_is_versioned = (is_driver_versioned.group(2).strip().lower() == 'yes')
             elif single_card:
                 gpu_test.has_single_card = True
             elif offloading:
@@ -561,15 +590,27 @@ class GpuManagerTest(unittest.TestCase):
                     gpu_test.has_custom_xorg_hybrid_power_saving = True
                 elif has_custom_xorg.group(1) == 'non-hybrid':
                     gpu_test.has_custom_xorg_non_hybrid = True
-
+            elif amdgpu_pro_powersaving:
+                gpu_test.amdgpu_pro_powersaving = True
+                gpu_test.has_not_acted = False
+            elif amdgpu_pro_performance:
+                gpu_test.amdgpu_pro_performance = True
+                gpu_test.has_not_acted = False
+            elif amdgpu_pro_reset:
+                gpu_test.amdgpu_pro_reset = True
+                gpu_test.has_not_acted = False
 
         # Close the log
         log.close()
 
         # No driver selection and no changes to xorg.conf
+        # We deliberately leave the amdgpu-pro settings
+        # out of this for now.
         if (not gpu_test.has_selected_driver and
            (not gpu_test.has_removed_xorg and
-            not gpu_test.has_regenerated_xorg)):
+            not gpu_test.has_regenerated_xorg) and not
+           (gpu_test.amdgpu_pro_powersaving or
+            amdgpu_pro_performance or amdgpu_pro_reset)):
             gpu_test.has_not_acted = True
 
         # Copy the logs
@@ -856,7 +897,8 @@ class GpuManagerTest(unittest.TestCase):
                    first_boot=False,
                    nvidia_version='',
                    core_alternatives=False,
-                   egl_alternatives=False):
+                   egl_alternatives=False,
+                   module_is_versioned=False):
 
         self.set_params(last_boot, current_boot,
                    loaded_modules, available_drivers,
@@ -875,7 +917,8 @@ class GpuManagerTest(unittest.TestCase):
 
         # Call the program
         self.exec_manager(requires_offloading=requires_offloading,
-                          module_is_available=module_is_available)
+                          module_is_available=module_is_available,
+                          module_is_versioned=module_is_versioned)
 
         # Return data
         return self.check_vars()
@@ -13105,6 +13148,180 @@ EndSection
         self.assertFalse(gpu_test.has_custom_xorg_hybrid_performance)
         self.assertFalse(gpu_test.has_custom_xorg_non_hybrid)
         self.assertTrue(gpu_test.copied_custom_xorg)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+    def test_laptop_one_intel_one_amd_amdgpu_pro(self):
+        '''laptop: intel + amdgpu-pro'''
+        self.this_function_name = sys._getframe().f_code.co_name
+
+        # Case 1a: the discrete card is now available (BIOS)
+        #          the driver is enabled and the module is loaded
+
+        # Fake the hybrid script
+        amdgpu_pro_px_file = open(self.amdgpu_pro_px_file.name, 'w')
+        amdgpu_pro_px_file.write('testing')
+        amdgpu_pro_px_file.close()
+
+        # Collect data
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'amd'],
+                                                 ['i915', 'amdgpu'],
+                                                 ['mesa'],
+                                                 'mesa',
+                                                 module_is_available=True,
+                                                 module_is_versioned=True)
+
+        # Check the variables
+
+        # Check if pro stack
+        self.assertTrue(gpu_test.module_is_versioned)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # Mesa is enabled
+        # The pro stack does its own thing with
+        # the linker
+        self.assertTrue(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        # This is pretty irrelevant as they use
+        # /etc/X11/xorg.conf.d
+        self.assertFalse(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+        self.assertTrue(gpu_test.amdgpu_pro_powersaving)
+        self.assertFalse(gpu_test.amdgpu_pro_performance)
+        self.assertFalse(gpu_test.amdgpu_pro_reset)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+        # Case 2a: the integrated card is no longer available (BIOS)
+        #          the driver is enabled and the module is loaded
+
+        # Fake the hybrid script
+        amdgpu_pro_px_file = open(self.amdgpu_pro_px_file.name, 'w')
+        amdgpu_pro_px_file.write('testing')
+        amdgpu_pro_px_file.close()
+
+        # Collect data
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['amd'],
+                                                 ['amdgpu'],
+                                                 ['mesa'],
+                                                 'mesa',
+                                                 module_is_available=True,
+                                                 module_is_versioned=True)
+
+        # Check the variables
+
+        # Check if pro stack
+        self.assertTrue(gpu_test.module_is_versioned)
+
+        self.assertTrue(gpu_test.has_single_card)
+
+        # Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+
+        # Mesa is enabled
+        # The pro stack does its own thing with
+        # the linker
+        self.assertTrue(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        # This is pretty irrelevant as they use
+        # /etc/X11/xorg.conf.d
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.amdgpu_pro_powersaving)
+        self.assertFalse(gpu_test.amdgpu_pro_performance)
+        self.assertTrue(gpu_test.amdgpu_pro_reset)
+
+        # No further action is required
+        self.assertFalse(gpu_test.has_not_acted)
+
+
+        # Case 2b: no hybrid script is available
+
+        # Collect data
+        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
+                                                 ['amd'],
+                                                 ['amdgpu'],
+                                                 ['mesa'],
+                                                 'mesa',
+                                                 module_is_available=True,
+                                                 module_is_versioned=True)
+
+        # Check the variables
+
+        # Check if pro stack
+        self.assertTrue(gpu_test.module_is_versioned)
+
+        self.assertTrue(gpu_test.has_single_card)
+
+        # Intel
+        self.assertFalse(gpu_test.has_intel)
+        self.assertFalse(gpu_test.intel_loaded)
+
+        # Mesa is enabled
+        # The pro stack does its own thing with
+        # the linker
+        self.assertTrue(gpu_test.mesa_enabled)
+        # AMD
+        self.assertTrue(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertTrue(gpu_test.amdgpu_loaded)
+        self.assertFalse(gpu_test.fglrx_loaded)
+        self.assertFalse(gpu_test.fglrx_enabled)
+        self.assertFalse(gpu_test.pxpress_enabled)
+        # No NVIDIA
+        self.assertFalse(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertFalse(gpu_test.nvidia_loaded)
+        self.assertFalse(gpu_test.nvidia_enabled)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+        # This is pretty irrelevant as they use
+        # /etc/X11/xorg.conf.d
+        self.assertTrue(gpu_test.has_removed_xorg)
+        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertFalse(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.amdgpu_pro_powersaving)
+        self.assertFalse(gpu_test.amdgpu_pro_performance)
+        self.assertTrue(gpu_test.amdgpu_pro_reset)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
