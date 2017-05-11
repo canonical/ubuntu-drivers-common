@@ -1,8 +1,33 @@
-ubuntu-drivers-common (1:0.4.23) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.23) artful; urgency=medium
 
-  * 
+  [ Alberto Milone ]
+  * gpu-manager.{c|py}:
+    - Disable persistence mode before powering down the dGPU.
+      If persistence mode is not disabled, gpu-manager will not be
+      able to unload the nvidia module.
+    - Add support for using custom xorg.confs with the nvidia
+      driver (LP: #1667198).
+      Custom xorg files can be named "non-hybrid" (for non hybrid
+      systems), "hybrid-performance", and "hybrid-power-saving",
+      and will have to placed in the /usr/share/gpu-manager.d
+      directory.
+      The directory can be overridden by passing another directory
+      along with the "--custom-xorg-conf-path" parameter.
+    - Add tests for the custom xorg.confs code and for amdgpu-pro
+      hybrid support.
+  [ Kai-Heng Feng ]
+  * debian/control:
+    - Add build dependency on libkmod-dev.
+  * gpu-manager.c:
+    - Detect and handle switchable graphics with the amdgpu-pro driver.
+      AMDGPU-Pro has its own script to switch between powersaving and
+      performance mode.
+      Some machines allow enabling switchable graphics, or disabling
+      the iGPU completely, thus leaving only the dGPU on. This new code
+      simply detects the different profiles supported by AMD, and
+      enables powersaving mode when possible.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 10 Mar 2017 12:25:49 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 11 May 2017 11:05:40 +0200
 
 ubuntu-drivers-common (1:0.4.22) yakkety; urgency=medium
 
