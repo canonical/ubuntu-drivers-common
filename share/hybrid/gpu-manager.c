@@ -2050,6 +2050,7 @@ static bool write_prime_xorg_conf(struct device **devices, int cards_n) {
                 "    Device \"nvidia\"\n"
                 "    Option \"AllowEmptyInitialConfiguration\" \"on\"\n"
                 "    Option \"IgnoreDisplayDevices\" \"CRT\"\n"
+                "    Option \"nvidiaXineramaInfo\" \"False\"\n"
                 "EndSection\n\n",
                (int)(devices[i]->bus),
                (int)(devices[i]->domain),
