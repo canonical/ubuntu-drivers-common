@@ -1,8 +1,18 @@
-ubuntu-drivers-common (1:0.4.17.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.17.3) xenial-proposed; urgency=medium
 
-  * 
+  * gpu-manager.{c|py}:
+    - Add support for using custom xorg.confs with the nvidia
+      driver (LP: #1667198).
+      Custom xorg files can be named "non-hybrid" (for non hybrid
+      systems), "hybrid-performance", and "hybrid-power-saving",
+      and will have to placed in the /usr/share/gpu-manager.d
+      directory.
+      The directory can be overridden by passing another directory
+      along with the "--custom-xorg-conf-path" parameter.
+    - Add tests for the custom xorg.confs code and for amdgpu-pro
+      hybrid support.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 19 Jun 2017 17:25:08 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 19 Jun 2017 17:27:33 +0200
 
 ubuntu-drivers-common (1:0.4.17.2) xenial-proposed; urgency=medium
 
