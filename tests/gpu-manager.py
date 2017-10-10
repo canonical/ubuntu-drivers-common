@@ -139,7 +139,7 @@ class GpuManagerTest(unittest.TestCase):
         klass.xorg_hybrid_performance_file.close()
         klass.xorg_hybrid_power_saving_file = tempfile.NamedTemporaryFile(mode='w', prefix='hybrid-power-saving_', dir=tests_path, delete=False)
         klass.xorg_hybrid_power_saving_file.close()
-        klass.custom_xorg_path = tests_path or "/tmp"
+        klass.custom_hook_path = tests_path or "/tmp"
 
         klass.amdgpu_pro_px_file = tempfile.NamedTemporaryFile(mode='w', prefix='amdgpu_pro_px_file_', dir=tests_path, delete=False)
 
@@ -359,8 +359,8 @@ class GpuManagerTest(unittest.TestCase):
                    self.fake_lspci.name,
                    '--xorg-conf-file',
                    self.xorg_file.name,
-                   '--custom-xorg-conf-path',
-                   self.custom_xorg_path,
+                   '--custom-hook-path',
+                   self.custom_hook_path,
                    '--amdgpu-pro-px-file',
                    self.amdgpu_pro_px_file.name,
                    '--amd-pcsdb-file',
@@ -12798,7 +12798,7 @@ EndSection
         # i.e. the first time (ever) gpu-manager runs
         #
         # Note the system won't detect the non-hybrid xorg.conf in this case
-        custom_xorg_file_path = os.path.join(self.custom_xorg_path, 'non-hybrid')
+        custom_xorg_file_path = os.path.join(self.custom_hook_path, 'non-hybrid')
         custom_xorg_file = open(self.xorg_non_hybrid_file.name, 'w')
         custom_xorg_file.write('''
 Section "Device"
@@ -12857,7 +12857,7 @@ EndSection
         # instead of nvidia.
         #
         # Check that the custom xorg.conf is actually copied.
-        custom_xorg_file_path = os.path.join(self.custom_xorg_path, 'non-hybrid')
+        custom_xorg_file_path = os.path.join(self.custom_hook_path, 'non-hybrid')
         custom_xorg_file = open(self.xorg_non_hybrid_file.name, 'w')
         custom_xorg_file.write('''
 Section "Device"
@@ -13081,7 +13081,7 @@ EndSection
         #          prime is enabled and the module is loaded
         #          HYBRID POWER SAVING MODE
 
-        custom_xorg_file_path = os.path.join(self.custom_xorg_path, 'hybrid-power-saving')
+        custom_xorg_file_path = os.path.join(self.custom_hook_path, 'hybrid-power-saving')
         custom_xorg_file = open(self.xorg_hybrid_power_saving_file.name, 'w')
 
         custom_xorg_file.write('''
