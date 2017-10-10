@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.4.24) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 10 Oct 2017 10:53:03 +0200
+
 ubuntu-drivers-common (1:0.4.23) artful; urgency=medium
 
   [ Alberto Milone ]
