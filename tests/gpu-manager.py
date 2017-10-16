@@ -13417,9 +13417,9 @@ EndSection
         # Has changed
         self.assertTrue(gpu_test.has_changed)
         self.assertTrue(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
+        self.assertTrue(gpu_test.has_regenerated_xorg)
         self.assertTrue(gpu_test.has_force_dgpu_on_hook)
-        self.assertTrue(gpu_test.has_selected_driver)
+        self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
