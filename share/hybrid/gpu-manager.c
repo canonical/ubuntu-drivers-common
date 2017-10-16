@@ -1312,8 +1312,12 @@ static bool has_hybrid_power_saving_conf_file(void)
 static bool has_force_dgpu_on_file(void)
 {
     _cleanup_free_ char *path = NULL;
-    bool result = get_custom_hook_name("force-dgpu-on", &path);
-    fprintf(log_handle, "force-dgpu-on: %s\n", path);
+    bool result = false;
+    if (get_custom_hook_name("force-dgpu-on", &path)) {
+        result = is_file(path);
+        if (result)
+            fprintf(log_handle, "force-dgpu-on: %s\n", path);
+    }
 
     return result;
 }
