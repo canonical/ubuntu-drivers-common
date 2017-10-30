@@ -1,9 +1,12 @@
-ubuntu-drivers-common (1:0.4.24) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.23.1) artful-proposed; urgency=medium
 
-  * 
+  * gpu-manager.{c|py}:
+    - Add support for forcing the dGPU on on hybrid systems.
+      Creating an empty file named "force-dgpu-on"
+      in the /usr/share/gpu-manager.d directory will force the dGPU
+      on in power saving mode (LP: #1728547).
 
-
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 30 Oct 2017 10:22:30 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 30 Oct 2017 10:25:02 +0100
 
 ubuntu-drivers-common (1:0.4.23) artful; urgency=medium
 
