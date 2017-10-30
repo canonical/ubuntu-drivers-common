@@ -1,8 +1,26 @@
-ubuntu-drivers-common (1:0.4.17.4) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.17.4) xenial-proposed; urgency=medium
 
-  * 
+  [ Alberto Milone ]
+  * gpu-manager.{c|py}:
+    - Add support for forcing the dGPU on on hybrid systems.
+      Creating an empty file named "force-dgpu-on"
+      in the /usr/share/gpu-manager.d directory will force the dGPU
+      on in power saving mode (LP: #1728547).
+    - Sync amdgpu-pro support from 17.10.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 30 Oct 2017 15:43:03 +0100
+  [ Kai-Heng Feng ]
+  * debian/control:
+    - Add build dependency on libkmod-dev.
+  * gpu-manager.c:
+    - Detect and handle switchable graphics with the amdgpu-pro driver.
+      AMDGPU-Pro has its own script to switch between powersaving and
+      performance mode (LP: #1731873).
+      Some machines allow enabling switchable graphics, or disabling
+      the iGPU completely, thus leaving only the dGPU on. This new code
+      simply detects the different profiles supported by AMD, and
+      enables powersaving mode when possible.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 30 Oct 2017 15:48:27 +0100
 
 ubuntu-drivers-common (1:0.4.17.3) xenial-proposed; urgency=medium
 
