@@ -37,20 +37,6 @@ override_dh_install:
 	mkdir -p debian/dh-modaliases/usr/share/man/man1
 	pod2man -c Debhelper -r "$(DEB_VERSION)" debhelper/dh_modaliases debian/dh-modaliases/usr/share/man/man1/dh_modaliases.1
 
-	# clean up old upstart conffile for hybrid-detect
-	if [ ! -e debian/ubuntu-drivers-common/usr/bin/hybrid-detect ]; then \
-	    echo "rm_conffile /etc/init/hybrid-gfx.conf 1:0.2.91~" > debian/ubuntu-drivers-common.maintscript; \
-	fi
-
-	# clean up upstart conffile on upgrade on architectures which do not
-	# ship gpu-manager
-	if [ ! -e debian/ubuntu-drivers-common/usr/bin/gpu-manager ]; then \
-	    echo "rm_conffile /etc/init/gpu-manager.conf 1:0.2.91~" >> debian/ubuntu-drivers-common.maintscript; \
-	fi
-
-	# Remove fglrx-pxpress' upstart job
-	echo "rm_conffile /etc/init/amd-config.conf 1:0.2.91.1~" >> debian/ubuntu-drivers-common.maintscript
-
 override_dh_python3:
 	dh_python3 --shebang=/usr/bin/python3
 
