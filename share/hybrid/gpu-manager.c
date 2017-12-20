@@ -2144,8 +2144,17 @@ static bool prime_set_discrete(int mode) {
 static bool prime_enable_discrete() {
     bool status = false;
 
-    /* Set bbswitch */
-    status = prime_set_discrete(1);
+    /* See if there is a custom hook to disable power saving */
+    bool force_dgpu_on = has_force_dgpu_on_file();
+
+    /* No need to set bbswitch if we want to keep
+    * the dGPU on
+    */
+    if (!force_dgpu_on)
+        /* Set bbswitch */
+        status = prime_set_discrete(1);
+    else
+        status = true;
 
     /* Load the module */
     if (status) {
@@ -2160,11 +2169,13 @@ static bool prime_enable_discrete() {
     return status;
 }
 
-
 /* Power off the NVIDIA discrete card */
 static bool prime_disable_discrete(const int nvidia_version) {
     bool status = false;
     char command[100];
+
+    /* See if there is a custom hook to disable power saving */
+    bool force_dgpu_on = has_force_dgpu_on_file();
 
     /* Disable persistence mode (just in case) */
     sprintf(command, "LD_LIBRARY_PATH=\"/usr/lib/nvidia-%d\" /usr/bin/nvidia-smi -pm 0",
@@ -2184,9 +2195,12 @@ static bool prime_disable_discrete(const int nvidia_version) {
     /* Unload the module */
     status = unload_module("nvidia");
 
-    /* Set bbswitch */
-    if (status)
-        status = prime_set_discrete(0);
+    /* Set bbswitch, but No need for any further action if we want to keep
+    * the dGPU on
+    */
+    if (status && !force_dgpu_on) {
+       status = prime_set_discrete(0);
+    }
 
     return status;
 }
@@ -3187,7 +3201,7 @@ static bool enable_prime(const char *prime_settings,
         }
     }
 
-    if (!bbswitch_loaded && !force_dgpu_on) {
+    if (!bbswitch_loaded) {
         /* Try to load bbswitch */
         /* opts="`/sbin/get-quirk-options`"
         /sbin/modprobe bbswitch load_state=-1 unload_state=1 "$opts" || true */
@@ -3198,8 +3212,7 @@ static bool enable_prime(const char *prime_settings,
     }
 
     /* Get the current status from bbswitch */
-    if (!force_dgpu_on)
-        prime_discrete_on = !bbswitch_status ? true : prime_is_discrete_nvidia_on();
+    prime_discrete_on = !bbswitch_status ? true : prime_is_discrete_nvidia_on();
 
     /* Get the current settings for discrete
      * Note: the force-dgpu-on hook overrides this, and always
@@ -3249,11 +3262,6 @@ static bool enable_prime(const char *prime_settings,
         }
     }
 
-    /* No need for any further action if we are since we want to keep
-     * the dGPU on
-     */
-    if (force_dgpu_on)
-        goto end;
 
     /* This means we need to call bbswitch
      * to take action
