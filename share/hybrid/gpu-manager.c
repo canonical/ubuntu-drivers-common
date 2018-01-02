@@ -120,7 +120,6 @@ static char *bbswitch_quirks_path = NULL;
 static char *dmi_product_name_path = NULL;
 static char *dmi_product_version_path = NULL;
 static char *nvidia_driver_version_path = NULL;
-static char *amdgpu_pro_px_file = NULL;
 static char *modprobe_d_path = NULL;
 static char *custom_hook_path = NULL;
 static char *main_arch_path = NULL;
@@ -3086,11 +3085,8 @@ get_module_version_clean:
 }
 
 
-static bool is_module_versioned(const char *module_name) {
+static bool has_module_versioned(const char *module_name) {
     _cleanup_free_ const char *version = NULL;
-
-    if (dry_run)
-        return false;
 
     version = get_module_version(module_name);
 
@@ -3102,27 +3098,22 @@ static bool run_amdgpu_pro_px(amdgpu_pro_px_action action) {
     int status = 0;
     char command[100];
 
+    if (dry_run)
+        return true;
+
     switch (action) {
     case MODE_POWERSAVING:
-        snprintf(command, sizeof(command), "%s --%s", amdgpu_pro_px_file, "mode powersaving");
-        fprintf(log_handle, "Enabling power saving mode for amdgpu-pro");
+        snprintf(command, sizeof(command), "%s --%s", AMDGPU_PRO_PX, "mode powersaving");
         break;
     case MODE_PERFORMANCE:
-        snprintf(command, sizeof(command), "%s --%s", amdgpu_pro_px_file, "mode performance");
-        fprintf(log_handle, "Enabling performance mode for amdgpu-pro");
+        snprintf(command, sizeof(command), "%s --%s", AMDGPU_PRO_PX, "mode performance");
         break;
     case RESET:
-        snprintf(command, sizeof(command), "%s --%s", amdgpu_pro_px_file, "reset");
-        fprintf(log_handle, "Resetting the script changes for amdgpu-pro");
+        snprintf(command, sizeof(command), "%s --%s", AMDGPU_PRO_PX, "reset");
         break;
     case ISPX:
-        snprintf(command, sizeof(command), "%s --%s", amdgpu_pro_px_file, "ispx");
+        snprintf(command, sizeof(command), "%s --%s", AMDGPU_PRO_PX, "ispx");
         break;
-    }
-
-    if (dry_run) {
-        fprintf(log_handle, "%s\n", command);
-        return true;
     }
 
     status = system(command);
@@ -3400,7 +3391,6 @@ int main(int argc, char *argv[]) {
 
     static int fake_offloading = 0;
     static int fake_module_available = 0;
-    static int fake_module_versioned = 0;
     static int backup_log = 0;
 
     bool has_intel = false, has_amd = false, has_nvidia = false;
@@ -3459,7 +3449,6 @@ int main(int argc, char *argv[]) {
         {"fake-module-is-available", no_argument, &fake_module_available, 1},
         {"fake-module-is-not-available", no_argument, &fake_module_available, 0},
         {"backup-log", no_argument, &backup_log, 1},
-        {"fake-module-is-versioned", no_argument, &fake_module_versioned, 1},
         /* These options don't set a flag.
           We distinguish them by their indices. */
         {"log",  required_argument, 0, 'l'},
@@ -3484,13 +3473,12 @@ int main(int argc, char *argv[]) {
         {"nvidia-driver-version-path", required_argument, 0, 'j'},
         {"modprobe-d-path", required_argument, 0, 'k'},
         {"custom-hook-path", required_argument, 0, 't'},
-        {"amdgpu-pro-px-file", required_argument, 0, 'w'},
         {0, 0, 0, 0}
         };
         /* getopt_long stores the option index here. */
         int option_index = 0;
 
-        opt = getopt_long (argc, argv, "a:b:c:d:f:g:h:i:j:k:l:m:n:o:p:q:r:s:t:x:y:z:w:",
+        opt = getopt_long (argc, argv, "a:b:c:d:f:g:h:i:j:k:l:m:n:o:p:q:r:s:t:x:y:z:",
                         long_options, &option_index);
 
         /* Detect the end of the options. */
@@ -3674,11 +3662,6 @@ int main(int argc, char *argv[]) {
                 if (!custom_hook_path)
                     abort();
                 break;
-            case 'w':
-                amdgpu_pro_px_file = strdup(optarg);
-                if (!amdgpu_pro_px_file)
-                    abort();
-                break;
             case '?':
                 /* getopt_long already printed an error message. */
                 exit(1);
@@ -3828,16 +3811,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (amdgpu_pro_px_file)
-        fprintf(log_handle, "amdgpu_pro_px_file file: %s\n", amdgpu_pro_px_file);
-    else {
-        amdgpu_pro_px_file = strdup(AMDGPU_PRO_PX);
-        if (!amdgpu_pro_px_file) {
-            fprintf(log_handle, "Couldn't allocate amdgpu_pro_px_file\n");
-            goto end;
-        }
-    }
-
     if (modprobe_d_path)
         fprintf(log_handle, "modprobe_d_path file: %s\n", modprobe_d_path);
     else {
@@ -3873,8 +3846,8 @@ int main(int argc, char *argv[]) {
     radeon_blacklisted = is_module_blacklisted("radeon");
     amdgpu_loaded = is_module_loaded("amdgpu");
     amdgpu_blacklisted = is_module_blacklisted("amdgpu");
-    amdgpu_versioned = is_module_versioned("amdgpu");
-    amdgpu_pro_px_installed = exists_not_empty(amdgpu_pro_px_file);
+    amdgpu_versioned = has_module_versioned("amdgpu");
+    amdgpu_pro_px_installed = exists_not_empty(AMDGPU_PRO_PX);
     nouveau_loaded = is_module_loaded("nouveau");
     nouveau_blacklisted = is_module_blacklisted("nouveau");
 
@@ -3883,7 +3856,6 @@ int main(int argc, char *argv[]) {
         fglrx_kmod_available = fake_module_available;
         nvidia_kmod_available = fake_module_available;
         amdgpu_kmod_available = fake_module_available;
-        amdgpu_versioned = fake_module_versioned ? true : false;
     }
     else {
         fglrx_kmod_available = is_module_available("fglrx");
@@ -4611,9 +4583,6 @@ end:
 
     if (nvidia_driver_version_path)
         free(nvidia_driver_version_path);
-
-    if (amdgpu_pro_px_file)
-        free(amdgpu_pro_px_file);
 
     if (modprobe_d_path)
         free(modprobe_d_path);
