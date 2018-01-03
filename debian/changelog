@@ -1,8 +1,16 @@
-ubuntu-drivers-common (1:0.4.17.5) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.17.5) xenial-proposed; urgency=medium
 
-  * 
+  [ Alberto Milone ]
+  * gpu-manager.{c|py}:
+    - Drop the amdgpu-pro code introduced in the previous upload,
+      as it will be dealt with in a different upload.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 03 Jan 2018 11:34:41 +0100
+  [ Alex Tu ]
+  * gpu-manager.c:
+    - Skip bbswitch, and make sure to unload the nvidia driver when
+      the force-dgpu-on option is enabled (LP: #1728547).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 03 Jan 2018 12:33:56 +0100
 
 ubuntu-drivers-common (1:0.4.17.4) xenial-proposed; urgency=medium
 
