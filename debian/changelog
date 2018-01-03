@@ -1,8 +1,18 @@
-ubuntu-drivers-common (1:0.4.25) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.25) bionic; urgency=medium
 
-  * 
+  [ Alex Tu ]
+  * gpu-manager.c:
+    - Skip bbswitch, and make sure to unload the nvidia driver when
+      the force-dgpu-on option is enabled (LP: #1728547).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 03 Jan 2018 11:39:32 +0100
+  [ Bryan Quigley ]
+  * debian/rules,
+    debian/ubuntu-drivers-common.install,
+    setup.py,
+    share/hybrid/gpu-manager.conf:
+    - Remove the remaing upstart pieces.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 03 Jan 2018 12:51:48 +0100
 
 ubuntu-drivers-common (1:0.4.24) bionic; urgency=medium
 
