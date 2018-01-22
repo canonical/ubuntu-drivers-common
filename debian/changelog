@@ -1,8 +1,10 @@
-ubuntu-drivers-common (1:0.4.17.6) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.17.6) xenial-proposed; urgency=medium
 
-  * 
+  * tests/ubuntu_drivers.py:
+    - Skip test_system_modaliases_system on s390x.
+      Fixes FTBFS (LP: #1728547).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 22 Jan 2018 12:08:05 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 22 Jan 2018 12:48:54 +0100
 
 ubuntu-drivers-common (1:0.4.17.5) xenial-proposed; urgency=medium
 
