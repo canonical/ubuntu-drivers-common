@@ -1,8 +1,11 @@
-ubuntu-drivers-common (1:0.4.26) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.26) bionic; urgency=medium
 
-  * 
+  * tests/gpu-manager.py:
+    - It is ok that quirks are still be detected, even though bbswitch
+      won't use them, as it's not being loaded. Fixes FTFS.
+    - Skip test_system_modaliases_system on s390x.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 01 Feb 2018 12:24:00 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 01 Feb 2018 16:22:00 +0100
 
 ubuntu-drivers-common (1:0.4.25) bionic; urgency=medium
 
