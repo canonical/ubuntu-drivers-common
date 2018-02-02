@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.4.27) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 02 Feb 2018 09:36:55 +0100
+
 ubuntu-drivers-common (1:0.4.26) bionic; urgency=medium
 
   * tests/gpu-manager.py:
