@@ -1,8 +1,16 @@
-ubuntu-drivers-common (1:0.4.27) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.4.27) bionic; urgency=medium
 
-  * 
+  [ Chris Coulson ]
+  * detect-plugins/cpu-microcode.py, UbuntuDrivers/detect.py:
+    - Remove the cpu-microcode.py detection plugin (LP: #1738259).
+      Kernel metapackages are going to have a hard dependency on the
+      {intel,amd64}-microcode packages to ensure that all bare-metal installs
+      benefit from microcode updates. This means that microcode packages are
+      no longer "additional drivers" and since they won't be able to be removed
+      without uninstalling the kernel metapackages, there is no need for them
+      to be exposed by ubuntu-drivers.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 02 Feb 2018 09:36:55 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 02 Feb 2018 09:38:35 +0100
 
 ubuntu-drivers-common (1:0.4.26) bionic; urgency=medium
 
