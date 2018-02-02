@@ -102,6 +102,11 @@ typedef enum {
     ISPX,
 } amdgpu_pro_px_action;
 
+typedef enum {
+    DSM,
+    RTD3,
+} bbswitch_type;
+
 static char *log_file = NULL;
 static FILE *log_handle = NULL;
 static char *last_boot_file = NULL;
@@ -126,6 +131,7 @@ static char *custom_hook_path = NULL;
 static char *main_arch_path = NULL;
 static char *other_arch_path = NULL;
 static prime_intel_drv prime_intel_driver = SNA;
+static const char bbswitch_dev_path[] = "/sys/bus/pci/drivers/bbswitch_dev/new_id";
 
 static struct pci_slot_match match = {
     PCI_MATCH_ANY, PCI_MATCH_ANY, PCI_MATCH_ANY, PCI_MATCH_ANY, 0
@@ -2125,12 +2131,47 @@ static bool prime_set_discrete(int mode) {
 }
 
 
+static bool prime_set_rtd3(const struct device *device) {
+    _cleanup_fclose_ FILE *file = NULL;
+    _cleanup_fclose_ FILE *reset = NULL;
+    char reset_path[64];
+
+    /* TODO: Reset the device in kernel module */
+    sprintf(reset_path, "/sys/bus/pci/devices/%04x:%02x:%02x.%x/reset",
+            device->domain, device->bus, device->dev, device->func);
+    reset = fopen(reset_path, "w");
+    fprintf(reset, "1\n");
+    fflush(reset);
+
+    if (!is_module_loaded("bbswitch_dev")) {
+        if (!load_module("bbswitch_dev"))
+            return false;
+    }
+
+    file = fopen(bbswitch_dev_path, "w");
+    if (!file)
+        return false;
+
+    fprintf(file, "%04x %04x\n", device->vendor_id, device->device_id);
+    fflush(file);
+
+    return true;
+}
+
+
 /* Power on the NVIDIA discrete card */
-static bool prime_enable_discrete() {
+static bool prime_enable_discrete(const bbswitch_type type) {
     bool status = false;
 
     /* Set bbswitch */
-    status = prime_set_discrete(1);
+    if (type == DSM)
+        status = prime_set_discrete(1);
+    else {
+        if (is_module_loaded("bbswitch_dev"))
+            unload_module("bbswitch_dev");
+
+        status = true;
+    }
 
     /* Load the module */
     if (status) {
@@ -2147,7 +2188,9 @@ static bool prime_enable_discrete() {
 
 
 /* Power off the NVIDIA discrete card */
-static bool prime_disable_discrete(const int nvidia_version) {
+static bool prime_disable_discrete(const bbswitch_type type,
+                                   const int nvidia_version,
+                                   const struct device *device) {
     bool status = false;
     char command[100];
 
@@ -2170,8 +2213,12 @@ static bool prime_disable_discrete(const int nvidia_version) {
     status = unload_module("nvidia");
 
     /* Set bbswitch */
-    if (status)
-        status = prime_set_discrete(0);
+    if (status) {
+        if (type == DSM)
+            status = prime_set_discrete(0);
+        else
+            status = prime_set_rtd3(device);
+    }
 
     return status;
 }
@@ -2194,13 +2241,11 @@ static void get_boot_vga(struct device **devices,
 
 static void get_first_discrete(struct device **devices,
                                int cards_number,
-                               unsigned int *vendor_id,
-                               unsigned int *device_id) {
+                               struct device *device) {
     int i;
     for(i = 0; i < cards_number; i++) {
         if (!devices[i]->boot_vga) {
-            *vendor_id = devices[i]->vendor_id;
-            *device_id = devices[i]->device_id;
+            memcpy(device, devices[i], sizeof(struct device));
             break;
         }
     }
@@ -3116,9 +3161,28 @@ static bool run_amdgpu_pro_px(amdgpu_pro_px_action action) {
 }
 
 
+static bbswitch_type decide_bbswitch_type() {
+    _cleanup_fclose_ FILE *file;
+    int date, month, year;
+
+    file = fopen("/sys/class/dmi/id/bios_date", "r");
+    if (!file)
+        return DSM;
+    else {
+        if (fscanf(file, "%d/%d/%d", &month, &date, &year) != 3)
+            return DSM;
+
+        /* This is what Linux PCI checks for bridge D3 support */
+        if (year >= 2015)
+            return RTD3;
+    }
+
+    return DSM;
+}
+
 static bool enable_prime(const char *prime_settings,
                         bool bbswitch_loaded,
-                        unsigned int vendor_id,
+                        const struct device *device,
                         struct alternatives *alternative,
                         struct device **devices,
                         int cards_n) {
@@ -3126,6 +3190,7 @@ static bool enable_prime(const char *prime_settings,
     bool bbswitch_status = true, has_version = false;
     bool prime_discrete_on = false;
     bool prime_action_on = false;
+    bbswitch_type type;
 
     /* We only support Lightdm and GDM at this time */
     if (!(is_lightdm_default() || is_gdm_default() || is_sddm_default())) {
@@ -3166,7 +3231,9 @@ static bool enable_prime(const char *prime_settings,
         }
     }
 
-    if (!bbswitch_loaded) {
+    type = decide_bbswitch_type();
+    fprintf(log_handle, "type = %s\n", type == DSM ? "DSM" : "RTD3");
+    if (type == DSM && !bbswitch_loaded) {
         /* Try to load bbswitch */
         /* opts="`/sbin/get-quirk-options`"
         /sbin/modprobe bbswitch load_state=-1 unload_state=1 "$opts" || true */
@@ -3174,17 +3241,21 @@ static bool enable_prime(const char *prime_settings,
         if (!bbswitch_status)
             fprintf(log_handle,
                     "Warning: can't load bbswitch, switching between GPUs won't work\n");
-    }
+    } else if (type == RTD3)
+        /* Will load bbswitch_dev later */
+        bbswitch_status = true;
 
     /* Get the current status from bbswitch */
-    prime_discrete_on = !bbswitch_status ? true : prime_is_discrete_nvidia_on();
+    if (type == DSM)
+        prime_discrete_on = !bbswitch_status ? true : prime_is_discrete_nvidia_on();
+
     /* Get the current settings for discrete */
     prime_action_on = prime_is_action_on();
 
     if (prime_action_on) {
         if (!alternative->nvidia_enabled) {
             /* Select nvidia */
-            enable_nvidia(alternative, vendor_id, devices, cards_n);
+            enable_nvidia(alternative, device->vendor_id, devices, cards_n);
         }
 
         /* Use custom xorg.conf for performance mode on hybrid systems */
@@ -3226,7 +3297,7 @@ static bool enable_prime(const char *prime_settings,
     /* This means we need to call bbswitch
      * to take action
      */
-    if (prime_action_on == prime_discrete_on) {
+    if (type == DSM && prime_action_on == prime_discrete_on) {
         fprintf(log_handle, "No need to change the current bbswitch status\n");
         return true;
     }
@@ -3235,11 +3306,11 @@ static bool enable_prime(const char *prime_settings,
     if (bbswitch_status) {
         if (prime_action_on) {
             fprintf(log_handle, "Powering on the discrete card\n");
-            prime_enable_discrete();
+            prime_enable_discrete(type);
         }
         else {
             fprintf(log_handle, "Powering off the discrete card\n");
-            prime_disable_discrete(major);
+            prime_disable_discrete(type, major, device);
         }
     }
 
@@ -3393,9 +3464,6 @@ int main(int argc, char *argv[]) {
     /* Vendor and device id (boot vga) */
     unsigned int boot_vga_vendor_id = 0, boot_vga_device_id = 0;
 
-    /* Vendor and device id (discrete) */
-    unsigned int discrete_vendor_id = 0, discrete_device_id = 0;
-
     /* The current number of cards */
     int cards_n = 0;
 
@@ -3410,6 +3478,9 @@ int main(int argc, char *argv[]) {
     /* Store the devices here */
     struct device *current_devices[MAX_CARDS_N];
     struct device *old_devices[MAX_CARDS_N];
+
+    /* Device information (discrete) */
+    struct device discrete_device = { 0 };
 
     /* Alternatives */
     struct alternatives *alternative = NULL;
@@ -4102,8 +4173,7 @@ int main(int argc, char *argv[]) {
 
                 /* Get data about the first discrete card */
                 get_first_discrete(current_devices, cards_n,
-                                   &discrete_vendor_id,
-                                   &discrete_device_id);
+                                   &discrete_device);
 
                 enable_pxpress(alternative, current_devices, cards_n);
                 /* No further action */
@@ -4119,13 +4189,12 @@ int main(int argc, char *argv[]) {
 
                 /* Get data about the first discrete card */
                 get_first_discrete(current_devices, cards_n,
-                                   &discrete_vendor_id,
-                                   &discrete_device_id);
+                                   &discrete_device);
 
                 /* Try to enable prime */
                 if (enable_prime(prime_settings, bbswitch_loaded,
-                             discrete_vendor_id, alternative,
-                             current_devices, cards_n)) {
+                                 &discrete_device, alternative,
+                                 current_devices, cards_n)) {
 
                     /* Write permanent settings about offloading */
                     set_offloading();
@@ -4251,8 +4320,7 @@ int main(int argc, char *argv[]) {
 
         /* Get data about the first discrete card */
         get_first_discrete(current_devices, cards_n,
-                           &discrete_vendor_id,
-                           &discrete_device_id);
+                           &discrete_device);
 
         /* Intel + another GPU */
         if (boot_vga_vendor_id == INTEL) {
@@ -4282,7 +4350,7 @@ int main(int argc, char *argv[]) {
 
                 /* Try to enable prime */
                 if (enable_prime(prime_settings, bbswitch_loaded,
-                             discrete_vendor_id, alternative,
+                             &discrete_device, alternative,
                              current_devices, cards_n)) {
 
                     /* Write permanent settings about offloading */
@@ -4307,13 +4375,13 @@ int main(int argc, char *argv[]) {
                  * move the file away.
                  */
 
-                if (discrete_vendor_id == NVIDIA) {
+                if (discrete_device.vendor_id == NVIDIA) {
                     fprintf(log_handle, "Discrete NVIDIA card detected\n");
 
                     /* Kernel module is available */
                     if (((nvidia_loaded || nvidia_kmod_available) && !nvidia_blacklisted) && (!nouveau_loaded || nouveau_blacklisted)) {
                         /* Try to enable nvidia */
-                        enable_nvidia(alternative, discrete_vendor_id, current_devices, cards_n);
+                        enable_nvidia(alternative, discrete_device.vendor_id, current_devices, cards_n);
                     }
                     /* Kernel module is not available */
                     else {
@@ -4349,14 +4417,14 @@ int main(int argc, char *argv[]) {
 
                     }
                 }
-                else if (discrete_vendor_id == AMD) {
+                else if (discrete_device.vendor_id == AMD) {
                     fprintf(log_handle, "Discrete AMD card detected\n");
 
                     /* Kernel module is available */
                     if (((fglrx_loaded || fglrx_kmod_available) && !fglrx_blacklisted) &&
                         (!radeon_loaded || radeon_blacklisted) && (!amdgpu_loaded || amdgpu_blacklisted)) {
                         /* Try to enable fglrx */
-                        enable_fglrx(alternative, discrete_vendor_id, current_devices, cards_n);
+                        enable_fglrx(alternative, discrete_device.vendor_id, current_devices, cards_n);
                     }
                     /* Kernel module is not available */
                     else {
@@ -4392,7 +4460,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 else {
-                    fprintf(log_handle, "Unsupported discrete card vendor: %x\n", discrete_vendor_id);
+                    fprintf(log_handle, "Unsupported discrete card vendor: %x\n", discrete_device.vendor_id);
                     fprintf(log_handle, "Nothing to do\n");
                 }
             }
@@ -4401,7 +4469,7 @@ int main(int argc, char *argv[]) {
         else if (boot_vga_vendor_id == AMD) {
             /* Either AMD+AMD hybrid system or AMD desktop APU + discrete card */
             fprintf(log_handle, "AMD IGP detected\n");
-            if (discrete_vendor_id == AMD) {
+            if (discrete_device.vendor_id == AMD) {
                 fprintf(log_handle, "Discrete AMD card detected\n");
 
 
@@ -4409,7 +4477,7 @@ int main(int argc, char *argv[]) {
                 if (((fglrx_loaded || fglrx_kmod_available) && !fglrx_blacklisted) &&
                     (!radeon_loaded || radeon_blacklisted) && (!amdgpu_loaded || amdgpu_blacklisted)) {
                     /* Try to enable fglrx */
-                    enable_fglrx(alternative, discrete_vendor_id, current_devices, cards_n);
+                    enable_fglrx(alternative, discrete_device.vendor_id, current_devices, cards_n);
                 }
                 /* Kernel module is not available */
                 else {
@@ -4443,13 +4511,13 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }
-            else if (discrete_vendor_id == NVIDIA) {
+            else if (discrete_device.vendor_id == NVIDIA) {
                 fprintf(log_handle, "Discrete NVIDIA card detected\n");
 
                 /* Kernel module is available */
                 if (((nvidia_loaded || nvidia_kmod_available) && !nvidia_blacklisted) && (!nouveau_loaded || nouveau_blacklisted)) {
                     /* Try to enable nvidia */
-                    enable_nvidia(alternative, discrete_vendor_id, current_devices, cards_n);
+                    enable_nvidia(alternative, discrete_device.vendor_id, current_devices, cards_n);
                 }
                 /* Nvidia kernel module is not available */
                 else {
@@ -4497,7 +4565,7 @@ int main(int argc, char *argv[]) {
                 }
             }
             else {
-                fprintf(log_handle, "Unsupported discrete card vendor: %x\n", discrete_vendor_id);
+                fprintf(log_handle, "Unsupported discrete card vendor: %x\n", discrete_device.vendor_id);
                 fprintf(log_handle, "Nothing to do\n");
             }
         }
