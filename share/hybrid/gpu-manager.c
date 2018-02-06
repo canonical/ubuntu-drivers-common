@@ -1266,8 +1266,6 @@ static bool get_custom_hook_name(const char *pattern, char **path)
             break;
         }
         closedir(dir);
-        if (!*path)
-            return false;
     }
     else {
         *path = malloc(strlen(custom_hook_path) + strlen(pattern) + 2);
@@ -1285,9 +1283,9 @@ static bool has_custom_hook(const char *filename)
 {
     _cleanup_free_ char *path = NULL;
 
-    bool status = get_custom_hook_name(filename, &path);
+    get_custom_hook_name(filename, &path);
 
-    return (status ? exists_not_empty(path) : false);
+    return exists_not_empty(path);
 }
 
 
@@ -1306,16 +1304,6 @@ static bool has_hybrid_performance_conf_file(void)
 static bool has_hybrid_power_saving_conf_file(void)
 {
     return has_custom_hook("hybrid-power-saving");
-}
-
-
-static bool has_force_dgpu_on_file(void)
-{
-    _cleanup_free_ char *path = NULL;
-    bool result = get_custom_hook_name("force-dgpu-on", &path);
-    fprintf(log_handle, "force-dgpu-on: %s\n", path);
-
-    return result;
 }
 
 
@@ -2126,6 +2114,7 @@ static bool prime_is_action_on() {
 
 static bool prime_set_discrete(int mode) {
     _cleanup_fclose_ FILE *file = NULL;
+
     file = fopen(bbswitch_path, "w");
     if (!file)
         return false;
@@ -3138,12 +3127,6 @@ static bool enable_prime(const char *prime_settings,
     bool prime_discrete_on = false;
     bool prime_action_on = false;
 
-    /* See if there is a custom hook to disable power saving */
-    bool force_dgpu_on = has_force_dgpu_on_file();
-
-    fprintf(log_handle, "force-dgpu-on hook %s\n",
-            (force_dgpu_on ? "on" : "off"));
-
     /* We only support Lightdm and GDM at this time */
     if (!(is_lightdm_default() || is_gdm_default() || is_sddm_default())) {
         fprintf(log_handle, "Neither Lightdm nor GDM is the default display "
@@ -3183,7 +3166,7 @@ static bool enable_prime(const char *prime_settings,
         }
     }
 
-    if (!bbswitch_loaded && !force_dgpu_on) {
+    if (!bbswitch_loaded) {
         /* Try to load bbswitch */
         /* opts="`/sbin/get-quirk-options`"
         /sbin/modprobe bbswitch load_state=-1 unload_state=1 "$opts" || true */
@@ -3194,14 +3177,9 @@ static bool enable_prime(const char *prime_settings,
     }
 
     /* Get the current status from bbswitch */
-    if (!force_dgpu_on)
-        prime_discrete_on = !bbswitch_status ? true : prime_is_discrete_nvidia_on();
-
-    /* Get the current settings for discrete
-     * Note: the force-dgpu-on hook overrides this, and always
-     *       forces the dGPU to be on
-     */
-    prime_action_on = force_dgpu_on ? false : prime_is_action_on();
+    prime_discrete_on = !bbswitch_status ? true : prime_is_discrete_nvidia_on();
+    /* Get the current settings for discrete */
+    prime_action_on = prime_is_action_on();
 
     if (prime_action_on) {
         if (!alternative->nvidia_enabled) {
@@ -3245,12 +3223,6 @@ static bool enable_prime(const char *prime_settings,
         }
     }
 
-    /* No need for any further action if we are since we want to keep
-     * the dGPU on
-     */
-    if (force_dgpu_on)
-        goto end;
-
     /* This means we need to call bbswitch
      * to take action
      */
@@ -3271,7 +3243,6 @@ static bool enable_prime(const char *prime_settings,
         }
     }
 
-end:
     return true;
 }
 
