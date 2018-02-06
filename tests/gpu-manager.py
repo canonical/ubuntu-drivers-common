@@ -13387,9 +13387,9 @@ EndSection
 
         # Check the variables
 
-        # Check quirks - they will be ignored, though, as load_bbswitch is skipped
-        self.assertTrue(gpu_test.matched_quirk)
-        self.assertTrue(gpu_test.loaded_with_args)
+        # Check quirks - ignore, as load_bbswitch is skipped
+        self.assertFalse(gpu_test.matched_quirk)
+        self.assertFalse(gpu_test.loaded_with_args)
 
         # Check if laptop
         self.assertTrue(gpu_test.requires_offloading)
