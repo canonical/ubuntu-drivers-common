@@ -8,7 +8,6 @@
 # (at your option) any later version.
 
 import os
-import glob
 import time
 import unittest
 import subprocess
@@ -72,7 +71,6 @@ class GpuTest(object):
                  has_custom_xorg_hybrid_performance=False,
                  has_custom_xorg_hybrid_power_saving=False,
                  copied_custom_xorg=False,
-                 has_force_dgpu_on_hook=False,
                  module_is_versioned=False,
                  amdgpu_pro_powersaving=False,
                  amdgpu_pro_performance=False,
@@ -118,7 +116,6 @@ class GpuTest(object):
         self.has_custom_xorg_hybrid_performance = has_custom_xorg_hybrid_performance
         self.has_custom_xorg_hybrid_power_saving = has_custom_xorg_hybrid_power_saving
         self.copied_custom_xorg = copied_custom_xorg
-        self.has_force_dgpu_on_hook = has_force_dgpu_on_hook
         self.module_is_versioned = module_is_versioned
         self.amdgpu_pro_powersaving = amdgpu_pro_powersaving
         self.amdgpu_pro_performance = amdgpu_pro_performance
@@ -208,7 +205,6 @@ class GpuManagerTest(unittest.TestCase):
         klass.has_added_gpu_from_file = re.compile('Adding GPU from file: (.+)')
         klass.copied_custom_xorg_pt = re.compile('(.+) was copied successfully to.*')
         klass.has_custom_xorg_pt = re.compile('Custom (.+) xorg.conf detected.*')
-        klass.has_force_dgpu_on_hook_pt = re.compile('force-dgpu-on hook (.+).*')
         klass.amdgpu_pro_powersaving_pt = re.compile('Enabling power saving mode for amdgpu-pro.*')
         klass.amdgpu_pro_performance_pt = re.compile('Enabling performance mode for amdgpu-pro.*')
         klass.amdgpu_pro_reset_pt = re.compile('Resetting the script changes for amdgpu-pro.*')
@@ -230,14 +226,12 @@ class GpuManagerTest(unittest.TestCase):
         '''
         self.remove_xorg_conf()
         self.remove_modprobe_d_path()
-        self.remove_force_dgpu_on_hook()
         #self.remove_amd_pcsdb_file()
 
     def tearDown(self):
         print('%s over\n' % self.this_function_name)
         # Remove all the logs
         self.handle_logs(delete=True)
-        self.remove_force_dgpu_on_hook()
 
     def cp_to_target_dir(self, filename):
         try:
@@ -256,11 +250,6 @@ class GpuManagerTest(unittest.TestCase):
             os.unlink(self.modprobe_d_path)
         except:
             pass
-
-    def remove_force_dgpu_on_hook(self):
-        for filename in glob.glob(os.path.join((tests_path or '/tmp'), "force-dgpu-on*")):
-            print('Removing hook: %s' % filename)
-            os.unlink(filename)
 
     def remove_amd_pcsdb_file(self):
         try:
@@ -483,7 +472,6 @@ class GpuManagerTest(unittest.TestCase):
             has_added_gpu_from_file = self.has_added_gpu_from_file.match(line)
             copied_custom_xorg = self.copied_custom_xorg_pt.match(line)
             has_custom_xorg = self.has_custom_xorg_pt.match(line)
-            has_force_dgpu_on_hook = self.has_force_dgpu_on_hook_pt.match(line)
             amdgpu_pro_powersaving = self.amdgpu_pro_powersaving_pt.match(line)
             amdgpu_pro_performance = self.amdgpu_pro_performance_pt.match(line)
             amdgpu_pro_reset = self.amdgpu_pro_reset_pt.match(line)
@@ -602,8 +590,6 @@ class GpuManagerTest(unittest.TestCase):
                     gpu_test.has_custom_xorg_hybrid_power_saving = True
                 elif has_custom_xorg.group(1) == 'non-hybrid':
                     gpu_test.has_custom_xorg_non_hybrid = True
-            elif has_force_dgpu_on_hook:
-                gpu_test.has_force_dgpu_on_hook = (has_force_dgpu_on_hook.group(1) == 'on')
             elif amdgpu_pro_powersaving:
                 gpu_test.amdgpu_pro_powersaving = True
                 gpu_test.has_not_acted = False
@@ -648,9 +634,6 @@ class GpuManagerTest(unittest.TestCase):
 
         # Remove the modprobe.d path
         self.remove_modprobe_d_path()
-
-        # Remove the force-dgpu-on hook
-        self.remove_force_dgpu_on_hook()
 
         return gpu_test
 
@@ -13292,10 +13275,6 @@ EndSection
 
 
         # Case 2b: no hybrid script is available
-        try:
-            os.unlink(self.amdgpu_pro_px_file.name)
-        except FileNotFoundError:
-            pass
 
         # Collect data
         gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
@@ -13342,151 +13321,7 @@ EndSection
         self.assertFalse(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.amdgpu_pro_powersaving)
         self.assertFalse(gpu_test.amdgpu_pro_performance)
-        # No no hybrid script = no reset
-        self.assertFalse(gpu_test.amdgpu_pro_reset)
-
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-    def test_laptop_one_intel_one_nvidia_binary_force_dgpu_on_hook(self):
-        '''laptop: intel + nvidia'''
-        self.this_function_name = sys._getframe().f_code.co_name
-
-        # Case 1a: the discrete card is now available (BIOS)
-        #          the driver is enabled and the module is loaded
-        #          HYBRID PERFORMANCE MODE
-
-        # Set dmi product version
-        self.set_dmi_product_version('ThinkPad T410s')
-
-        # Set default quirks
-        self.set_bbswitch_quirks()
-
-        # Hook to tell gpu-manager not to disable the dGPU
-        self.force_dgpu_on_hook_file = tempfile.NamedTemporaryFile(mode='w',
-                                              prefix='force-dgpu-on_',
-                                              dir=(tests_path or '/tmp'), delete=False)
-        self.force_dgpu_on_hook_file.close()
-
-        # Empty custom xorg.conf
-        custom_xorg_file = open(self.xorg_hybrid_performance_file.name, 'w')
-        custom_xorg_file.close()
-
-        # Set default bbswitch status
-        self.set_prime_discrete_default_status_on(True)
-
-        # Request action from bbswitch
-        self.request_prime_discrete_on(True)
-
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 'nvidia',
-                                                 requires_offloading=True)
-
-        # Check the variables
-
-        # Check quirks - ignore, as load_bbswitch is skipped
-        self.assertFalse(gpu_test.matched_quirk)
-        self.assertFalse(gpu_test.loaded_with_args)
-
-        # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
-
-        self.assertFalse(gpu_test.has_single_card)
-
-        # Intel
-        self.assertTrue(gpu_test.has_intel)
-        self.assertTrue(gpu_test.intel_loaded)
-
-        # Mesa is not enabled
-        self.assertFalse(gpu_test.mesa_enabled)
-        # No AMD
-        self.assertFalse(gpu_test.has_amd)
-        self.assertFalse(gpu_test.radeon_loaded)
-        self.assertFalse(gpu_test.amdgpu_loaded)
-        self.assertFalse(gpu_test.fglrx_loaded)
-        self.assertFalse(gpu_test.fglrx_enabled)
-        self.assertFalse(gpu_test.pxpress_enabled)
-        # NVIDIA
-        self.assertTrue(gpu_test.has_nvidia)
-        self.assertFalse(gpu_test.nouveau_loaded)
-        self.assertTrue(gpu_test.nvidia_loaded)
-        self.assertTrue(gpu_test.nvidia_enabled)
-        # Has changed
-        self.assertTrue(gpu_test.has_changed)
-        self.assertTrue(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        self.assertTrue(gpu_test.has_force_dgpu_on_hook)
-        self.assertTrue(gpu_test.has_selected_driver)
-
-        # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
-
-
-        # Case 1b: the discrete card was already available (BIOS)
-        #          prime is enabled and the module is loaded
-        #          HYBRID POWER SAVING MODE
-
-        # Set default bbswitch status
-        self.set_prime_discrete_default_status_on(True)
-
-        # Request action from bbswitch
-        self.request_prime_discrete_on(False)
-
-        # Hook to tell gpu-manager not to disable the dGPU
-        self.force_dgpu_on_hook_file = tempfile.NamedTemporaryFile(mode='w',
-                                              prefix='force-dgpu-on_',
-                                              dir=(tests_path or '/tmp'), delete=False)
-        self.force_dgpu_on_hook_file.close()
-
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 'prime',
-                                                 requires_offloading=True,
-                                                 enabled_egl_driver='prime',
-                                                 egl_alternatives=True)
-
-        # Check the variables
-
-        # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
-
-        self.assertFalse(gpu_test.has_single_card)
-
-        # Intel
-        self.assertTrue(gpu_test.has_intel)
-        self.assertTrue(gpu_test.intel_loaded)
-
-        # Mesa is not enabled
-        self.assertFalse(gpu_test.mesa_enabled)
-        self.assertFalse(gpu_test.mesa_egl_enabled)
-        # No AMD
-        self.assertFalse(gpu_test.has_amd)
-        self.assertFalse(gpu_test.radeon_loaded)
-        self.assertFalse(gpu_test.amdgpu_loaded)
-        self.assertFalse(gpu_test.fglrx_loaded)
-        self.assertFalse(gpu_test.fglrx_enabled)
-        self.assertFalse(gpu_test.pxpress_enabled)
-        # NVIDIA
-        self.assertTrue(gpu_test.has_nvidia)
-        self.assertFalse(gpu_test.nouveau_loaded)
-        self.assertTrue(gpu_test.nvidia_loaded)
-        self.assertFalse(gpu_test.nvidia_enabled)
-        self.assertFalse(gpu_test.nvidia_egl_enabled)
-        self.assertTrue(gpu_test.prime_enabled)
-        self.assertTrue(gpu_test.prime_egl_enabled)
-        # Has changed
-        self.assertFalse(gpu_test.has_changed)
-        self.assertTrue(gpu_test.has_removed_xorg)
-        self.assertFalse(gpu_test.has_regenerated_xorg)
-        # We are forcing performance mode because of the hook
-        self.assertFalse(gpu_test.has_selected_driver)
-        self.assertTrue(gpu_test.has_force_dgpu_on_hook)
-        self.assertFalse(gpu_test.copied_custom_xorg)
+        self.assertTrue(gpu_test.amdgpu_pro_reset)
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
