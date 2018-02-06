@@ -3201,7 +3201,7 @@ static bool enable_prime(const char *prime_settings,
      * Note: the force-dgpu-on hook overrides this, and always
      *       forces the dGPU to be on
      */
-    prime_action_on = prime_is_action_on();
+    prime_action_on = force_dgpu_on ? false : prime_is_action_on();
 
     if (prime_action_on) {
         if (!alternative->nvidia_enabled) {
