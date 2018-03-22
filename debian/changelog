@@ -1,3 +1,13 @@
+ubuntu-drivers-common (1:0.5) bionic; urgency=medium
+
+  * gpu-manager.{c|py}:
+    - Drop all the code to handle driver configuration, which
+      stopped working after we moved away from alternatives.
+      Only keep telling the system whether PRIME is supported
+      or not (LP: #1757180).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 22 Mar 2018 18:35:19 +0100
+
 ubuntu-drivers-common (1:0.4.27) bionic; urgency=medium
 
   [ Chris Coulson ]
