@@ -49,6 +49,7 @@ class GpuTest(object):
                  has_changed=False,
                  has_removed_xorg=False,
                  has_regenerated_xorg=False,
+                 has_created_xorg_conf_d=False,
                  has_selected_driver=False,
                  has_not_acted=True,
                  has_skipped_hybrid=False,
@@ -79,6 +80,7 @@ class GpuTest(object):
         self.has_changed = has_changed
         self.has_removed_xorg = has_removed_xorg
         self.has_regenerated_xorg = has_regenerated_xorg
+        self.has_created_xorg_conf_d = has_created_xorg_conf_d
         self.has_selected_driver = has_selected_driver
         self.has_not_acted = has_not_acted
         self.has_skipped_hybrid = has_skipped_hybrid
@@ -123,6 +125,9 @@ class GpuManagerTest(unittest.TestCase):
         klass.modprobe_d_path = tempfile.NamedTemporaryFile(mode='w', prefix='modprobe_d_path_', dir=tests_path, delete=False)
         klass.modprobe_d_path.close()
 
+        klass.xorg_conf_d_path = tempfile.NamedTemporaryFile(mode='w', prefix='xorg_conf_d_path_', dir=tests_path, delete=False)
+        klass.xorg_conf_d_path.close()
+
         klass.log = tempfile.NamedTemporaryFile(mode='w', prefix='log_', dir=tests_path, delete=False)
         klass.log.close()
 
@@ -144,6 +149,7 @@ class GpuManagerTest(unittest.TestCase):
         klass.removed_xorg_pt = re.compile('Removing xorg.conf. Path: .+')
         klass.regenerated_xorg_pt = re.compile('Regenerating xorg.conf. Path: .+')
         klass.not_modified_xorg_pt = re.compile('No need to modify xorg.conf. Path .+')
+        klass.created_xorg_conf_d_pt = re.compile('Creating (.+)')
         klass.no_action_pt = re.compile('Nothing to do')
         klass.has_skipped_hybrid_pt = re.compile('Lightdm is not the default display manager. Nothing to do')
         klass.matched_quirk_pt = re.compile('Found matching quirk.*')
@@ -158,6 +164,7 @@ class GpuManagerTest(unittest.TestCase):
 
     def setUp(self):
         self.remove_modprobe_d_path()
+        self.remove_xorg_conf_d_path()
 
     def tearDown(self):
         print('%s over\n' % self.this_function_name)
@@ -173,6 +180,12 @@ class GpuManagerTest(unittest.TestCase):
     def remove_modprobe_d_path(self):
         try:
             os.unlink(self.modprobe_d_path)
+        except:
+            pass
+
+    def remove_xorg_conf_d_path(self):
+        try:
+            os.unlink(self.xorg_conf_d_path)
         except:
             pass
 
@@ -287,6 +300,8 @@ class GpuManagerTest(unittest.TestCase):
                    self.nvidia_driver_version_path.name,
                    '--modprobe-d-path',
                    self.modprobe_d_path.name,
+                   '--xorg-conf-d-path',
+                   self.xorg_conf_d_path.name,
                    '--new-boot-file',
                    self.new_boot_file.name,
                    fake_requires_offloading,
@@ -350,6 +365,7 @@ class GpuManagerTest(unittest.TestCase):
 
             removed_xorg = self.removed_xorg_pt.match(line)
             regenerated_xorg = self.regenerated_xorg_pt.match(line)
+            created_xorg_conf_d = self.created_xorg_conf_d_pt.match(line)
             not_modified_xorg = self.not_modified_xorg_pt.match(line)
             selected_driver = self.selected_driver_pt.match(line)
             no_action = self.no_action_pt.match(line)
@@ -414,6 +430,8 @@ class GpuManagerTest(unittest.TestCase):
                 gpu_test.has_regenerated_xorg = True
                 # This is an action
                 gpu_test.has_not_acted = False
+            elif created_xorg_conf_d:
+                gpu_test.has_created_xorg_conf_d = True
             elif selected_driver:
                 gpu_test.has_selected_driver = True
                 # This is an action
@@ -1982,12 +2000,13 @@ class GpuManagerTest(unittest.TestCase):
         # Enable when we support hybrid laptops
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
+
+        # Check that the xorg.conf.d file was created
+        self.assertTrue(gpu_test.has_created_xorg_conf_d)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # What if dmi product version is invalid?
 
@@ -2071,9 +2090,11 @@ class GpuManagerTest(unittest.TestCase):
 
         self.assertFalse(gpu_test.has_selected_driver)
 
+        # Check that the xorg.conf.d file was created
+        self.assertFalse(gpu_test.has_created_xorg_conf_d)
+
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 1c: the discrete card is now available (BIOS)
 
@@ -2110,6 +2131,9 @@ class GpuManagerTest(unittest.TestCase):
 
 
         self.assertFalse(gpu_test.has_selected_driver)
+
+        # Check that the xorg.conf.d file was created
+        self.assertTrue(gpu_test.has_created_xorg_conf_d)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
@@ -2151,6 +2175,9 @@ class GpuManagerTest(unittest.TestCase):
 
         self.assertFalse(gpu_test.has_selected_driver)
 
+        # Check that the xorg.conf.d file was created
+        self.assertTrue(gpu_test.has_created_xorg_conf_d)
+
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
@@ -2188,9 +2215,11 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         # Fall back to mesa
         self.assertFalse(gpu_test.has_selected_driver)
+
+        # Check that the xorg.conf.d file was created
+        self.assertFalse(gpu_test.has_created_xorg_conf_d)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
@@ -2231,6 +2260,9 @@ class GpuManagerTest(unittest.TestCase):
 
 
         self.assertFalse(gpu_test.has_selected_driver)
+
+        # Check that the xorg.conf.d file was created
+        self.assertTrue(gpu_test.has_created_xorg_conf_d)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
@@ -2313,6 +2345,8 @@ class GpuManagerTest(unittest.TestCase):
 
 
         self.assertFalse(gpu_test.has_selected_driver)
+        # Check that the xorg.conf.d file was created
+        self.assertTrue(gpu_test.has_created_xorg_conf_d)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
@@ -2354,6 +2388,9 @@ class GpuManagerTest(unittest.TestCase):
 
         self.assertFalse(gpu_test.has_selected_driver)
 
+        # Check that the xorg.conf.d file was created
+        self.assertFalse(gpu_test.has_created_xorg_conf_d)
+
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
@@ -2393,6 +2430,9 @@ class GpuManagerTest(unittest.TestCase):
 
 
         self.assertFalse(gpu_test.has_selected_driver)
+
+        # Check that the xorg.conf.d file was created
+        self.assertTrue(gpu_test.has_created_xorg_conf_d)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
@@ -2434,6 +2474,9 @@ class GpuManagerTest(unittest.TestCase):
 
         self.assertFalse(gpu_test.has_selected_driver)
 
+        # Check that the xorg.conf.d file was created
+        self.assertTrue(gpu_test.has_created_xorg_conf_d)
+
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
@@ -2471,9 +2514,11 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertFalse(gpu_test.has_changed)
 
-
         # Fallback
         self.assertFalse(gpu_test.has_selected_driver)
+
+        # Check that the xorg.conf.d file was created
+        self.assertFalse(gpu_test.has_created_xorg_conf_d)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
@@ -2512,9 +2557,11 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertFalse(gpu_test.has_changed)
 
-
         # Select PRIME
         self.assertFalse(gpu_test.has_selected_driver)
+
+        # Check that the xorg.conf.d file was created
+        self.assertTrue(gpu_test.has_created_xorg_conf_d)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
@@ -2549,8 +2596,11 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
+
+        # Check that the xorg.conf.d file was created
+        self.assertFalse(gpu_test.has_created_xorg_conf_d)
+
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
@@ -2584,8 +2634,11 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
+
+        # Check that the xorg.conf.d file was created
+        self.assertTrue(gpu_test.has_created_xorg_conf_d)
+
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
@@ -2624,8 +2677,11 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
+
+        # Check that the xorg.conf.d file was created
+        self.assertTrue(gpu_test.has_created_xorg_conf_d)
+
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
@@ -2665,8 +2721,11 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
+
+        # Check that the xorg.conf.d file was created
+        self.assertTrue(gpu_test.has_created_xorg_conf_d)
+
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
@@ -2700,8 +2759,11 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
+
+        # Check that the xorg.conf.d file was created
+        self.assertFalse(gpu_test.has_created_xorg_conf_d)
+
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
@@ -2736,8 +2798,11 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
+
+        # Check that the xorg.conf.d file was created
+        self.assertFalse(gpu_test.has_created_xorg_conf_d)
+
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
@@ -2771,8 +2836,11 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
+
+        # Check that the xorg.conf.d file was created
+        self.assertFalse(gpu_test.has_created_xorg_conf_d)
+
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
@@ -2806,8 +2874,11 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
+
+        # Check that the xorg.conf.d file was created
+        self.assertFalse(gpu_test.has_created_xorg_conf_d)
+
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
