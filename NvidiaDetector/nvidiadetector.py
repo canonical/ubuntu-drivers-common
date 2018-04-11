@@ -147,16 +147,13 @@ class NvidiaDetection(object):
 
             # package names can be like "nvidia-173:i386" and we need to
             # extract the driver flavour from the name e.g. "173"
-            stripped_package_name = package.name.split('-', 1)[1].split(':', 1)[0]
+            stripped_package_name = package.name.split('-')[-1].split(':', 1)[0]
             driver_version = self.__get_value_from_name(stripped_package_name)
 
             try:
-                for part in m.split(')'):
-                    part = part.strip()
-                    if not part:
-                        continue
-                    module, lst = part.split('(')
-                    for alias in lst.split(','):
+                if m:
+                    m = m[(m.find('(')+1):].replace(')', '')
+                    for alias in m.split(','):
                         vp = vendor_product_re.match(alias.lstrip())
                         if not vp:
                             logging.error('Package %s has unexpected modalias: %s' % (
@@ -314,15 +311,16 @@ class NvidiaDetection(object):
                 '''
                 choice = self.driversForCards[list(self.driversForCards.keys())[0]][0]
                 if self.verbose and not self.printonly:
-                    print('Recommended NVIDIA driver: ' + choice)
+                    print('Recommended NVIDIA driver: %d' % choice)
             '''
             FIXME: we should use a metapackage for this
             '''
+
             driver_name = self.__get_name_from_value(choice)
             if driver_name != None:
-                choice = 'nvidia-' + str(driver_name)
+                choice = (choice >= 390 and 'nvidia-driver-' or 'nvidia-') + str(driver_name)
             else:
-                choice = 'nvidia-' + str(choice)
+                choice = (choice >= 390 and 'nvidia-driver-' or 'nvidia-') + str(choice)
         else:
             '''
             If no card is supported
