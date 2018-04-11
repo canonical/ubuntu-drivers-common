@@ -2,10 +2,10 @@ Source: ubuntu-drivers-common
 Section: admin
 Priority: optional
 Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
-Build-Depends: debhelper (>= 9),
+Build-Depends: debhelper (>= 9.20160709),
+ dh-python,
  po-debconf,
  dh-apport,
- dh-systemd,
  python3-all (>= 3.2),
  python3-setuptools,
  libpciaccess-dev (>= 0.12.1-2),
