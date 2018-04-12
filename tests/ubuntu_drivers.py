@@ -81,6 +81,15 @@ def gen_fakearchive():
 
     return a
 
+def get_deb_arch():
+    proc = subprocess.Popen(['dpkg', '--print-architecture'], stdout=subprocess.PIPE,
+                            universal_newlines=True)
+    try:
+        output = proc.communicate()[0]
+        output = output.strip()
+    except:
+        return None
+    return output
 
 class DetectTest(unittest.TestCase):
     '''Test UbuntuDrivers.detect'''
@@ -137,10 +146,15 @@ class DetectTest(unittest.TestCase):
 
         sec = (stop.ru_utime + stop.ru_stime) - (start.ru_utime + start.ru_stime)
         sys.stderr.write('[%.2f s] ' % sec)
+
         if 'arm' in os.uname().machine:
-            self.assertLess(sec, 90.0)
+            target = 90.0
+        elif 'i386' == get_deb_arch():
+            target = 40.0
         else:
-            self.assertLess(sec, 30.0)
+            target = 30.0
+
+        self.assertLess(sec, target)
 
     def test_system_driver_packages_chroot(self):
         '''system_driver_packages() for test package repository'''
