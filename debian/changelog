@@ -1,8 +1,23 @@
-ubuntu-drivers-common (1:0.5.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.5.1) bionic; urgency=medium
 
-  * 
+  * debian/control:
+    - Build depend on dh-python.
+    - Drop dh-systemd, and use debhelper (>= 9.20160709).
+  * tests/ubuntu_drivers.py:
+    - Raise time to 40.0 for i386 in
+      test_system_driver_packages_performance().
+  * NvidiaDetector/nvidiadetector.py:
+    - Fix crash with new name scheme of the NVIDIA
+      packages (LP: #1054458).
+  * gpu-manager.(c|py):
+    - Create a xorg.conf.d file for systems with PRIME.
+      This way we can drop the PrimaryGpu option from
+      the main NVIDIA configuration xorg.conf.d snippet,
+      and generate an additional custom snippet on demand
+      with that option, to avoid causing problems on systems
+      with multiple NVIDIA GPUs (LP: #1756226).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 09 Apr 2018 17:01:49 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 12 Apr 2018 16:35:07 +0200
 
 ubuntu-drivers-common (1:0.5) bionic; urgency=medium
 
