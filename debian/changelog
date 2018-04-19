@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.5.2) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 19 Apr 2018 13:28:38 +0200
+
 ubuntu-drivers-common (1:0.5.1) bionic; urgency=medium
 
   * debian/control:
