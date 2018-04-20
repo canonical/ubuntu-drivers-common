@@ -1356,6 +1356,7 @@ static bool create_prime_outputclass(void) {
                 "    MatchDriver \"nvidia-drm\"\n"
                 "    Driver \"nvidia\"\n"
                 "    Option \"AllowEmptyInitialConfiguration\"\n"
+                "    Option \"IgnoreDisplayDevices\" \"CRT\"\n"
                 "    Option \"PrimaryGPU\" \"Yes\"\n"
                 "    ModulePath \"/%s/nvidia/xorg\"\n"
                 "EndSection\n\n",
