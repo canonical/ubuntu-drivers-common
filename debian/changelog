@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.5.3) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 20 Jun 2018 14:31:59 +0200
+
 ubuntu-drivers-common (1:0.5.2) bionic; urgency=medium
 
   * gpu-manager.c:
