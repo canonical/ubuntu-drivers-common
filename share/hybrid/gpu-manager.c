@@ -1369,6 +1369,39 @@ static bool create_prime_outputclass(void) {
     return false;
 }
 
+static bool remove_prime_outputclass(void) {
+    char xorg_d_custom[PATH_MAX];
+    snprintf(xorg_d_custom, sizeof(xorg_d_custom), "%s/11-nvidia-prime.conf",
+            xorg_conf_d_path);
+    fprintf(log_handle, "Removing %s\n", xorg_d_custom);
+    unlink(xorg_d_custom);
+}
+
+
+static bool enable_power_management(const struct device *device) {
+    _cleanup_fclose_ FILE *file = NULL;
+    char pci_device_path[PATH_MAX];
+
+    snprintf(pci_device_path, sizeof(pci_device_path),
+             "/sys/bus/pci/devices/%04x:%02x:%02x.%x/power/control",
+             (unsigned int)device->domain,
+             (unsigned int)device->bus,
+             (unsigned int)device->dev,
+             (unsigned int)device->func);
+
+    fprintf(log_handle, "Setting power control to \"auto\" in %s\n", pci_device_path);
+    file = fopen(pci_device_path, "w");
+    if (!file) {
+        fprintf(log_handle, "Error while opening %s\n", pci_device_path);
+    }
+    else {
+        fputs("auto\n", file);
+
+        fflush(file);
+        return true;
+    }
+}
+
 
 static bool enable_prime(const char *prime_settings,
                         const struct device *device,
@@ -1409,10 +1442,25 @@ static bool enable_prime(const char *prime_settings,
         }
     }
 
-    /* Create an OutputClass just for PRIME, to override
-     * the default NVIDIA settings
-     */
-    create_prime_outputclass();
+    if (prime_is_action_on()) {
+        /* Create an OutputClass just for PRIME, to override
+         * the default NVIDIA settings
+         */
+        create_prime_outputclass();
+    }
+    else {
+        /* Unload the NVIDIA modules and enable pci power management */
+        unload_module("nvidia-drm");
+        unload_module("nvidia-uvm");
+        unload_module("nvidia-modeset");
+        unload_module("nvidia");
+
+        /* Remove the OutputClass */
+        remove_prime_outputclass();
+
+        /* Set power control to "auto" to save power */
+        enable_power_management(device);
+    }
 
     return true;
 }
