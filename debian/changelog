@@ -1,8 +1,10 @@
-ubuntu-drivers-common (1:0.5.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.5.3~ppa1) bionic; urgency=medium
 
-  * 
+  * gpu-manager.{c|py}:
+    - Set automatic PCI power management when the dGPU is disabled.
+    - Remove the outputclass for X11 when the dGPU is disabled.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 20 Jun 2018 14:31:59 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 20 Jun 2018 18:10:05 +0200
 
 ubuntu-drivers-common (1:0.5.2) bionic; urgency=medium
 
