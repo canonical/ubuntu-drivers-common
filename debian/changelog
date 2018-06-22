@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.5.3~ppa2) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.5.3~ppa2) bionic; urgency=medium
 
-  * 
+  * gpu-manager.service:
+    - Start before oem-config.service.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 22 Jun 2018 11:21:40 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 22 Jun 2018 12:12:51 +0200
 
 ubuntu-drivers-common (1:0.5.3~ppa1) bionic; urgency=medium
 
