@@ -1447,6 +1447,8 @@ static bool enable_prime(const char *prime_settings,
          * the default NVIDIA settings
          */
         create_prime_outputclass();
+        if (!nvidia_loaded)
+            load_module("nvidia");
     }
     else {
         /* Unload the NVIDIA modules and enable pci power management */
