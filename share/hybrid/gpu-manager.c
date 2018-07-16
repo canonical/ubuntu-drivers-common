@@ -1407,26 +1407,6 @@ static bool enable_prime(const char *prime_settings,
                         const struct device *device,
                         struct device **devices,
                         int cards_n) {
-    int major = 0, minor = 0;
-    bool has_version = false;
-
-    /* Check the driver version
-     * Note: this won't be available when the discrete GPU
-     *       is disabled, so don't error out if we cannot
-     *       determine the version.
-     */
-    has_version = get_nvidia_driver_version(&major, &minor);
-    if (has_version) {
-        fprintf(log_handle, "Nvidia driver version %d.%d detected\n",
-                major, minor);
-
-        if (major < 331) {
-            fprintf(log_handle, "Error: hybrid graphics is not supported "
-                                "with driver releases older than 331\n");
-            return false;
-        }
-    }
-
     /* Check if prime_settings is available
      * File doesn't exist or empty
      */
