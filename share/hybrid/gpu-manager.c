@@ -1857,8 +1857,7 @@ int main(int argc, char *argv[]) {
                 fprintf(log_handle, "Is boot vga? %s\n", (pci_device_is_boot_vga(info) ? "yes" : "no"));
 
                 if (!is_device_bound_to_driver(info)) {
-                    fprintf(log_handle, "The device is not bound to any driver. Skipping...\n");
-                    continue;
+                    fprintf(log_handle, "The device is not bound to any driver.\n");
                 }
 
                 if (is_device_pci_passthrough(info)) {
