@@ -1447,7 +1447,7 @@ static bool enable_prime(const char *prime_settings,
          * the default NVIDIA settings
          */
         create_prime_outputclass();
-        if (!nvidia_loaded)
+        if (!is_module_loaded("nvidia"))
             load_module("nvidia");
     }
     else {
