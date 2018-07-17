@@ -1369,7 +1369,7 @@ static bool create_prime_outputclass(void) {
     return false;
 }
 
-static bool remove_prime_outputclass(void) {
+static void remove_prime_outputclass(void) {
     char xorg_d_custom[PATH_MAX];
     snprintf(xorg_d_custom, sizeof(xorg_d_custom), "%s/11-nvidia-prime.conf",
             xorg_conf_d_path);
