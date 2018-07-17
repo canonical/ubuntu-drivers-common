@@ -375,7 +375,6 @@ static bool is_module_blacklisted(const char* module) {
             match = get_output(command, NULL, NULL);
     }
     else {
-        fprintf(stderr, "%s is not a file\n", modprobe_d_path);
         snprintf(command, sizeof(command),
                  "grep -G \"^blacklist.*%s[[:space:]]*$\" %s/*.conf",
                  module, modprobe_d_path);
@@ -1413,10 +1412,20 @@ static bool enable_power_management(const struct device *device) {
 }
 
 
+static bool unload_nvidia(void) {
+    unload_module("nvidia-drm");
+    unload_module("nvidia-uvm");
+    unload_module("nvidia-modeset");
+
+    return unload_module("nvidia");
+}
+
+
 static bool enable_prime(const char *prime_settings,
                         const struct device *device,
                         struct device **devices,
                         int cards_n) {
+    bool status = false;
     /* Check if prime_settings is available
      * File doesn't exist or empty
      */
@@ -1443,10 +1452,11 @@ static bool enable_prime(const char *prime_settings,
     else {
         /* Unload the NVIDIA modules and enable pci power management */
         if (is_module_loaded("nvidia")) {
-            unload_module("nvidia-drm");
-            unload_module("nvidia-uvm");
-            unload_module("nvidia-modeset");
-            unload_module("nvidia");
+            status = unload_nvidia();
+
+            if (!status && is_module_loaded("nvidia")) {
+                fprintf(log_handle, "Error: failure to unload the nvidia modules.\n");
+            }
         }
 
         /* Remove the OutputClass */
