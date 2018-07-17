@@ -381,6 +381,15 @@ static bool is_module_blacklisted(const char* module) {
                  module, modprobe_d_path);
 
         match = get_output(command, NULL, NULL);
+
+        if (!match) {
+            free(match);
+            snprintf(command, sizeof(command),
+                 "grep -G \"^blacklist.*%s[[:space:]]*$\" %s/*.conf",
+                 module, "/lib/modprobe.d");
+
+            match = get_output(command, NULL, NULL);
+        }
     }
 
     if (!match)
