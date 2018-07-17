@@ -1393,6 +1393,7 @@ static bool enable_power_management(const struct device *device) {
     file = fopen(pci_device_path, "w");
     if (!file) {
         fprintf(log_handle, "Error while opening %s\n", pci_device_path);
+        return false;
     }
     else {
         fputs("auto\n", file);
