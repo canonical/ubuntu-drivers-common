@@ -1432,10 +1432,12 @@ static bool enable_prime(const char *prime_settings,
     }
     else {
         /* Unload the NVIDIA modules and enable pci power management */
-        unload_module("nvidia-drm");
-        unload_module("nvidia-uvm");
-        unload_module("nvidia-modeset");
-        unload_module("nvidia");
+        if (is_module_loaded("nvidia")) {
+            unload_module("nvidia-drm");
+            unload_module("nvidia-uvm");
+            unload_module("nvidia-modeset");
+            unload_module("nvidia");
+        }
 
         /* Remove the OutputClass */
         remove_prime_outputclass();
