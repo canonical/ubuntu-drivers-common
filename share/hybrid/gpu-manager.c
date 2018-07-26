@@ -1420,12 +1420,187 @@ static bool unload_nvidia(void) {
     return unload_module("nvidia");
 }
 
+static char* get_pid_by_name(const char *name) {
+    char command[100];
+    char *pid = NULL;
+
+    snprintf(command, sizeof(command),
+             "/bin/pidof %s",
+             name);
+    fprintf(log_handle, "Calling %s\n", command);
+    pid = get_output(command, NULL, NULL);
+
+    if (!pid) {
+        fprintf(log_handle, "Info: no PID found for %s.\n",
+                name);
+        return NULL;
+    }
+
+    return pid;
+}
+
+
+static long get_uid_of_pid(const char *pid) {
+    char path[PATH_MAX];
+
+    _cleanup_free_ char *line = NULL;
+    _cleanup_fclose_ FILE *file = NULL;
+    size_t len = 0;
+    size_t read;
+    char pattern[] = "Uid:";
+    long uid = -1;
+
+    snprintf(path, sizeof(path),
+             "/proc/%s/status",
+             pid);
+    fprintf(log_handle, "Opening %s\n", path);
+
+    file = fopen(path, "r");
+    if (file == NULL) {
+        fprintf(log_handle, "Error: can't open %s\n", path);
+        return -1;
+    }
+    while ((read = getline(&line, &len, file)) != -1) {
+        if (istrstr(line, pattern) != NULL) {
+            fprintf(log_handle, "found \"%s\"\n", line);
+            if (strncmp(line, "Uid:", 4) == 0) {
+                uid = strtol(line + 4, NULL, 10);
+                fprintf(log_handle, "Found %ld\n", uid);
+            }
+        }
+    }
+    return uid;
+}
+
+
+static char* get_user_from_uid(const long uid) {
+    size_t read;
+    char *token, *str;
+    char pattern[PATH_MAX];
+    char *user = NULL;
+    size_t len = 0;
+    _cleanup_free_ char *line = NULL;
+    _cleanup_fclose_ FILE *file = NULL;
+    _cleanup_free_ char *tofree = NULL;
+
+    snprintf(pattern, sizeof(pattern),
+             "%ld",
+             uid);
+    fprintf(log_handle, "Looking for %s\n", pattern);
+
+    file = fopen("/etc/passwd", "r");
+    if (file == NULL)
+         return NULL;
+    while ((read = getline(&line, &len, file)) != -1) {
+        if (istrstr(line, pattern) != NULL) {
+            tofree = str = strdup(line);
+            /* Get the first result
+             * gdm:x:120:125:Gnome Display Manager:/var/lib/gdm3:/bin/false
+             */
+            while( (token = strsep(&str, ":")) != NULL ) {
+                user = strdup(token);
+                fprintf(log_handle, "USER: %s\n", user);
+                break;
+            }
+        }
+    }
+    return user;
+}
+
+
+/* Check a strings with pids, and find the gdm session */
+static long find_pid_main_session(const char *pid_str) {
+    _cleanup_free_ char *tofree = NULL;
+    _cleanup_free_ char *user = NULL;
+    long uid = -1;
+    char *token, *str;
+    long pid = -1;
+
+    tofree = str = strdup(pid_str);
+    while( (token = strsep(&str," ")) != NULL ) {
+        if ( (uid = get_uid_of_pid(token)) >= 0) {
+            fprintf(log_handle, "Found: %s %ld\n", token, uid);
+            /*look up the UID in /etc/passwd */
+            user = get_user_from_uid(uid);
+            fprintf(log_handle, "User: %s UID: %ld\n", user, uid);
+            if ((user != NULL) && (strcmp(user, "gdm") == 0)) {
+                pid = strtol(token, NULL, 10);
+                break;
+            }
+        }
+    }
+    return pid;
+}
+
+
+static long get_gdm_session_pid(const char* display_server) {
+    _cleanup_free_ char *pid_str = NULL;
+    long pid = -1;
+
+    pid_str = get_pid_by_name(display_server);
+    if (!pid_str) {
+        fprintf(log_handle, "INFO: no PID found for %s.\n",
+                display_server);
+        return -1;
+    }
+
+    fprintf(log_handle, "INFO: found PID(s) %s for %s.\n",
+                    pid_str, display_server);
+    /* We might have to deal with two or more display sessions.
+     * We want the one owned by gdm
+     */
+    if (strstr(pid_str, " ") != NULL)
+        pid = find_pid_main_session(pid_str);
+    else
+        pid = strtol(pid_str, NULL, 10);
+
+    fprintf(log_handle, "INFO: found PID %ld for Gdm main %s session.\n",
+            pid, display_server);
+
+    return pid;
+}
+
+
+/* Kill the main display session created by Gdm 3 */
+static bool kill_main_display_session (void) {
+    int i;
+    _cleanup_free_ char *final_pid = NULL;
+    char command[100];
+    char server[] = "Xwayland";
+    long pid = -1;
+    int status = 0;
+    /* try with Xwayland first */
+    char *servers[2] = {"Xwayland", "Xorg"};
+
+    if (!dry_run) {
+        for(i = 0; i < 2; i++) {
+            pid = get_gdm_session_pid(servers[i]);
+            if (pid <= 0)
+                fprintf(log_handle, "Info: no PID found for %s.\n", servers[i]);
+            else
+                break;
+        }
+        if (pid <= 0)
+            return false;
+
+        fprintf(log_handle, "Info: found PID(s) %ld for %s.\n",
+                pid, server);
+
+        /* Kill the session */
+        snprintf(command, sizeof(command), "kill -KILL %ld", pid);
+        fprintf(log_handle, "Calling %s\n", command);
+        status = system(command);
+    }
+    return (status == 0);
+}
+
 
 static bool enable_prime(const char *prime_settings,
                         const struct device *device,
                         struct device **devices,
                         int cards_n) {
     bool status = false;
+    int tries = 0;
     /* Check if prime_settings is available
      * File doesn't exist or empty
      */
@@ -1450,18 +1625,30 @@ static bool enable_prime(const char *prime_settings,
             load_module("nvidia");
     }
     else {
+        /* Remove the OutputClass */
+        remove_prime_outputclass();
+
+unload_again:
         /* Unload the NVIDIA modules and enable pci power management */
         if (is_module_loaded("nvidia")) {
             status = unload_nvidia();
 
             if (!status && is_module_loaded("nvidia")) {
-                fprintf(log_handle, "Error: failure to unload the nvidia modules.\n");
+                fprintf(log_handle, "Warning: failure to unload the nvidia modules.\n");
+                if (tries == 0) {
+                    fprintf(log_handle, "Info: killing X...\n");
+                    status = kill_main_display_session();
+                    if (status) {
+                        tries++;
+                        goto unload_again;
+                    }
+                }
+                else {
+                    fprintf(log_handle, "Error: giving up on unloading nvidia...\n");
+                    return false;
+                }
             }
         }
-
-        /* Remove the OutputClass */
-        remove_prime_outputclass();
-
         /* Set power control to "auto" to save power */
         enable_power_management(device);
     }
