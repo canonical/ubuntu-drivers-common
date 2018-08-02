@@ -1,8 +1,23 @@
-ubuntu-drivers-common (1:0.5.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.5.2.1) bionic; urgency=medium
 
-  * 
+  * debian/rules:
+    - Make sure to remove "__pycache__" directory.
+  * debian/source/options:
+    - Ignore the "__pycache__" directory.
+  * gpu-manager.(c|py):
+    - Set automatic pci power management when the dGPU is disabled (LP: #1778011).
+    - Load the nvidia modules when switching to performance mode.
+    - Do not skip unbound devices.
+    - Make remove_prime_outputclass() void.
+    - Report failures in enable_power_management().
+    - Look for blacklisted modules in /lib/modprobe.d too.
+    - Report failure when the nvidia modules cannot be unloaded,
+      kill the main display session created by gdm3, and try
+      unloading the nvidia modules once again.
+  * gpu-manager.service:
+    - Start before oem-config.service (LP: #1789201).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 20 Jun 2018 14:31:59 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 02 Aug 2018 15:45:42 +0200
 
 ubuntu-drivers-common (1:0.5.2) bionic; urgency=medium
 
