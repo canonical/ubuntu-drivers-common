@@ -1,8 +1,14 @@
-ubuntu-drivers-common (1:0.5.4) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.5.4) cosmic; urgency=medium
 
-  * 
+  * debian/source/options:
+      - Ignore "__pycache__" dir.
+  * debian/rules:
+    - Make sure to remove all the "__pycache__" directories.
+  * gpu-manager.c:
+      - Fix potential issue introduced in commit
+        6770360ed3324358d9069c7468a3af80219157ef.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 27 Aug 2018 09:40:56 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 18 Sep 2018 14:38:12 +0200
 
 ubuntu-drivers-common (1:0.5.3) cosmic; urgency=medium
 
