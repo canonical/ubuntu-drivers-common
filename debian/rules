@@ -47,4 +47,5 @@ override_dh_clean:
 	rm -rf build
 	rm -rf *.egg-info
 	rm -f debian/ubuntu-drivers-common.maintscript
+	find $(CURDIR) -name "__pycache__" -exec rm -rf "{}" \;
 	dh_clean
