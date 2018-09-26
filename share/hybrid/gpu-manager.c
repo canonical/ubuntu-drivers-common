@@ -1385,7 +1385,7 @@ static void remove_prime_outputclass(void) {
 }
 
 
-static bool enable_power_management(const struct device *device) {
+static bool manage_power_management(const struct device *device, bool enabled) {
     _cleanup_fclose_ FILE *file = NULL;
     char pci_device_path[PATH_MAX];
 
@@ -1396,20 +1396,27 @@ static bool enable_power_management(const struct device *device) {
              (unsigned int)device->dev,
              (unsigned int)device->func);
 
-    fprintf(log_handle, "Setting power control to \"auto\" in %s\n", pci_device_path);
+    fprintf(log_handle, "Setting power control to \"%s\" in %s\n", enabled ? "auto" : "on", pci_device_path);
     file = fopen(pci_device_path, "w");
     if (!file) {
         fprintf(log_handle, "Error while opening %s\n", pci_device_path);
         return false;
     }
     else {
-        fputs("auto\n", file);
+        fputs(enabled ? "auto\n" : "on\n", file);
 
         fflush(file);
         return true;
     }
 }
 
+static bool enable_power_management(const struct device *device) {
+    manage_power_management(device, true);
+}
+
+static bool disable_power_management(const struct device *device) {
+    manage_power_management(device, false);
+}
 
 static bool unload_nvidia(void) {
     unload_module("nvidia-drm");
@@ -1490,7 +1497,7 @@ static char* get_user_from_uid(const long uid) {
     file = fopen("/etc/passwd", "r");
     if (file == NULL)
          return NULL;
-    while ((read = getline(&line, &len, file)) != -1) {
+    while ((read = getline(&line, &len, file)) != -1 && (user == NULL)) {
         if (istrstr(line, pattern) != NULL) {
             tofree = str = strdup(line);
             /* Get the first result
@@ -1545,13 +1552,8 @@ static long get_gdm_session_pid(const char* display_server) {
 
     fprintf(log_handle, "INFO: found PID(s) %s for %s.\n",
                     pid_str, display_server);
-    /* We might have to deal with two or more display sessions.
-     * We want the one owned by gdm
-     */
-    if (strstr(pid_str, " ") != NULL)
-        pid = find_pid_main_session(pid_str);
-    else
-        pid = strtol(pid_str, NULL, 10);
+
+    pid = find_pid_main_session(pid_str);
 
     fprintf(log_handle, "INFO: found PID %ld for Gdm main %s session.\n",
             pid, display_server);
@@ -1620,6 +1622,7 @@ static bool enable_prime(const char *prime_settings,
          * the default NVIDIA settings
          */
         create_prime_outputclass();
+        disable_power_management(device);
         if (!is_module_loaded("nvidia"))
             load_module("nvidia");
     }
