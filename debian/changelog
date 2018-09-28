@@ -1,8 +1,10 @@
-ubuntu-drivers-common (1:0.5.5) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.5.5) cosmic; urgency=medium
 
-  * 
+  *  gpu-manager.c:
+    - Improve pid detection, and restore the default pci
+      power control profile in performance mode (LP: #1778011).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 26 Sep 2018 10:36:43 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 28 Sep 2018 11:19:26 +0200
 
 ubuntu-drivers-common (1:0.5.4) cosmic; urgency=medium
 
