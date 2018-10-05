@@ -35,11 +35,11 @@ The three main functions are:
 
 3. Which driver package(s) applies to this piece of hardware?
 
-        ```python
-        import apt
-        apt_cache = apt.Cache
-        apt_packages = UbuntuDrivers.detect.packages_for_modalias(apt_cache, modalias)
-        ```
+    ```python
+    import apt
+    apt_cache = apt.Cache
+    apt_packages = UbuntuDrivers.detect.packages_for_modalias(apt_cache, modalias)
+    ```
 
 These functions only use python-apt. They do not need any other dependencies,
 root privileges, D-BUS calls, etc.
