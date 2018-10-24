@@ -377,6 +377,42 @@ exec /sbin/modinfo "$@"
         self.assertEqual(set(UbuntuDrivers.detect.auto_install_filter(pkgs)),
                          set(['bcmwl-kernel-source', 'nvidia-173']))
 
+
+    def test_gpgpu_install_filter(self):
+        '''gpgpu_install_filter()'''
+
+        #gpgpu driver[:version][,driver[:version]]
+
+        self.assertEqual(UbuntuDrivers.detect.gpgpu_install_filter({}, 'nvidia'), {})
+
+        pkgs = {'nvidia-driver-390': {'recommended': True},
+                'nvidia-driver-410': {},
+                'nvidia-driver-340': {'recommended': False}}
+
+        result = set(UbuntuDrivers.detect.gpgpu_install_filter(pkgs, 'nvidia'))
+
+        # Nothing is specified, we return the recommended driver
+        self.assertEqual(set(UbuntuDrivers.detect.gpgpu_install_filter(pkgs, 'nvidia')),
+            set(['nvidia-driver-390']))
+
+        # We specify that we want nvidia 410
+        pkgs = {'nvidia-driver-390': {'recommended': True},
+                'nvidia-driver-410': {},
+                'nvidia-driver-340': {'recommended': False}}
+        self.assertEqual(set(UbuntuDrivers.detect.gpgpu_install_filter(pkgs, '410')),
+                         set(['nvidia-driver-410']))
+
+        self.assertEqual(set(UbuntuDrivers.detect.gpgpu_install_filter(pkgs, 'nvidia:410')),
+                         set(['nvidia-driver-410']))
+
+        # Now with multiple drivers (to be implemented in the future)
+        self.assertEqual(set(UbuntuDrivers.detect.gpgpu_install_filter(pkgs, 'nvidia:410,amdgpu:284')),
+                         set(['nvidia-driver-410']))
+
+        # Specify the same nvidia driver twice, just to break things
+        self.assertEqual(UbuntuDrivers.detect.gpgpu_install_filter(pkgs, 'nvidia:410,nvidia:390'),
+                         {})
+
     def test_detect_plugin_packages(self):
         '''detect_plugin_packages()'''
 
