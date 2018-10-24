@@ -13,6 +13,7 @@ import logging
 import fnmatch
 import subprocess
 import functools
+import re
 
 import apt
 
@@ -332,6 +333,142 @@ def system_driver_packages(apt_cache=None):
 
     return packages
 
+def _get_vendor_model_from_alias(alias):
+    vendor = None
+    model = None
+    modalias_pattern = re.compile('(.+):v(.+)d(.+)sv(.+)sd(.+)bc(.+)i.*')
+
+    details = modalias_pattern.match(alias)
+
+    if details:
+        return (details.group(2)[4:], details.group(3)[4:])
+
+    return (None, None)
+
+def _get_headless_no_dkms_metapackage(pkg, apt_cache):
+    assert pkg.candidate is not None
+    metapackage = None
+    '''Return headless-no-dkms metapackage from the main metapackage.
+
+    This is useful when dealing with packages such as nvidia-driver-$flavour
+    whose headless-no-dkms metapackage would be nvidia-headless-no-dkms-$flavour
+    '''
+    headless_template = 'nvidia-headless-no-dkms-%s'
+    name = pkg.shortname
+    flavour = name[name.rfind('-')+1:]
+    try:
+        int(flavour)
+    except ValueError:
+        return metapackage
+
+    candidate = headless_template % flavour
+
+    for package in apt_cache:
+        if apt_cache.get(candidate):
+            # skip foreign architectures, we usually only want native
+            # driver packages
+            if (not package.candidate or
+                package.candidate.architecture not in ('all', system_architecture)):
+                continue
+            metapackage = candidate
+            break
+        else:
+            continue
+
+    return metapackage
+
+def _is_package_free(pkg):
+    assert pkg.candidate is not None
+    # it would be better to check the actual license, as we do not have
+    # the component for third-party packages; but this is the best we can do
+    # at the moment
+    if pkg.candidate.section.startswith('restricted') or \
+            pkg.candidate.section.startswith('multiverse'):
+        return False
+    return True
+
+def _is_package_from_distro(pkg):
+    if pkg.candidate is None:
+        return False
+
+    for o in pkg.candidate.origins:
+        if o.origin == 'Ubuntu':
+            return True
+    return False
+
+
+
+def system_gpgpu_driver_packages(apt_cache=None):
+    '''Get driver packages, for gpgpu purposes, that are available for the system.
+
+    This calls system_modaliases() to determine the system's hardware and then
+    queries apt about which packages provide drivers for those. Finally, it looks
+    for the correct metapackage, by calling _get_headless_no_dkms_metapackage().
+
+    If you already have an apt.Cache() object, you should pass it as an
+    argument for efficiency. If not given, this function creates a temporary
+    one by itself.
+
+    Return a dictionary which maps package names to information about them:
+
+      driver_package → {'modalias': 'pci:...', ...}
+
+    Available information keys are:
+      'modalias':    Modalias for the device that needs this driver (not for
+                     drivers from detect plugins)
+      'syspath':     sysfs directory for the device that needs this driver
+                     (not for drivers from detect plugins)
+      'plugin':      Name of plugin that detected this package (only for
+                     drivers from detect plugins)
+      'free':        Boolean flag whether driver is free, i. e. in the "main"
+                     or "universe" component.
+      'from_distro': Boolean flag whether the driver is shipped by the distro;
+                     if not, it comes from a (potentially less tested/trusted)
+                     third party source.
+      'vendor':      Human readable vendor name, if available.
+      'model':       Human readable product name, if available.
+      'recommended': Some drivers (nvidia, fglrx) come in multiple variants and
+                     versions; these have this flag, where exactly one has
+                     recommended == True, and all others False.
+    '''
+    vendors_whitelist = ['10de']
+    modaliases = system_modaliases()
+
+    if not apt_cache:
+        apt_cache = apt.Cache()
+
+    packages = {}
+    for alias, syspath in modaliases.items():
+        for p in packages_for_modalias(apt_cache, alias):
+            (vendor, model) = _get_db_name(syspath, alias)
+            vendor_id, model_id = _get_vendor_model_from_alias(alias)
+            if (vendor_id is not None) and (vendor_id.lower() in vendors_whitelist):
+                packages[p.name] = {
+                        'modalias': alias,
+                        'syspath': syspath,
+                        'free': _is_package_free(p),
+                        'from_distro': _is_package_from_distro(p),
+                    }
+                if vendor is not None:
+                    packages[p.name]['vendor'] = vendor
+                if model is not None:
+                    packages[p.name]['model'] = model
+                metapackage = _get_headless_no_dkms_metapackage(p, apt_cache)
+
+                if metapackage is not None:
+                    packages[p.name]['metapackage'] = metapackage
+
+    # Add "recommended" flags for NVidia alternatives
+    nvidia_packages = [p for p in packages if p.startswith('nvidia-')]
+    if nvidia_packages:
+        nvidia_packages.sort(key=functools.cmp_to_key(_cmp_gfx_alternatives))
+        recommended = nvidia_packages[-1]
+        for p in nvidia_packages:
+            packages[p]['recommended'] = (p == recommended)
+
+    return packages
+
+
 def system_device_drivers(apt_cache=None):
     '''Get by-device driver packages that are available for the system.
     
@@ -435,6 +572,138 @@ def auto_install_filter(packages):
         if 'recommended' not in packages[p] or packages[p]['recommended']:
             result[p] = packages[p]
     return result
+
+class _GpgpuDriver(object):
+
+    def __init__(self, vendor=None, flavour=None):
+        self.vendor = vendor
+        self.flavour = flavour
+
+    def is_valid(self):
+        return not (not self.vendor and not self.flavour)
+
+def _process_driver_string(string):
+    '''Returns a _GpgpuDriver object'''
+    driver = _GpgpuDriver()
+    if string.find(':') != -1:
+        details = string.split(':')
+        if len(details) > 2:
+            return None
+        for elem in details:
+            try:
+                int(elem)
+            except ValueError:
+                driver.vendor = elem
+            else:
+                driver.flavour = elem
+    else:
+        driver.flavour = string
+    return driver
+
+def gpgpu_install_filter(packages, drivers_str):
+    drivers = []
+    allow = []
+    result = {}
+    '''Filter the Ubuntu packages according to the parameters the users passed
+
+    Ubuntu-drivers syntax
+
+    ubuntu-drivers autoinstall --gpgpu [[driver:]version]
+    ubuntu-drivers autoinstall --gpgpu driver[:version][,driver[:version]]
+
+    If no version is specified, gives the “current” supported version for the GPU in question.
+
+    Examples:
+    ubuntu-drivers autoinstall --gpgpu
+    ubuntu-drivers autoinstall --gpgpu 390
+    ubuntu-drivers autoinstall --gpgpu nvidia:390
+
+    Today this is only nvidia.  In the future there may be amdgpu-pro.  Possible syntax, to be confirmed only once there are driver packages that could use it:
+    ubuntu-drivers autoinstall --gpgpu nvidia:390,amdgpu
+    ubuntu-drivers autoinstall --gpgpu amdgpu:version
+    '''
+
+    if not packages:
+        return result
+
+    # No args, just --gpgpu
+    if drivers_str == 'nvidia':
+        driver = _GpgpuDriver()
+        drivers.append(driver)
+    else:
+        if drivers_str.find(',') != -1:
+            # Multiple drivers
+            # e.g. --gpgpu nvidia:390,amdgpu
+            for item in drivers_str.split(','):
+                driver = _process_driver_string(item)
+                if driver.is_valid():
+                    drivers.append(driver)
+        else:
+            # Just one driver
+            # e.g. --gpgpu 390
+            #      --gpgpu nvidia:390
+            driver = _process_driver_string(drivers_str)
+            if driver.is_valid():
+                drivers.append(driver)
+
+    if len(drivers) < 1:
+        return result
+
+    # If the vendor is not specified, we assume it's nvidia
+    it = 0
+    for driver in drivers:
+        if not driver.vendor:
+            drivers[it].vendor = 'nvidia'
+        it += 1
+
+    # Do not allow installing multiple versions of the nvidia driver
+    it = 0
+    vendors_temp = []
+    for driver in drivers:
+        vendor = driver.vendor
+        if vendors_temp.__contains__(vendor):
+            # TODO: raise error here
+            logging.debug('Multiple nvidia versions passed at the same time')
+            return result
+        vendors_temp.append(vendor)
+        it += 1
+
+    # If the flavour is not specified, we assume it's nvidia,
+    # and we install the newest driver
+    it = 0
+    for driver in drivers:
+        if not driver.flavour:
+            drivers[it].vendor = 'nvidia'
+        it += 1
+
+    # Filter the packages
+    # any package which matches any of those globs will be accepted
+    for driver in drivers:
+        if driver.flavour:
+            pattern = '%s*%s*' % (driver.vendor, driver.flavour)
+        else:
+            pattern = '%s*' % (driver.vendor)
+        #print('pattern: %s' % pattern)
+        allow.extend(fnmatch.filter(packages, pattern))
+        #print(allow)
+
+    # FIXME: if no flavour is specified, pick the recommended driver ?
+    #print('packages: %s' % packages)
+    for p in allow:
+        # If the version was specified, we override the recommended attribute
+        for driver in drivers:
+            if p.__contains__(driver.vendor):
+                if driver.flavour:
+                    #print('Found "%s" flavour in %s' % (driver.flavour, packages[p]))
+                    result[p] = packages[p]
+                else:
+                    #print('before recommended: %s' % packages[p])
+                    if packages[p].get('recommended'):
+                        result[p] = packages[p]
+                        #print('Found "recommended" flavour in %s' % (packages[p]))
+                break
+    return result
+
 
 def detect_plugin_packages(apt_cache=None):
     '''Get driver packages from custom detection plugins.
