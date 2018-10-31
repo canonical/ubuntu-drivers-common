@@ -640,21 +640,6 @@ APT::Get::AllowUnauthenticated "true";
                      'nvidia-current', 'special', 'picky']))
         self.assertEqual(ud.returncode, 0)
 
-    def test_list_system(self):
-        '''ubuntu-drivers list for fake sysfs and system apt'''
-
-        env = os.environ.copy()
-        del env['APT_CONFIG']
-
-        ud = subprocess.Popen([self.tool_path, 'list'],
-                universal_newlines=True, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE, env=env)
-        out, err = ud.communicate()
-        # real system packages should not match our fake modalises
-        self.assertEqual(err, '')
-        self.assertEqual(out, '')
-        self.assertEqual(ud.returncode, 0)
-
     def test_devices_chroot(self):
         '''ubuntu-drivers devices for fake sysfs and chroot'''
 
@@ -695,21 +680,6 @@ APT::Get::AllowUnauthenticated "true";
         self.assertTrue('special - third-party free' in out, out)
         self.assertEqual(ud.returncode, 0)
 
-    def test_devices_system(self):
-        '''ubuntu-drivers devices for fake sysfs and system apt'''
-
-        env = os.environ.copy()
-        del env['APT_CONFIG']
-
-        ud = subprocess.Popen([self.tool_path, 'devices'],
-                universal_newlines=True, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE, env=env)
-        out, err = ud.communicate()
-        # real system packages should not match our fake modalises
-        self.assertEqual(err, '')
-        self.assertEqual(out, '')
-        self.assertEqual(ud.returncode, 0)
-
     def test_auto_install_chroot(self):
         '''ubuntu-drivers autoinstall for fake sysfs and chroot'''
 
@@ -747,21 +717,6 @@ APT::Get::AllowUnauthenticated "true";
 
         with open(listfile) as f:
             self.assertEqual(f.read(), 'bcmwl-kernel-source\n')
-
-    def test_auto_install_system(self):
-        '''ubuntu-drivers autoinstall for fake sysfs and system apt'''
-
-        env = os.environ.copy()
-        del env['APT_CONFIG']
-
-        ud = subprocess.Popen([self.tool_path, 'autoinstall'],
-                universal_newlines=True, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE, env=env)
-        out, err = ud.communicate()
-        self.assertEqual(err, '')
-        # real system packages should not match our fake modalises
-        self.assertTrue('No drivers found' in out)
-        self.assertEqual(ud.returncode, 0)
 
     def test_debug(self):
         '''ubuntu-drivers debug'''
