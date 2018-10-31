@@ -650,7 +650,7 @@ APT::Get::AllowUnauthenticated "true";
         out, err = ud.communicate()
         # real system packages should not match our fake modalises
         self.assertEqual(err, '')
-        self.assertEqual(out, '\n')
+        self.assertEqual(out, '')
         self.assertEqual(ud.returncode, 0)
 
     def test_devices_chroot(self):
