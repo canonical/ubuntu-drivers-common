@@ -102,6 +102,7 @@ class DetectTest(unittest.TestCase):
         # no custom detection plugins by default
         self.plugin_dir = tempfile.mkdtemp()
         os.environ['UBUNTU_DRIVERS_DETECT_DIR'] = self.plugin_dir
+        os.environ['UBUNTU_DRIVERS_SYS_DIR'] = self.umockdev.get_sys_dir()
 
     def tearDown(self):
         shutil.rmtree(self.plugin_dir)
@@ -126,11 +127,11 @@ class DetectTest(unittest.TestCase):
     def test_system_modalises_fake(self):
         '''system_modaliases() for fake sysfs'''
 
-        res = UbuntuDrivers.detect.system_modaliases()
+        res = UbuntuDrivers.detect.system_modaliases(self.umockdev.get_sys_dir())
         self.assertEqual(set(res), set(['pci:v00001234d00sv00000001sd00bc00sc00i00',
             'pci:vDEADBEEFd00', 'usb:v9876dABCDsv01sd02bc00sc01i05',
             modalias_nv]))
-        self.assertEqual(res['pci:vDEADBEEFd00'], '/sys/devices/grey')
+        self.assertTrue(res['pci:vDEADBEEFd00'].endswith('/sys/devices/grey'))
 
     def test_system_driver_packages_performance(self):
         '''system_driver_packages() performance for a lot of modaliases'''
@@ -599,6 +600,7 @@ APT::Get::AllowUnauthenticated "true";
         '''Create a fake sysfs'''
 
         self.umockdev = gen_fakehw()
+        os.environ['UBUNTU_DRIVERS_SYS_DIR'] = self.umockdev.get_sys_dir()
 
     def tearDown(self):
         # some tests install this package
@@ -713,7 +715,7 @@ APT::Get::AllowUnauthenticated "true";
 
         ud = subprocess.Popen([self.tool_path, 'autoinstall'],
                 universal_newlines=True, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE)
+                stderr=subprocess.PIPE, env=os.environ)
         out, err = ud.communicate()
         self.assertEqual(err, '')
         self.assertTrue('bcmwl-kernel-source' in out, out)
@@ -724,7 +726,7 @@ APT::Get::AllowUnauthenticated "true";
         # now all packages should be installed, so it should not do anything
         ud = subprocess.Popen([self.tool_path, 'autoinstall'],
                 universal_newlines=True, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE)
+                stderr=subprocess.PIPE, env=os.environ)
         out, err = ud.communicate()
         self.assertEqual(err, '')
         self.assertFalse('bcmwl-kernel-source' in out, out)
@@ -814,6 +816,7 @@ class KernelDectionTest(unittest.TestCase):
         # no custom detection plugins by default
         self.plugin_dir = tempfile.mkdtemp()
         os.environ['UBUNTU_DRIVERS_DETECT_DIR'] = self.plugin_dir
+        os.environ['UBUNTU_DRIVERS_SYS_DIR'] = self.umockdev.get_sys_dir()
 
     def tearDown(self):
         shutil.rmtree(self.plugin_dir)
