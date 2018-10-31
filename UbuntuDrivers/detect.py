@@ -21,7 +21,7 @@ from UbuntuDrivers import kerneldetection
 
 system_architecture = apt.apt_pkg.get_architectures()[0]
 
-def system_modaliases():
+def system_modaliases(sys_path=None):
     '''Get modaliases present in the system.
 
     This ignores devices whose drivers are statically built into the kernel, as
@@ -30,7 +30,8 @@ def system_modaliases():
     Return a modalias → sysfs path map.
     '''
     aliases = {}
-    for path, dirs, files in os.walk('/sys/devices'):
+    devices = sys_path and '%s/devices' % (sys_path) or '/sys/devices'
+    for path, dirs, files in os.walk(devices):
         modalias = None
 
         # most devices have modalias files
@@ -252,7 +253,7 @@ def _get_db_name(syspath, alias):
                   alias, vendor, model)
     return (vendor, model)
 
-def system_driver_packages(apt_cache=None):
+def system_driver_packages(apt_cache=None, sys_path=None):
     '''Get driver packages that are available for the system.
     
     This calls system_modaliases() to determine the system's hardware and then
@@ -285,7 +286,7 @@ def system_driver_packages(apt_cache=None):
                      versions; these have this flag, where exactly one has
                      recommended == True, and all others False.
     '''
-    modaliases = system_modaliases()
+    modaliases = system_modaliases(sys_path)
 
     if not apt_cache:
         apt_cache = apt.Cache()
@@ -398,7 +399,7 @@ def _is_package_from_distro(pkg):
 
 
 
-def system_gpgpu_driver_packages(apt_cache=None):
+def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
     '''Get driver packages, for gpgpu purposes, that are available for the system.
 
     This calls system_modaliases() to determine the system's hardware and then
@@ -432,7 +433,7 @@ def system_gpgpu_driver_packages(apt_cache=None):
                      recommended == True, and all others False.
     '''
     vendors_whitelist = ['10de']
-    modaliases = system_modaliases()
+    modaliases = system_modaliases(sys_path)
 
     if not apt_cache:
         apt_cache = apt.Cache()
@@ -469,7 +470,7 @@ def system_gpgpu_driver_packages(apt_cache=None):
     return packages
 
 
-def system_device_drivers(apt_cache=None):
+def system_device_drivers(apt_cache=None, sys_path=None):
     '''Get by-device driver packages that are available for the system.
     
     This calls system_modaliases() to determine the system's hardware and then
@@ -524,7 +525,7 @@ def system_device_drivers(apt_cache=None):
         apt_cache = apt.Cache()
 
     # copy the system_driver_packages() structure into the by-device structure
-    for pkg, pkginfo in system_driver_packages(apt_cache).items():
+    for pkg, pkginfo in system_driver_packages(apt_cache, sys_path).items():
         if 'syspath' in pkginfo:
             device_name = pkginfo['syspath']
         else:
