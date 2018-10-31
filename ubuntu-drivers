@@ -19,6 +19,8 @@ import apt
 
 import UbuntuDrivers.detect
 
+sys_path = os.environ.get('UBUNTU_DRIVERS_SYS_DIR')
+
 def parse_args():
     '''Parse command line arguments.'''
 
@@ -39,14 +41,14 @@ def parse_args():
     parser.add_argument('--package-list', metavar='PATH', 
             help='Create file with list of installed packages (in autoinstall mode)')
 
-    parser.add_argument("--gpgpu", const='nvidia', nargs='?', default='nvidia', metavar='driver{:version}{,driver{:version}}', help="Auto install GPGPU drivers")
+    parser.add_argument("--gpgpu", const='nvidia', nargs='?', metavar='driver{:version}{,driver{:version}}', help="Auto install GPGPU drivers")
 
     return parser.parse_args()
 
 def command_list(args):
     '''Show all driver packages which apply to the current system.'''
 
-    packages = UbuntuDrivers.detect.system_driver_packages()
+    packages = UbuntuDrivers.detect.system_driver_packages(sys_path=sys_path)
     if packages:
         print('\n'.join(packages))
 
@@ -54,7 +56,7 @@ def command_list(args):
 
 def list_gpgpu(args):
     cache = apt.Cache()
-    packages = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache)
+    packages = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path)
     for package in packages:
         candidate = packages[package]['metapackage']
         if candidate:
@@ -66,7 +68,7 @@ def list_gpgpu(args):
 def command_devices(args):
     '''Show all devices which need drivers, and which packages apply to them.'''
 
-    drivers = UbuntuDrivers.detect.system_device_drivers()
+    drivers = UbuntuDrivers.detect.system_device_drivers(sys_path=sys_path)
     for device, info in drivers.items():
         print('== %s ==' % device)
         for k, v in info.items():
@@ -96,7 +98,7 @@ def command_autoinstall(args):
 
     cache = apt.Cache()
 
-    packages = UbuntuDrivers.detect.system_driver_packages(cache)
+    packages = UbuntuDrivers.detect.system_driver_packages(cache, sys_path)
     packages = UbuntuDrivers.detect.auto_install_filter(packages)
     if not packages:
         print('No drivers found for automatic installation.')
@@ -128,7 +130,7 @@ def autoinstall_gpgpu(args):
 
     cache = apt.Cache()
 
-    packages = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache)
+    packages = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path)
     packages = UbuntuDrivers.detect.gpgpu_install_filter(packages, args.gpgpu)
     if not packages:
         print('No drivers found for automatic installation.')
@@ -165,7 +167,7 @@ def command_debug(args):
     print('=== log messages from detection ===')
     aliases = UbuntuDrivers.detect.system_modaliases()
     cache = apt.Cache()
-    packages = UbuntuDrivers.detect.system_driver_packages(cache)
+    packages = UbuntuDrivers.detect.system_driver_packages(cache, sys_path)
     auto_packages = UbuntuDrivers.detect.auto_install_filter(packages)
 
     print('=== modaliases in the system ===')
