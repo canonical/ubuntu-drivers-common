@@ -41,7 +41,11 @@ def parse_args():
     parser.add_argument('--package-list', metavar='PATH', 
             help='Create file with list of installed packages (in autoinstall mode)')
 
-    parser.add_argument("--gpgpu", const='nvidia', nargs='?', metavar='driver{:version}{,driver{:version}}', help="Auto install GPGPU drivers")
+    if sys.version_info.major == 3 and sys.version_info.minor >= 6:
+        parser.add_argument("--gpgpu", const='nvidia', nargs='?', metavar='driver[:version][,driver[:version]]', help="Auto install GPGPU drivers")
+    else:
+        # Python 3.5.2 in Xenial will crash when matching square brackets
+        parser.add_argument("--gpgpu", const='nvidia', nargs='?', metavar='driver{:version}{,driver{:version}}', help="Auto install GPGPU drivers")
 
     return parser.parse_args()
 
