@@ -21,8 +21,8 @@ import UbuntuDrivers.detect
 
 sys_path = os.environ.get('UBUNTU_DRIVERS_SYS_DIR')
 
-def parse_args():
-    '''Parse command line arguments.'''
+def create_parser():
+    '''Create parser for command line arguments.'''
 
     # build help for commands
     commands = []
@@ -47,7 +47,7 @@ def parse_args():
         # Python 3.5.2 in Xenial will crash when matching square brackets
         parser.add_argument("--gpgpu", const='nvidia', nargs='?', metavar='driver{:version}{,driver{:version}}', help="Auto install GPGPU drivers")
 
-    return parser.parse_args()
+    return parser
 
 def command_list(args):
     '''Show all driver packages which apply to the current system.'''
@@ -217,10 +217,14 @@ def command_debug(args):
 #
 # main
 #
-args = parse_args()
+parser = create_parser()
+args = parser.parse_args()
 if args.command == 'autoinstall' and args.gpgpu != None:
     sys.exit(autoinstall_gpgpu(args))
 else:
+    if not args.command:
+        parser.print_help()
+        sys.exit(1)
     # run the function corresponding to the specified command
     command = globals()['command_' + args.command]
     sys.exit(command(args))
