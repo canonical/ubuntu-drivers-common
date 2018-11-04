@@ -142,7 +142,7 @@ class DetectTest(unittest.TestCase):
             self.umockdev.add_device('usb', 'usbdev%i' % i, None, ['modalias', 'usb:s%04X' % i], [])
 
         start = resource.getrusage(resource.RUSAGE_SELF)
-        UbuntuDrivers.detect.system_driver_packages()
+        UbuntuDrivers.detect.system_driver_packages(sys_path=self.umockdev.get_sys_dir())
         stop = resource.getrusage(resource.RUSAGE_SELF)
 
         sec = (stop.ru_utime + stop.ru_stime) - (start.ru_utime + start.ru_stime)
@@ -177,7 +177,7 @@ class DetectTest(unittest.TestCase):
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             chroot.add_repository(archive.path, True, False)
             cache = apt.Cache(rootdir=chroot.path)
-            res = UbuntuDrivers.detect.system_driver_packages(cache)
+            res = UbuntuDrivers.detect.system_driver_packages(cache, sys_path=self.umockdev.get_sys_dir())
         finally:
             chroot.remove()
         self.assertEqual(set(res), set(['chocolate', 'vanilla', 'nvidia-current',
@@ -216,6 +216,42 @@ class DetectTest(unittest.TestCase):
         self.assertEqual(res['nvidia-34']['modalias'], modalias_nv)
         self.assertEqual(res['nvidia-34']['recommended'], False)
 
+    def test_system_gpgpu_driver_packages_chroot(self):
+        '''system_driver_packages() for test package repository'''
+
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            # older applicable driver which is not the recommended one
+            archive.create_deb('nvidia-driver-390', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+            # -updates driver which also should not be recommended
+            archive.create_deb('nvidia-driver-410', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+            # driver package which supports multiple ABIs
+            archive.create_deb('nvidia-340',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+            archive.create_deb('nvidia-headless-no-dkms-410',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+            archive.create_deb('nvidia-headless-no-dkms-390',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            chroot.add_repository(archive.path, True, False)
+            cache = apt.Cache(rootdir=chroot.path)
+            res = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path=self.umockdev.get_sys_dir())
+        finally:
+            chroot.remove()
+        self.assertTrue('nvidia-driver-410' in res)
+        packages = UbuntuDrivers.detect.gpgpu_install_filter(res, 'nvidia')
+        self.assertEqual(set(packages), set(['nvidia-driver-410']))
+        driver = list(packages.keys())[0]
+        self.assertEqual(packages[driver].get('metapackage'), 'nvidia-headless-no-dkms-410')
+
     def test_system_driver_packages_bad_encoding(self):
         '''system_driver_packages() with badly encoded Packages index'''
 
@@ -238,7 +274,7 @@ Description: broken \xEB encoding
 ''')
             chroot.add_repository(archive.path, True, False)
             cache = apt.Cache(rootdir=chroot.path)
-            res = UbuntuDrivers.detect.system_driver_packages(cache)
+            res = UbuntuDrivers.detect.system_driver_packages(cache, sys_path=self.umockdev.get_sys_dir())
         finally:
             chroot.remove()
 
@@ -250,7 +286,7 @@ Description: broken \xEB encoding
         with open(os.path.join(self.plugin_dir, 'extra.py'), 'w') as f:
             f.write('def detect(apt): return ["coreutils", "no_such_package"]\n')
 
-        res = UbuntuDrivers.detect.system_driver_packages() 
+        res = UbuntuDrivers.detect.system_driver_packages(sys_path=self.umockdev.get_sys_dir()) 
         self.assertTrue('coreutils' in res, list(res.keys()))
         self.assertEqual(res['coreutils'], {'free': True, 'from_distro': True, 'plugin': 'extra.py'})
 
@@ -274,7 +310,7 @@ Description: broken \xEB encoding
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             chroot.add_repository(archive.path, True, False)
             cache = apt.Cache(rootdir=chroot.path)
-            res = UbuntuDrivers.detect.system_device_drivers(cache)
+            res = UbuntuDrivers.detect.system_device_drivers(cache, sys_path=self.umockdev.get_sys_dir())
         finally:
             chroot.remove()
 
@@ -283,33 +319,38 @@ Description: broken \xEB encoding
         graphics = '/sys/devices/graphics'
         self.assertEqual(len(res), 3)  # the three devices above
 
-        self.assertEqual(res[white], 
+
+        white_dict = [value for key, value in res.items() if key.endswith(white)][0]
+        black_dict = [value for key, value in res.items() if key.endswith(black)][0]
+        graphics_dict = [value for key, value in res.items() if key.endswith(graphics)][0]
+
+        self.assertEqual(white_dict,
                          {'modalias': 'pci:v00001234d00sv00000001sd00bc00sc00i00',
                           'drivers': {'vanilla': {'free': True, 'from_distro': False}}
                          })
 
-        self.assertEqual(res[black], 
+        self.assertEqual(black_dict,
                          {'modalias': 'usb:v9876dABCDsv01sd02bc00sc01i05',
                           'drivers': {'chocolate': {'free': True, 'from_distro': False}}
                          })
 
-        self.assertEqual(res[graphics]['modalias'], modalias_nv)
-        self.assertTrue('nvidia' in res[graphics]['vendor'].lower())
-        self.assertTrue('GeForce' in res[graphics]['model'])
+        self.assertEqual(graphics_dict['modalias'], modalias_nv)
+        self.assertTrue('nvidia' in graphics_dict['vendor'].lower())
+        self.assertTrue('GeForce' in graphics_dict['model'])
 
         # should contain nouveau driver; note that free is True here because
         # these come from the fake archive
-        self.assertEqual(res[graphics]['drivers']['nvidia-current'],
+        self.assertEqual(graphics_dict['drivers']['nvidia-current'],
                          {'free': True, 'from_distro': False, 'recommended': True})
-        self.assertEqual(res[graphics]['drivers']['nvidia-current-updates'],
+        self.assertEqual(graphics_dict['drivers']['nvidia-current-updates'],
                          {'free': True, 'from_distro': False, 'recommended': False})
-        self.assertEqual(res[graphics]['drivers']['nvidia-123'],
+        self.assertEqual(graphics_dict['drivers']['nvidia-123'],
                           {'free': True, 'from_distro': False, 'recommended': False})
-        self.assertEqual(res[graphics]['drivers']['nvidia-experimental'],
+        self.assertEqual(graphics_dict['drivers']['nvidia-experimental'],
                          {'free': True, 'from_distro': False, 'recommended': False})
-        self.assertEqual(res[graphics]['drivers']['xserver-xorg-video-nouveau'],
+        self.assertEqual(graphics_dict['drivers']['xserver-xorg-video-nouveau'],
                          {'free': True, 'from_distro': True, 'recommended': False, 'builtin': True})
-        self.assertEqual(len(res[graphics]['drivers']), 5, list(res[graphics]['drivers'].keys()))
+        self.assertEqual(len(graphics_dict['drivers']), 5, list(graphics_dict['drivers'].keys()))
 
     def test_system_device_drivers_detect_plugins(self):
         '''system_device_drivers() includes custom detection plugins'''
@@ -317,7 +358,7 @@ Description: broken \xEB encoding
         with open(os.path.join(self.plugin_dir, 'extra.py'), 'w') as f:
             f.write('def detect(apt): return ["coreutils", "no_such_package"]\n')
 
-        res = UbuntuDrivers.detect.system_device_drivers()
+        res = UbuntuDrivers.detect.system_device_drivers(sys_path=self.umockdev.get_sys_dir())
         self.assertTrue('extra.py' in res, list(res.keys()))
         self.assertEqual(res['extra.py'],
                          {'drivers': {'coreutils': {'free': True, 'from_distro': True}}})
@@ -346,17 +387,18 @@ exec /sbin/modinfo "$@"
             orig_path = os.environ['PATH']
             os.environ['PATH'] = '%s:%s' % (chroot.path, os.environ['PATH'])
 
-            res = UbuntuDrivers.detect.system_device_drivers(cache)
+            res = UbuntuDrivers.detect.system_device_drivers(cache, sys_path=self.umockdev.get_sys_dir())
         finally:
             chroot.remove()
             os.environ['PATH'] = orig_path
 
         graphics = '/sys/devices/graphics'
-        self.assertEqual(res[graphics]['modalias'], modalias_nv)
-        self.assertTrue(res[graphics]['manual_install'])
+        graphics_dict = [value for key, value in res.items() if key.endswith(graphics)][0]
+        self.assertEqual(graphics_dict['modalias'], modalias_nv)
+        self.assertTrue(graphics_dict['manual_install'])
 
         # should still show the drivers
-        self.assertGreater(len(res[graphics]['drivers']), 1)
+        self.assertGreater(len(graphics_dict['drivers']), 1)
 
     def test_auto_install_filter(self):
         '''auto_install_filter()'''
