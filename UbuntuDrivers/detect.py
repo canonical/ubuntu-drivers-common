@@ -364,17 +364,15 @@ def _get_headless_no_dkms_metapackage(pkg, apt_cache):
 
     candidate = headless_template % flavour
 
-    for package in apt_cache:
-        if apt_cache.get(candidate):
-            # skip foreign architectures, we usually only want native
-            # driver packages
-            if (not package.candidate or
-                package.candidate.architecture not in ('all', system_architecture)):
-                continue
+    try:
+        package = apt_cache.__getitem__(candidate)
+        # skip foreign architectures, we usually only want native
+        # driver packages
+        if (package.candidate and
+            package.candidate.architecture in ('all', system_architecture)):
             metapackage = candidate
-            break
-        else:
-            continue
+    except KeyError:
+        pass
 
     return metapackage
 
