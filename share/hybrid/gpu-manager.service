@@ -6,6 +6,8 @@ Before=oem-config.service
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/gpu-manager --log /var/log/gpu-manager.log
+StandardOutput=null
+StandardError=null
 
 [Install]
 WantedBy=display-manager.service
