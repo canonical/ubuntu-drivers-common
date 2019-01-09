@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.5.7) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.5.7) disco; urgency=medium
 
-  * 
+  * share/hybrid/gpu-manager.service:
+    - Do not let the output through journald (LP: #1768637).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 09 Jan 2019 15:11:01 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 09 Jan 2019 17:10:36 +0100
 
 ubuntu-drivers-common (1:0.5.6) disco; urgency=medium
 
