@@ -2,7 +2,27 @@ ubuntu-drivers-common (1:0.6) UNRELEASED; urgency=medium
 
   * 
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 16 Oct 2018 17:55:40 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 14 Jan 2019 16:39:20 +0100
+
+ubuntu-drivers-common (1:0.5.7) disco; urgency=medium
+
+  * share/hybrid/gpu-manager.service:
+    - Do not let the output through journald (LP: #1768637).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 09 Jan 2019 17:10:36 +0100
+
+ubuntu-drivers-common (1:0.5.6) disco; urgency=medium
+
+  * nvidia-installer-hooks/alternate-install-available,
+    nvidia-installer-hooks/pre-install,
+    setup.py:
+    - Rather than failing with no explanation, let the
+      NVIDIA installer provide instructions on how to
+      install the driver from the Ubuntu archive.
+    - Stop making hooks executable, since they are only
+      plain text files now.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 05 Dec 2018 17:50:26 +0100
 
 ubuntu-drivers-common (1:0.5.5) cosmic; urgency=medium
 

@@ -15,8 +15,8 @@ if '86' in os.uname()[4]:
     extra_data.append(("/lib/udev/rules.d/", ["share/hybrid/71-u-d-c-gpu-detection.rules"]))
 
 # Make the nvidia-installer hooks executable
-for x in glob.glob("nvidia-installer-hooks/*"):
-    os.chmod(x, 0o755)
+#for x in glob.glob("nvidia-installer-hooks/*"):
+#    os.chmod(x, 0o755)
 
 setup(
     name="ubuntu-drivers-common",
