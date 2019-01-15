@@ -723,9 +723,9 @@ APT::Get::AllowUnauthenticated "true";
         self.assertEqual(ud.returncode, 0)
 
     def test_auto_install_chroot(self):
-        '''ubuntu-drivers autoinstall for fake sysfs and chroot'''
+        '''ubuntu-drivers install for fake sysfs and chroot'''
 
-        ud = subprocess.Popen([self.tool_path, 'autoinstall'],
+        ud = subprocess.Popen([self.tool_path, 'install'],
                 universal_newlines=True, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, env=os.environ)
         out, err = ud.communicate()
@@ -736,7 +736,7 @@ APT::Get::AllowUnauthenticated "true";
         self.assertEqual(ud.returncode, 0)
 
         # now all packages should be installed, so it should not do anything
-        ud = subprocess.Popen([self.tool_path, 'autoinstall'],
+        ud = subprocess.Popen([self.tool_path, 'install'],
                 universal_newlines=True, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, env=os.environ)
         out, err = ud.communicate()
@@ -745,12 +745,12 @@ APT::Get::AllowUnauthenticated "true";
         self.assertEqual(ud.returncode, 0)
 
     def test_auto_install_packagelist(self):
-        '''ubuntu-drivers autoinstall package list creation'''
+        '''ubuntu-drivers install package list creation'''
 
         listfile = os.path.join(self.chroot.path, 'pkgs')
         self.addCleanup(os.unlink, listfile)
 
-        ud = subprocess.Popen([self.tool_path, 'autoinstall', '--package-list', listfile],
+        ud = subprocess.Popen([self.tool_path, 'install', '--package-list', listfile],
                 universal_newlines=True, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE)
         out, err = ud.communicate()
