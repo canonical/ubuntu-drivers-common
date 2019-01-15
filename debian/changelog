@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.6) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.6~ppa2) bionic; urgency=medium
 
-  * 
+  * ubuntu-drivers:
+    - Deprecate the "autoinstall" argument in favour of "install".
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 14 Jan 2019 16:39:20 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 15 Jan 2019 09:29:29 +0100
 
 ubuntu-drivers-common (1:0.5.7) disco; urgency=medium
 
