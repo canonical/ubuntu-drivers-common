@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.6~ppa3) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 15 Jan 2019 09:38:33 +0100
+
 ubuntu-drivers-common (1:0.6~ppa2) bionic; urgency=medium
 
   * ubuntu-drivers:
