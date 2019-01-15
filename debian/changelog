@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.6~ppa3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.6~ppa3) bionic; urgency=medium
 
-  * 
+  * tests/ubuntu_drivers.py:
+    - Update test suite.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 15 Jan 2019 09:38:33 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 15 Jan 2019 09:40:19 +0100
 
 ubuntu-drivers-common (1:0.6~ppa2) bionic; urgency=medium
 
