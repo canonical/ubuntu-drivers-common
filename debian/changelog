@@ -1,8 +1,18 @@
-ubuntu-drivers-common (1:0.6) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.6) disco; urgency=medium
 
-  * 
+  * ubuntu-drivers,
+    tests/ubuntu_drivers.py:
+    - Deprecate the "autoinstall" argument in favour of the "install" one.
+    - Use umockdev more, and test metapackages.
+    - Fix up tests to honour fake sys path.
+    - Allow passing --gpgpu to the list parameter. This will show the
+      available gpgpgu drivers.
+    - Show help screen if no mandatory argument is passed.
+    - Work around bug in argparse in python 3.5.5 in xenial.
+  * UbuntuDrivers/detect.py:
+    - Clean up the way we access the apt cache.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 30 Jan 2019 12:58:55 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 30 Jan 2019 13:05:30 +0100
 
 ubuntu-drivers-common (1:0.5.7) disco; urgency=medium
 
