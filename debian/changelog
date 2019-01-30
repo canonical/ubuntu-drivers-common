@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.6) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 30 Jan 2019 12:58:55 +0100
+
 ubuntu-drivers-common (1:0.5.7) disco; urgency=medium
 
   * share/hybrid/gpu-manager.service:
