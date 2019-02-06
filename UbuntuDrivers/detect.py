@@ -630,18 +630,14 @@ def gpgpu_install_filter(packages, drivers_str):
         driver = _GpgpuDriver()
         drivers.append(driver)
     else:
-        if drivers_str.find(',') != -1:
-            # Multiple drivers
-            # e.g. --gpgpu nvidia:390,amdgpu
-            for item in drivers_str.split(','):
-                driver = _process_driver_string(item)
-                if driver.is_valid():
-                    drivers.append(driver)
-        else:
-            # Just one driver
-            # e.g. --gpgpu 390
-            #      --gpgpu nvidia:390
-            driver = _process_driver_string(drivers_str)
+        # Just one driver
+        # e.g. --gpgpu 390
+        #      --gpgpu nvidia:390
+        #
+        # Or Multiple drivers
+        # e.g. --gpgpu nvidia:390,amdgpu
+        for item in drivers_str.split(','):
+            driver = _process_driver_string(item)
             if driver.is_valid():
                 drivers.append(driver)
 
