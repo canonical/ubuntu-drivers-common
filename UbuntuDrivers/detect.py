@@ -626,7 +626,7 @@ def gpgpu_install_filter(packages, drivers_str):
         return result
 
     # No args, just --gpgpu
-    if drivers_str == 'nvidia':
+    if drivers_str == 'default':
         driver = _GpgpuDriver()
         drivers.append(driver)
     else:
