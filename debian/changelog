@@ -1,8 +1,13 @@
-ubuntu-drivers-common (1:0.6.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.6.1) disco; urgency=medium
 
-  * 
+  * ubuntu-drivers,
+    UbuntuDrivers/detect.py:
+    - Use exit status 1 if the gpgpu driver is specified and not found,
+      0 if it's not specified and not found.
+    - Exclude the "autoinstall" argument from the help page, and
+      remove the deprecation warning.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 31 Jan 2019 10:00:59 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 05 Mar 2019 18:39:13 +0100
 
 ubuntu-drivers-common (1:0.6) disco; urgency=medium
 
