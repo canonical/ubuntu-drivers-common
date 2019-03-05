@@ -12,6 +12,7 @@
 
 import argparse
 import subprocess
+import fnmatch
 import sys
 import os
 import logging
@@ -25,6 +26,7 @@ logger.setLevel(logging.WARNING)
 
 def create_parser():
     '''Create parser for command line arguments.'''
+    deprecated = ('autoinstall',)
 
     # build help for commands
     commands = []
@@ -33,7 +35,8 @@ def create_parser():
         if c.startswith('command_'):
             name = c.split('_', 1)[1]
             commands.append(name)
-            command_help += '\n   %s: %s' % (name, globals()[c].__doc__)
+            if not fnmatch.filter(deprecated, name) :
+                command_help += '\n   %s: %s' % (name, globals()[c].__doc__)
 
     parser = argparse.ArgumentParser(description='List/install driver packages for Ubuntu.',
             epilog=command_help, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -133,7 +136,6 @@ def command_install(args):
 
 def command_autoinstall(args):
     '''Install drivers that are appropriate for automatic installation. [DEPRECATED]'''
-    logger.warn('DEPRECATED: please use the "install" argument instead of the "autoinstall" argument in the future')
     return command_install(args)
 
 def install_gpgpu(args):
