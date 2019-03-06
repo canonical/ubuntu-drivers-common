@@ -596,7 +596,13 @@ def _process_driver_string(string):
             else:
                 driver.flavour = elem
     else:
-        driver.flavour = string
+        try:
+            int(string)
+        except ValueError:
+            driver.vendor = string
+        else:
+            driver.flavour = string
+
     return driver
 
 def gpgpu_install_filter(packages, drivers_str):
