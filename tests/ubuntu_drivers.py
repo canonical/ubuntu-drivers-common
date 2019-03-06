@@ -425,14 +425,11 @@ exec /sbin/modinfo "$@"
         '''gpgpu_install_filter()'''
 
         #gpgpu driver[:version][,driver[:version]]
-
         self.assertEqual(UbuntuDrivers.detect.gpgpu_install_filter({}, 'nvidia'), {})
 
         pkgs = {'nvidia-driver-390': {'recommended': True},
                 'nvidia-driver-410': {},
                 'nvidia-driver-340': {'recommended': False}}
-
-        result = set(UbuntuDrivers.detect.gpgpu_install_filter(pkgs, 'nvidia'))
 
         # Nothing is specified, we return the recommended driver
         self.assertEqual(set(UbuntuDrivers.detect.gpgpu_install_filter(pkgs, 'nvidia')),
