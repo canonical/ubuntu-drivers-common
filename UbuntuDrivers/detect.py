@@ -575,10 +575,15 @@ def auto_install_filter(packages):
 class _GpgpuDriver(object):
 
     def __init__(self, vendor=None, flavour=None):
+        self._vendors_whitelist = ('nvidia',)
         self.vendor = vendor
         self.flavour = flavour
 
     def is_valid(self):
+        if self.vendor:
+            # Filter the allowed vendors
+            if not fnmatch.filter(self._vendors_whitelist, self.vendor):
+                return False
         return not (not self.vendor and not self.flavour)
 
 def _process_driver_string(string):
@@ -586,7 +591,9 @@ def _process_driver_string(string):
     driver = _GpgpuDriver()
     if string.find(':') != -1:
         details = string.split(':')
-        if len(details) > 2:
+        # Remove empty strings
+        details = [x for x in details if x.strip()]
+        if len(details) != 2:
             return None
         for elem in details:
             try:
@@ -644,7 +651,7 @@ def gpgpu_install_filter(packages, drivers_str):
         # e.g. --gpgpu nvidia:390,amdgpu
         for item in drivers_str.split(','):
             driver = _process_driver_string(item)
-            if driver.is_valid():
+            if driver and driver.is_valid():
                 drivers.append(driver)
 
     if len(drivers) < 1:
@@ -673,7 +680,7 @@ def gpgpu_install_filter(packages, drivers_str):
     # and we install the newest driver
     it = 0
     for driver in drivers:
-        if not driver.flavour:
+        if not driver.flavour and not driver.vendor:
             drivers[it].vendor = 'nvidia'
         it += 1
 
