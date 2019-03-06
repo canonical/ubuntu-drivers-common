@@ -35,7 +35,7 @@ def create_parser():
         if c.startswith('command_'):
             name = c.split('_', 1)[1]
             commands.append(name)
-            if not fnmatch.filter(deprecated, name) :
+            if not fnmatch.filter(deprecated, name):
                 command_help += '\n   %s: %s' % (name, globals()[c].__doc__)
 
     parser = argparse.ArgumentParser(description='List/install driver packages for Ubuntu.',

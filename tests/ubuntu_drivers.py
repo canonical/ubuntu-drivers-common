@@ -453,6 +453,13 @@ exec /sbin/modinfo "$@"
         self.assertEqual(UbuntuDrivers.detect.gpgpu_install_filter(pkgs, 'nvidia:410,nvidia:390'),
                          {})
 
+        # More incorrect values
+        self.assertEqual(UbuntuDrivers.detect.gpgpu_install_filter(pkgs, 'nv:410'), {})
+
+        self.assertEqual(UbuntuDrivers.detect.gpgpu_install_filter(pkgs, ':410'), {})
+
+        self.assertEqual(UbuntuDrivers.detect.gpgpu_install_filter(pkgs, 'nvidia-driver:410'), {})
+
     def test_detect_plugin_packages(self):
         '''detect_plugin_packages()'''
 
