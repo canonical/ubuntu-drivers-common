@@ -1,8 +1,14 @@
-ubuntu-drivers-common (1:0.5.2.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.5.2.3) bionic; urgency=medium
 
-  * 
+  * tests/ubuntu_drivers.py,
+    UbuntuDrivers/detect.py,
+    ubuntu-drivers:
+    - Deprecate the "autoinstall" parameter in favour of
+      "install". While "autoinstall" will still work,
+      we recommend the latter.
+    - Add support to for the --gpgpu parameter (LP: #1819729).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 12 Mar 2019 15:32:27 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 12 Mar 2019 16:31:04 +0100
 
 ubuntu-drivers-common (1:0.5.2.2) bionic; urgency=medium
 
