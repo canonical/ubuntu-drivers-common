@@ -166,9 +166,9 @@ def _is_package_free(pkg):
     # it would be better to check the actual license, as we do not have
     # the component for third-party packages; but this is the best we can do
     # at the moment
-    if pkg.candidate.section.startswith('restricted') or \
-            pkg.candidate.section.startswith('multiverse'):
-        return False
+    for o in pkg.candidate.origins:
+        if o.component in ('restricted','multiverse'):
+            return False
     return True
 
 def _is_package_from_distro(pkg):
@@ -375,26 +375,6 @@ def _get_headless_no_dkms_metapackage(pkg, apt_cache):
         pass
 
     return metapackage
-
-def _is_package_free(pkg):
-    assert pkg.candidate is not None
-    # it would be better to check the actual license, as we do not have
-    # the component for third-party packages; but this is the best we can do
-    # at the moment
-    if pkg.candidate.section.startswith('restricted') or \
-            pkg.candidate.section.startswith('multiverse'):
-        return False
-    return True
-
-def _is_package_from_distro(pkg):
-    if pkg.candidate is None:
-        return False
-
-    for o in pkg.candidate.origins:
-        if o.origin == 'Ubuntu':
-            return True
-    return False
-
 
 
 def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
