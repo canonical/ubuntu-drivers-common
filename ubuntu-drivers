@@ -52,12 +52,15 @@ def create_parser():
         # Python 3.5.2 in Xenial will crash when matching square brackets
         parser.add_argument("--gpgpu", const='default', nargs='?', metavar='driver{:version}{,driver{:version}}', help="Install GPGPU drivers")
 
+    parser.add_argument('--free-only', action="store_true", default=False,
+                        help='Only consider free packages')
     return parser
 
 def command_list(args):
     '''Show all driver packages which apply to the current system.'''
 
-    packages = UbuntuDrivers.detect.system_driver_packages(sys_path=sys_path)
+    packages = UbuntuDrivers.detect.system_driver_packages(
+        sys_path=sys_path, freeonly=args.free_only)
     if packages:
         print('\n'.join(packages))
 
@@ -77,7 +80,8 @@ def list_gpgpu(args):
 def command_devices(args):
     '''Show all devices which need drivers, and which packages apply to them.'''
 
-    drivers = UbuntuDrivers.detect.system_device_drivers(sys_path=sys_path)
+    drivers = UbuntuDrivers.detect.system_device_drivers(
+        sys_path=sys_path, freeonly=args.free_only)
     for device, info in drivers.items():
         print('== %s ==' % device)
         for k, v in info.items():
@@ -107,7 +111,8 @@ def command_install(args):
 
     cache = apt.Cache()
 
-    packages = UbuntuDrivers.detect.system_driver_packages(cache, sys_path)
+    packages = UbuntuDrivers.detect.system_driver_packages(
+        cache, sys_path, freeonly=args.free_only)
     packages = UbuntuDrivers.detect.auto_install_filter(packages)
     if not packages:
         print('No drivers found for installation.')
@@ -192,7 +197,8 @@ def command_debug(args):
     print('=== log messages from detection ===')
     aliases = UbuntuDrivers.detect.system_modaliases()
     cache = apt.Cache()
-    packages = UbuntuDrivers.detect.system_driver_packages(cache, sys_path)
+    packages = UbuntuDrivers.detect.system_driver_packages(
+        cache, sys_path, freeonly=args.free_only)
     auto_packages = UbuntuDrivers.detect.auto_install_filter(packages)
 
     print('=== modaliases in the system ===')

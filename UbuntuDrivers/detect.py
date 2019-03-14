@@ -253,7 +253,7 @@ def _get_db_name(syspath, alias):
                   alias, vendor, model)
     return (vendor, model)
 
-def system_driver_packages(apt_cache=None, sys_path=None):
+def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False):
     '''Get driver packages that are available for the system.
     
     This calls system_modaliases() to determine the system's hardware and then
@@ -263,6 +263,9 @@ def system_driver_packages(apt_cache=None, sys_path=None):
     If you already have an apt.Cache() object, you should pass it as an
     argument for efficiency. If not given, this function creates a temporary
     one by itself.
+
+    If freeonly is set to True, only free packages (from main and universe) are
+    considered
 
     Return a dictionary which maps package names to information about them:
 
@@ -294,6 +297,8 @@ def system_driver_packages(apt_cache=None, sys_path=None):
     packages = {}
     for alias, syspath in modaliases.items():
         for p in packages_for_modalias(apt_cache, alias):
+            if freeonly and not _is_package_free(p):
+                continue
             packages[p.name] = {
                     'modalias': alias,
                     'syspath': syspath,
@@ -448,7 +453,7 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
     return packages
 
 
-def system_device_drivers(apt_cache=None, sys_path=None):
+def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
     '''Get by-device driver packages that are available for the system.
     
     This calls system_modaliases() to determine the system's hardware and then
@@ -459,6 +464,9 @@ def system_device_drivers(apt_cache=None, sys_path=None):
     If you already have an apt.Cache() object, you should pass it as an
     argument for efficiency. If not given, this function creates a temporary
     one by itself.
+
+    If freeonly is set to True, only free packages (from main and universe) are
+    considered
 
     Return a dictionary which maps devices to available drivers:
 
@@ -503,7 +511,8 @@ def system_device_drivers(apt_cache=None, sys_path=None):
         apt_cache = apt.Cache()
 
     # copy the system_driver_packages() structure into the by-device structure
-    for pkg, pkginfo in system_driver_packages(apt_cache, sys_path).items():
+    for pkg, pkginfo in system_driver_packages(apt_cache, sys_path,
+                                               freeonly=freeonly).items():
         if 'syspath' in pkginfo:
             device_name = pkginfo['syspath']
         else:
