@@ -47,7 +47,6 @@ def system_modaliases(sys_path=None):
         # devices on SSB bus only mention the modalias in the uevent file (as
         # of 2.6.24)
         elif 'ssb' in path and 'uevent' in files:
-            info = {}
             with open(os.path.join(path, 'uevent')) as f:
                 for l in f:
                     if l.startswith('MODALIAS='):
@@ -335,8 +334,6 @@ def system_driver_packages(apt_cache=None, sys_path=None):
     return packages
 
 def _get_vendor_model_from_alias(alias):
-    vendor = None
-    model = None
     modalias_pattern = re.compile('(.+):v(.+)d(.+)sv(.+)sd(.+)bc(.+)i.*')
 
     details = modalias_pattern.match(alias)
@@ -375,26 +372,6 @@ def _get_headless_no_dkms_metapackage(pkg, apt_cache):
         pass
 
     return metapackage
-
-def _is_package_free(pkg):
-    assert pkg.candidate is not None
-    # it would be better to check the actual license, as we do not have
-    # the component for third-party packages; but this is the best we can do
-    # at the moment
-    if pkg.candidate.section.startswith('restricted') or \
-            pkg.candidate.section.startswith('multiverse'):
-        return False
-    return True
-
-def _is_package_from_distro(pkg):
-    if pkg.candidate is None:
-        return False
-
-    for o in pkg.candidate.origins:
-        if o.origin == 'Ubuntu':
-            return True
-    return False
-
 
 
 def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
@@ -751,7 +728,7 @@ def detect_plugin_packages(apt_cache=None):
                 exec(compile(f.read(), plugin, 'exec'), symb)
                 result = symb['detect'](apt_cache)
                 logging.debug('plugin %s return value: %s', plugin, result)
-            except Exception as e:
+            except Exception:
                 logging.exception('plugin %s failed:', plugin)
                 continue
 
