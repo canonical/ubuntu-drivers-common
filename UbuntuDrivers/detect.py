@@ -47,7 +47,6 @@ def system_modaliases(sys_path=None):
         # devices on SSB bus only mention the modalias in the uevent file (as
         # of 2.6.24)
         elif 'ssb' in path and 'uevent' in files:
-            info = {}
             with open(os.path.join(path, 'uevent')) as f:
                 for l in f:
                     if l.startswith('MODALIAS='):
@@ -340,8 +339,6 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False):
     return packages
 
 def _get_vendor_model_from_alias(alias):
-    vendor = None
-    model = None
     modalias_pattern = re.compile('(.+):v(.+)d(.+)sv(.+)sd(.+)bc(.+)i.*')
 
     details = modalias_pattern.match(alias)
@@ -740,7 +737,7 @@ def detect_plugin_packages(apt_cache=None):
                 exec(compile(f.read(), plugin, 'exec'), symb)
                 result = symb['detect'](apt_cache)
                 logging.debug('plugin %s return value: %s', plugin, result)
-            except Exception as e:
+            except Exception:
                 logging.exception('plugin %s failed:', plugin)
                 continue
 

@@ -7,7 +7,6 @@
 # (at your option) any later version.
 
 import os
-import time
 import unittest
 import subprocess
 import resource
@@ -16,7 +15,7 @@ import tempfile
 import shutil
 import logging
 
-from gi.repository import GLib
+# from gi.repository import GLib
 from gi.repository import UMockdev
 import apt
 import aptdaemon.test

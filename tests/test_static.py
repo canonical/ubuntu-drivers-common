@@ -51,11 +51,20 @@ class TestStatic(unittest.TestCase):
     def all_paths(self):
         '''Returns a list of python files of the project'''
 
-        ignore_dirs = [".bzr", ".git", "__pycache__", "debian"]
+        ignore_dirs = [
+            ".bzr", ".git", "__pycache__", "debian",
+            # Project dirs ignored for the moment
+            "Quirks",
+            "NvidiaDetector",
+            ]
         # List of files to ignore with ../ stripped from the beginning of the path
         ignore_files = [
             'tests/settings.py',
-            'setup.py']
+            'setup.py',
+            # Project files ignores for the moment
+            'tests/gpu-manager.py',
+            'tests/quirkreader-test.py'
+            ]
 
         paths = []
         for dirpath, dirnames, filenames in os.walk(".."):
