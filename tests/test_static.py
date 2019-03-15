@@ -32,6 +32,8 @@ if sys.version < "3":
 else:
     pyflakes_cmd = "pyflakes3"
 
+PEP8_MAX_LINE_LENGTH = 120
+
 
 def find_on_path(command):
     """Is command on the executable search path?"""
@@ -84,7 +86,7 @@ class TestStatic(unittest.TestCase):
         '''pycodestyle - Python style guide checker'''
 
         subp = subprocess.Popen(
-            [pycodestyle_cmd, '--max-line-length=160'] + self.all_paths(),
+            [pycodestyle_cmd, '--max-line-length=%d' % PEP8_MAX_LINE_LENGTH] + self.all_paths(),
             stdout=subprocess.PIPE, universal_newlines=True)
         output = subp.communicate()[0].splitlines()
         for line in output:
