@@ -49,7 +49,7 @@ class KernelDetection(object):
 
         logging.debug('Comparing %s with %s' % (term1, term2))
         command = 'dpkg --compare-versions %s gt %s' % \
-                   (term1, term2)
+                  (term1, term2)
         process = Popen(command.split(' '))
         process.communicate()
         return not process.returncode
@@ -64,9 +64,9 @@ class KernelDetection(object):
         version = ''
         for pkg in self.apt_cache:
             if ('linux-image' in pkg.name and
-                'extra' not in pkg.name and
-                self.apt_cache[pkg.name].is_installed or
-                self.apt_cache[pkg.name].marked_install):
+                    'extra' not in pkg.name and
+                    self.apt_cache[pkg.name].is_installed or
+                    self.apt_cache[pkg.name].marked_install):
                 match = pattern.match(pkg.name)
                 # Here we filter out packages such as
                 # linux-generic-lts-quantal

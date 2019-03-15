@@ -21,6 +21,7 @@ from UbuntuDrivers import kerneldetection
 
 system_architecture = apt.apt_pkg.get_architectures()[0]
 
+
 def system_modaliases(sys_path=None):
     '''Get modaliases present in the system.
 
@@ -41,7 +42,7 @@ def system_modaliases(sys_path=None):
                     modalias = f.read().strip()
             except IOError as e:
                 logging.debug('system_modaliases(): Cannot read %s/modalias: %s',
-                        path, e)
+                              path, e)
                 continue
 
         # devices on SSB bus only mention the modalias in the uevent file (as
@@ -57,15 +58,16 @@ def system_modaliases(sys_path=None):
             continue
 
         # ignore drivers which are statically built into the kernel
-        driverlink =  os.path.join(path, 'driver')
+        driverlink = os.path.join(path, 'driver')
         modlink = os.path.join(driverlink, 'module')
         if os.path.islink(driverlink) and not os.path.islink(modlink):
-            #logging.debug('system_modaliases(): ignoring device %s which has no module (built into kernel)', path)
+            # logging.debug('system_modaliases(): ignoring device %s which has no module (built into kernel)', path)
             continue
 
         aliases[modalias] = path
 
     return aliases
+
 
 def _check_video_abi_compat(apt_cache, record):
     xorg_video_abi = None
@@ -75,7 +77,7 @@ def _check_video_abi_compat(apt_cache, record):
         for p in apt_cache['xserver-xorg-core'].candidate.provides:
             if p.startswith('xorg-video-abi-'):
                 xorg_video_abi = p
-                #logging.debug('_check_video_abi_compat(): Current X.org video abi: %s', xorg_video_abi)
+                # logging.debug('_check_video_abi_compat(): Current X.org video abi: %s', xorg_video_abi)
                 break
     except (AttributeError, KeyError):
         logging.debug('_check_video_abi_compat(): xserver-xorg-core not available, cannot check ABI')
@@ -88,10 +90,11 @@ def _check_video_abi_compat(apt_cache, record):
     except KeyError:
         return True
     if 'xorg-video-abi-' in deps and xorg_video_abi not in deps:
-        logging.debug('Driver package %s is incompatible with current X.org server ABI %s', 
-                record['Package'], xorg_video_abi)
+        logging.debug('Driver package %s is incompatible with current X.org server ABI %s',
+                      record['Package'], xorg_video_abi)
         return False
     return True
+
 
 def _apt_cache_modalias_map(apt_cache):
     '''Build a modalias map from an apt.Cache object.
@@ -107,7 +110,7 @@ def _apt_cache_modalias_map(apt_cache):
         # skip foreign architectures, we usually only want native
         # driver packages
         if (not package.candidate or
-            package.candidate.architecture not in ('all', system_architecture)):
+                package.candidate.architecture not in ('all', system_architecture)):
             continue
 
         # skip packages without a modalias field
@@ -136,9 +139,10 @@ def _apt_cache_modalias_map(apt_cache):
 
     return result
 
+
 def packages_for_modalias(apt_cache, modalias):
     '''Search packages which match the given modalias.
-    
+
     Return a list of apt.Package objects.
     '''
     pkgs = set()
@@ -158,7 +162,9 @@ def packages_for_modalias(apt_cache, modalias):
 
     return [apt_cache[p] for p in pkgs]
 
+
 packages_for_modalias.cache_maps = {}
+
 
 def _is_package_free(pkg):
     assert pkg.candidate is not None
@@ -170,6 +176,7 @@ def _is_package_free(pkg):
             return False
     return True
 
+
 def _is_package_from_distro(pkg):
     if pkg.candidate is None:
         return False
@@ -178,6 +185,7 @@ def _is_package_from_distro(pkg):
         if o.origin == 'Ubuntu':
             return True
     return False
+
 
 def _pkg_get_module(pkg):
     '''Determine module name from apt Package object'''
@@ -195,6 +203,7 @@ def _pkg_get_module(pkg):
 
     module = m[:paren]
     return module
+
 
 def _is_manual_install(pkg):
     '''Determine if the kernel module from an apt.Package is manually installed.'''
@@ -225,6 +234,7 @@ def _is_manual_install(pkg):
                   pkg.name, module)
     return False
 
+
 def _get_db_name(syspath, alias):
     '''Return (vendor, model) names for given device.
 
@@ -252,9 +262,14 @@ def _get_db_name(syspath, alias):
                   alias, vendor, model)
     return (vendor, model)
 
+<<<<<<< HEAD
 def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False):
+=======
+
+def system_driver_packages(apt_cache=None, sys_path=None):
+>>>>>>> Fixed code style
     '''Get driver packages that are available for the system.
-    
+
     This calls system_modaliases() to determine the system's hardware and then
     queries apt about which packages provide drivers for those. It also adds
     available packages from detect_plugin_packages().
@@ -338,6 +353,7 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False):
 
     return packages
 
+
 def _get_vendor_model_from_alias(alias):
     modalias_pattern = re.compile('(.+):v(.+)d(.+)sv(.+)sd(.+)bc(.+)i.*')
 
@@ -347,6 +363,7 @@ def _get_vendor_model_from_alias(alias):
         return (details.group(2)[4:], details.group(3)[4:])
 
     return (None, None)
+
 
 def _get_headless_no_dkms_metapackage(pkg, apt_cache):
     assert pkg.candidate is not None
@@ -371,7 +388,7 @@ def _get_headless_no_dkms_metapackage(pkg, apt_cache):
         # skip foreign architectures, we usually only want native
         # driver packages
         if (package.candidate and
-            package.candidate.architecture in ('all', system_architecture)):
+                package.candidate.architecture in ('all', system_architecture)):
             metapackage = candidate
     except KeyError:
         pass
@@ -452,7 +469,7 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
 
 def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
     '''Get by-device driver packages that are available for the system.
-    
+
     This calls system_modaliases() to determine the system's hardware and then
     queries apt about which packages provide drivers for each of those. It also
     adds available packages from detect_plugin_packages(), using the name of
@@ -467,7 +484,7 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
 
     Return a dictionary which maps devices to available drivers:
 
-      device_name →  {'modalias': 'pci:...', <device info>, 
+      device_name →  {'modalias': 'pci:...', <device info>,
                       'drivers': {'pkgname': {<driver package info>}}
 
     A key (device name) is either the sysfs path (for drivers detected through
@@ -531,11 +548,12 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
                 break
         else:
             info['manual_install'] = True
- 
+
     # add OS builtin free alternatives to proprietary drivers
     _add_builtins(result)
- 
+
     return result
+
 
 def auto_install_filter(packages):
     '''Get packages which are appropriate for automatic installation.
@@ -559,6 +577,7 @@ def auto_install_filter(packages):
             result[p] = packages[p]
     return result
 
+
 class _GpgpuDriver(object):
 
     def __init__(self, vendor=None, flavour=None):
@@ -572,6 +591,7 @@ class _GpgpuDriver(object):
             if not fnmatch.filter(self._vendors_whitelist, self.vendor):
                 return False
         return not (not self.vendor and not self.flavour)
+
 
 def _process_driver_string(string):
     '''Returns a _GpgpuDriver object'''
@@ -599,6 +619,7 @@ def _process_driver_string(string):
 
     return driver
 
+
 def gpgpu_install_filter(packages, drivers_str):
     drivers = []
     allow = []
@@ -617,7 +638,8 @@ def gpgpu_install_filter(packages, drivers_str):
     ubuntu-drivers autoinstall --gpgpu 390
     ubuntu-drivers autoinstall --gpgpu nvidia:390
 
-    Today this is only nvidia.  In the future there may be amdgpu-pro.  Possible syntax, to be confirmed only once there are driver packages that could use it:
+    Today this is only nvidia.  In the future there may be amdgpu-pro.
+    Possible syntax, to be confirmed only once there are driver packages that could use it:
     ubuntu-drivers autoinstall --gpgpu nvidia:390,amdgpu
     ubuntu-drivers autoinstall --gpgpu amdgpu:version
     '''
@@ -678,24 +700,24 @@ def gpgpu_install_filter(packages, drivers_str):
             pattern = '%s*%s*' % (driver.vendor, driver.flavour)
         else:
             pattern = '%s*' % (driver.vendor)
-        #print('pattern: %s' % pattern)
+        # print('pattern: %s' % pattern)
         allow.extend(fnmatch.filter(packages, pattern))
-        #print(allow)
+        # print(allow)
 
     # FIXME: if no flavour is specified, pick the recommended driver ?
-    #print('packages: %s' % packages)
+    # print('packages: %s' % packages)
     for p in allow:
         # If the version was specified, we override the recommended attribute
         for driver in drivers:
             if p.__contains__(driver.vendor):
                 if driver.flavour:
-                    #print('Found "%s" flavour in %s' % (driver.flavour, packages[p]))
+                    # print('Found "%s" flavour in %s' % (driver.flavour, packages[p]))
                     result[p] = packages[p]
                 else:
-                    #print('before recommended: %s' % packages[p])
+                    # print('before recommended: %s' % packages[p])
                     if packages[p].get('recommended'):
                         result[p] = packages[p]
-                        #print('Found "recommended" flavour in %s' % (packages[p]))
+                        # print('Found "recommended" flavour in %s' % (packages[p]))
                 break
     return result
 
@@ -717,7 +739,7 @@ def detect_plugin_packages(apt_cache=None):
     '''
     packages = {}
     plugindir = os.environ.get('UBUNTU_DRIVERS_DETECT_DIR',
-            '/usr/share/ubuntu-drivers-common/detect/')
+                               '/usr/share/ubuntu-drivers-common/detect/')
     if not os.path.isdir(plugindir):
         logging.debug('Custom detection plugin directory %s does not exist', plugindir)
         return packages
@@ -756,6 +778,7 @@ def detect_plugin_packages(apt_cache=None):
 
     return packages
 
+
 def _cmp_gfx_alternatives(x, y):
     '''Compare two graphics driver names in terms of preference.
 
@@ -779,6 +802,7 @@ def _cmp_gfx_alternatives(x, y):
     assert x == y
     return 0
 
+
 def _add_builtins(drivers):
     '''Add builtin driver alternatives'''
 
@@ -800,10 +824,12 @@ def _add_builtins(drivers):
                     'free': True, 'builtin': True, 'from_distro': True, 'recommended': True}
                 break
 
+
 def get_linux_headers(apt_cache):
     '''Return the linux headers for the system's kernel'''
     kernel_detection = kerneldetection.KernelDetection(apt_cache)
     return kernel_detection.get_linux_headers_metapackage()
+
 
 def get_linux(apt_cache):
     '''Return the linux metapackage for the system's kernel'''
