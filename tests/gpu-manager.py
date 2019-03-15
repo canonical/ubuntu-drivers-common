@@ -8,14 +8,10 @@
 # (at your option) any later version.
 
 import os
-import time
 import unittest
-import subprocess
-import resource
 import sys
 import tempfile
 import shutil
-import logging
 import re
 import argparse
 import copy
@@ -26,6 +22,7 @@ tests_path = None
 with_valgrind = False
 # Global path to use gdb
 with_gdb = False
+
 
 class GpuTest(object):
 
@@ -98,34 +95,46 @@ class GpuManagerTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(klass):
-        klass.last_boot_file = tempfile.NamedTemporaryFile(mode='w', prefix='last_boot_file_', dir=tests_path, delete=False)
+        klass.last_boot_file = tempfile.NamedTemporaryFile(
+            mode='w', prefix='last_boot_file_', dir=tests_path, delete=False)
         klass.last_boot_file.close()
-        klass.new_boot_file = tempfile.NamedTemporaryFile(mode='w', prefix='new_boot_file_', dir=tests_path, delete=False)
+        klass.new_boot_file = tempfile.NamedTemporaryFile(
+            mode='w', prefix='new_boot_file_', dir=tests_path, delete=False)
         klass.new_boot_file.close()
 
-        klass.amdgpu_pro_px_file = tempfile.NamedTemporaryFile(mode='w', prefix='amdgpu_pro_px_file_', dir=tests_path, delete=False)
+        klass.amdgpu_pro_px_file = tempfile.NamedTemporaryFile(
+            mode='w', prefix='amdgpu_pro_px_file_', dir=tests_path, delete=False)
 
-        klass.amd_pcsdb_file = tempfile.NamedTemporaryFile(mode='w', prefix='amd_pcsdb_file_', dir=tests_path, delete=False)
+        klass.amd_pcsdb_file = tempfile.NamedTemporaryFile(
+            mode='w', prefix='amd_pcsdb_file_', dir=tests_path, delete=False)
         klass.amd_pcsdb_file.close()
-        klass.fake_lspci = tempfile.NamedTemporaryFile(mode='w', prefix='fake_lspci_', dir=tests_path, delete=False)
+        klass.fake_lspci = tempfile.NamedTemporaryFile(
+            mode='w', prefix='fake_lspci_', dir=tests_path, delete=False)
         klass.fake_lspci.close()
-        klass.fake_modules = tempfile.NamedTemporaryFile(mode='w', prefix='fake_modules_', dir=tests_path, delete=False)
+        klass.fake_modules = tempfile.NamedTemporaryFile(
+            mode='w', prefix='fake_modules_', dir=tests_path, delete=False)
         klass.fake_modules.close()
         klass.gpu_detection_path = tests_path or "/tmp"
         klass.module_detection_file = tests_path or "/tmp"
         klass.gpu_detection_file = tests_path or "/tmp"
-        klass.prime_settings = tempfile.NamedTemporaryFile(mode='w', prefix='prime_settings_', dir=tests_path, delete=False)
+        klass.prime_settings = tempfile.NamedTemporaryFile(
+            mode='w', prefix='prime_settings_', dir=tests_path, delete=False)
         klass.prime_settings.close()
-        klass.dmi_product_version_path = tempfile.NamedTemporaryFile(mode='w', prefix='dmi_product_version_path_', dir=tests_path, delete=False)
+        klass.dmi_product_version_path = tempfile.NamedTemporaryFile(
+            mode='w', prefix='dmi_product_version_path_', dir=tests_path, delete=False)
         klass.dmi_product_version_path.close()
-        klass.dmi_product_name_path = tempfile.NamedTemporaryFile(mode='w', prefix='dmi_product_name_path_', dir=tests_path, delete=False)
+        klass.dmi_product_name_path = tempfile.NamedTemporaryFile(
+            mode='w', prefix='dmi_product_name_path_', dir=tests_path, delete=False)
         klass.dmi_product_name_path.close()
-        klass.nvidia_driver_version_path = tempfile.NamedTemporaryFile(mode='w', prefix='nvidia_driver_version_path_', dir=tests_path, delete=False)
+        klass.nvidia_driver_version_path = tempfile.NamedTemporaryFile(
+            mode='w', prefix='nvidia_driver_version_path_', dir=tests_path, delete=False)
         klass.nvidia_driver_version_path.close()
-        klass.modprobe_d_path = tempfile.NamedTemporaryFile(mode='w', prefix='modprobe_d_path_', dir=tests_path, delete=False)
+        klass.modprobe_d_path = tempfile.NamedTemporaryFile(
+            mode='w', prefix='modprobe_d_path_', dir=tests_path, delete=False)
         klass.modprobe_d_path.close()
 
-        klass.xorg_conf_d_path = tempfile.NamedTemporaryFile(mode='w', prefix='xorg_conf_d_path_', dir=tests_path, delete=False)
+        klass.xorg_conf_d_path = tempfile.NamedTemporaryFile(
+            mode='w', prefix='xorg_conf_d_path_', dir=tests_path, delete=False)
         klass.xorg_conf_d_path.close()
 
         klass.log = tempfile.NamedTemporaryFile(mode='w', prefix='log_', dir=tests_path, delete=False)
@@ -160,7 +169,7 @@ class GpuManagerTest(unittest.TestCase):
         klass.amdgpu_pro_reset_pt = re.compile('Resetting the script changes for amdgpu-pro.*')
 
         klass.vendors = {'amd': 0x1002, 'nvidia': 0x10de,
-                        'intel': 0x8086, 'unknown': 0x1016}
+                         'intel': 0x8086, 'unknown': 0x1016}
 
     def setUp(self):
         self.remove_modprobe_d_path()
@@ -227,20 +236,20 @@ class GpuManagerTest(unittest.TestCase):
                 pass
 
         for file in (self.last_boot_file,
-            self.new_boot_file,
-            self.fake_lspci,
-            self.fake_modules,
-            self.module_detection_file,
-            self.gpu_detection_file,
-            self.prime_settings,
-            self.dmi_product_version_path,
-            self.dmi_product_name_path,
-            self.nvidia_driver_version_path,
-            self.modprobe_d_path,
-            self.log,
-            self.amdgpu_pro_px_file,
-            self.amd_pcsdb_file,
-            self.valgrind_log):
+                     self.new_boot_file,
+                     self.fake_lspci,
+                     self.fake_modules,
+                     self.module_detection_file,
+                     self.gpu_detection_file,
+                     self.prime_settings,
+                     self.dmi_product_version_path,
+                     self.dmi_product_name_path,
+                     self.nvidia_driver_version_path,
+                     self.modprobe_d_path,
+                     self.log,
+                     self.amdgpu_pro_px_file,
+                     self.amd_pcsdb_file,
+                     self.valgrind_log):
             try:
                 file.close()
             except:
@@ -263,7 +272,8 @@ class GpuManagerTest(unittest.TestCase):
 
     def exec_manager(self, requires_offloading=False, module_is_available=False,
                      module_is_versioned=False):
-        fake_requires_offloading = requires_offloading and '--fake-requires-offloading' or '--fake-no-requires-offloading'
+        fake_requires_offloading = \
+            requires_offloading and '--fake-requires-offloading' or '--fake-no-requires-offloading'
         fake_module_available = module_is_available and '--fake-module-is-available' or '--fake-module-is-not-available'
         if with_valgrind:
             valgrind = ['valgrind', '--tool=memcheck', '--leak-check=full',
@@ -276,7 +286,6 @@ class GpuManagerTest(unittest.TestCase):
             gdb = ['gdb', '-batch', '--args']
         else:
             gdb = []
-
 
         command = ['share/hybrid/gpu-manager',
                    '--dry-run',
@@ -326,7 +335,7 @@ class GpuManagerTest(unittest.TestCase):
         if valgrind:
             self.valgrind_log = open(self.valgrind_log.name, 'r')
             errors_pt = re.compile('(.+) ERROR SUMMARY: (.+) errors from (.+) '
-                       'contexts (suppressed: .+ from .+).*')
+                                   'contexts (suppressed: .+ from .+).*')
             for line in self.valgrind_log.readlines():
                 errors = errors_pt.match(line)
                 if errors:
@@ -420,7 +429,7 @@ class GpuManagerTest(unittest.TestCase):
             elif offloading:
                 gpu_test.requires_offloading = (offloading.group(1).strip().lower() == 'yes')
             elif no_change_stop:
-                #gpu_test.has_changed = False
+                # gpu_test.has_changed = False
                 gpu_test.has_not_acted = True
             elif no_action:
                 gpu_test.has_not_acted = True
@@ -462,8 +471,8 @@ class GpuManagerTest(unittest.TestCase):
         # We deliberately leave the amdgpu-pro settings
         # out of this for now.
         if (not gpu_test.has_selected_driver and not
-           (gpu_test.amdgpu_pro_powersaving or
-            amdgpu_pro_performance or amdgpu_pro_reset)):
+            (gpu_test.amdgpu_pro_powersaving or
+                amdgpu_pro_performance or amdgpu_pro_reset)):
             gpu_test.has_not_acted = True
 
         # Copy the logs
@@ -509,17 +518,18 @@ class GpuManagerTest(unittest.TestCase):
         boot_vga_device_id = 0x68d8
         discrete_device_id = 0x28e8
         for card in cards:
-            card_line = '%04x:%04x;0000:%02d:%02d:0;%d\n' % (self.vendors.get(card),
-                                           ((it == 0) and
-                                            (bump_boot_vga_device_id and
-                                             boot_vga_device_id + 1 or
-                                             boot_vga_device_id) or
-                                            (bump_discrete_device_id and
-                                             discrete_device_id + 1 or
-                                             discrete_device_id)),
-                                           (it == 0) and 0 or it,
-                                           (it == 0) and 1 or 0,
-                                           (it == 0) and 1 or 0)
+            card_line = '%04x:%04x;0000:%02d:%02d:0;%d\n' % (
+                self.vendors.get(card),
+                ((it == 0) and
+                 (bump_boot_vga_device_id and
+                    boot_vga_device_id + 1 or
+                    boot_vga_device_id) or
+                 (bump_discrete_device_id and
+                    discrete_device_id + 1 or
+                    discrete_device_id)),
+                (it == 0) and 0 or it,
+                (it == 0) and 1 or 0,
+                (it == 0) and 1 or 0)
             cards_list.append(card_line)
             it += 1
         return cards_list
@@ -545,7 +555,6 @@ class GpuManagerTest(unittest.TestCase):
         one.'''
         cards_list = self._get_cards_from_list(cards)
         self._add_pci_ids_from_last_boot(cards_list)
-
 
     def add_kernel_modules(self, modules):
         if modules:
@@ -611,7 +620,6 @@ class GpuManagerTest(unittest.TestCase):
             gpu_file = open(self.gpu_detection_file, 'w')
             gpu_file.close()
 
-
     def set_params(self, last_boot, current_boot,
                    loaded_modules, available_drivers,
                    unloaded_module='',
@@ -633,8 +641,8 @@ class GpuManagerTest(unittest.TestCase):
 
         # Current boot
         self.set_current_cards(current_boot,
-                          bump_boot_vga_device_id,
-                          bump_discrete_device_id)
+                               bump_boot_vga_device_id,
+                               bump_discrete_device_id)
 
         # Kernel modules
         self.add_kernel_modules(loaded_modules)
@@ -645,28 +653,30 @@ class GpuManagerTest(unittest.TestCase):
         if nvidia_version:
             self.set_nvidia_version(nvidia_version)
 
-    def run_manager_and_get_data(self, last_boot, current_boot,
-                   loaded_modules, available_drivers,
-                   unloaded_module='',
-                   requires_offloading=False,
-                   module_is_available=False,
-                   matched_quirk=False,
-                   loaded_with_quirk=False,
-                   bump_boot_vga_device_id=False,
-                   bump_discrete_device_id=False,
-                   first_boot=False,
-                   nvidia_version='',
-                   module_is_versioned=False):
+    def run_manager_and_get_data(self,
+                                 last_boot, current_boot,
+                                 loaded_modules, available_drivers,
+                                 unloaded_module='',
+                                 requires_offloading=False,
+                                 module_is_available=False,
+                                 matched_quirk=False,
+                                 loaded_with_quirk=False,
+                                 bump_boot_vga_device_id=False,
+                                 bump_discrete_device_id=False,
+                                 first_boot=False,
+                                 nvidia_version='',
+                                 module_is_versioned=False):
 
-        self.set_params(last_boot, current_boot,
-                   loaded_modules, available_drivers,
-                   unloaded_module,
-                   matched_quirk,
-                   loaded_with_quirk,
-                   bump_boot_vga_device_id,
-                   bump_discrete_device_id,
-                   first_boot,
-                   nvidia_version)
+        self.set_params(
+            last_boot, current_boot,
+            loaded_modules, available_drivers,
+            unloaded_module,
+            matched_quirk,
+            loaded_with_quirk,
+            bump_boot_vga_device_id,
+            bump_discrete_device_id,
+            first_boot,
+            nvidia_version)
 
         # Call the program
         self.exec_manager(requires_offloading=requires_offloading,
@@ -682,10 +692,9 @@ class GpuManagerTest(unittest.TestCase):
 
         # Collect data
         gpu_test = self.run_manager_and_get_data(['intel'],
-                                      ['intel'],
-                                      ['i915-brw'],
-                                      ['mesa'])
-
+                                                 ['intel'],
+                                                 ['i915-brw'],
+                                                 ['mesa'])
 
         # Check the variables
 
@@ -715,11 +724,11 @@ class GpuManagerTest(unittest.TestCase):
 
         # Collect data
         gpu_test = self.run_manager_and_get_data(['nvidia'],
-                                      ['nvidia'],
-                                      ['nvidia'],
-                                      ['mesa', 'nvidia'],
-                                      'nvidia',
-                                      requires_offloading=True)
+                                                 ['nvidia'],
+                                                 ['nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 'nvidia',
+                                                 requires_offloading=True)
 
         # Check the variables
         self.assertTrue(gpu_test.has_single_card)
@@ -752,9 +761,9 @@ class GpuManagerTest(unittest.TestCase):
 
         # Collect data
         gpu_test = self.run_manager_and_get_data(['nvidia'],
-                                      ['nvidia'],
-                                      ['nouveau'],
-                                      ['mesa'])
+                                                 ['nvidia'],
+                                                 ['nouveau'],
+                                                 ['mesa'])
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -832,10 +841,8 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Let's try again, only this time it's all
         # already in place
@@ -865,10 +872,8 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # module is not there?
         #
@@ -898,14 +903,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.amdgpu_loaded)
         # NVIDIA
         self.assertTrue(gpu_test.has_nvidia)
-        #The open driver is blacklisted
+        # The open driver is blacklisted
         self.assertFalse(gpu_test.nouveau_loaded)
         # No kenrel module
         self.assertFalse(gpu_test.nvidia_loaded)
         self.assertFalse(gpu_test.nvidia_blacklisted)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
-
 
         # We should switch to mesa
         self.assertFalse(gpu_test.has_selected_driver)
@@ -940,7 +944,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.nvidia_loaded)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
-
 
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -978,7 +981,6 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
@@ -1014,7 +1016,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.nvidia_loaded)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
-
 
         # No need to do anything else
         self.assertFalse(gpu_test.has_selected_driver)
@@ -1052,11 +1053,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         # No need to do anything else
         self.assertFalse(gpu_test.has_selected_driver)
         self.assertTrue(gpu_test.has_not_acted)
-
 
     def test_one_amd_open_to_nvidia_binary(self):
         '''radeon -> nouveau'''
@@ -1090,11 +1089,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         # Select the driver
         self.assertFalse(gpu_test.has_selected_driver)
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Let's try again, only this time it's all
         # already in place
@@ -1127,11 +1124,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         # No need to do anything else
         self.assertFalse(gpu_test.has_selected_driver)
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # module is not there?
         #
@@ -1161,13 +1156,12 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.amdgpu_loaded)
         # NVIDIA
         self.assertTrue(gpu_test.has_nvidia)
-        #The open driver is blacklisted
+        # The open driver is blacklisted
         self.assertFalse(gpu_test.nouveau_loaded)
         # No kenrel module
         self.assertFalse(gpu_test.nvidia_loaded)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
-
 
         # We should switch to mesa
         self.assertFalse(gpu_test.has_selected_driver)
@@ -1194,7 +1188,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_intel)
         self.assertTrue(gpu_test.intel_loaded)
 
-
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -1205,7 +1198,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.nvidia_loaded)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
-
 
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -1232,7 +1224,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
-
         # No AMD
         self.assertTrue(gpu_test.has_amd)
         self.assertTrue(gpu_test.radeon_loaded)
@@ -1242,7 +1233,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.nvidia_loaded)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
-
 
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -1252,7 +1242,6 @@ class GpuManagerTest(unittest.TestCase):
         '''nvidia -> intel'''
         self.this_function_name = sys._getframe().f_code.co_name
 
-
         # Collect data
         gpu_test = self.run_manager_and_get_data(['nvidia'],
                                                  ['intel'],
@@ -1278,15 +1267,12 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.nvidia_loaded)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
-
 
         self.assertFalse(gpu_test.has_selected_driver)
         # Action is required
         # We enable mesa
         self.assertTrue(gpu_test.has_not_acted)
 
-
-
         # Collect data
         gpu_test = self.run_manager_and_get_data(['nvidia'],
                                                  ['intel'],
@@ -1313,12 +1299,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
-
 
         # Collect data
         gpu_test = self.run_manager_and_get_data(['nvidia'],
@@ -1346,12 +1329,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
-
 
         # Collect data
         gpu_test = self.run_manager_and_get_data(['nvidia'],
@@ -1379,17 +1359,14 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
     def test_one_nvidia_binary_to_amd_open(self):
         '''nvidia -> radeon'''
         self.this_function_name = sys._getframe().f_code.co_name
 
-
         # Collect data
         gpu_test = self.run_manager_and_get_data(['nvidia'],
                                                  ['amd'],
@@ -1415,15 +1392,12 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.nvidia_loaded)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
-
 
         self.assertFalse(gpu_test.has_selected_driver)
         # Action is required
         # We enable mesa
         self.assertTrue(gpu_test.has_not_acted)
 
-
-
         # Collect data
         gpu_test = self.run_manager_and_get_data(['nvidia'],
                                                  ['amd'],
@@ -1450,12 +1424,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
-
 
         # Collect data
         gpu_test = self.run_manager_and_get_data(['nvidia'],
@@ -1483,12 +1454,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
-
 
         # Collect data
         gpu_test = self.run_manager_and_get_data(['nvidia'],
@@ -1502,7 +1470,7 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
-        #No Intel
+        # No Intel
         self.assertFalse(gpu_test.has_intel)
         self.assertFalse(gpu_test.intel_loaded)
 
@@ -1515,7 +1483,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.nvidia_loaded)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
-
 
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -1555,11 +1522,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2: the discrete card was already available (BIOS)
 
@@ -1591,11 +1556,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has not changed
         self.assertFalse(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3: the discrete card is no longer available (BIOS)
 
@@ -1627,7 +1590,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.nvidia_loaded)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
-
 
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -1666,11 +1628,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2: the discrete card was already available (BIOS)
 
@@ -1701,11 +1661,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has not changed
         self.assertFalse(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3: the discrete card is no longer available (BIOS)
 
@@ -1736,7 +1694,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.nvidia_loaded)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
-
 
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -1775,11 +1732,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2: the discrete card was already available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -1810,11 +1765,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has not changed
         self.assertFalse(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -1844,7 +1797,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.nvidia_loaded)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
-
 
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -1882,11 +1834,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2: the discrete card was already available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -1916,11 +1866,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has not changed
         self.assertFalse(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -1950,7 +1898,6 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
@@ -1976,8 +1923,8 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check quirks
-        #self.assertTrue(gpu_test.matched_quirk)
-        #self.assertTrue(gpu_test.loaded_with_args)
+        # self.assertTrue(gpu_test.matched_quirk)
+        # self.assertTrue(gpu_test.loaded_with_args)
 
         # Check if laptop
         self.assertTrue(gpu_test.requires_offloading)
@@ -2026,8 +1973,7 @@ class GpuManagerTest(unittest.TestCase):
 
         # Check quirks
         self.assertFalse(gpu_test.matched_quirk)
-        #self.assertTrue(gpu_test.loaded_with_args)
-
+        # self.assertTrue(gpu_test.loaded_with_args)
 
         # What if dmi product version is invalid but dmi product
         # name is not?
@@ -2050,9 +1996,8 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check quirks
-        #self.assertTrue(gpu_test.matched_quirk)
-        #self.assertTrue(gpu_test.loaded_with_args)
-
+        # self.assertTrue(gpu_test.matched_quirk)
+        # self.assertTrue(gpu_test.loaded_with_args)
 
         # Case 1b: the discrete card is now available (BIOS)
 
@@ -2086,7 +2031,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.nvidia_unloaded)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
-
 
         self.assertFalse(gpu_test.has_selected_driver)
 
@@ -2129,7 +2073,6 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # Check that the xorg.conf.d file was created
@@ -2138,8 +2081,7 @@ class GpuManagerTest(unittest.TestCase):
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
-
-        # Case 1d: the discrete card is now available (BIOS)  
+        # Case 1d: the discrete card is now available (BIOS)
 
         # Request action from bbswitch
         self.request_prime_discrete_on(False)
@@ -2172,7 +2114,6 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # Check that the xorg.conf.d file was not created
@@ -2180,7 +2121,6 @@ class GpuManagerTest(unittest.TestCase):
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 1e: the discrete card is now available (BIOS)
 
@@ -2224,7 +2164,6 @@ class GpuManagerTest(unittest.TestCase):
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
-
         # Case 1f: the discrete card is now available (BIOS)
 
         # Request action from bbswitch
@@ -2258,7 +2197,6 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # Check that the xorg.conf.d file was created
@@ -2266,7 +2204,6 @@ class GpuManagerTest(unittest.TestCase):
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 1g: the discrete card is now available (BIOS)
         #          the nvidia driver version is too old to support
@@ -2301,12 +2238,10 @@ class GpuManagerTest(unittest.TestCase):
         # Enable when we support hybrid laptops
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2a: the discrete card was already available (BIOS)
 
@@ -2343,14 +2278,12 @@ class GpuManagerTest(unittest.TestCase):
         # Enable when we support hybrid laptops
         self.assertFalse(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # Check that the xorg.conf.d file was created
         self.assertTrue(gpu_test.has_created_xorg_conf_d)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2b: the discrete card was already available (BIOS)
 
@@ -2385,7 +2318,6 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertFalse(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # Check that the xorg.conf.d file was created
@@ -2393,7 +2325,6 @@ class GpuManagerTest(unittest.TestCase):
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2c: the discrete card was already available (BIOS)
 
@@ -2428,7 +2359,6 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertFalse(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # Check that the xorg.conf.d file was created
@@ -2436,7 +2366,6 @@ class GpuManagerTest(unittest.TestCase):
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2d: the discrete card was already available (BIOS)
 
@@ -2471,7 +2400,6 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertFalse(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # Check that the xorg.conf.d file was not created
@@ -2479,7 +2407,6 @@ class GpuManagerTest(unittest.TestCase):
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2e: the discrete card was already available (BIOS)
 
@@ -2523,7 +2450,6 @@ class GpuManagerTest(unittest.TestCase):
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
-
         # Case 2f: the discrete card was already available (BIOS)
 
         # Request action from bbswitch
@@ -2566,7 +2492,6 @@ class GpuManagerTest(unittest.TestCase):
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
-
         # Case 3a: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
                                                  ['intel'],
@@ -2604,7 +2529,6 @@ class GpuManagerTest(unittest.TestCase):
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
-
         # Case 3b: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
                                                  ['intel'],
@@ -2641,7 +2565,6 @@ class GpuManagerTest(unittest.TestCase):
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3c: the discrete card is no longer available (bbswitch)
 
@@ -2684,7 +2607,6 @@ class GpuManagerTest(unittest.TestCase):
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3d: the discrete card is no longer available (bbswitch)
         #          we need to select nvidia for better performance
@@ -2729,7 +2651,6 @@ class GpuManagerTest(unittest.TestCase):
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
-
         # Case 3e: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
                                                  ['intel'],
@@ -2766,7 +2687,6 @@ class GpuManagerTest(unittest.TestCase):
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3f: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -2806,7 +2726,6 @@ class GpuManagerTest(unittest.TestCase):
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
-
         # Case 3g: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
                                                  ['intel'],
@@ -2843,7 +2762,6 @@ class GpuManagerTest(unittest.TestCase):
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3h: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -2882,7 +2800,6 @@ class GpuManagerTest(unittest.TestCase):
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
-
     def test_laptop_one_intel_one_nvidia_binary_egl(self):
         '''laptop: intel + nvidia - EGL'''
         self.this_function_name = sys._getframe().f_code.co_name
@@ -2904,8 +2821,8 @@ class GpuManagerTest(unittest.TestCase):
         # Check the variables
 
         # Check quirks
-        #self.assertTrue(gpu_test.matched_quirk)
-        #self.assertTrue(gpu_test.loaded_with_args)
+        # self.assertTrue(gpu_test.matched_quirk)
+        # self.assertTrue(gpu_test.loaded_with_args)
 
         # Check if laptop
         self.assertTrue(gpu_test.requires_offloading)
@@ -2915,7 +2832,6 @@ class GpuManagerTest(unittest.TestCase):
         # Intel
         self.assertTrue(gpu_test.has_intel)
         self.assertTrue(gpu_test.intel_loaded)
-
 
         # No AMD
         self.assertFalse(gpu_test.has_amd)
@@ -2929,12 +2845,10 @@ class GpuManagerTest(unittest.TestCase):
         # Enable when we support hybrid laptops
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 1b: the discrete card is now available (BIOS)
 
@@ -2957,7 +2871,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_intel)
         self.assertTrue(gpu_test.intel_loaded)
 
-
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -2970,12 +2883,10 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 1c: the discrete card is now available (BIOS)
 
@@ -2999,7 +2910,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_intel)
         self.assertTrue(gpu_test.intel_loaded)
 
-
         # No AMD
         self.assertFalse(gpu_test.has_amd)
         self.assertFalse(gpu_test.radeon_loaded)
@@ -3011,12 +2921,10 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 1d: the discrete card is now available (BIOS)
 
@@ -3051,12 +2959,10 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 1e: the discrete card is now available (BIOS)
 
@@ -3091,13 +2997,11 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         # Fall back to mesa
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 1f: the discrete card is now available (BIOS)
 
@@ -3132,12 +3036,10 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 1g: the discrete card is now available (BIOS)
         #          the nvidia driver version is too old to support
@@ -3172,12 +3074,10 @@ class GpuManagerTest(unittest.TestCase):
         # Enable when we support hybrid laptops
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2a: the discrete card was already available (BIOS)
 
@@ -3214,12 +3114,10 @@ class GpuManagerTest(unittest.TestCase):
         # Enable when we support hybrid laptops
         self.assertFalse(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2b: the discrete card was already available (BIOS)
 
@@ -3254,12 +3152,10 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertFalse(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2c: the discrete card was already available (BIOS)
 
@@ -3294,12 +3190,10 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertFalse(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2d: the discrete card was already available (BIOS)
 
@@ -3334,12 +3228,10 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertFalse(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2e: the discrete card was already available (BIOS)
 
@@ -3374,13 +3266,11 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertFalse(gpu_test.has_changed)
 
-
         # Fallback
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2f: the discrete card was already available (BIOS)
 
@@ -3415,13 +3305,11 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertFalse(gpu_test.has_changed)
 
-
         # Select PRIME
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3a: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -3452,11 +3340,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3b: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -3487,11 +3373,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3c: the discrete card is no longer available (bbswitch)
 
@@ -3527,11 +3411,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3d: the discrete card is no longer available (bbswitch)
         #          we need to select nvidia for better performance
@@ -3568,11 +3450,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3e: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -3603,11 +3483,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3f: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -3638,11 +3516,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3g: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -3673,11 +3549,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3h: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -3707,7 +3581,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.nvidia_loaded)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
-
 
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -3745,11 +3618,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 1b: the discrete card is now available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel'],
@@ -3781,11 +3652,9 @@ class GpuManagerTest(unittest.TestCase):
         # Enable when we support hybrid laptops
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 1c: the discrete card is now available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel'],
@@ -3817,12 +3686,10 @@ class GpuManagerTest(unittest.TestCase):
         # Enable when we support hybrid laptops
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 1d: the discrete card is now available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel'],
@@ -3852,12 +3719,10 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 1e: the discrete card is now available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel'],
@@ -3887,12 +3752,10 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 1f: the discrete card is now available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel'],
@@ -3922,12 +3785,10 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2a: the discrete card was already available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -3957,6 +3818,26 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertFalse(gpu_test.has_changed)
 
+        self.assertFalse(gpu_test.has_selected_driver)
+
+        # No further action is required
+        self.assertTrue(gpu_test.has_not_acted)
+
+        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'])
+
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        # Has changed
+        self.assertFalse(gpu_test.has_changed)
 
         self.assertFalse(gpu_test.has_selected_driver)
 
@@ -3979,34 +3860,10 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertFalse(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
-
-        # No AMD
-        self.assertFalse(gpu_test.has_amd)
-        self.assertFalse(gpu_test.radeon_loaded)
-        self.assertFalse(gpu_test.amdgpu_loaded)
-        # NVIDIA
-        self.assertTrue(gpu_test.has_nvidia)
-        self.assertFalse(gpu_test.nouveau_loaded)
-        self.assertTrue(gpu_test.nvidia_loaded)
-        # Has changed
-        self.assertFalse(gpu_test.has_changed)
-
-
-        self.assertFalse(gpu_test.has_selected_driver)
-
-        # No further action is required
-        self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2b: the discrete card was already available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -4036,12 +3893,10 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertFalse(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2c: the discrete card was already available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -4071,12 +3926,10 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertFalse(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2d: the discrete card was already available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -4106,12 +3959,10 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertFalse(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 2e: the discrete card was already available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -4141,16 +3992,12 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertFalse(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
-
         # Case 2f: the discrete card was already available (BIOS)
-
-
 
         # Case 3a: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -4180,11 +4027,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3b: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -4214,11 +4059,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3c: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -4248,11 +4091,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3d: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -4282,11 +4123,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3e: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -4316,11 +4155,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # Case 3f: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -4349,7 +4186,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.nvidia_loaded)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
-
 
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
@@ -4386,11 +4222,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # What if radeon is blacklisted
         gpu_test = self.run_manager_and_get_data(['amd'],
@@ -4419,7 +4253,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.nvidia_loaded)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
-
 
         # We'll probably use vesa + llvmpipe
         self.assertFalse(gpu_test.has_selected_driver)
@@ -4455,11 +4288,9 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
-
 
         # What if amdgpu is blacklisted
         gpu_test = self.run_manager_and_get_data(['amd'],
@@ -4480,7 +4311,7 @@ class GpuManagerTest(unittest.TestCase):
 
         # AMD
         self.assertTrue(gpu_test.has_amd)
-        #self.assertFalse(gpu_test.radeon_loaded)
+        # self.assertFalse(gpu_test.radeon_loaded)
         self.assertFalse(gpu_test.amdgpu_loaded)
         # No NVIDIA
         self.assertFalse(gpu_test.has_nvidia)
@@ -4488,7 +4319,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.nvidia_loaded)
         # Has changed
         self.assertTrue(gpu_test.has_changed)
-
 
         # We'll probably use vesa + llvmpipe
         self.assertFalse(gpu_test.has_selected_driver)
@@ -4521,7 +4351,6 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_changed)
 
         self.assertFalse(gpu_test.has_selected_driver)
-
 
         # What if there are no graphics cards in the system?
         self.fake_lspci = open(self.fake_lspci.name, 'w')
@@ -4593,7 +4422,6 @@ class GpuManagerTest(unittest.TestCase):
         # Has changed
         self.assertTrue(gpu_test.has_changed)
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
@@ -4646,7 +4474,6 @@ class GpuManagerTest(unittest.TestCase):
         # This is pretty irrelevant as they use
         # /etc/X11/xorg.conf.d
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         self.assertTrue(gpu_test.amdgpu_pro_powersaving)
         self.assertFalse(gpu_test.amdgpu_pro_performance)
@@ -4696,7 +4523,6 @@ class GpuManagerTest(unittest.TestCase):
         # This is pretty irrelevant as they use
         # /etc/X11/xorg.conf.d
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.amdgpu_pro_powersaving)
         self.assertFalse(gpu_test.amdgpu_pro_performance)
@@ -4704,7 +4530,6 @@ class GpuManagerTest(unittest.TestCase):
 
         # No further action is required
         self.assertFalse(gpu_test.has_not_acted)
-
 
         # Case 2b: no hybrid script is available
 
@@ -4742,7 +4567,6 @@ class GpuManagerTest(unittest.TestCase):
         # This is pretty irrelevant as they use
         # /etc/X11/xorg.conf.d
 
-
         self.assertFalse(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.amdgpu_pro_powersaving)
         self.assertFalse(gpu_test.amdgpu_pro_performance)
@@ -4753,7 +4577,7 @@ class GpuManagerTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    if not '86' in os.uname()[4]:
+    if '86' not in os.uname()[4]:
         exit(0)
     # unittest.main() does its own parsing, therefore we
     # do our own parsing, then we create a copy of sys.argv where
@@ -4771,10 +4595,9 @@ if __name__ == '__main__':
 
     new_argv = []
     for elem in sys.argv:
-        if ((elem != '--save-logs-to' and elem != args.save_logs_to) and
-            (elem != '--with-valgrind' and elem != args.with_valgrind) and
-            (elem != '--with-gdb' and elem != args.with_gdb)):
+        if (
+                (elem != '--save-logs-to' and elem != args.save_logs_to) and
+                (elem != '--with-valgrind' and elem != args.with_valgrind) and
+                (elem != '--with-gdb' and elem != args.with_gdb)):
             new_argv.append(elem)
     unittest.main(argv=new_argv)
-
-
