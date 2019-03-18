@@ -82,6 +82,7 @@ def gen_fakearchive():
     a.create_deb('nvidia-old', dependencies={'Depends': 'xorg-video-abi-3'},
                  extra_tags={'Modaliases':
                  'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*, pci:v000010DEd000010C2sv*sd*bc03sc*i*,)'})
+<<<<<<< HEAD
 
     # Free package in universe
     a.create_deb('stracciatella',
@@ -98,6 +99,8 @@ def gen_fakearchive():
                  component='multiverse',
                  extra_tags={
                      'Modaliases': 'tuttifrutti(usb:v1234dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'})
+=======
+>>>>>>> 21bc03d549549bfe1e29e7e22552711b91649f13
 
     # packages not covered by modalises, for testing detection plugins
     a.create_deb('special')
@@ -155,6 +158,7 @@ class DetectTest(unittest.TestCase):
         '''system_modaliases() for fake sysfs'''
 
         res = UbuntuDrivers.detect.system_modaliases(self.umockdev.get_sys_dir())
+<<<<<<< HEAD
         self.assertEqual(set(res), set([
             'pci:v00001234d00sv00000001sd00bc00sc00i00',
             'pci:vDEADBEEFd00', 'usb:v9876dABCDsv01sd02bc00sc01i05',
@@ -162,6 +166,13 @@ class DetectTest(unittest.TestCase):
             'pci:v98761234d00sv00000001sd00bc00sc00i00',
             'pci:v67891234d00sv00000001sd00bc00sc00i00',
             modalias_nv]))
+=======
+        self.assertEqual(
+            set(res),
+            set(['pci:v00001234d00sv00000001sd00bc00sc00i00',
+                 'pci:vDEADBEEFd00', 'usb:v9876dABCDsv01sd02bc00sc01i05',
+                 modalias_nv]))
+>>>>>>> 21bc03d549549bfe1e29e7e22552711b91649f13
         self.assertTrue(res['pci:vDEADBEEFd00'].endswith('/sys/devices/grey'))
 
     def test_system_driver_packages_performance(self):
@@ -367,10 +378,14 @@ Description: broken \xEB encoding
         white = '/sys/devices/white'
         black = '/sys/devices/black'
         graphics = '/sys/devices/graphics'
+<<<<<<< HEAD
         self.assertEqual(len(res), 6)  # the three devices above + 3 fake devices
         self.assertEqual(
             set([os.path.basename(d) for d in res]),
             set(['white', 'purple', 'aubergine', 'orange', 'graphics', 'black']))
+=======
+        self.assertEqual(len(res), 3)  # the three devices above
+>>>>>>> 21bc03d549549bfe1e29e7e22552711b91649f13
 
         white_dict = [value for key, value in res.items() if key.endswith(white)][0]
         black_dict = [value for key, value in res.items() if key.endswith(black)][0]
@@ -771,8 +786,12 @@ APT::Get::AllowUnauthenticated "true";
         out, err = ud.communicate()
         self.assertEqual(err, '')
         self.assertEqual(set(out.splitlines()),
+<<<<<<< HEAD
                          set(['vanilla', 'chocolate', 'bcmwl-kernel-source', 'nvidia-current',
                              'stracciatella', 'tuttifrutti', 'neapolitan']))
+=======
+                         set(['vanilla', 'chocolate', 'bcmwl-kernel-source', 'nvidia-current']))
+>>>>>>> 21bc03d549549bfe1e29e7e22552711b91649f13
         self.assertEqual(ud.returncode, 0)
 
     def test_list_detect_plugins(self):
@@ -792,8 +811,12 @@ APT::Get::AllowUnauthenticated "true";
         self.assertEqual(err, '')
         self.assertEqual(set(out.splitlines()),
                          set(['vanilla', 'chocolate', 'bcmwl-kernel-source',
+<<<<<<< HEAD
                               'nvidia-current', 'special', 'picky',
                               'stracciatella', 'tuttifrutti', 'neapolitan']))
+=======
+                              'nvidia-current', 'special', 'picky']))
+>>>>>>> 21bc03d549549bfe1e29e7e22552711b91649f13
         self.assertEqual(ud.returncode, 0)
 
     def test_devices_chroot(self):
