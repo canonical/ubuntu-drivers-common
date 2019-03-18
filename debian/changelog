@@ -1,8 +1,15 @@
-ubuntu-drivers-common (1:0.6.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.6.3) disco; urgency=medium
 
-  * 
+  [ Jean-Baptiste Lallement ]
+  * ubuntu-drivers,
+    UbuntuDrivers/detect.py,
+    tests/ubuntu_drivers.py:
+    - Add a --free-only parameter, so as to allow installing only the
+     available free drivers (LP: #1819207).
+    - Add support for testing against a fake archive with free and
+      non-free components.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 11 Mar 2019 10:26:32 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 18 Mar 2019 16:20:49 +0100
 
 ubuntu-drivers-common (1:0.6.2) disco; urgency=medium
 
