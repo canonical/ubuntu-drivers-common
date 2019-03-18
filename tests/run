@@ -30,6 +30,8 @@ def usage():
     '\n  -i, --input=<filename>', '\tthe xorg.conf used for the tests.'
     
     '\n  -h, --help', '\t\t\thelp page.'
+
+    '\n  [Test ...]', '\t\t\tList of tests, the entire testsuite will be executed otherwise.'
     ]
     print(''.join(instructionsList))
 
@@ -69,10 +71,13 @@ def main():
     settingsFile.close()
         
     # run all tests in our directory
-    suite = unittest.TestLoader().loadTestsFromNames(
-        [t[:-3] for t in os.listdir(os.path.dirname(__file__)) 
-         if t.endswith('.py') and t not in ['settings.py', '__init__.py'] and not
-         (t == 'gpu-manager.py' and '86' not in os.uname()[4])])
+    if args:
+        suite = unittest.TestLoader().loadTestsFromNames(args)
+    else:
+        suite = unittest.TestLoader().loadTestsFromNames(
+            [t[:-3] for t in os.listdir(os.path.dirname(__file__))
+            if t.endswith('.py') and t not in ['settings.py', '__init__.py'] and not
+            (t == 'gpu-manager.py' and '86' not in os.uname()[4])])
     res = unittest.TextTestRunner(verbosity=2).run(suite)
     return len(res.errors) + len(res.failures)
 

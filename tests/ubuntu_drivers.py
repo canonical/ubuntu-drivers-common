@@ -53,6 +53,12 @@ def gen_fakehw():
     # not covered by any driver package
     t.add_device('pci', 'grey', None, ['modalias', 'pci:vDEADBEEFd00'], [])
     t.add_device('ssb', 'yellow', None, [], ['MODALIAS', 'pci:vDEADBEEFd00'])
+    # covered by stracciatella.deb / universe
+    t.add_device('pci', 'orange', None, ['modalias', 'pci:v98761234d00sv00000001sd00bc00sc00i00'], [])
+    # covered by neapolitan.deb / restricted
+    t.add_device('pci', 'purple', None, ['modalias', 'pci:v67891234d00sv00000001sd00bc00sc00i00'], [])
+    # covered by tuttifrutti.deb / multiverse
+    t.add_device('usb', 'aubergine', None, ['modalias', 'usb:v1234dABCDsv01sd02bc00sc01i05'], [])
 
     return t
 
@@ -73,6 +79,20 @@ def gen_fakearchive():
                  extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*, pci:v000010DEd000010C4sv*sd*bc03sc*i*,)'})
     a.create_deb('nvidia-old', dependencies={'Depends': 'xorg-video-abi-3'},
                  extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*, pci:v000010DEd000010C2sv*sd*bc03sc*i*,)'})
+
+    # Free package in universe
+    a.create_deb('stracciatella',
+                 component='universe',
+                 extra_tags={'Modaliases': 'stracciatella(pci:v98761234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)'})
+
+    # Non-free packages
+    a.create_deb('neapolitan',
+                 component='restricted',
+                 extra_tags={'Modaliases': 'neapolitan(pci:v67891234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)'})
+
+    a.create_deb('tuttifrutti',
+                 component='multiverse',
+                 extra_tags={'Modaliases': 'tuttifrutti(usb:v1234dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'})
 
     # packages not covered by modalises, for testing detection plugins
     a.create_deb('special')
@@ -130,6 +150,9 @@ class DetectTest(unittest.TestCase):
         res = UbuntuDrivers.detect.system_modaliases(self.umockdev.get_sys_dir())
         self.assertEqual(set(res), set(['pci:v00001234d00sv00000001sd00bc00sc00i00',
             'pci:vDEADBEEFd00', 'usb:v9876dABCDsv01sd02bc00sc01i05',
+            'usb:v1234dABCDsv01sd02bc00sc01i05',
+            'pci:v98761234d00sv00000001sd00bc00sc00i00',
+            'pci:v67891234d00sv00000001sd00bc00sc00i00',
             modalias_nv]))
         self.assertTrue(res['pci:vDEADBEEFd00'].endswith('/sys/devices/grey'))
 
@@ -176,16 +199,30 @@ class DetectTest(unittest.TestCase):
                                dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             chroot.add_repository(archive.path, True, False)
+
+            # Overwrite sources list generate by aptdaemon testsuite to add
+            # options to apt and ignore unsigned repository
+            sources_list = os.path.join(chroot.path,'etc/apt/sources.list')
+            with open(sources_list, 'w') as f:
+                f.write(archive.apt_source)
+
             cache = apt.Cache(rootdir=chroot.path)
+            cache.update()
+            cache.open()
             res = UbuntuDrivers.detect.system_driver_packages(cache, sys_path=self.umockdev.get_sys_dir())
         finally:
             chroot.remove()
         self.assertEqual(set(res), set(['chocolate', 'vanilla', 'nvidia-current',
                                         'nvidia-current-updates', 'nvidia-123',
-                                        'nvidia-34']))
+                                        'nvidia-34',
+                                        'neapolitan',
+                                        'tuttifrutti',
+                                        'stracciatella',
+                                        ]))
+
         self.assertEqual(res['vanilla']['modalias'], 'pci:v00001234d00sv00000001sd00bc00sc00i00')
         self.assertTrue(res['vanilla']['syspath'].endswith('/devices/white'))
-        self.assertFalse(res['vanilla']['from_distro'])
+        self.assertTrue(res['vanilla']['from_distro'])
         self.assertTrue(res['vanilla']['free'])
         self.assertFalse('vendor' in res['vanilla'])
         self.assertFalse('model' in res['vanilla'])
@@ -215,6 +252,8 @@ class DetectTest(unittest.TestCase):
 
         self.assertEqual(res['nvidia-34']['modalias'], modalias_nv)
         self.assertEqual(res['nvidia-34']['recommended'], False)
+
+        self.assertFalse(res['neapolitan']['free'])
 
     def test_system_gpgpu_driver_packages_chroot(self):
         '''system_driver_packages() for test package repository'''
@@ -278,7 +317,10 @@ Description: broken \xEB encoding
         finally:
             chroot.remove()
 
-        self.assertEqual(set(res), set(['chocolate', 'vanilla', 'nvidia-current']))
+        self.assertEqual(
+            set(res),
+            set(['chocolate', 'vanilla', 'nvidia-current',
+                 'neapolitan', 'tuttifrutti', 'stracciatella']))
 
     def test_system_driver_packages_detect_plugins(self):
         '''system_driver_packages() includes custom detection plugins'''
@@ -317,7 +359,10 @@ Description: broken \xEB encoding
         white = '/sys/devices/white'
         black = '/sys/devices/black'
         graphics = '/sys/devices/graphics'
-        self.assertEqual(len(res), 3)  # the three devices above
+        self.assertEqual(len(res), 6)  # the three devices above + 3 fake devices
+        self.assertEqual(
+            set([os.path.basename(d) for d in res]),
+            set(['white', 'purple', 'aubergine', 'orange', 'graphics', 'black']))
 
 
         white_dict = [value for key, value in res.items() if key.endswith(white)][0]
@@ -459,6 +504,57 @@ exec /sbin/modinfo "$@"
         self.assertEqual(UbuntuDrivers.detect.gpgpu_install_filter(pkgs, ':410'), {})
 
         self.assertEqual(UbuntuDrivers.detect.gpgpu_install_filter(pkgs, 'nvidia-driver:410'), {})
+
+    def test_system_driver_packages_freeonly(self):
+        '''system_driver_packages() returns only free packages'''
+
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            archive = gen_fakearchive()
+            chroot.add_repository(archive.path, True, False)
+
+            # Overwrite sources list generate by aptdaemon testsuite to add
+            # options to apt and ignore unsigned repository
+            sources_list = os.path.join(chroot.path,'etc/apt/sources.list')
+            with open(sources_list, 'w') as f:
+                f.write(archive.apt_source)
+
+            cache = apt.Cache(rootdir=chroot.path)
+            cache.update()
+            cache.open()
+
+            res = set(UbuntuDrivers.detect.system_driver_packages(cache, sys_path=self.umockdev.get_sys_dir(), freeonly=True))
+        finally:
+            chroot.remove()
+
+        self.assertEqual(res, set(['stracciatella', 'vanilla', 'chocolate', 'nvidia-current']))
+
+    def test_system_device_drivers_freeonly(self):
+        '''system_device_drivers() returns only devices with free drivers'''
+
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            archive = gen_fakearchive()
+            chroot.add_repository(archive.path, True, False)
+
+            # Overwrite sources list generate by aptdaemon testsuite to add
+            # options to apt and ignore unsigned repository
+            sources_list = os.path.join(chroot.path,'etc/apt/sources.list')
+            with open(sources_list, 'w') as f:
+                f.write(archive.apt_source)
+
+            cache = apt.Cache(rootdir=chroot.path)
+            cache.update()
+            cache.open()
+
+            res = UbuntuDrivers.detect.system_device_drivers(cache, sys_path=self.umockdev.get_sys_dir(), freeonly=True)
+        finally:
+            chroot.remove()
+        self.assertEqual(
+            set([os.path.basename(d) for d in res]),
+            set(['black', 'white', 'graphics', 'orange']))
 
     def test_detect_plugin_packages(self):
         '''detect_plugin_packages()'''
@@ -664,7 +760,8 @@ APT::Get::AllowUnauthenticated "true";
         out, err = ud.communicate()
         self.assertEqual(err, '')
         self.assertEqual(set(out.splitlines()), 
-                set(['vanilla', 'chocolate', 'bcmwl-kernel-source', 'nvidia-current']))
+                set(['vanilla', 'chocolate', 'bcmwl-kernel-source', 'nvidia-current',
+                     'stracciatella', 'tuttifrutti', 'neapolitan']))
         self.assertEqual(ud.returncode, 0)
 
     def test_list_detect_plugins(self):
@@ -683,7 +780,8 @@ APT::Get::AllowUnauthenticated "true";
         self.assertEqual(err, '')
         self.assertEqual(set(out.splitlines()), 
                 set(['vanilla', 'chocolate', 'bcmwl-kernel-source',
-                     'nvidia-current', 'special', 'picky']))
+                     'nvidia-current', 'special', 'picky',
+                     'stracciatella', 'tuttifrutti', 'neapolitan']))
         self.assertEqual(ud.returncode, 0)
 
     def test_devices_chroot(self):

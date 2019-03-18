@@ -26,8 +26,63 @@ class Archive:
         object gets deleted.
         '''
         self.path = tempfile.mkdtemp()
+        self.dist = 'devel'
+        self.components = ['main', 'universe', 'restricted', 'multiverse']
+        self.archs = ['amd64', 'i386', 'arm64', 'armhf', 'ppc64el', 's390x']
+
         atexit.register(shutil.rmtree, self.path)
-        self.apt_source = 'deb file://%s /' % self.path
+
+        # Local repository is not signed so trusted is required
+        self.apt_source_pattern = 'deb [trusted=yes] file://%s %s %s'
+        self.apt_source = self.apt_source_pattern % (
+            self.path, self.dist, " ".join(self.components))
+
+        # Configuration file for apt-ftparchive to generate archive indices
+        # For simplification Suite and Codename are the same and we nly support
+        # one arch. This can be further extended to support other archs if the
+        # testsuite requires it
+        self.aptftp_conf = os.path.join(self.path,'aptftp.conf')
+        with open(self.aptftp_conf, 'w') as f:
+            f.write('''
+APT::FTPArchive::Release {{
+Origin "Ubuntu";
+Label "Ubuntu";
+Suite "{suite}";
+Codename "{codename}";
+Architectures "{archs}";
+Components "{components}";
+Description "Test Repository";
+}};
+'''.format(suite=self.dist, codename=self.dist, archs=" ".join(self.archs), components=" ".join(self.components)))
+
+
+        self.aptftp_generate_conf = os.path.join(self.path,'aptftpgenerate.conf')
+        with open(self.aptftp_generate_conf, 'w') as f:
+            f.write('''
+Dir::ArchiveDir ".";
+Dir::CacheDir ".";
+TreeDefault::Directory "pool/$(SECTION)/";
+TreeDefault::SrcDirectory "pool/$(SECTION)/";
+Default::Packages::Extensions ".deb";
+Default::Packages::Compress ". gzip bzip2";
+Default::Sources::Compress ". gzip bzip2";
+Default::Contents::Compress "gzip bzip2";
+
+Tree "dists/{dist}" {{
+  Sections "{components}";
+  Architectures "{archs}";
+}};
+'''.format(dist=self.dist, archs=" ".join(self.archs), components=" ".join(self.components)))
+
+            for arch in self.archs:
+                for component in self.components:
+                    f.write('''
+BinDirectory "dists/{dist}/{component}/binary-{arch}" {{
+  Packages "dists/{dist}/{component}/binary-{arch}/Packages";
+  Contents "dists/{dist}/Contents-{arch}";
+}};
+'''.format(dist=self.dist, arch=arch, component=component))
+
 
     def create_deb(self, name, version='1', architecture='all',
                    dependencies={}, description='test package', extra_tags={},
@@ -115,11 +170,36 @@ Architecture: %s
         old_cwd = os.getcwd()
         try:
             os.chdir(self.path)
+            devnull = open(os.devnull, 'w')     #  Make apt-ftparchive quiet
+            dists_dir = os.path.join(self.path,'dists')
+
+            # Completely recreates the dist directory to ensure there is no
+            # leftover from a previous test.
+            if os.path.isdir(dists_dir):
+                shutil.rmtree(dists_dir)
+            for arch in self.archs:
+                for component in self.components:
+                    os.makedirs(os.path.join(dists_dir, self.dist, component, 'binary-%s' % arch))
+
+            subprocess.check_call(['apt-ftparchive', 'generate', '-c',
+                    self.aptftp_conf,
+                    self.aptftp_generate_conf],
+                stderr=devnull)
+
+            with open(os.path.join(dists_dir, self.dist, 'Release'), 'w') as f:
+                subprocess.check_call(['apt-ftparchive', 'release', '-c',
+                        self.aptftp_conf,
+                        os.path.join(dists_dir, self.dist)],
+                    stdout=f, stderr=devnull)
+
+            # This is still required by the aptdaemon test structure
             with open('Packages', 'w') as f:
                 subprocess.check_call(['apt-ftparchive', 'packages', '.'],
-                                      stdout=f)
+                    stdout=f, stderr=devnull)
+
         finally:
             os.chdir(old_cwd)
+            devnull.close()
 
 # a = Archive()
 # a.create_deb('vanilla')
