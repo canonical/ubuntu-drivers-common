@@ -86,7 +86,8 @@ def gen_fakearchive():
     # Free package in universe
     a.create_deb('stracciatella',
                  component='universe',
-                 extra_tags={'Modaliases': 'stracciatella(pci:v98761234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)'})
+                 extra_tags={
+                     'Modaliases': 'stracciatella(pci:v98761234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)'})
 
     # Non-free packages
     a.create_deb('neapolitan',
@@ -95,7 +96,8 @@ def gen_fakearchive():
 
     a.create_deb('tuttifrutti',
                  component='multiverse',
-                 extra_tags={'Modaliases': 'tuttifrutti(usb:v1234dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'})
+                 extra_tags={
+                     'Modaliases': 'tuttifrutti(usb:v1234dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'})
 
     # packages not covered by modalises, for testing detection plugins
     a.create_deb('special')
@@ -153,20 +155,13 @@ class DetectTest(unittest.TestCase):
         '''system_modaliases() for fake sysfs'''
 
         res = UbuntuDrivers.detect.system_modaliases(self.umockdev.get_sys_dir())
-<<<<<<< HEAD
-        self.assertEqual(set(res), set(['pci:v00001234d00sv00000001sd00bc00sc00i00',
+        self.assertEqual(set(res), set([
+            'pci:v00001234d00sv00000001sd00bc00sc00i00',
             'pci:vDEADBEEFd00', 'usb:v9876dABCDsv01sd02bc00sc01i05',
             'usb:v1234dABCDsv01sd02bc00sc01i05',
             'pci:v98761234d00sv00000001sd00bc00sc00i00',
             'pci:v67891234d00sv00000001sd00bc00sc00i00',
             modalias_nv]))
-=======
-        self.assertEqual(
-            set(res),
-            set(['pci:v00001234d00sv00000001sd00bc00sc00i00',
-                 'pci:vDEADBEEFd00', 'usb:v9876dABCDsv01sd02bc00sc01i05',
-                 modalias_nv]))
->>>>>>> Fixed code style
         self.assertTrue(res['pci:vDEADBEEFd00'].endswith('/sys/devices/grey'))
 
     def test_system_driver_packages_performance(self):
@@ -215,7 +210,7 @@ class DetectTest(unittest.TestCase):
 
             # Overwrite sources list generate by aptdaemon testsuite to add
             # options to apt and ignore unsigned repository
-            sources_list = os.path.join(chroot.path,'etc/apt/sources.list')
+            sources_list = os.path.join(chroot.path, 'etc/apt/sources.list')
             with open(sources_list, 'w') as f:
                 f.write(archive.apt_source)
 
@@ -529,7 +524,7 @@ exec /sbin/modinfo "$@"
 
             # Overwrite sources list generate by aptdaemon testsuite to add
             # options to apt and ignore unsigned repository
-            sources_list = os.path.join(chroot.path,'etc/apt/sources.list')
+            sources_list = os.path.join(chroot.path, 'etc/apt/sources.list')
             with open(sources_list, 'w') as f:
                 f.write(archive.apt_source)
 
@@ -537,7 +532,8 @@ exec /sbin/modinfo "$@"
             cache.update()
             cache.open()
 
-            res = set(UbuntuDrivers.detect.system_driver_packages(cache, sys_path=self.umockdev.get_sys_dir(), freeonly=True))
+            res = set(UbuntuDrivers.detect.system_driver_packages(
+                cache, sys_path=self.umockdev.get_sys_dir(), freeonly=True))
         finally:
             chroot.remove()
 
@@ -554,7 +550,7 @@ exec /sbin/modinfo "$@"
 
             # Overwrite sources list generate by aptdaemon testsuite to add
             # options to apt and ignore unsigned repository
-            sources_list = os.path.join(chroot.path,'etc/apt/sources.list')
+            sources_list = os.path.join(chroot.path, 'etc/apt/sources.list')
             with open(sources_list, 'w') as f:
                 f.write(archive.apt_source)
 
@@ -774,14 +770,9 @@ APT::Get::AllowUnauthenticated "true";
             stderr=subprocess.PIPE)
         out, err = ud.communicate()
         self.assertEqual(err, '')
-<<<<<<< HEAD
-        self.assertEqual(set(out.splitlines()), 
-                set(['vanilla', 'chocolate', 'bcmwl-kernel-source', 'nvidia-current',
-                     'stracciatella', 'tuttifrutti', 'neapolitan']))
-=======
         self.assertEqual(set(out.splitlines()),
-                         set(['vanilla', 'chocolate', 'bcmwl-kernel-source', 'nvidia-current']))
->>>>>>> Fixed code style
+                         set(['vanilla', 'chocolate', 'bcmwl-kernel-source', 'nvidia-current',
+                             'stracciatella', 'tuttifrutti', 'neapolitan']))
         self.assertEqual(ud.returncode, 0)
 
     def test_list_detect_plugins(self):
@@ -799,16 +790,10 @@ APT::Get::AllowUnauthenticated "true";
             stderr=subprocess.PIPE)
         out, err = ud.communicate()
         self.assertEqual(err, '')
-<<<<<<< HEAD
-        self.assertEqual(set(out.splitlines()), 
-                set(['vanilla', 'chocolate', 'bcmwl-kernel-source',
-                     'nvidia-current', 'special', 'picky',
-                     'stracciatella', 'tuttifrutti', 'neapolitan']))
-=======
         self.assertEqual(set(out.splitlines()),
                          set(['vanilla', 'chocolate', 'bcmwl-kernel-source',
-                              'nvidia-current', 'special', 'picky']))
->>>>>>> Fixed code style
+                              'nvidia-current', 'special', 'picky',
+                              'stracciatella', 'tuttifrutti', 'neapolitan']))
         self.assertEqual(ud.returncode, 0)
 
     def test_devices_chroot(self):

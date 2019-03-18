@@ -172,7 +172,7 @@ def _is_package_free(pkg):
     # the component for third-party packages; but this is the best we can do
     # at the moment
     for o in pkg.candidate.origins:
-        if o.component in ('restricted','multiverse'):
+        if o.component in ('restricted', 'multiverse'):
             return False
     return True
 
@@ -262,12 +262,8 @@ def _get_db_name(syspath, alias):
                   alias, vendor, model)
     return (vendor, model)
 
-<<<<<<< HEAD
-def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False):
-=======
 
-def system_driver_packages(apt_cache=None, sys_path=None):
->>>>>>> Fixed code style
+def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False):
     '''Get driver packages that are available for the system.
 
     This calls system_modaliases() to determine the system's hardware and then
