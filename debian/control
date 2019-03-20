@@ -27,6 +27,8 @@ Build-Depends: debhelper (>= 9.20160709),
  libdrm-dev,
  python3-dbus,
  libkmod-dev,
+ pycodestyle|pep8,
+ pyflakes3,
 Standards-Version: 3.9.8
 Vcs-Git: git://github.com/tseliot/ubuntu-drivers-common.git
 Vcs-Browser: https://github.com/tseliot/ubuntu-drivers-common

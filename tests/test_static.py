@@ -61,14 +61,16 @@ class TestStatic(unittest.TestCase):
             ]
         # List of files to ignore with ../ stripped from the beginning of the path
         ignore_files = [
-            'tests/settings.py',
+            'settings.py',
             'setup.py',
             # Project files ignores for the moment
             'tests/gpu-manager.py',
             ]
 
         paths = []
-        for dirpath, dirnames, filenames in os.walk(".."):
+        basedir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
+        for dirpath, dirnames, filenames in os.walk(basedir):
+            dirpath = dirpath.replace(basedir, '')
             for ignore in ignore_dirs:
                 if ignore in dirnames:
                     dirnames.remove(ignore)
@@ -76,8 +78,9 @@ class TestStatic(unittest.TestCase):
                 n for n in filenames
                 if not n.startswith(".") and not n.endswith("~")]
             for filename in filenames:
-                if filename.endswith(".py") and os.path.join(dirpath[3:], filename) not in ignore_files:
-                    paths.append(os.path.join(dirpath, filename))
+                filepath = os.path.join(dirpath, filename).lstrip('/')
+                if filepath.endswith(".py") and filepath not in ignore_files:
+                    paths.append(filepath)
         return paths
 
     @unittest.skipUnless(find_on_path(pycodestyle_cmd), '%s not found on this system' % pycodestyle_cmd)
