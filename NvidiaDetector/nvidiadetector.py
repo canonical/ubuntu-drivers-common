@@ -110,21 +110,28 @@ class NvidiaDetection(object):
         self.cards = []
         p1 = Popen(['lspci', '-n'], stdout=PIPE, universal_newlines=True)
         p = p1.communicate()[0].split('\n')
+
+        # Display controllers are device class 03
+        # There are 4 subclasses
+        #   00	VGA compatible controller
+        #   01	XGA compatible controller
+        #   02	3D controller
+        #   80	Display controller
         # if you don't have an nvidia card, fake one for debugging
         # p = ['00:02.0 0300: 10DE:03DE (rev 02)']
-        indentifier1 = re.compile(r'.*0300: *(.+):(.+) \(.+\)')
-        indentifier2 = re.compile(r'.*0300: *(.+):(.+)')
+        indentifier1 = re.compile(r'.*03(80|0[0-2]): *(?P<vendor>.+):(?P<device>.+) \(.+\)')
+        indentifier2 = re.compile(r'.*03(80|0[0-2]): *(?P<vendor>.+):(?P<device>.+)')
         for line in p:
             m1 = indentifier1.match(line)
             m2 = indentifier2.match(line)
             if m1:
-                id1 = m1.group(1).strip().lower()
-                id2 = m1.group(2).strip().lower()
+                id1 = m1.group("vendor").strip().lower()
+                id2 = m1.group("device").strip().lower()
                 id = id1 + ':' + id2
                 self.cards.append(id)
             elif m2:
-                id1 = m2.group(1).strip().lower()
-                id2 = m2.group(2).strip().lower()
+                id1 = m2.group("vendor").strip().lower()
+                id2 = m2.group("device").strip().lower()
                 id = id1 + ':' + id2
                 self.cards.append(id)
 
