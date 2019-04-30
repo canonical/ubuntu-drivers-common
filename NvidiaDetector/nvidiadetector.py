@@ -1,3 +1,7 @@
+#!/usr/bin/python3
+
+''' Detection tool for nVidia graphics cards '''
+
 #
 #       nvidiadetector.py
 #
@@ -349,15 +353,15 @@ class NvidiaDetection(object):
         p = p1.communicate()[0]
         c = p.split('\n')
         for line in c:
-            if line.find('\tinstall') != -1:#the relevant lines
+            if line.find('\tinstall') != -1:    # the relevant lines
                 lines.append(line.split('\t')[0])
-        if self.isstr(pkglist) == True:#if it is a string
+        if isinstance(pkglist, str):            # if it is a string
             try:
                 if lines.index(pkglist):
                     pass
             except ValueError:
                 notinstalled.append(pkglist)
-        else:#if it is a list
+        else:       # if it is a list
             for pkg in pkglist:
                 try:
                     if lines.index(pkg):
@@ -366,18 +370,6 @@ class NvidiaDetection(object):
                     notinstalled.append(pkg)
 
         return notinstalled
-
-    def isstr(self, elem):
-        if bytes is str:
-            #Python 2
-            string_types = basestring
-        else:
-            #Python 3
-            string_types = str
-        return isinstance(elem, string_types)
-
-    def islst(self, elem):
-        return isinstance(elem, (tuple, list))
 
     def getDrivers(self):
         '''
