@@ -57,7 +57,6 @@ class TestStatic(unittest.TestCase):
             ".bzr", ".git", "__pycache__", "debian",
             # Project dirs ignored for the moment
             "Quirks",
-            "NvidiaDetector",
             ]
         # List of files to ignore with ../ stripped from the beginning of the path
         ignore_files = [
