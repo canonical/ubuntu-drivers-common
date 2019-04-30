@@ -76,7 +76,7 @@ class NvidiaDetection(object):
         if printonly:
             self.printSelection()
         else:
-            self.selectDriver()
+            print(self.selectDriver())
 
     def __get_name_from_value(self, value):
         '''Get the name of a driver from its corresponding integer'''
@@ -407,7 +407,7 @@ class NvidiaDetection(object):
         else:
             # print driver
             sys.stdout.flush()
-            print('none')
+            print(driver)
 
 # def usage():
 #     instructionsList = ['The only accepted parameters are:'
