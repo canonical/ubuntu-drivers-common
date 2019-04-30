@@ -385,11 +385,14 @@ class NvidiaDetection(object):
         notInstalled = a list of the obsolete drivers which are not
                        installed
         '''
-        installedPackage = None
+
+        #  FIXME: Commented code to make static tests pass
+        #         This piece of code sets installedPackage which is not used anywhere
+        # installedPackage = None
         notInstalled = self.checkpkg(self.oldPackages)
-        for package in self.oldPackages:
-            if package not in notInstalled:
-                installedPackage = package
+        # for package in self.oldPackages:
+        #     if package not in notInstalled:
+        #        installedPackage = package
         return (len(notInstalled) != len(self.oldPackages))
 
     def printSelection(self):
