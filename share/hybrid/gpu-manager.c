@@ -102,6 +102,12 @@ typedef enum {
     ISPX,
 } amdgpu_pro_px_action;
 
+typedef enum {
+    ON,
+    OFF,
+    ONDEMAND
+} prime_mode_settings;
+
 static char *log_file = NULL;
 static FILE *log_handle = NULL;
 static char *last_boot_file = NULL;
@@ -116,6 +122,7 @@ static char *amdgpu_pro_px_file = NULL;
 static char *modprobe_d_path = NULL;
 static char *xorg_conf_d_path = NULL;
 static prime_intel_drv prime_intel_driver = SNA;
+static prime_mode_settings prime_mode = OFF;
 
 static struct pci_slot_match match = {
     PCI_MATCH_ANY, PCI_MATCH_ANY, PCI_MATCH_ANY, PCI_MATCH_ANY, 0
@@ -555,6 +562,33 @@ static bool prime_is_action_on() {
     return (check_on_off(prime_settings));
 }
 
+
+static void get_prime_action() {
+    char line[100];
+    _cleanup_fclose_ FILE *file = NULL;
+
+    file = fopen(prime_settings, "r");
+
+    if (!file) {
+        fprintf(log_handle, "Error: can't open %s\n", prime_settings);
+        prime_mode = OFF;
+    }
+
+    while (fgets(line, sizeof(line), file)) {
+        if (istrstr(line, "on-demand") != NULL) {
+            prime_mode = ONDEMAND;
+            break;
+        }
+        else if (istrstr(line, "on") != NULL) {
+            prime_mode = ON;
+            break;
+        }
+        else {
+            prime_mode = OFF;
+            break;
+        }
+    }
+}
 
 static void get_boot_vga(struct device **devices,
                         int cards_number,
@@ -1410,11 +1444,11 @@ static bool manage_power_management(const struct device *device, bool enabled) {
     }
 }
 
-static bool enable_power_management(const struct device *device) {
+static void enable_power_management(const struct device *device) {
     manage_power_management(device, true);
 }
 
-static bool disable_power_management(const struct device *device) {
+static void disable_power_management(const struct device *device) {
     manage_power_management(device, false);
 }
 
@@ -1617,11 +1651,19 @@ static bool enable_prime(const char *prime_settings,
         }
     }
 
-    if (prime_is_action_on()) {
+    get_prime_action();
+    if (prime_mode == ON) {
         /* Create an OutputClass just for PRIME, to override
          * the default NVIDIA settings
          */
         create_prime_outputclass();
+        disable_power_management(device);
+        if (!is_module_loaded("nvidia"))
+            load_module("nvidia");
+    }
+    else if (prime_mode == ONDEMAND) {
+        /* Remove the OutputClass */
+        remove_prime_outputclass();
         disable_power_management(device);
         if (!is_module_loaded("nvidia"))
             load_module("nvidia");
