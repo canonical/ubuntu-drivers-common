@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.7) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.7) eoan; urgency=medium
 
-  * 
+  * gpu-manager.c:
+    - Add support for the on-demand mode for PRIME.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 09 Jul 2019 13:24:23 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 09 Jul 2019 16:59:37 +0200
 
 ubuntu-drivers-common (1:0.6.3) disco; urgency=medium
 
