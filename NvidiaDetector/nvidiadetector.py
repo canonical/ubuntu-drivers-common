@@ -1,3 +1,7 @@
+#!/usr/bin/python3
+
+''' Detection tool for nVidia graphics cards '''
+
 #
 #       nvidiadetector.py
 #
@@ -18,17 +22,18 @@
 #       Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #       MA 02110-1301, USA.
 
-import os
 import re
-import subprocess
 from subprocess import Popen, PIPE
-import sys, logging
+import sys
+import logging
 import apt
 
 obsoletePackagesPath = '/usr/share/ubuntu-drivers-common/obsolete'
 
+
 class NoDatadirError(Exception):
     "Exception thrown when no modaliases dir can be found"
+
 
 class NvidiaDetection(object):
     '''
@@ -68,10 +73,10 @@ class NvidiaDetection(object):
         self.getData()
         self.getCards()
         self.removeUnsupported()
-        if printonly == True:
+        if printonly:
             self.printSelection()
         else:
-            self.selectDriver()
+            print(self.selectDriver())
 
     def __get_name_from_value(self, value):
         '''Get the name of a driver from its corresponding integer'''
@@ -105,21 +110,28 @@ class NvidiaDetection(object):
         self.cards = []
         p1 = Popen(['lspci', '-n'], stdout=PIPE, universal_newlines=True)
         p = p1.communicate()[0].split('\n')
+
+        # Display controllers are device class 03
+        # There are 4 subclasses
+        #   00	VGA compatible controller
+        #   01	XGA compatible controller
+        #   02	3D controller
+        #   80	Display controller
         # if you don't have an nvidia card, fake one for debugging
-        #p = ['00:02.0 0300: 10DE:03DE (rev 02)']
-        indentifier1 = re.compile('.*0300: *(.+):(.+) \(.+\)')
-        indentifier2 = re.compile('.*0300: *(.+):(.+)')
+        # p = ['00:02.0 0300: 10DE:03DE (rev 02)']
+        indentifier1 = re.compile(r'.*03(80|0[0-2]): *(?P<vendor>.+):(?P<device>.+) \(.+\)')
+        indentifier2 = re.compile(r'.*03(80|0[0-2]): *(?P<vendor>.+):(?P<device>.+)')
         for line in p:
             m1 = indentifier1.match(line)
             m2 = indentifier2.match(line)
             if m1:
-                id1 = m1.group(1).strip().lower()
-                id2 = m1.group(2).strip().lower()
+                id1 = m1.group("vendor").strip().lower()
+                id2 = m1.group("device").strip().lower()
                 id = id1 + ':' + id2
                 self.cards.append(id)
             elif m2:
-                id1 = m2.group(1).strip().lower()
-                id2 = m2.group(2).strip().lower()
+                id1 = m2.group("vendor").strip().lower()
+                id2 = m2.group("device").strip().lower()
                 id = id1 + ':' + id2
                 self.cards.append(id)
 
@@ -132,17 +144,17 @@ class NvidiaDetection(object):
         vendor_product_re = re.compile('pci:v0000(.+)d0000(.+)sv')
 
         for package in apt.Cache():
-            if (not package.name.startswith('nvidia-')
-                or 'updates' in package.name
-                or 'experimental' in package.name
-                or 'current' in package.name):
+            if (not package.name.startswith('nvidia-') or
+                    'updates' in package.name or
+                    'experimental' in package.name or
+                    'current' in package.name):
                 continue
             try:
                 m = package.candidate.record['Modaliases']
             except (KeyError, AttributeError):
                 # that's entirely expected for -vdpau and friends; just for
                 # debugging
-                #logging.warning('Package %s has no modalias header' % package.name)
+                # logging.warning('Package %s has no modalias header' % package.name)
                 continue
 
             # package names can be like "nvidia-173:i386" and we need to
@@ -173,7 +185,7 @@ class NvidiaDetection(object):
         if len(self.drivers.keys()) == 0:
             sys.stdout.flush()
             print('none')
-            #raise ValueError, "modaliases have no useful information"
+            # raise ValueError, "modaliases have no useful information"
 
     def getCards(self):
         '''
@@ -218,7 +230,7 @@ class NvidiaDetection(object):
                     if self.verbose:
                         print('Card %s supported by driver %s' % (card, driver))
                     self.driversForCards.setdefault(card, []).append(driver)
-            if supported == False:
+            if not supported:
                 self.driversForCards.setdefault(card, []).append(None)
 
     def removeUnsupported(self):
@@ -242,8 +254,8 @@ class NvidiaDetection(object):
         If more than one card is available, try to get the highest common driver
         '''
         cardsNumber = len(self.nvidiaCards)
-        if cardsNumber > 0:#if a NVIDIA card is available
-            if cardsNumber > 1:#if more than 1 card
+        if cardsNumber > 0:         # if a NVIDIA card is available
+            if cardsNumber > 1:     # if more than 1 card
                 '''
                 occurrence stores the number of occurrences (the values of the
                 dictionary) of each driver version (the keys of the dictionary)
@@ -303,7 +315,7 @@ class NvidiaDetection(object):
                     choice = occurrences[0]
                     if self.verbose and not self.printonly:
                         print('Recommended NVIDIA driver: ' + choice)
-            else:#just one card
+            else:   # just one card
                 '''
                 The choice is easy if only one card is available and/or supported.
 
@@ -317,7 +329,7 @@ class NvidiaDetection(object):
             '''
 
             driver_name = self.__get_name_from_value(choice)
-            if driver_name != None:
+            if driver_name is not None:
                 choice = (choice >= 390 and 'nvidia-driver-' or 'nvidia-') + str(driver_name)
             else:
                 choice = (choice >= 390 and 'nvidia-driver-' or 'nvidia-') + str(choice)
@@ -349,15 +361,15 @@ class NvidiaDetection(object):
         p = p1.communicate()[0]
         c = p.split('\n')
         for line in c:
-            if line.find('\tinstall') != -1:#the relevant lines
+            if line.find('\tinstall') != -1:    # the relevant lines
                 lines.append(line.split('\t')[0])
-        if self.isstr(pkglist) == True:#if it is a string
+        if isinstance(pkglist, str):            # if it is a string
             try:
                 if lines.index(pkglist):
                     pass
             except ValueError:
                 notinstalled.append(pkglist)
-        else:#if it is a list
+        else:       # if it is a list
             for pkg in pkglist:
                 try:
                     if lines.index(pkg):
@@ -367,29 +379,20 @@ class NvidiaDetection(object):
 
         return notinstalled
 
-    def isstr(self, elem):
-        if bytes is str:
-            #Python 2
-            string_types = basestring
-        else:
-            #Python 3
-            string_types = str
-        return isinstance(elem, string_types)
-
-    def islst(self, elem):
-        return isinstance(elem, (tuple, list))
-
     def getDrivers(self):
         '''
         oldPackages = a list of the names of the obsolete drivers
         notInstalled = a list of the obsolete drivers which are not
                        installed
         '''
-        installedPackage = None
+
+        #  FIXME: Commented code to make static tests pass
+        #         This piece of code sets installedPackage which is not used anywhere
+        # installedPackage = None
         notInstalled = self.checkpkg(self.oldPackages)
-        for package in self.oldPackages:
-            if package not in notInstalled:
-                installedPackage = package
+        # for package in self.oldPackages:
+        #     if package not in notInstalled:
+        #        installedPackage = package
         return (len(notInstalled) != len(self.oldPackages))
 
     def printSelection(self):
@@ -397,50 +400,46 @@ class NvidiaDetection(object):
         Part for the kernel postinst.d/ hook
         '''
         driver = self.selectDriver()
-        if self.getDrivers():#if an old driver is installed
-            if driver:#if an appropriate driver is found
+        if self.getDrivers():       # if an old driver is installed
+            if driver:              # if an appropriate driver is found
                 sys.stdout.flush()
                 print(driver)
             else:
                 sys.stdout.flush()
                 print('none')
         else:
-            #print driver
+            # print driver
             sys.stdout.flush()
-            print('none')
+            print(driver)
 
-#def usage():
-#    instructionsList = ['The only accepted parameters are:'
-#    '\n  --printonly', '\tprint the suggested driver'
-#
-#    '\n  --verbose', '\t\teach step will be verbose'
-#    ]
-#    print(''.join(instructionsList))
+# def usage():
+#     instructionsList = ['The only accepted parameters are:'
+#     '\n  --printonly', '\tprint the suggested driver'
 
-#def main():
-#    err = 'Error: parameters not recognised'
-#    try:
-#        opts, args = getopt.getopt(sys.argv[1:], 'hp:v', ['help', 'printonly', 'verbose'])
-#    except getopt.GetoptError as err:
-#        # print help information and exit:
-#        print str(err) # will print something like 'option -a not recognized'
-#        usage()
-#        sys.exit(2)
-#    printonly = None
-#    verbose = None
-#    for o, a in opts:
-#        if o in ('-v', '--verbose'):
-#            verbose = True
-#        elif o in ('-p', '--printonly'):
-#            printonly = True
-#        elif o in ('-h', '--help'):
-#            usage()
-#            sys.exit()
-#        else:
-#            assert False, 'unhandled option'
-#    a = NvidiaDetection(printonly=printonly, verbose=verbose)
-
-
-#if __name__ == '__main__':
-#    main()
-
+#     '\n  --verbose', '\t\teach step will be verbose'
+#     ]
+#     print(''.join(instructionsList))
+# def main():
+#     err = 'Error: parameters not recognised'
+#     try:
+#         opts, args = getopt.getopt(sys.argv[1:], 'hp:v', ['help', 'printonly', 'verbose'])
+#     except getopt.GetoptError as err:
+#         # print help information and exit:
+#         print str(err) # will print something like 'option -a not recognized'
+#         usage()
+#         sys.exit(2)
+#     printonly = None
+#     verbose = None
+#     for o, a in opts:
+#         if o in ('-v', '--verbose'):
+#             verbose = True
+#         elif o in ('-p', '--printonly'):
+#             printonly = True
+#         elif o in ('-h', '--help'):
+#             usage()
+#             sys.exit()
+#         else:
+#             assert False, 'unhandled option'
+#     a = NvidiaDetection(printonly=printonly, verbose=verbose)
+# if __name__ == '__main__':
+#     main()

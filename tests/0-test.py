@@ -19,11 +19,9 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 
-
 def main():
-	
-	return 0
+    return 0
+
 
 if __name__ == '__main__':
-	main()
-
+    main()

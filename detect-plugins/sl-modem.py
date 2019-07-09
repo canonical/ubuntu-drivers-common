@@ -8,10 +8,11 @@ import re
 import logging
 import subprocess
 
-modem_re = re.compile('^\s*\d+\s*\[Modem\s*\]')
-modem_as_subdevice_re = re.compile('^card [0-9].*[mM]odem')
+modem_re = re.compile(r'^\s*\d+\s*\[Modem\s*\]')
+modem_as_subdevice_re = re.compile(r'^card [0-9].*[mM]odem')
 
 pkg = 'sl-modem-daemon'
+
 
 def detect(apt_cache):
     # Check in /proc/asound/cards
@@ -31,14 +32,15 @@ def detect(apt_cache):
         except KeyError:
             pass
         env['LC_ALL'] = 'C'
-        aplay = subprocess.Popen(['aplay', '-l'], env=env,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                universal_newlines=True)
+        aplay = subprocess.Popen(
+            ['aplay', '-l'], env=env,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            universal_newlines=True)
         (aplay_out, aplay_err) = aplay.communicate()
 
         if aplay.returncode != 0:
             logging.error('aplay -l failed with %i: %s' % (aplay.returncode,
-                aplay_err))
+                          aplay_err))
             return None
     except OSError:
         logging.exception('could not open aplay -l')
