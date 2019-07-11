@@ -1,8 +1,10 @@
-ubuntu-drivers-common (1:0.7.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.7.1) eoan; urgency=medium
 
-  * 
+  * debian/tests/system:
+    - Do not try installing dkms packages. We already have an
+      infrastructure in place to catch any such failures.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 11 Jul 2019 17:07:57 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 11 Jul 2019 17:12:12 +0200
 
 ubuntu-drivers-common (1:0.7) eoan; urgency=medium
 
