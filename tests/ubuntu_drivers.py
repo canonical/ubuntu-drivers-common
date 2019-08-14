@@ -263,7 +263,7 @@ class DetectTest(unittest.TestCase):
 
         self.assertFalse(res['neapolitan']['free'])
 
-    def test_system_gpgpu_driver_packages_chroot(self):
+    def test_system_gpgpu_driver_packages_chroot1(self):
         '''system_driver_packages() for test package repository'''
 
         chroot = aptdaemon.test.Chroot()
@@ -298,6 +298,83 @@ class DetectTest(unittest.TestCase):
         self.assertEqual(set(packages), set(['nvidia-driver-410']))
         driver = list(packages.keys())[0]
         self.assertEqual(packages[driver].get('metapackage'), 'nvidia-headless-no-dkms-410')
+
+    def test_system_gpgpu_driver_packages_chroot2(self):
+        '''system_driver_packages() for test package repository'''
+
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            # older applicable driver which is not the recommended one
+            archive.create_deb('nvidia-driver-390', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+            # -updates driver which also should not be recommended
+            archive.create_deb('nvidia-driver-410', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+            # driver package which supports multiple ABIs
+            archive.create_deb('nvidia-340',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+            archive.create_deb('nvidia-headless-no-dkms-410',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+            archive.create_deb('nvidia-headless-no-dkms-390',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-410-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-410-5.2.0-10-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-410-5.2.0-10-generic',
+                               dependencies={'Depends': 'linux-image-5.2.0-10-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-image-3.2.0-23-generic',
+                               extra_tags={'Source': 'linux'})
+            archive.create_deb('linux-image-5.2.0-10-generic',
+                               extra_tags={'Source': 'linux'})
+            archive.create_deb('linux-image-3.5.0-18-generic',
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
+            archive.create_deb('linux-image-3.5.0-19-generic',
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
+            archive.create_deb('linux-image-generic',
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-image-generic-lts-quantal',
+                               extra_tags={'Source':
+                                           'linux-meta-lts-quantal'})
+
+            chroot.add_repository(archive.path, True, False)
+            cache = apt.Cache(rootdir=chroot.path)
+
+
+            # Install kernel packages
+            for pkg in ('linux-image-3.2.0-23-generic',
+                        'linux-image-5.2.0-10-generic',
+                        'linux-image-3.5.0-18-generic',
+                        'linux-image-3.5.0-19-generic',
+                        'linux-image-generic',
+                        'linux-image-generic-lts-quantal'):
+                cache[pkg].mark_install()
+
+            res = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path=self.umockdev.get_sys_dir())
+            linux_package = UbuntuDrivers.detect.get_linux(cache)
+            modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, 'nvidia-driver-410')
+        finally:
+            chroot.remove()
+
+        self.assertTrue('nvidia-driver-410' in res)
+        packages = UbuntuDrivers.detect.gpgpu_install_filter(res, 'nvidia')
+        self.assertEqual(set(packages), set(['nvidia-driver-410']))
+        driver = list(packages.keys())[0]
+        self.assertEqual(packages[driver].get('metapackage'), 'nvidia-headless-no-dkms-410')
+        self.assertEqual(linux_package, 'linux-generic')
+        self.assertEqual(modules_package, 'linux-modules-nvidia-410-generic')
 
     def test_system_driver_packages_bad_encoding(self):
         '''system_driver_packages() with badly encoded Packages index'''
