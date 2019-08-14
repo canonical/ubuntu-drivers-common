@@ -831,3 +831,37 @@ def get_linux(apt_cache):
     '''Return the linux metapackage for the system's kernel'''
     kernel_detection = kerneldetection.KernelDetection(apt_cache)
     return kernel_detection.get_linux_metapackage()
+
+
+def get_linux_modules_metapackage(apt_cache, candidate):
+    '''Return the linux-modules-$driver metapackage for the system's kernel'''
+    assert candidate is not None
+    metapackage = None
+
+    if 'nvidia' not in candidate:
+        logging.debug('Non NVIDIA linux-modules packages are not supported at this time: %s. Skipping', candidate)
+        return metapackage
+
+    linux_meta = get_linux(apt_cache)
+    linux_flavour = linux_meta[linux_meta.rfind('-')+1:]
+    candidate_flavour = candidate[candidate.rfind('-')+1:]
+
+    try:
+        int(candidate_flavour)
+    except ValueError:
+        logging.error('No flavour can be found in %s. Skipping.', candidate)
+        return metapackage
+
+    linux_modules_candidate = 'linux-modules-nvidia-%s-%s' % (candidate_flavour, linux_flavour)
+
+    try:
+        package = apt_cache.__getitem__(linux_modules_candidate)
+        # skip foreign architectures, we usually only want native
+        if (package.candidate and
+                package.candidate.architecture in ('all', system_architecture)):
+            metapackage = linux_modules_candidate
+    except KeyError:
+        logging.error('No "%s" can be found.', linux_modules_candidate)
+        pass
+
+    return metapackage
