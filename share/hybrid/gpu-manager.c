@@ -1486,6 +1486,73 @@ static void disable_power_management(const struct device *device) {
     manage_power_management(device, false);
 }
 
+
+static int remove_device(const struct device *device) {
+    _cleanup_fclose_ FILE *file = NULL;
+    char pci_device_path[PATH_MAX];
+
+    snprintf(pci_device_path, sizeof(pci_device_path),
+             "/sys/bus/pci/devices/%04x:%02x:%02x.%x/remove",
+             (unsigned int)device->domain,
+             (unsigned int)device->bus,
+             (unsigned int)device->dev,
+             (unsigned int)device->func);
+
+    fprintf(log_handle, "Removing device \"/%04x:%02x:%02x.%x\"\n",
+             (unsigned int)device->domain,
+             (unsigned int)device->bus,
+             (unsigned int)device->dev,
+             (unsigned int)device->func);
+
+    file = fopen(pci_device_path, "w");
+    if (!file) {
+        fprintf(log_handle, "Error while opening %s\n", pci_device_path);
+        return false;
+    }
+    else {
+        fputs("1\n", file);
+
+        fflush(file);
+        return true;
+    }
+}
+
+static int rescan_bus(const struct device *device) {
+    _cleanup_fclose_ FILE *file = NULL;
+    char pci_device_path[PATH_MAX];
+    char pci_device_rescan[] = "/sys/bus/pci/rescan";
+
+
+    snprintf(pci_device_path, sizeof(pci_device_path),
+             "/sys/bus/pci/devices/%04x:%02x:%02x.%x",
+             (unsigned int)device->domain,
+             (unsigned int)device->bus,
+             (unsigned int)device->dev,
+             (unsigned int)device->func);
+
+    if (is_dir(pci_device_path)) {
+        fprintf(log_handle, "Device %s is available. Not rescanning pci bus\n",
+            pci_device_path);
+        return true;
+    }
+
+    fprintf(log_handle, "Rescanning pci bus\n");
+
+    file = fopen(pci_device_rescan, "w");
+    if (!file) {
+        fprintf(log_handle, "Error while opening %s\n", pci_device_rescan);
+        return false;
+    }
+    else {
+        fputs("1\n", file);
+
+        fflush(file);
+        return true;
+    }
+
+}
+
+
 static bool unload_nvidia(void) {
     unload_module("nvidia-drm");
     unload_module("nvidia-uvm");
@@ -1693,7 +1760,10 @@ static bool enable_prime(const char *prime_settings,
         create_prime_outputclass();
         /* Remove the ServerLayout */
         remove_offload_serverlayout();
-        disable_power_management(device);
+        /*disable_power_management(device); */
+        status = rescan_bus(device);
+        if (status)
+            fprintf(log_handle, "PCI Bus rescanned\n");
         if (!is_module_loaded("nvidia"))
             load_module("nvidia");
     }
@@ -1733,9 +1803,12 @@ unload_again:
                     return false;
                 }
             }
+
         }
+
         /* Set power control to "auto" to save power */
-        enable_power_management(device);
+        /*enable_power_management(device);*/
+        remove_device(device);
     }
 
     return true;
