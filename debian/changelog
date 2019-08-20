@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.7.4) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.7.4) eoan; urgency=medium
 
-  * 
+  * tests/quirkreader-test.py:
+    - Fix indentation of comments.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 20 Aug 2019 16:50:00 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 20 Aug 2019 19:53:11 +0200
 
 ubuntu-drivers-common (1:0.7.3) eoan; urgency=medium
 
