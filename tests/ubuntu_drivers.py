@@ -352,7 +352,6 @@ class DetectTest(unittest.TestCase):
             chroot.add_repository(archive.path, True, False)
             cache = apt.Cache(rootdir=chroot.path)
 
-
             # Install kernel packages
             for pkg in ('linux-image-3.2.0-23-generic',
                         'linux-image-5.2.0-10-generic',
