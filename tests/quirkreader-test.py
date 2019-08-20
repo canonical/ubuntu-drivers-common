@@ -44,8 +44,8 @@ def get_quirks_from_file(quirk_file):
 class QuirkReaderTestCase(unittest.TestCase):
 
     # def setUp(self):
-        # self.quirk_file = quirkreader.ReadQuirk(quirk_file)
-        # self.quirks = self.quirk_file.get_quirks()
+    #     self.quirk_file = quirkreader.ReadQuirk(quirk_file)
+    #     self.quirks = self.quirk_file.get_quirks()
 
     def tearDown(self):
         # self.parser.comments.insert(0, '\n-----' + self.this_function_name + '-----\n')
