@@ -1,8 +1,10 @@
-ubuntu-drivers-common (1:0.7.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.7.3) eoan; urgency=medium
 
-  * 
+  * UbuntuDrivers/detect.py,
+    tests/ubuntu_drivers.py:
+    - Remove blank line, and add new line to make test_static.py happy.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 20 Aug 2019 16:19:03 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 20 Aug 2019 16:22:53 +0200
 
 ubuntu-drivers-common (1:0.7.2) eoan; urgency=medium
 
