@@ -1,8 +1,10 @@
-ubuntu-drivers-common (1:0.7.5) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.7.5) eoan; urgency=medium
 
-  * 
+  [ Philip Langdale ]
+  * gpu-manager.c:
+    - Turn on PRIME offload when in on-demand mode.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 20 Aug 2019 19:54:57 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 21 Aug 2019 16:06:34 +0200
 
 ubuntu-drivers-common (1:0.7.4) eoan; urgency=medium
 
