@@ -117,7 +117,6 @@ static char *gpu_detection_path = NULL;
 static char *prime_settings = NULL;
 static char *dmi_product_name_path = NULL;
 static char *dmi_product_version_path = NULL;
-static char *nvidia_driver_version_path = NULL;
 static char *amdgpu_pro_px_file = NULL;
 static char *modprobe_d_path = NULL;
 static char *xorg_conf_d_path = NULL;
@@ -142,8 +141,6 @@ struct device {
 
 
 static bool is_file(char *file);
-static bool is_dir(char *directory);
-static bool is_dir_empty(char *directory);
 static bool is_link(char *file);
 static bool is_module_loaded(const char *module);
 
@@ -161,23 +158,6 @@ static inline void fclosep(FILE **file) {
 static inline void pclosep(FILE **file) {
     if (*file != NULL)
         pclose(*file);
-}
-
-
-/* Trim string in place */
-static void trim(char *str) {
-    char *pointer = str;
-    int len = strlen(pointer);
-
-    while(isspace(pointer[len - 1]))
-        pointer[--len] = 0;
-
-    while(* pointer && isspace(* pointer)) {
-        ++pointer;
-        --len;
-    }
-
-    memmove(str, pointer, len + 1);
 }
 
 
@@ -441,20 +421,6 @@ static bool find_string_in_file(const char *path, const char *pattern) {
 }
 
 
-static bool is_file_empty(const char *file) {
-    struct stat stbuf;
-
-    if (stat(file, &stbuf) == -1) {
-        fprintf(log_handle, "can't access %s\n", file);
-        return false;
-    }
-    if ((stbuf.st_mode & S_IFMT) && ! stbuf.st_size)
-        return true;
-
-    return false;
-}
-
-
 static bool has_cmdline_option(const char *option)
 {
     return (find_string_in_file("/proc/cmdline", option));
@@ -488,81 +454,11 @@ static prime_intel_drv get_prime_intel_driver() {
 }
 
 
-static bool copy_file(const char *src_path, const char *dst_path)
-{
-    _cleanup_fclose_ FILE *src = NULL;
-    _cleanup_fclose_ FILE *dst = NULL;
-    int src_fd, dst_fd;
-    int n = 0;
-    char buf[BUFSIZ];
-
-    src = fopen(src_path, "r");
-    if (src == NULL) {
-        fprintf(log_handle, "error: can't open %s for reading\n", src_path);
-        return false;
-    }
-
-    dst = fopen(dst_path, "w");
-    if (dst == NULL) {
-        fprintf(log_handle, "error: can't open %s for writing.\n",
-                dst_path);
-        return false;
-    }
-
-    src_fd = fileno(src);
-    dst_fd = fileno(dst);
-
-    fprintf(log_handle, "copying %s to %s...\n", src_path, dst_path);
-
-    while ((n = read(src_fd, buf, BUFSIZ)) > 0)
-        if (write(dst_fd, buf, n) != n) {
-            fprintf(log_handle, "write error on file %s\n", dst_path);
-            return false;
-        }
-
-    fprintf(log_handle, "%s was copied successfully to %s\n", src_path, dst_path);
-    return true;
-}
-
-
-/* Open a file and check if it contains "on"
- * or "off".
- *
- * Return false if the file doesn't exist or is empty.
- */
-static bool check_on_off(const char *path) {
-    bool status = false;
-    char line[100];
-    _cleanup_fclose_ FILE *file = NULL;
-
-    file = fopen(path, "r");
-
-    if (!file) {
-        fprintf(log_handle, "Error: can't open %s\n", path);
-        return false;
-    }
-
-    while (fgets(line, sizeof(line), file)) {
-        if (istrstr(line, "on") != NULL) {
-            status = true;
-            break;
-        }
-    }
-
-    return status;
-}
-
-
 /* Get the settings for PRIME.
  *
  * This tells us whether the discrete card should be
- * on or off.
+ * on, off, or enabled on-demand.
  */
-static bool prime_is_action_on() {
-    return (check_on_off(prime_settings));
-}
-
-
 static void get_prime_action() {
     char line[100];
     _cleanup_fclose_ FILE *file = NULL;
@@ -920,37 +816,6 @@ static bool is_file(char *file) {
 }
 
 
-static bool is_dir(char *directory) {
-    struct stat stbuf;
-
-    if (stat(directory, &stbuf) == -1) {
-        fprintf(log_handle, "Error: can't access %s\n", directory);
-        return false;
-    }
-    if ((stbuf.st_mode & S_IFMT) == S_IFDIR)
-        return true;
-    return false;
-}
-
-
-static bool is_dir_empty(char *directory) {
-    int n = 0;
-    struct dirent *d;
-    DIR *dir = opendir(directory);
-    if (dir == NULL)
-        return true;
-    while ((d = readdir(dir)) != NULL) {
-        if(++n > 2)
-        break;
-    }
-    closedir(dir);
-    if (n <= 2)
-        return true;
-    else
-        return false;
-}
-
-
 static bool is_link(char *file) {
     struct stat stbuf;
 
@@ -1246,37 +1111,6 @@ static bool create_prime_settings(const char *prime_settings) {
     /* Set prime to "on" */
     fprintf(file, "on\n");
     fflush(file);
-
-    return true;
-}
-
-
-static bool get_nvidia_driver_version(int *major, int *minor) {
-
-    int status;
-    size_t len = 0;
-    _cleanup_free_ char *driver_version = NULL;
-    _cleanup_fclose_ FILE *file = NULL;
-
-    /* Check the driver version */
-    file = fopen(nvidia_driver_version_path, "r");
-    if (file == NULL) {
-        fprintf(log_handle, "can't open %s\n", nvidia_driver_version_path);
-        return false;
-    }
-    if (getline(&driver_version, &len, file) == -1) {
-        fprintf(log_handle, "can't get line from %s\n", nvidia_driver_version_path);
-        return false;
-    }
-
-    status = sscanf(driver_version, "%d.%d\n", major, minor);
-
-    /* Make sure that we match "desired_matches" */
-    if (status == EOF || status != 2) {
-        fprintf(log_handle, "Warning: couldn't get the driver version from %s\n",
-                nvidia_driver_version_path);
-        return false;
-    }
 
     return true;
 }
@@ -1910,11 +1744,6 @@ int main(int argc, char *argv[]) {
                 if (!dmi_product_name_path)
                     abort();
                 break;
-            case 'j':
-                nvidia_driver_version_path = strdup(optarg);
-                if (!nvidia_driver_version_path)
-                    abort();
-                break;
             case 'k':
                 modprobe_d_path = strdup(optarg);
                 if (!modprobe_d_path)
@@ -2017,16 +1846,6 @@ int main(int argc, char *argv[]) {
         dmi_product_version_path = strdup("/sys/class/dmi/id/product_version");
         if (!dmi_product_version_path) {
             fprintf(log_handle, "Couldn't allocate dmi_product_version_path\n");
-            goto end;
-        }
-    }
-
-    if (nvidia_driver_version_path)
-        fprintf(log_handle, "nvidia_driver_version_path file: %s\n", nvidia_driver_version_path);
-    else {
-        nvidia_driver_version_path = strdup("/sys/module/nvidia/version");
-        if (!nvidia_driver_version_path) {
-            fprintf(log_handle, "Couldn't allocate nvidia_driver_version_path\n");
             goto end;
         }
     }
@@ -2389,9 +2208,6 @@ end:
 
     if (dmi_product_version_path)
         free(dmi_product_version_path);
-
-    if (nvidia_driver_version_path)
-        free(nvidia_driver_version_path);
 
     if (modprobe_d_path)
         free(modprobe_d_path);
