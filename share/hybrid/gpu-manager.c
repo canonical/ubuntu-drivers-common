@@ -1031,7 +1031,7 @@ static bool is_connector_connected(const char *connector) {
 
 /* Count the number of outputs connected to the card */
 int count_connected_outputs(const char *device_name) {
-    char name[50];
+    char name[PATH_MAX];
     struct dirent *dp;
     DIR *dfd;
     int connected_outputs = 0;
@@ -1050,7 +1050,8 @@ int count_connected_outputs(const char *device_name) {
                     drm_dir, dp->d_name);
         else {
             /* Open the file for the connector */
-            sprintf(name, "%s/%s/status", drm_dir, dp->d_name);
+            snprintf(name, sizeof(name), "%s/%s/status", drm_dir, dp->d_name);
+            name[sizeof(name) - 1] = 0;
             if (is_connector_connected(name)) {
                 fprintf(log_handle, "output %d:\n", connected_outputs);
                 fprintf(log_handle, "\t%s\n", dp->d_name);
@@ -1070,7 +1071,7 @@ int count_connected_outputs(const char *device_name) {
 static int has_driver_connected_outputs(const char *driver) {
     DIR *dir;
     struct dirent* dir_entry;
-    char path[20];
+    char path[PATH_MAX];
     int fd = 1;
     drmVersionPtr version;
     int connected_outputs = 0;
@@ -1089,6 +1090,7 @@ static int has_driver_connected_outputs(const char *driver) {
             continue;
 
         snprintf(path, sizeof(path), "%s/%s", dri_dir, dir_entry->d_name);
+        path[sizeof(path) - 1] = 0;
         fd = open(path, O_RDWR);
         if (fd) {
             if ((version = drmGetVersion(fd))) {
