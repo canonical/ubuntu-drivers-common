@@ -1704,7 +1704,7 @@ static bool enable_prime(const char *prime_settings,
         create_offload_serverlayout();
         /* Remove the OutputClass */
         remove_prime_outputclass();
-        disable_power_management(device);
+        enable_power_management(device);
         if (!is_module_loaded("nvidia"))
             load_module("nvidia");
     }
