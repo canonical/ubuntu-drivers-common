@@ -56,7 +56,7 @@ class KernelDetection(object):
 
     def _get_linux_metapackage(self, headers):
         '''Get the linux headers or linux metapackage'''
-        suffix = headers and '-headers' or ''
+        suffix = '-headers' if headers else ''
         pattern = re.compile('linux-image-(.+)-([0-9]+)-(.+)')
         source_pattern = re.compile('linux-(.+)')
 
