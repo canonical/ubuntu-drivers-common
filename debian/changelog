@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.7.6) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 09 Sep 2019 11:39:51 +0200
+
 ubuntu-drivers-common (1:0.7.5) eoan; urgency=medium
 
   [ Philip Langdale ]
