@@ -525,44 +525,7 @@ static bool copy_file(const char *src_path, const char *dst_path)
 }
 
 
-/* Open a file and check if it contains "on"
- * or "off".
- *
- * Return false if the file doesn't exist or is empty.
- */
-static bool check_on_off(const char *path) {
-    bool status = false;
-    char line[100];
-    _cleanup_fclose_ FILE *file = NULL;
-
-    file = fopen(path, "r");
-
-    if (!file) {
-        fprintf(log_handle, "Error: can't open %s\n", path);
-        return false;
-    }
-
-    while (fgets(line, sizeof(line), file)) {
-        if (istrstr(line, "on") != NULL) {
-            status = true;
-            break;
-        }
-    }
-
-    return status;
-}
-
-
-/* Get the settings for PRIME.
- *
- * This tells us whether the discrete card should be
- * on or off.
- */
-static bool prime_is_action_on() {
-    return (check_on_off(prime_settings));
-}
-
-
+/* Get prime action, which can be "on", "off", or "on-demand" */
 static void get_prime_action() {
     char line[100];
     _cleanup_fclose_ FILE *file = NULL;
