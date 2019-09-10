@@ -317,6 +317,7 @@ class DetectTest(unittest.TestCase):
             archive.create_deb('nvidia-340',
                                dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+
             archive.create_deb('nvidia-headless-no-dkms-410',
                                dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
                                extra_tags={})
@@ -324,41 +325,91 @@ class DetectTest(unittest.TestCase):
                                dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
                                extra_tags={})
 
+            # Linux nvidia modules
             archive.create_deb('linux-modules-nvidia-410-generic',
-                               dependencies={'Depends': 'linux-modules-nvidia-410-5.2.0-10-generic'},
+                               dependencies={'Depends': 'linux-modules-nvidia-410-5.0.0-27-generic'},
                                extra_tags={})
 
-            archive.create_deb('linux-modules-nvidia-410-5.2.0-10-generic',
-                               dependencies={'Depends': 'linux-image-5.2.0-10-generic'},
+            archive.create_deb('linux-modules-nvidia-410-5.0.0-27-generic',
+                               dependencies={'Depends': 'linux-image-5.0.0-27-generic'},
                                extra_tags={})
 
-            archive.create_deb('linux-image-3.2.0-23-generic',
-                               extra_tags={'Source': 'linux'})
-            archive.create_deb('linux-image-5.2.0-10-generic',
-                               extra_tags={'Source': 'linux'})
-            archive.create_deb('linux-image-3.5.0-18-generic',
+            # Image packages
+            archive.create_deb('linux-image-4.15.0-20-generic',
+                               extra_tags={'Source': 'linux-signed'})
+            archive.create_deb('linux-image-5.0.0-27-generic',
+                               extra_tags={'Source': 'linux-signed-hwe'})
+            archive.create_deb('linux-image-5.0.0-20-generic',
                                extra_tags={'Source':
-                                           'linux-lts-quantal'})
-            archive.create_deb('linux-image-3.5.0-19-generic',
-                               extra_tags={'Source':
-                                           'linux-lts-quantal'})
+                                           'linux-signed-hwe-edge'})
+
+            # Image metapackages
             archive.create_deb('linux-image-generic',
+                               dependencies={'Depends': 'linux-image-4.15.0-20-generic'},
                                extra_tags={'Source':
                                            'linux-meta'})
-            archive.create_deb('linux-image-generic-lts-quantal',
+            archive.create_deb('linux-image-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-image-5.0.0-27-generic'},
+                               extra_tags={'Source': 'linux-meta-hwe'})
+            archive.create_deb('linux-image-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-image-5.0.0-20-generic'},
                                extra_tags={'Source':
-                                           'linux-meta-lts-quantal'})
+                                           'linux-meta-hwe-edge'})
+            # Header packages
+            archive.create_deb('linux-headers-4.15.0-20-generic',
+                               extra_tags={'Source': 'linux'})
+            archive.create_deb('linux-headers-5.0.0-27-generic',
+                               extra_tags={'Source': 'linux-signed-hwe'})
+            archive.create_deb('linux-headers-5.0.0-20-generic',
+                               extra_tags={'Source':
+                                           'linux-signed-hwe-edge'})
+
+            # Header metapackages
+            archive.create_deb('linux-headers-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-headers-5.0.0-27-generic'},
+                               extra_tags={'Source': 'linux-meta-hwe'})
+            archive.create_deb('linux-headers-generic',
+                               dependencies={'Depends': 'linux-headers-4.15.0-20-generic'},
+                               extra_tags={'Source': 'linux-signed'})
+            archive.create_deb('linux-headers-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-headers-5.0.0-20-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta-hwe-edge'})
+
+            # Full metas
+            archive.create_deb('linux-generic',
+                               dependencies={'Depends': 'linux-image-generic, linux-headers-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04, linux-headers-generic-hwe-18.04'},
+                               extra_tags={'Source':
+                                           'linux-meta-hwe'})
+            archive.create_deb('linux-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04-edge, linux-headers-generic-hwe-18.04-edge'},
+                               extra_tags={'Source':
+                                           'linux-meta-hwe-edge'})
+
 
             chroot.add_repository(archive.path, True, False)
             cache = apt.Cache(rootdir=chroot.path)
 
             # Install kernel packages
-            for pkg in ('linux-image-3.2.0-23-generic',
-                        'linux-image-5.2.0-10-generic',
-                        'linux-image-3.5.0-18-generic',
-                        'linux-image-3.5.0-19-generic',
+            for pkg in ('linux-image-4.15.0-20-generic',
+                        'linux-image-5.0.0-27-generic',
+                        'linux-image-5.0.0-20-generic',
+                        'linux-headers-4.15.0-20-generic',
+                        'linux-headers-5.0.0-27-generic',
+                        'linux-headers-5.0.0-20-generic',
+                        'linux-headers-generic-hwe-18.04',
+                        'linux-headers-generic',
+                        'linux-headers-generic-hwe-18.04-edge',
+                        'linux-image-generic-hwe-18.04',
                         'linux-image-generic',
-                        'linux-image-generic-lts-quantal'):
+                        'linux-image-generic-hwe-18.04-edge',
+                        'linux-generic-hwe-18.04',
+                        'linux-generic',
+                        'linux-generic-hwe-18.04-edge'):
                 cache[pkg].mark_install()
 
             res = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path=self.umockdev.get_sys_dir())
@@ -372,7 +423,7 @@ class DetectTest(unittest.TestCase):
         self.assertEqual(set(packages), set(['nvidia-driver-410']))
         driver = list(packages.keys())[0]
         self.assertEqual(packages[driver].get('metapackage'), 'nvidia-headless-no-dkms-410')
-        self.assertEqual(linux_package, 'linux-generic')
+        self.assertEqual(linux_package, 'linux-generic-hwe-18.04')
         self.assertEqual(modules_package, 'linux-modules-nvidia-410-generic')
 
     def test_system_driver_packages_bad_encoding(self):
@@ -713,12 +764,47 @@ def detect(apt):
             archive.create_deb('linux-image-3.5.0-19-generic',
                                extra_tags={'Source':
                                            'linux-lts-quantal'})
+
+            archive.create_deb('linux-headers-3.2.0-23-generic',
+                               extra_tags={'Source': 'linux'})
+            archive.create_deb('linux-headers-3.2.0-33-generic',
+                               extra_tags={'Source': 'linux'})
+            archive.create_deb('linux-headers-3.5.0-18-generic',
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
+            archive.create_deb('linux-headers-3.5.0-19-generic',
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
+
             archive.create_deb('linux-image-generic',
+                               dependencies={'Depends': 'linux-image-3.2.0-33-generic'},
                                extra_tags={'Source':
                                            'linux-meta'})
             archive.create_deb('linux-image-generic-lts-quantal',
+                               dependencies={'Depends': 'linux-image-3.5.0-19-generic'},
                                extra_tags={'Source':
                                            'linux-meta-lts-quantal'})
+
+            archive.create_deb('linux-headers-generic',
+                               dependencies={'Depends': 'linux-headers-3.2.0-33-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-headers-generic-lts-quantal',
+                               dependencies={'Depends': 'linux-headers-3.5.0-19-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta-lts-quantal'})
+
+            archive.create_deb('linux-generic',
+                               dependencies={'Depends': 'linux-image-generic, linux-headers-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-generic-lts-quantal',
+                               dependencies={'Depends': 'linux-image-generic-lts-quantal, linux-headers-generic-lts-quantal'},
+                               extra_tags={'Source':
+                                           'linux-meta-lts-quantal'})
+
+
+
             chroot.add_repository(archive.path, True, False)
 
             cache = apt.Cache(rootdir=chroot.path)
@@ -731,8 +817,16 @@ def detect(apt):
                         'linux-image-3.2.0-33-generic',
                         'linux-image-3.5.0-18-generic',
                         'linux-image-3.5.0-19-generic',
+                        'linux-headers-3.2.0-23-generic',
+                        'linux-headers-3.2.0-33-generic',
+                        'linux-headers-3.5.0-18-generic',
+                        'linux-headers-3.5.0-19-generic',
                         'linux-image-generic',
-                        'linux-image-generic-lts-quantal'):
+                        'linux-image-generic-lts-quantal',
+                        'linux-headers-generic',
+                        'linux-headers-generic-lts-quantal',
+                        'linux-generic',
+                        'linux-generic-lts-quantal'):
                 cache[pkg].mark_install()
 
             linux_headers = UbuntuDrivers.detect.get_linux_headers(cache)
@@ -757,12 +851,45 @@ def detect(apt):
             archive.create_deb('linux-image-3.5.0-19-generic',
                                extra_tags={'Source':
                                            'linux-lts-quantal'})
+
+            archive.create_deb('linux-headers-3.2.0-23-generic',
+                               extra_tags={'Source': 'linux'})
+            archive.create_deb('linux-headers-3.2.0-33-generic',
+                               extra_tags={'Source': 'linux'})
+            archive.create_deb('linux-headers-3.5.0-18-generic',
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
+            archive.create_deb('linux-headers-3.5.0-19-generic',
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
+
             archive.create_deb('linux-image-generic',
+                               dependencies={'Depends': 'linux-image-3.2.0-33-generic'},
                                extra_tags={'Source':
                                            'linux-meta'})
             archive.create_deb('linux-image-generic-lts-quantal',
+                               dependencies={'Depends': 'linux-image-3.5.0-19-generic'},
                                extra_tags={'Source':
                                            'linux-meta-lts-quantal'})
+
+            archive.create_deb('linux-headers-generic',
+                               dependencies={'Depends': 'linux-headers-3.2.0-33-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-headers-generic-lts-quantal',
+                               dependencies={'Depends': 'linux-headers-3.5.0-19-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta-lts-quantal'})
+
+            archive.create_deb('linux-generic',
+                               dependencies={'Depends': 'linux-image-generic, linux-headers-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-generic-lts-quantal',
+                               dependencies={'Depends': 'linux-image-generic-lts-quantal, linux-headers-generic-lts-quantal'},
+                               extra_tags={'Source':
+                                           'linux-meta-lts-quantal'})
+
             chroot.add_repository(archive.path, True, False)
 
             cache = apt.Cache(rootdir=chroot.path)
@@ -775,8 +902,16 @@ def detect(apt):
                         'linux-image-3.2.0-33-generic',
                         'linux-image-3.5.0-18-generic',
                         'linux-image-3.5.0-19-generic',
+                        'linux-headers-3.2.0-23-generic',
+                        'linux-headers-3.2.0-33-generic',
+                        'linux-headers-3.5.0-18-generic',
+                        'linux-headers-3.5.0-19-generic',
                         'linux-image-generic',
-                        'linux-image-generic-lts-quantal'):
+                        'linux-image-generic-lts-quantal',
+                        'linux-headers-generic',
+                        'linux-headers-generic-lts-quantal',
+                        'linux-generic',
+                        'linux-generic-lts-quantal'):
                 cache[pkg].mark_install()
 
             linux = UbuntuDrivers.detect.get_linux(cache)
@@ -1024,112 +1159,92 @@ class KernelDectionTest(unittest.TestCase):
             chroot.setup()
             chroot.add_test_repository()
             archive = gen_fakearchive()
-            archive.create_deb('linux-image-3.2.0-23-generic',
-                               extra_tags={'Source': 'linux'})
-            archive.create_deb('linux-image-3.2.0-33-generic',
-                               extra_tags={'Source': 'linux'})
-            archive.create_deb('linux-image-3.5.0-18-generic',
+
+            # Image packages
+            archive.create_deb('linux-image-4.15.0-20-generic',
+                               extra_tags={'Source': 'linux-signed'})
+            archive.create_deb('linux-image-5.0.0-27-generic',
+                               extra_tags={'Source': 'linux-signed-hwe'})
+            archive.create_deb('linux-image-5.0.0-20-generic',
                                extra_tags={'Source':
-                                           'linux-lts-quantal'})
-            archive.create_deb('linux-image-3.5.0-19-generic',
-                               extra_tags={'Source':
-                                           'linux-lts-quantal'})
+                                           'linux-signed-hwe-edge'})
+
+            # Image metapackages
             archive.create_deb('linux-image-generic',
+                               dependencies={'Depends': 'linux-image-4.15.0-20-generic'},
                                extra_tags={'Source':
                                            'linux-meta'})
-            archive.create_deb('linux-image-generic-lts-quantal',
+            archive.create_deb('linux-image-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-image-5.0.0-27-generic'},
+                               extra_tags={'Source': 'linux-meta-hwe'})
+            archive.create_deb('linux-image-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-image-5.0.0-20-generic'},
                                extra_tags={'Source':
-                                           'linux-meta-lts-quantal'})
+                                           'linux-meta-hwe-edge'})
+            # Header packages
+            archive.create_deb('linux-headers-4.15.0-20-generic',
+                               extra_tags={'Source': 'linux'})
+            archive.create_deb('linux-headers-5.0.0-27-generic',
+                               extra_tags={'Source': 'linux-signed-hwe'})
+            archive.create_deb('linux-headers-5.0.0-20-generic',
+                               extra_tags={'Source':
+                                           'linux-signed-hwe-edge'})
+
+            # Header metapackages
+            archive.create_deb('linux-headers-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-headers-5.0.0-27-generic'},
+                               extra_tags={'Source': 'linux-meta-hwe'})
+            archive.create_deb('linux-headers-generic',
+                               dependencies={'Depends': 'linux-headers-4.15.0-20-generic'},
+                               extra_tags={'Source': 'linux-signed'})
+            archive.create_deb('linux-headers-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-headers-5.0.0-20-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta-hwe-edge'})
+
+            # Full metas
+            archive.create_deb('linux-generic',
+                               dependencies={'Depends': 'linux-image-generic, linux-headers-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04, linux-headers-generic-hwe-18.04'},
+                               extra_tags={'Source':
+                                           'linux-meta-hwe'})
+            archive.create_deb('linux-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04-edge, linux-headers-generic-hwe-18.04-edge'},
+                               extra_tags={'Source':
+                                           'linux-meta-hwe-edge'})
+
             chroot.add_repository(archive.path, True, False)
 
             cache = apt.Cache(rootdir=chroot.path)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
-            linux_headers = kernel_detection.get_linux_headers_metapackage()
-            self.assertEqual(linux_headers, '')
+            linux = kernel_detection.get_linux_headers_metapackage()
+            self.assertEqual(linux, '')
 
             # Install kernel packages
-            for pkg in ('linux-image-3.2.0-23-generic',
-                        'linux-image-3.2.0-33-generic',
-                        'linux-image-3.5.0-18-generic',
-                        'linux-image-3.5.0-19-generic',
+            for pkg in ('linux-image-4.15.0-20-generic',
+                        'linux-image-5.0.0-27-generic',
+                        'linux-image-5.0.0-20-generic',
+                        'linux-headers-4.15.0-20-generic',
+                        'linux-headers-5.0.0-27-generic',
+                        'linux-headers-5.0.0-20-generic',
+                        'linux-headers-generic-hwe-18.04',
+                        'linux-headers-generic',
+                        'linux-headers-generic-hwe-18.04-edge',
+                        'linux-image-generic-hwe-18.04',
                         'linux-image-generic',
-                        'linux-image-generic-lts-quantal'):
+                        'linux-image-generic-hwe-18.04-edge',
+                        'linux-generic-hwe-18.04',
+                        'linux-generic',
+                        'linux-generic-hwe-18.04-edge'):
                 cache[pkg].mark_install()
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
-            linux_headers = kernel_detection.get_linux_headers_metapackage()
-            self.assertEqual(linux_headers, 'linux-headers-generic-lts-quantal')
-        finally:
-            chroot.remove()
-
-    def test_linux_headers_detection_names_chroot1(self):
-        chroot = aptdaemon.test.Chroot()
-        try:
-            chroot.setup()
-            chroot.add_test_repository()
-            archive = gen_fakearchive()
-            archive.create_deb('linux-image-nexus7',
-                               extra_tags={'Source': 'linux-meta-nexus7'})
-            archive.create_deb('linux-image-3.1.10-9-nexus7',
-                               extra_tags={'Source': 'linux-nexus7'})
-            archive.create_deb('linux-image-omap4',
-                               extra_tags={'Source':
-                                           'linux-meta-ti-omap4'})
-            archive.create_deb('linux-image-3.2.0-1419-omap4',
-                               extra_tags={'Source':
-                                           'linux-ti-omap4'})
-            archive.create_deb('linux-image-3.5.0-17-highbank',
-                               extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-highbank',
-                               extra_tags={'Source':
-                                           'linux-meta-highbank'})
-            archive.create_deb('linux-image-powerpc-smp',
-                               extra_tags={'Source':
-                                           'linux-meta-powerpc-smp'})
-            archive.create_deb('linux-image-3.5.0-18-powerpc-smp',
-                               extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-powerpc64-smp',
-                               extra_tags={'Source':
-                                           'linux-meta-powerpc64-smp'})
-            archive.create_deb('linux-image-3.5.0-17-powerpc64-smp',
-                               extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-ac100',
-                               extra_tags={'Source':
-                                           'linux-meta-ac100'})
-            archive.create_deb('linux-image-3.0.27-1-ac100',
-                               extra_tags={'Source':
-                                           'linux-ac100'})
-
-            chroot.add_repository(archive.path, True, False)
-
-            cache = apt.Cache(rootdir=chroot.path)
-
-            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
-            linux_headers = kernel_detection.get_linux_headers_metapackage()
-            self.assertEqual(linux_headers, '')
-
-            # Install kernel packages
-            for pkg in ('linux-image-nexus7',
-                        'linux-image-3.1.10-9-nexus7',
-                        'linux-image-omap4',
-                        'linux-image-3.2.0-1419-omap4',
-                        'linux-image-highbank',
-                        'linux-image-3.5.0-17-highbank',
-                        'linux-image-powerpc-smp',
-                        'linux-image-3.5.0-18-powerpc-smp',
-                        'linux-image-powerpc64-smp',
-                        'linux-image-3.5.0-17-powerpc64-smp',
-                        'linux-image-ac100',
-                        'linux-image-3.0.27-1-ac100'):
-                cache[pkg].mark_install()
-
-            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
-            linux_headers = kernel_detection.get_linux_headers_metapackage()
-            self.assertEqual(linux_headers, 'linux-headers-powerpc-smp')
+            linux = kernel_detection.get_linux_headers_metapackage()
+            self.assertEqual(linux, 'linux-headers-generic-hwe-18.04')
         finally:
             chroot.remove()
 
@@ -1139,149 +1254,51 @@ class KernelDectionTest(unittest.TestCase):
             chroot.setup()
             chroot.add_test_repository()
             archive = gen_fakearchive()
-            archive.create_deb('linux-image-nexus7',
-                               extra_tags={'Source': 'linux-meta-nexus7'})
-            archive.create_deb('linux-image-3.1.10-9-nexus7',
-                               extra_tags={'Source': 'linux-nexus7'})
-            archive.create_deb('linux-image-omap4',
-                               extra_tags={'Source':
-                                           'linux-meta-ti-omap4'})
-            archive.create_deb('linux-image-3.2.0-1419-omap4',
-                               extra_tags={'Source':
-                                           'linux-ti-omap4'})
-            archive.create_deb('linux-image-3.5.0-17-highbank',
-                               extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-highbank',
-                               extra_tags={'Source':
-                                           'linux-meta-highbank'})
             archive.create_deb('linux-image-powerpc-smp',
-                               extra_tags={'Source':
-                                           'linux-meta-powerpc-smp'})
-            archive.create_deb('linux-image-3.5.0-18-powerpc-smp',
-                               extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-powerpc64-smp',
-                               extra_tags={'Source':
-                                           'linux-meta-powerpc64-smp'})
-            archive.create_deb('linux-image-3.5.0-19-powerpc64-smp',
-                               extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-ac100',
-                               extra_tags={'Source':
-                                           'linux-meta-ac100'})
-            archive.create_deb('linux-image-3.0.27-1-ac100',
-                               extra_tags={'Source':
-                                           'linux-ac100'})
-
-            chroot.add_repository(archive.path, True, False)
-
-            cache = apt.Cache(rootdir=chroot.path)
-
-            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
-            linux_headers = kernel_detection.get_linux_headers_metapackage()
-            self.assertEqual(linux_headers, '')
-
-            # Install kernel packages
-            for pkg in ('linux-image-nexus7',
-                        'linux-image-3.1.10-9-nexus7',
-                        'linux-image-omap4',
-                        'linux-image-3.2.0-1419-omap4',
-                        'linux-image-highbank',
-                        'linux-image-3.5.0-17-highbank',
-                        'linux-image-powerpc-smp',
-                        'linux-image-3.5.0-18-powerpc-smp',
-                        'linux-image-powerpc64-smp',
-                        'linux-image-3.5.0-19-powerpc64-smp',
-                        'linux-image-ac100',
-                        'linux-image-3.0.27-1-ac100'):
-                cache[pkg].mark_install()
-
-            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
-            linux_headers = kernel_detection.get_linux_headers_metapackage()
-            self.assertEqual(linux_headers, 'linux-headers-powerpc64-smp')
-        finally:
-            chroot.remove()
-
-    def test_linux_headers_detection_names_chroot3(self):
-        chroot = aptdaemon.test.Chroot()
-        try:
-            chroot.setup()
-            chroot.add_test_repository()
-            archive = gen_fakearchive()
-            archive.create_deb('linux-image-nexus7',
-                               extra_tags={'Source': 'linux-meta-nexus7'})
-            archive.create_deb('linux-image-3.1.10-9-nexus7',
-                               extra_tags={'Source': 'linux-nexus7'})
-            archive.create_deb('linux-image-omap4',
-                               extra_tags={'Source':
-                                           'linux-meta-ti-omap4'})
-            archive.create_deb('linux-image-3.8.0-1419-omap4',
-                               extra_tags={'Source':
-                                           'linux-ti-omap4'})
-            archive.create_deb('linux-image-3.5.0-17-highbank',
-                               extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-highbank',
-                               extra_tags={'Source':
-                                           'linux-meta-highbank'})
-            archive.create_deb('linux-image-powerpc-smp',
-                               extra_tags={'Source':
-                                           'linux-meta-powerpc-smp'})
-            archive.create_deb('linux-image-3.5.0-18-powerpc-smp',
-                               extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-powerpc64-smp',
-                               extra_tags={'Source':
-                                           'linux-meta-powerpc64-smp'})
-            archive.create_deb('linux-image-3.5.0-19-powerpc64-smp',
-                               extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-ac100',
-                               extra_tags={'Source':
-                                           'linux-meta-ac100'})
-            archive.create_deb('linux-image-3.0.27-1-ac100',
-                               extra_tags={'Source':
-                                           'linux-ac100'})
-
-            chroot.add_repository(archive.path, True, False)
-
-            cache = apt.Cache(rootdir=chroot.path)
-
-            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
-            linux_headers = kernel_detection.get_linux_headers_metapackage()
-            self.assertEqual(linux_headers, '')
-
-            # Install kernel packages
-            for pkg in ('linux-image-nexus7',
-                        'linux-image-3.1.10-9-nexus7',
-                        'linux-image-omap4',
-                        'linux-image-3.8.0-1419-omap4',
-                        'linux-image-highbank',
-                        'linux-image-3.5.0-17-highbank',
-                        'linux-image-powerpc-smp',
-                        'linux-image-3.5.0-18-powerpc-smp',
-                        'linux-image-powerpc64-smp',
-                        'linux-image-3.5.0-19-powerpc64-smp',
-                        'linux-image-ac100',
-                        'linux-image-3.0.27-1-ac100'):
-                cache[pkg].mark_install()
-
-            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
-            linux_headers = kernel_detection.get_linux_headers_metapackage()
-            self.assertEqual(linux_headers, 'linux-headers-omap4')
-        finally:
-            chroot.remove()
-
-    def test_linux_headers_detection_names_chroot4(self):
-        chroot = aptdaemon.test.Chroot()
-        try:
-            chroot.setup()
-            chroot.add_test_repository()
-            archive = gen_fakearchive()
-            archive.create_deb('linux-image-powerpc-smp',
+                               dependencies={'Depends': 'linux-image-3.8.0-1-powerpc-smp'},
                                extra_tags={'Source':
                                            'linux-ppc'})
+            
+            archive.create_deb('linux-image-powerpc-e500',
+                               dependencies={'Depends': 'linux-image-3.8.0-3-powerpc-e500'},
+                               extra_tags={'Source':
+                                           'linux-ppc'})
+
+            archive.create_deb('linux-image-powerpc64-smp',
+                               dependencies={'Depends': 'linux-image-3.8.0-2-powerpc64-smp'},
+                               extra_tags={'Source':
+                                           'linux-ppc'})
+
+            archive.create_deb('linux-headers-powerpc-smp',
+                               dependencies={'Depends': 'linux-headers-3.8.0-1-powerpc-smp'},
+                               extra_tags={'Source':
+                                           'linux-ppc'})
+            
+            archive.create_deb('linux-headers-powerpc-e500',
+                               dependencies={'Depends': 'linux-headers-3.8.0-3-powerpc-e500'},
+                               extra_tags={'Source':
+                                           'linux-ppc'})
+
+            archive.create_deb('linux-headers-powerpc64-smp',
+                               dependencies={'Depends': 'linux-headers-3.8.0-2-powerpc64-smp'},
+                               extra_tags={'Source':
+                                           'linux-ppc'})
+
+            archive.create_deb('linux-powerpc-smp',
+                               dependencies={'Depends': 'linux-headers-3.8.0-1-powerpc-smp, linux-image-3.8.0-1-powerpc-smp'},
+                               extra_tags={'Source':
+                                           'linux-ppc'})
+            
+            archive.create_deb('linux-powerpc-e500',
+                               dependencies={'Depends': 'linux-headers-3.8.0-3-powerpc-e500, linux-image-3.8.0-3-powerpc-e500'},
+                               extra_tags={'Source':
+                                           'linux-ppc'})
+
+            archive.create_deb('linux-powerpc64-smp',
+                               dependencies={'Depends': 'linux-headers-3.8.0-2-powerpc64-smp, linux-image-3.8.0-2-powerpc64-smp'},
+                               extra_tags={'Source':
+                                           'linux-ppc'})
+
             archive.create_deb('linux-image-3.8.0-3-powerpc-e500',
                                extra_tags={'Source':
                                            'linux-ppc'})
@@ -1294,9 +1311,19 @@ class KernelDectionTest(unittest.TestCase):
             archive.create_deb('linux-image-3.8.0-2-powerpc64-smp',
                                extra_tags={'Source':
                                            'linux-ppc'})
-            archive.create_deb('linux-image-3.0.27-1-ac100',
+
+            archive.create_deb('linux-headers-3.8.0-3-powerpc-e500',
                                extra_tags={'Source':
-                                           'linux-ac100'})
+                                           'linux-ppc'})
+            archive.create_deb('linux-headers-3.8.0-1-powerpc-smp',
+                               extra_tags={'Source':
+                                           'linux-ppc'})
+            archive.create_deb('linux-headers-3.5.0-19-powerpc64-smp',
+                               extra_tags={'Source':
+                                           'linux-ppc'})
+            archive.create_deb('linux-headers-3.8.0-2-powerpc64-smp',
+                               extra_tags={'Source':
+                                           'linux-ppc'})
 
             chroot.add_repository(archive.path, True, False)
 
@@ -1308,11 +1335,22 @@ class KernelDectionTest(unittest.TestCase):
 
             # Install kernel packages
             for pkg in ('linux-image-powerpc-smp',
+                        'linux-headers-powerpc-smp',
+                        'linux-powerpc-smp',
+                        'linux-image-powerpc-e500',
+                        'linux-headers-powerpc-e500',
+                        'linux-powerpc-e500',
+                        'linux-image-powerpc64-smp',
+                        'linux-headers-powerpc64-smp',
+                        'linux-powerpc64-smp',
                         'linux-image-3.8.0-3-powerpc-e500',
                         'linux-image-3.8.0-1-powerpc-smp',
                         'linux-image-3.5.0-19-powerpc64-smp',
                         'linux-image-3.8.0-2-powerpc64-smp',
-                        'linux-image-3.0.27-1-ac100'):
+                        'linux-headers-3.8.0-3-powerpc-e500',
+                        'linux-headers-3.8.0-1-powerpc-smp',
+                        'linux-headers-3.5.0-19-powerpc64-smp',
+                        'linux-headers-3.8.0-2-powerpc64-smp'):
                 cache[pkg].mark_install()
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
@@ -1321,28 +1359,72 @@ class KernelDectionTest(unittest.TestCase):
         finally:
             chroot.remove()
 
-    def test_linux_headers_detection_names_chroot5(self):
+    def test_linux_headers_detection_names_chroot3(self):
         chroot = aptdaemon.test.Chroot()
+        to_install = []
         try:
             chroot.setup()
             chroot.add_test_repository()
             archive = gen_fakearchive()
-            archive.create_deb('linux-image-3.2.0-36-lowlatency-pae',
+
+            archive.create_deb('linux-image-3.5.0-19-lowlatency',
                                extra_tags={'Source': 'linux-lowlatency'})
-            archive.create_deb('linux-image-3.8.0-0-lowlatency',
-                               extra_tags={'Source': 'linux-lowlatency'})
-            archive.create_deb('linux-image-3.5.0-18-generic',
-                               extra_tags={'Source':
-                                           'linux-lts-quantal'})
             archive.create_deb('linux-image-3.5.0-19-generic',
                                extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-image-3.8.0-0-generic',
+                               extra_tags={'Source':
                                            'linux-lts-quantal'})
-            archive.create_deb('linux-image-generic',
+
+
+            archive.create_deb('linux-headers-3.5.0-19-lowlatency',
+                               extra_tags={'Source': 'linux-lowlatency'})
+            archive.create_deb('linux-headers-3.5.0-19-generic',
                                extra_tags={'Source':
                                            'linux-meta'})
-            archive.create_deb('linux-image-generic-lts-quantal',
+            archive.create_deb('linux-headers-3.8.0-0-generic',
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
+
+            archive.create_deb('linux-headers-generic',
+                               dependencies={'Depends': 'linux-headers-3.5.0-19-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-image-generic',
+                               dependencies={'Depends': 'linux-image-3.5.0-19-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-generic',
+                               dependencies={'Depends': 'linux-image-generic, linux-headers-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+
+            archive.create_deb('linux-headers-lowlatency',
+                               dependencies={'Depends': 'linux-headers-3.5.0-19-lowlatency'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-image-lowlatency',
+                               dependencies={'Depends': 'linux-image-3.5.0-19-lowlatency'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-lowlatency',
+                               dependencies={'Depends': 'linux-image-lowlatency, linux-headers-lowlatency'},
+                               extra_tags={'Source':
+                                           'linux-lowlatency'})
+
+            archive.create_deb('linux-headers-generic-lts-quantal',
+                               dependencies={'Depends': 'linux-headers-3.8.0-0-generic'},
                                extra_tags={'Source':
                                            'linux-meta-lts-quantal'})
+            archive.create_deb('linux-image-generic-lts-quantal',
+                               dependencies={'Depends': 'linux-image-3.8.0-0-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta-lts-quantal'})
+            archive.create_deb('linux-generic-lts-quantal',
+                               dependencies={'Depends': 'linux-image-generic-lts-quantal, linux-headers-generic-lts-quantal'},
+                               extra_tags={'Source':
+                                           'linux-meta-lts-quantal'})
+
             chroot.add_repository(archive.path, True, False)
 
             cache = apt.Cache(rootdir=chroot.path)
@@ -1352,17 +1434,26 @@ class KernelDectionTest(unittest.TestCase):
             self.assertEqual(linux_headers, '')
 
             # Install kernel packages
-            for pkg in ('linux-image-3.2.0-36-lowlatency-pae',
-                        'linux-image-3.8.0-0-lowlatency',
-                        'linux-image-3.5.0-18-generic',
+            for pkg in ('linux-image-3.5.0-19-lowlatency',
                         'linux-image-3.5.0-19-generic',
+                        'linux-image-3.8.0-0-generic',
+                        'linux-headers-3.5.0-19-lowlatency',
+                        'linux-headers-3.5.0-19-generic',
+                        'linux-headers-3.8.0-0-generic',
+                        'linux-image-lowlatency',
                         'linux-image-generic',
-                        'linux-image-generic-lts-quantal'):
+                        'linux-image-generic-lts-quantal',
+                        'linux-headers-lowlatency',
+                        'linux-headers-generic',
+                        'linux-headers-generic-lts-quantal',
+                        'linux-lowlatency',
+                        'linux-generic',
+                        'linux-generic-lts-quantal'):
                 cache[pkg].mark_install()
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux_headers = kernel_detection.get_linux_headers_metapackage()
-            self.assertEqual(linux_headers, 'linux-headers-lowlatency')
+            self.assertEqual(linux_headers, 'linux-headers-generic-lts-quantal')
         finally:
             chroot.remove()
 
@@ -1373,22 +1464,63 @@ class KernelDectionTest(unittest.TestCase):
             chroot.setup()
             chroot.add_test_repository()
             archive = gen_fakearchive()
-            archive.create_deb('linux-image-3.2.0-23-generic',
-                               extra_tags={'Source': 'linux'})
-            archive.create_deb('linux-image-3.2.0-33-generic',
-                               extra_tags={'Source': 'linux'})
-            archive.create_deb('linux-image-3.5.0-18-generic',
+
+            # Image packages
+            archive.create_deb('linux-image-4.15.0-20-generic',
+                               extra_tags={'Source': 'linux-signed'})
+            archive.create_deb('linux-image-5.0.0-27-generic',
+                               extra_tags={'Source': 'linux-signed-hwe'})
+            archive.create_deb('linux-image-5.0.0-20-generic',
                                extra_tags={'Source':
-                                           'linux-lts-quantal'})
-            archive.create_deb('linux-image-3.5.0-19-generic',
-                               extra_tags={'Source':
-                                           'linux-lts-quantal'})
+                                           'linux-signed-hwe-edge'})
+
+            # Image metapackages
             archive.create_deb('linux-image-generic',
+                               dependencies={'Depends': 'linux-image-4.15.0-20-generic'},
                                extra_tags={'Source':
                                            'linux-meta'})
-            archive.create_deb('linux-image-generic-lts-quantal',
+            archive.create_deb('linux-image-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-image-5.0.0-27-generic'},
+                               extra_tags={'Source': 'linux-meta-hwe'})
+            archive.create_deb('linux-image-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-image-5.0.0-20-generic'},
                                extra_tags={'Source':
-                                           'linux-meta-lts-quantal'})
+                                           'linux-meta-hwe-edge'})
+            # Header packages
+            archive.create_deb('linux-headers-4.15.0-20-generic',
+                               extra_tags={'Source': 'linux'})
+            archive.create_deb('linux-headers-5.0.0-27-generic',
+                               extra_tags={'Source': 'linux-signed-hwe'})
+            archive.create_deb('linux-headers-5.0.0-20-generic',
+                               extra_tags={'Source':
+                                           'linux-signed-hwe-edge'})
+
+            # Header metapackages
+            archive.create_deb('linux-headers-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-headers-5.0.0-27-generic'},
+                               extra_tags={'Source': 'linux-meta-hwe'})
+            archive.create_deb('linux-headers-generic',
+                               dependencies={'Depends': 'linux-headers-4.15.0-20-generic'},
+                               extra_tags={'Source': 'linux-signed'})
+            archive.create_deb('linux-headers-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-headers-5.0.0-20-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta-hwe-edge'})
+
+            # Full metas
+            archive.create_deb('linux-generic',
+                               dependencies={'Depends': 'linux-image-generic, linux-headers-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04, linux-headers-generic-hwe-18.04'},
+                               extra_tags={'Source':
+                                           'linux-meta-hwe'})
+            archive.create_deb('linux-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04-edge, linux-headers-generic-hwe-18.04-edge'},
+                               extra_tags={'Source':
+                                           'linux-meta-hwe-edge'})
+
             chroot.add_repository(archive.path, True, False)
 
             cache = apt.Cache(rootdir=chroot.path)
@@ -1398,89 +1530,29 @@ class KernelDectionTest(unittest.TestCase):
             self.assertEqual(linux, '')
 
             # Install kernel packages
-            for pkg in ('linux-image-3.2.0-23-generic',
-                        'linux-image-3.2.0-33-generic',
-                        'linux-image-3.5.0-18-generic',
-                        'linux-image-3.5.0-19-generic',
+            for pkg in ('linux-image-4.15.0-20-generic',
+                        'linux-image-5.0.0-27-generic',
+                        'linux-image-5.0.0-20-generic',
+                        'linux-headers-4.15.0-20-generic',
+                        'linux-headers-5.0.0-27-generic',
+                        'linux-headers-5.0.0-20-generic',
+                        'linux-headers-generic-hwe-18.04',
+                        'linux-headers-generic',
+                        'linux-headers-generic-hwe-18.04-edge',
+                        'linux-image-generic-hwe-18.04',
                         'linux-image-generic',
-                        'linux-image-generic-lts-quantal'):
+                        'linux-image-generic-hwe-18.04-edge',
+                        'linux-generic-hwe-18.04',
+                        'linux-generic',
+                        'linux-generic-hwe-18.04-edge'):
                 cache[pkg].mark_install()
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_metapackage()
-            self.assertEqual(linux, 'linux-generic-lts-quantal')
+            self.assertEqual(linux, 'linux-generic-hwe-18.04')
         finally:
             chroot.remove()
 
-    def test_linux_detection_names_chroot1(self):
-        chroot = aptdaemon.test.Chroot()
-        try:
-            chroot.setup()
-            chroot.add_test_repository()
-            archive = gen_fakearchive()
-            archive.create_deb('linux-image-nexus7',
-                               extra_tags={'Source': 'linux-meta-nexus7'})
-            archive.create_deb('linux-image-3.1.10-9-nexus7',
-                               extra_tags={'Source': 'linux-nexus7'})
-            archive.create_deb('linux-image-omap4',
-                               extra_tags={'Source':
-                                           'linux-meta-ti-omap4'})
-            archive.create_deb('linux-image-3.2.0-1419-omap4',
-                               extra_tags={'Source':
-                                           'linux-ti-omap4'})
-            archive.create_deb('linux-image-3.5.0-17-highbank',
-                               extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-highbank',
-                               extra_tags={'Source':
-                                           'linux-meta-highbank'})
-            archive.create_deb('linux-image-powerpc-smp',
-                               extra_tags={'Source':
-                                           'linux-meta-powerpc-smp'})
-            archive.create_deb('linux-image-3.5.0-18-powerpc-smp',
-                               extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-powerpc64-smp',
-                               extra_tags={'Source':
-                                           'linux-meta-powerpc64-smp'})
-            archive.create_deb('linux-image-3.5.0-17-powerpc64-smp',
-                               extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-ac100',
-                               extra_tags={'Source':
-                                           'linux-meta-ac100'})
-            archive.create_deb('linux-image-3.0.27-1-ac100',
-                               extra_tags={'Source':
-                                           'linux-ac100'})
-
-            chroot.add_repository(archive.path, True, False)
-
-            cache = apt.Cache(rootdir=chroot.path)
-
-            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
-            linux = kernel_detection.get_linux_metapackage()
-            self.assertEqual(linux, '')
-
-            # Install kernel packages
-            for pkg in ('linux-image-nexus7',
-                        'linux-image-3.1.10-9-nexus7',
-                        'linux-image-omap4',
-                        'linux-image-3.2.0-1419-omap4',
-                        'linux-image-highbank',
-                        'linux-image-3.5.0-17-highbank',
-                        'linux-image-powerpc-smp',
-                        'linux-image-3.5.0-18-powerpc-smp',
-                        'linux-image-powerpc64-smp',
-                        'linux-image-3.5.0-17-powerpc64-smp',
-                        'linux-image-ac100',
-                        'linux-image-3.0.27-1-ac100'):
-                cache[pkg].mark_install()
-
-            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
-            linux = kernel_detection.get_linux_metapackage()
-            self.assertEqual(linux, 'linux-powerpc-smp')
-        finally:
-            chroot.remove()
 
     def test_linux_detection_names_chroot2(self):
         chroot = aptdaemon.test.Chroot()
@@ -1488,147 +1560,15 @@ class KernelDectionTest(unittest.TestCase):
             chroot.setup()
             chroot.add_test_repository()
             archive = gen_fakearchive()
-            archive.create_deb('linux-image-nexus7',
-                               extra_tags={'Source': 'linux-meta-nexus7'})
-            archive.create_deb('linux-image-3.1.10-9-nexus7',
-                               extra_tags={'Source': 'linux-nexus7'})
-            archive.create_deb('linux-image-omap4',
-                               extra_tags={'Source':
-                                           'linux-meta-ti-omap4'})
-            archive.create_deb('linux-image-3.2.0-1419-omap4',
-                               extra_tags={'Source':
-                                           'linux-ti-omap4'})
-            archive.create_deb('linux-image-3.5.0-17-highbank',
-                               extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-highbank',
-                               extra_tags={'Source':
-                                           'linux-meta-highbank'})
             archive.create_deb('linux-image-powerpc-smp',
                                extra_tags={'Source':
-                                           'linux-meta-powerpc-smp'})
-            archive.create_deb('linux-image-3.5.0-18-powerpc-smp',
+                                           'linux-ppc'})
+            archive.create_deb('linux-image-powerpc-e500',
+                               dependencies={'Depends': 'linux-image-3.8.0-3-powerpc-e500'},
                                extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-powerpc64-smp',
-                               extra_tags={'Source':
-                                           'linux-meta-powerpc64-smp'})
-            archive.create_deb('linux-image-3.5.0-19-powerpc64-smp',
-                               extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-ac100',
-                               extra_tags={'Source':
-                                           'linux-meta-ac100'})
-            archive.create_deb('linux-image-3.0.27-1-ac100',
-                               extra_tags={'Source':
-                                           'linux-ac100'})
-
-            chroot.add_repository(archive.path, True, False)
-
-            cache = apt.Cache(rootdir=chroot.path)
-
-            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
-            linux = kernel_detection.get_linux_metapackage()
-            self.assertEqual(linux, '')
-
-            # Install kernel packages
-            for pkg in ('linux-image-nexus7',
-                        'linux-image-3.1.10-9-nexus7',
-                        'linux-image-omap4',
-                        'linux-image-3.2.0-1419-omap4',
-                        'linux-image-highbank',
-                        'linux-image-3.5.0-17-highbank',
-                        'linux-image-powerpc-smp',
-                        'linux-image-3.5.0-18-powerpc-smp',
-                        'linux-image-powerpc64-smp',
-                        'linux-image-3.5.0-19-powerpc64-smp',
-                        'linux-image-ac100',
-                        'linux-image-3.0.27-1-ac100'):
-                cache[pkg].mark_install()
-
-            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
-            linux = kernel_detection.get_linux_metapackage()
-            self.assertEqual(linux, 'linux-powerpc64-smp')
-        finally:
-            chroot.remove()
-
-    def test_linux_detection_names_chroot3(self):
-        chroot = aptdaemon.test.Chroot()
-        try:
-            chroot.setup()
-            chroot.add_test_repository()
-            archive = gen_fakearchive()
-            archive.create_deb('linux-image-nexus7',
-                               extra_tags={'Source': 'linux-meta-nexus7'})
-            archive.create_deb('linux-image-3.1.10-9-nexus7',
-                               extra_tags={'Source': 'linux-nexus7'})
-            archive.create_deb('linux-image-omap4',
-                               extra_tags={'Source':
-                                           'linux-meta-ti-omap4'})
-            archive.create_deb('linux-image-3.8.0-1419-omap4',
-                               extra_tags={'Source':
-                                           'linux-ti-omap4'})
-            archive.create_deb('linux-image-3.5.0-17-highbank',
-                               extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-highbank',
-                               extra_tags={'Source':
-                                           'linux-meta-highbank'})
-            archive.create_deb('linux-image-powerpc-smp',
-                               extra_tags={'Source':
-                                           'linux-meta-powerpc-smp'})
-            archive.create_deb('linux-image-3.5.0-18-powerpc-smp',
-                               extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-powerpc64-smp',
-                               extra_tags={'Source':
-                                           'linux-meta-powerpc64-smp'})
-            archive.create_deb('linux-image-3.5.0-19-powerpc64-smp',
-                               extra_tags={'Source':
-                                           'linux'})
-            archive.create_deb('linux-image-ac100',
-                               extra_tags={'Source':
-                                           'linux-meta-ac100'})
-            archive.create_deb('linux-image-3.0.27-1-ac100',
-                               extra_tags={'Source':
-                                           'linux-ac100'})
-
-            chroot.add_repository(archive.path, True, False)
-
-            cache = apt.Cache(rootdir=chroot.path)
-
-            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
-            linux = kernel_detection.get_linux_metapackage()
-            self.assertEqual(linux, '')
-
-            # Install kernel packages
-            for pkg in ('linux-image-nexus7',
-                        'linux-image-3.1.10-9-nexus7',
-                        'linux-image-omap4',
-                        'linux-image-3.8.0-1419-omap4',
-                        'linux-image-highbank',
-                        'linux-image-3.5.0-17-highbank',
-                        'linux-image-powerpc-smp',
-                        'linux-image-3.5.0-18-powerpc-smp',
-                        'linux-image-powerpc64-smp',
-                        'linux-image-3.5.0-19-powerpc64-smp',
-                        'linux-image-ac100',
-                        'linux-image-3.0.27-1-ac100'):
-                cache[pkg].mark_install()
-
-            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
-            linux = kernel_detection.get_linux_metapackage()
-            self.assertEqual(linux, 'linux-omap4')
-        finally:
-            chroot.remove()
-
-    def test_linux_detection_names_chroot4(self):
-        chroot = aptdaemon.test.Chroot()
-        try:
-            chroot.setup()
-            chroot.add_test_repository()
-            archive = gen_fakearchive()
-            archive.create_deb('linux-image-powerpc-smp',
+                                           'linux-ppc'})
+            archive.create_deb('linux-powerpc-e500',
+                               dependencies={'Depends': 'linux-image-powerpc-e500'},
                                extra_tags={'Source':
                                            'linux-ppc'})
             archive.create_deb('linux-image-3.8.0-3-powerpc-e500',
@@ -1657,6 +1597,8 @@ class KernelDectionTest(unittest.TestCase):
 
             # Install kernel packages
             for pkg in ('linux-image-powerpc-smp',
+                        'linux-image-powerpc-e500',
+                        'linux-powerpc-e500',
                         'linux-image-3.8.0-3-powerpc-e500',
                         'linux-image-3.8.0-1-powerpc-smp',
                         'linux-image-3.5.0-19-powerpc64-smp',
@@ -1676,6 +1618,13 @@ class KernelDectionTest(unittest.TestCase):
             chroot.setup()
             chroot.add_test_repository()
             archive = gen_fakearchive()
+            archive.create_deb('linux-lowlatency',
+                               dependencies={'Depends': 'linux-image-lowlatency'},
+                               extra_tags={'Source': 'linux-lowlatency'})
+            archive.create_deb('linux-image-lowlatency',
+                               dependencies={'Depends': 'linux-image-3.8.0-0-lowlatency'},
+                               extra_tags={'Source': 'linux-lowlatency'})
+
             archive.create_deb('linux-image-3.2.0-36-lowlatency-pae',
                                extra_tags={'Source': 'linux-lowlatency'})
             archive.create_deb('linux-image-3.8.0-0-lowlatency',
@@ -1706,12 +1655,81 @@ class KernelDectionTest(unittest.TestCase):
                         'linux-image-3.5.0-18-generic',
                         'linux-image-3.5.0-19-generic',
                         'linux-image-generic',
-                        'linux-image-generic-lts-quantal'):
+                        'linux-image-generic-lts-quantal',
+                        'linux-image-lowlatency',
+                        'linux-lowlatency'):
                 cache[pkg].mark_install()
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_metapackage()
             self.assertEqual(linux, 'linux-lowlatency')
+        finally:
+            chroot.remove()
+
+
+    def test_linux_detection_names_chroot6(self):
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            archive.create_deb('linux-image-5.0.0-27-generic',
+                               extra_tags={'Source': 'linux-signed-hwe'})
+            archive.create_deb('linux-image-4.15.0-62-generic',
+                               extra_tags={'Source': 'linux-signed'})
+            archive.create_deb('linux-image-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-image-5.0.0-27-generic'},
+                               extra_tags={'Source': 'linux-meta-hwe'})
+            archive.create_deb('linux-image-5.0.0-20-generic',
+                               extra_tags={'Source': 'linux-signed-hwe-edge'})
+            archive.create_deb('linux-image-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-image-5.0.0-20-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta-hwe-edge'})
+            archive.create_deb('linux-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04, linux-headers-generic-hwe-18.04'},
+                               extra_tags={'Source':
+                                           'linux-meta-hwe'})
+            archive.create_deb('linux-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04-edge, linux-headers-generic-hwe-18.04-edge'},
+                               extra_tags={'Source':
+                                           'linux-meta-hwe-edge'})
+            archive.create_deb('linux-headers-generic-hwe-18.04',
+                               extra_tags={})
+            archive.create_deb('linux-headers-generic-hwe-18.04-edge',
+                               extra_tags={})
+            archive.create_deb('linux-image-generic',
+                               dependencies={'Depends': 'linux-image-4.15.0-62-generic, linux-headers-4.15.0-62-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-image-generic-lts-quantal',
+                               extra_tags={'Source':
+                                           'linux-meta-lts-quantal'})
+            chroot.add_repository(archive.path, True, False)
+
+            cache = apt.Cache(rootdir=chroot.path)
+
+            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
+            linux = kernel_detection.get_linux_metapackage()
+            self.assertEqual(linux, '')
+
+            # Install kernel packages
+            for pkg in ('linux-image-5.0.0-27-generic',
+                        'linux-image-5.0.0-20-generic',
+                        'linux-image-4.15.0-62-generic',
+                        'linux-image-generic-hwe-18.04',
+                        'linux-image-generic-hwe-18.04-edge',
+                        'linux-headers-generic-hwe-18.04',
+                        'linux-headers-generic-hwe-18.04-edge',
+                        'linux-generic-hwe-18.04',
+                        'linux-generic-hwe-18.04-edge',
+                        'linux-image-generic',
+                        'linux-image-generic-lts-quantal'):
+                cache[pkg].mark_install()
+
+            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
+            linux = kernel_detection.get_linux_metapackage()
+            self.assertEqual(linux, 'linux-generic-hwe-18.04')
         finally:
             chroot.remove()
 
