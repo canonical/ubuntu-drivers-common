@@ -55,8 +55,8 @@ class KernelDetection(object):
         return not process.returncode
 
     def _find_reverse_dependencies(self, package, prefix):
-        '''prefix to restrict the searching
-           package we want reverse dependencies for'''
+        # prefix to restrict the searching
+        # package we want reverse dependencies for
         deps = []
         for pkg in self.apt_cache:
             if (pkg.name.startswith(prefix) and
@@ -74,15 +74,20 @@ class KernelDetection(object):
                     deps.append(pkg.name)
         return deps
 
-    def _get_linux_metapackage(self, headers):
-        '''Get the linux headers or linux metapackage'''
+    def _get_linux_metapackage(self, target):
+        '''Get the linux headers, linux-image or linux metapackage'''
         metapackage = ''
         version = ''
-        prefix = 'linux-%s' % ('headers' if headers else 'image')
-        pattern = re.compile('%s-(.+)-([0-9]+)-(.+)' % (prefix))
+        prefix = 'linux-%s' % ('headers' if target == 'headers' else 'image')
+
+        pattern = re.compile('linux-image-(.+)-([0-9]+)-(.+)')
 
         for pkg in self.apt_cache:
-            if (pkg.name.startswith(prefix) and
+            # We always start with "linux-image"
+            # since installing headers or metapackages
+            # for kernels that are not installed
+            # won't help
+            if (pkg.name.startswith('linux-image') and
                     'extra' not in pkg.name and
                     self.apt_cache[pkg.name].is_installed or
                     self.apt_cache[pkg.name].marked_install):
@@ -111,7 +116,7 @@ class KernelDetection(object):
                         break
 
                 # if we are looking for headers, then we are good
-                if not headers:
+                if target == 'meta':
                     # Let's get the metapackage
                     reverse_dependencies = self._find_reverse_dependencies(metapackage, 'linux-')
 
@@ -123,8 +128,33 @@ class KernelDetection(object):
 
     def get_linux_headers_metapackage(self):
         '''Get the linux headers for the newest_kernel installed'''
-        return self._get_linux_metapackage(True)
+        return self._get_linux_metapackage('headers')
+
+    def get_linux_image_metapackage(self):
+        '''Get the linux headers for the newest_kernel installed'''
+        return self._get_linux_metapackage('image')
 
     def get_linux_metapackage(self):
         '''Get the linux metapackage for the newest_kernel installed'''
-        return self._get_linux_metapackage(False)
+        return self._get_linux_metapackage('meta')
+
+    def get_linux_version(self):
+        linux_image_meta = self.get_linux_image_metapackage()
+        linux_version = ''
+        try:
+            dependencies = self.apt_cache[linux_image_meta].candidate.\
+                             record['Depends']
+        except KeyError:
+            logging.error('No dependencies can be found for %s' % (linux_image_meta))
+            return None
+
+        if ', ' in dependencies:
+            deps = dependencies.split(', ')
+            for dep in deps:
+                if dep.startswith('linux-image'):
+                    linux_version = dep.replace('linux-image-', '')
+        else:
+            if dependencies.strip().startswith('linux-image'):
+                linux_version = dependencies.strip().replace('linux-image-', '')
+
+        return linux_version

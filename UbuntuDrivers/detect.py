@@ -826,6 +826,16 @@ def get_linux_headers(apt_cache):
     kernel_detection = kerneldetection.KernelDetection(apt_cache)
     return kernel_detection.get_linux_headers_metapackage()
 
+def get_linux_image(apt_cache):
+    '''Return the linux image for the system's kernel'''
+    kernel_detection = kerneldetection.KernelDetection(apt_cache)
+    return kernel_detection.get_linux_image_metapackage()
+
+def get_linux_version(apt_cache):
+    '''Return the linux image for the system's kernel'''
+    kernel_detection = kerneldetection.KernelDetection(apt_cache)
+    return kernel_detection.get_linux_version()
+
 
 def get_linux(apt_cache):
     '''Return the linux metapackage for the system's kernel'''
@@ -843,7 +853,7 @@ def get_linux_modules_metapackage(apt_cache, candidate):
         return metapackage
 
     linux_meta = get_linux(apt_cache)
-    linux_flavour = linux_meta[linux_meta.rfind('-')+1:]
+    linux_flavour = linux_meta.replace('linux-', '')
     candidate_flavour = candidate[candidate.rfind('-')+1:]
 
     try:
@@ -859,9 +869,34 @@ def get_linux_modules_metapackage(apt_cache, candidate):
         # skip foreign architectures, we usually only want native
         if (package.candidate and
                 package.candidate.architecture in ('all', system_architecture)):
-            metapackage = linux_modules_candidate
+            linux_version = get_linux_version(apt_cache)
+            linux_modules_abi_candidate = 'linux-modules-nvidia-%s-%s' % (candidate_flavour, linux_version)
+            abi_specific = apt_cache.__getitem__(linux_modules_abi_candidate)
+            # skip foreign architectures, we usually only want native
+            if (abi_specific.candidate and
+                abi_specific.candidate.architecture in ('all', system_architecture)):
+                metapackage = linux_modules_candidate
     except KeyError:
         logging.error('No "%s" can be found.', linux_modules_candidate)
+        pass
+
+    # Add an extra layer of paranoia, and check the availability
+    # of modules with the correct ABI
+    if metapackage:
+        return metapackage
+
+    # If no linux-modules-nvidia package is available for the current kernel
+    # we should install the relevant DKMS package
+    dkms_package = 'nvidia-dkms-%s' % candidate_flavour
+
+    try:
+        package = apt_cache.__getitem__(dkms_package)
+        # skip foreign architectures, we usually only want native
+        if (package.candidate and
+                package.candidate.architecture in ('all', system_architecture)):
+            metapackage = dkms_package
+    except KeyError:
+        logging.error('No "%s" can be found.', dkms_package)
         pass
 
     return metapackage
