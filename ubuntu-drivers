@@ -74,14 +74,7 @@ def list_gpgpu(args):
     for package in packages:
         candidate = packages[package]['metapackage']
         if candidate:
-            print(candidate)
-            found = True
-    if found:
-        # Add the matching linux modules package
-        modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, candidate)
-        print(modules_package)
-        if modules_package and not cache[modules_package].installed:
-            to_install.append(modules_package)
+            print('%s, (kernel modules provided by %s)' % (candidate, UbuntuDrivers.detect.get_linux_modules_metapackage(cache, candidate)))
 
     return 0
 
