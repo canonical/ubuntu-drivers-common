@@ -389,14 +389,15 @@ class DetectTest(unittest.TestCase):
                                extra_tags={'Source':
                                            'linux-meta'})
             archive.create_deb('linux-generic-hwe-18.04',
-                               dependencies={'Depends': 'linux-image-generic-hwe-18.04, linux-headers-generic-hwe-18.04'},
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04, '
+                                                        'linux-headers-generic-hwe-18.04'},
                                extra_tags={'Source':
                                            'linux-meta-hwe'})
             archive.create_deb('linux-generic-hwe-18.04-edge',
-                               dependencies={'Depends': 'linux-image-generic-hwe-18.04-edge, linux-headers-generic-hwe-18.04-edge'},
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04-edge, '
+                                                        'linux-headers-generic-hwe-18.04-edge'},
                                extra_tags={'Source':
                                            'linux-meta-hwe-edge'})
-
 
             chroot.add_repository(archive.path, True, False)
             cache = apt.Cache(rootdir=chroot.path)
@@ -525,14 +526,15 @@ class DetectTest(unittest.TestCase):
                                extra_tags={'Source':
                                            'linux-meta'})
             archive.create_deb('linux-generic-hwe-18.04',
-                               dependencies={'Depends': 'linux-image-generic-hwe-18.04, linux-headers-generic-hwe-18.04'},
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04, '
+                                                        'linux-headers-generic-hwe-18.04'},
                                extra_tags={'Source':
                                            'linux-meta-hwe'})
             archive.create_deb('linux-generic-hwe-18.04-edge',
-                               dependencies={'Depends': 'linux-image-generic-hwe-18.04-edge, linux-headers-generic-hwe-18.04-edge'},
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04-edge, '
+                                                        'linux-headers-generic-hwe-18.04-edge'},
                                extra_tags={'Source':
                                            'linux-meta-hwe-edge'})
-
 
             chroot.add_repository(archive.path, True, False)
             cache = apt.Cache(rootdir=chroot.path)
@@ -549,9 +551,11 @@ class DetectTest(unittest.TestCase):
                         'linux-generic'):
                 cache[pkg].mark_install()
 
-            res = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path=self.umockdev.get_sys_dir())
+            res = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache,
+                                                                    sys_path=self.umockdev.get_sys_dir())
             linux_package = UbuntuDrivers.detect.get_linux(cache)
-            modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, 'nvidia-driver-410')
+            modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache,
+                                                                                 'nvidia-driver-410')
         finally:
             chroot.remove()
 
@@ -564,8 +568,6 @@ class DetectTest(unittest.TestCase):
         # Get the linux-modules-nvidia module for the kernel
         # So we expect the DKMS package as a fallback
         self.assertEqual(modules_package, 'linux-modules-nvidia-410-generic')
-
-
 
     def test_system_driver_packages_bad_encoding(self):
         '''system_driver_packages() with badly encoded Packages index'''
@@ -936,20 +938,18 @@ def detect(apt):
                                            'linux-meta-lts-quantal'})
 
             archive.create_deb('linux-generic',
-                               dependencies={'Depends': 'linux-image-generic, linux-headers-generic'},
+                               dependencies={'Depends': 'linux-image-generic, '
+                                                        'linux-headers-generic'},
                                extra_tags={'Source':
                                            'linux-meta'})
             archive.create_deb('linux-generic-lts-quantal',
-                               dependencies={'Depends': 'linux-image-generic-lts-quantal, linux-headers-generic-lts-quantal'},
+                               dependencies={'Depends': 'linux-image-generic-lts-quantal, '
+                                                        'linux-headers-generic-lts-quantal'},
                                extra_tags={'Source':
                                            'linux-meta-lts-quantal'})
 
-
-
             chroot.add_repository(archive.path, True, False)
-
             cache = apt.Cache(rootdir=chroot.path)
-
             linux_headers = UbuntuDrivers.detect.get_linux_headers(cache)
             self.assertEqual(linux_headers, '')
 
@@ -1023,11 +1023,13 @@ def detect(apt):
                                            'linux-meta-lts-quantal'})
 
             archive.create_deb('linux-generic',
-                               dependencies={'Depends': 'linux-image-generic, linux-headers-generic'},
+                               dependencies={'Depends': 'linux-image-generic, '
+                                                        'linux-headers-generic'},
                                extra_tags={'Source':
                                            'linux-meta'})
             archive.create_deb('linux-generic-lts-quantal',
-                               dependencies={'Depends': 'linux-image-generic-lts-quantal, linux-headers-generic-lts-quantal'},
+                               dependencies={'Depends': 'linux-image-generic-lts-quantal, '
+                                                        'linux-headers-generic-lts-quantal'},
                                extra_tags={'Source':
                                            'linux-meta-lts-quantal'})
 
@@ -1345,15 +1347,18 @@ class KernelDectionTest(unittest.TestCase):
 
             # Full metas
             archive.create_deb('linux-generic',
-                               dependencies={'Depends': 'linux-image-generic, linux-headers-generic'},
+                               dependencies={'Depends': 'linux-image-generic, '
+                                                        'linux-headers-generic'},
                                extra_tags={'Source':
                                            'linux-meta'})
             archive.create_deb('linux-generic-hwe-18.04',
-                               dependencies={'Depends': 'linux-image-generic-hwe-18.04, linux-headers-generic-hwe-18.04'},
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04, '
+                                                        'linux-headers-generic-hwe-18.04'},
                                extra_tags={'Source':
                                            'linux-meta-hwe'})
             archive.create_deb('linux-generic-hwe-18.04-edge',
-                               dependencies={'Depends': 'linux-image-generic-hwe-18.04-edge, linux-headers-generic-hwe-18.04-edge'},
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04-edge, '
+                                                        'linux-headers-generic-hwe-18.04-edge'},
                                extra_tags={'Source':
                                            'linux-meta-hwe-edge'})
 
@@ -1399,7 +1404,7 @@ class KernelDectionTest(unittest.TestCase):
                                dependencies={'Depends': 'linux-image-3.8.0-1-powerpc-smp'},
                                extra_tags={'Source':
                                            'linux-ppc'})
-            
+
             archive.create_deb('linux-image-powerpc-e500',
                                dependencies={'Depends': 'linux-image-3.8.0-3-powerpc-e500'},
                                extra_tags={'Source':
@@ -1414,7 +1419,7 @@ class KernelDectionTest(unittest.TestCase):
                                dependencies={'Depends': 'linux-headers-3.8.0-1-powerpc-smp'},
                                extra_tags={'Source':
                                            'linux-ppc'})
-            
+
             archive.create_deb('linux-headers-powerpc-e500',
                                dependencies={'Depends': 'linux-headers-3.8.0-3-powerpc-e500'},
                                extra_tags={'Source':
@@ -1426,17 +1431,20 @@ class KernelDectionTest(unittest.TestCase):
                                            'linux-ppc'})
 
             archive.create_deb('linux-powerpc-smp',
-                               dependencies={'Depends': 'linux-headers-3.8.0-1-powerpc-smp, linux-image-3.8.0-1-powerpc-smp'},
+                               dependencies={'Depends': 'linux-headers-3.8.0-1-powerpc-smp, '
+                                                        'linux-image-3.8.0-1-powerpc-smp'},
                                extra_tags={'Source':
                                            'linux-ppc'})
-            
+
             archive.create_deb('linux-powerpc-e500',
-                               dependencies={'Depends': 'linux-headers-3.8.0-3-powerpc-e500, linux-image-3.8.0-3-powerpc-e500'},
+                               dependencies={'Depends': 'linux-headers-3.8.0-3-powerpc-e500, '
+                                                        'linux-image-3.8.0-3-powerpc-e500'},
                                extra_tags={'Source':
                                            'linux-ppc'})
 
             archive.create_deb('linux-powerpc64-smp',
-                               dependencies={'Depends': 'linux-headers-3.8.0-2-powerpc64-smp, linux-image-3.8.0-2-powerpc64-smp'},
+                               dependencies={'Depends': 'linux-headers-3.8.0-2-powerpc64-smp, '
+                                                        'linux-image-3.8.0-2-powerpc64-smp'},
                                extra_tags={'Source':
                                            'linux-ppc'})
 
@@ -1502,7 +1510,6 @@ class KernelDectionTest(unittest.TestCase):
 
     def test_linux_headers_detection_names_chroot3(self):
         chroot = aptdaemon.test.Chroot()
-        to_install = []
         try:
             chroot.setup()
             chroot.add_test_repository()
@@ -1516,8 +1523,6 @@ class KernelDectionTest(unittest.TestCase):
             archive.create_deb('linux-image-3.8.0-0-generic',
                                extra_tags={'Source':
                                            'linux-lts-quantal'})
-
-
             archive.create_deb('linux-headers-3.5.0-19-lowlatency',
                                extra_tags={'Source': 'linux-lowlatency'})
             archive.create_deb('linux-headers-3.5.0-19-generic',
@@ -1526,7 +1531,6 @@ class KernelDectionTest(unittest.TestCase):
             archive.create_deb('linux-headers-3.8.0-0-generic',
                                extra_tags={'Source':
                                            'linux-lts-quantal'})
-
             archive.create_deb('linux-headers-generic',
                                dependencies={'Depends': 'linux-headers-3.5.0-19-generic'},
                                extra_tags={'Source':
@@ -1536,10 +1540,10 @@ class KernelDectionTest(unittest.TestCase):
                                extra_tags={'Source':
                                            'linux-meta'})
             archive.create_deb('linux-generic',
-                               dependencies={'Depends': 'linux-image-generic, linux-headers-generic'},
+                               dependencies={'Depends': 'linux-image-generic, '
+                                                        'linux-headers-generic'},
                                extra_tags={'Source':
                                            'linux-meta'})
-
             archive.create_deb('linux-headers-lowlatency',
                                dependencies={'Depends': 'linux-headers-3.5.0-19-lowlatency'},
                                extra_tags={'Source':
@@ -1549,10 +1553,10 @@ class KernelDectionTest(unittest.TestCase):
                                extra_tags={'Source':
                                            'linux-meta'})
             archive.create_deb('linux-lowlatency',
-                               dependencies={'Depends': 'linux-image-lowlatency, linux-headers-lowlatency'},
+                               dependencies={'Depends': 'linux-image-lowlatency, '
+                                                        'linux-headers-lowlatency'},
                                extra_tags={'Source':
                                            'linux-lowlatency'})
-
             archive.create_deb('linux-headers-generic-lts-quantal',
                                dependencies={'Depends': 'linux-headers-3.8.0-0-generic'},
                                extra_tags={'Source':
@@ -1562,7 +1566,8 @@ class KernelDectionTest(unittest.TestCase):
                                extra_tags={'Source':
                                            'linux-meta-lts-quantal'})
             archive.create_deb('linux-generic-lts-quantal',
-                               dependencies={'Depends': 'linux-image-generic-lts-quantal, linux-headers-generic-lts-quantal'},
+                               dependencies={'Depends': 'linux-image-generic-lts-quantal, '
+                                                        'linux-headers-generic-lts-quantal'},
                                extra_tags={'Source':
                                            'linux-meta-lts-quantal'})
 
@@ -1612,7 +1617,6 @@ class KernelDectionTest(unittest.TestCase):
                                extra_tags={'Source': 'linux-signed'})
             archive.create_deb('linux-image-5.0.0-20-generic',
                                extra_tags={'Source': 'linux-signed-hwe-edge'})
-
             # Headers
             archive.create_deb('linux-headers-5.0.0-27-generic',
                                extra_tags={'Source': 'linux-signed-hwe'})
@@ -1620,7 +1624,6 @@ class KernelDectionTest(unittest.TestCase):
                                extra_tags={'Source': 'linux-signed'})
             archive.create_deb('linux-headers-5.0.0-20-generic',
                                extra_tags={'Source': 'linux-signed-hwe-edge'})
-
             # Image meta
             archive.create_deb('linux-image-generic-hwe-18.04',
                                dependencies={'Depends': 'linux-image-5.0.0-27-generic'},
@@ -1635,7 +1638,6 @@ class KernelDectionTest(unittest.TestCase):
                                dependencies={'Depends': 'linux-image-4.15.0-62-generic'},
                                extra_tags={'Source':
                                            'linux-meta'})
-
             # Header meta
             archive.create_deb('linux-headers-generic-hwe-18.04',
                                dependencies={'Depends': 'linux-headers-5.0.0-27-generic'},
@@ -1650,15 +1652,18 @@ class KernelDectionTest(unittest.TestCase):
                                            'linux-meta'})
             # Meta
             archive.create_deb('linux-generic-hwe-18.04',
-                               dependencies={'Depends': 'linux-image-generic-hwe-18.04, linux-headers-generic-hwe-18.04'},
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04, '
+                                                        'linux-headers-generic-hwe-18.04'},
                                extra_tags={'Source':
                                            'linux-meta-hwe'})
             archive.create_deb('linux-generic-hwe-18.04-edge',
-                               dependencies={'Depends': 'linux-image-generic-hwe-18.04-edge, linux-headers-generic-hwe-18.04-edge'},
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04-edge, '
+                                                        'linux-headers-generic-hwe-18.04-edge'},
                                extra_tags={'Source':
                                            'linux-meta-hwe-edge'})
             archive.create_deb('linux-generic',
-                               dependencies={'Depends': 'linux-image-generic, linux-headers-generic'},
+                               dependencies={'Depends': 'linux-image-generic, '
+                                                        'linux-headers-generic'},
                                extra_tags={'Source':
                                            'linux-meta'})
 
@@ -1710,7 +1715,6 @@ class KernelDectionTest(unittest.TestCase):
             archive.create_deb('linux-image-5.0.0-20-generic',
                                extra_tags={'Source':
                                            'linux-signed-hwe-edge'})
-
             # Image metapackages
             archive.create_deb('linux-image-generic',
                                dependencies={'Depends': 'linux-image-4.15.0-20-generic'},
@@ -1731,7 +1735,6 @@ class KernelDectionTest(unittest.TestCase):
             archive.create_deb('linux-headers-5.0.0-20-generic',
                                extra_tags={'Source':
                                            'linux-signed-hwe-edge'})
-
             # Header metapackages
             archive.create_deb('linux-headers-generic-hwe-18.04',
                                dependencies={'Depends': 'linux-headers-5.0.0-27-generic'},
@@ -1743,18 +1746,20 @@ class KernelDectionTest(unittest.TestCase):
                                dependencies={'Depends': 'linux-headers-5.0.0-20-generic'},
                                extra_tags={'Source':
                                            'linux-meta-hwe-edge'})
-
             # Full metas
             archive.create_deb('linux-generic',
-                               dependencies={'Depends': 'linux-image-generic, linux-headers-generic'},
+                               dependencies={'Depends': 'linux-image-generic, '
+                                                        'linux-headers-generic'},
                                extra_tags={'Source':
                                            'linux-meta'})
             archive.create_deb('linux-generic-hwe-18.04',
-                               dependencies={'Depends': 'linux-image-generic-hwe-18.04, linux-headers-generic-hwe-18.04'},
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04, '
+                                                        'linux-headers-generic-hwe-18.04'},
                                extra_tags={'Source':
                                            'linux-meta-hwe'})
             archive.create_deb('linux-generic-hwe-18.04-edge',
-                               dependencies={'Depends': 'linux-image-generic-hwe-18.04-edge, linux-headers-generic-hwe-18.04-edge'},
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04-edge, '
+                                                        'linux-headers-generic-hwe-18.04-edge'},
                                extra_tags={'Source':
                                            'linux-meta-hwe-edge'})
 
@@ -1789,7 +1794,6 @@ class KernelDectionTest(unittest.TestCase):
             self.assertEqual(linux, 'linux-generic-hwe-18.04')
         finally:
             chroot.remove()
-
 
     def test_linux_detection_names_chroot2(self):
         chroot = aptdaemon.test.Chroot()
@@ -1903,7 +1907,6 @@ class KernelDectionTest(unittest.TestCase):
         finally:
             chroot.remove()
 
-
     def test_linux_detection_names_chroot6(self):
         chroot = aptdaemon.test.Chroot()
         try:
@@ -1924,11 +1927,13 @@ class KernelDectionTest(unittest.TestCase):
                                extra_tags={'Source':
                                            'linux-meta-hwe-edge'})
             archive.create_deb('linux-generic-hwe-18.04',
-                               dependencies={'Depends': 'linux-image-generic-hwe-18.04, linux-headers-generic-hwe-18.04'},
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04, '
+                                                        'linux-headers-generic-hwe-18.04'},
                                extra_tags={'Source':
                                            'linux-meta-hwe'})
             archive.create_deb('linux-generic-hwe-18.04-edge',
-                               dependencies={'Depends': 'linux-image-generic-hwe-18.04-edge, linux-headers-generic-hwe-18.04-edge'},
+                               dependencies={'Depends': 'linux-image-generic-hwe-18.04-edge, '
+                                                        'linux-headers-generic-hwe-18.04-edge'},
                                extra_tags={'Source':
                                            'linux-meta-hwe-edge'})
             archive.create_deb('linux-headers-generic-hwe-18.04',
@@ -1936,7 +1941,8 @@ class KernelDectionTest(unittest.TestCase):
             archive.create_deb('linux-headers-generic-hwe-18.04-edge',
                                extra_tags={})
             archive.create_deb('linux-image-generic',
-                               dependencies={'Depends': 'linux-image-4.15.0-62-generic, linux-headers-4.15.0-62-generic'},
+                               dependencies={'Depends': 'linux-image-4.15.0-62-generic, '
+                                                        'linux-headers-4.15.0-62-generic'},
                                extra_tags={'Source':
                                            'linux-meta'})
             archive.create_deb('linux-image-generic-lts-quantal',

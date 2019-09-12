@@ -825,10 +825,12 @@ def get_linux_headers(apt_cache):
     kernel_detection = kerneldetection.KernelDetection(apt_cache)
     return kernel_detection.get_linux_headers_metapackage()
 
+
 def get_linux_image(apt_cache):
     '''Return the linux image for the system's kernel'''
     kernel_detection = kerneldetection.KernelDetection(apt_cache)
     return kernel_detection.get_linux_image_metapackage()
+
 
 def get_linux_version(apt_cache):
     '''Return the linux image for the system's kernel'''
@@ -877,7 +879,7 @@ def get_linux_modules_metapackage(apt_cache, candidate):
             abi_specific = apt_cache.__getitem__(linux_modules_abi_candidate)
             # skip foreign architectures, we usually only want native
             if (abi_specific.candidate and
-                abi_specific.candidate.architecture in ('all', system_architecture)):
+                    abi_specific.candidate.architecture in ('all', system_architecture)):
                 logging.debug('Found ABI compatible %s' % (linux_modules_abi_candidate))
                 metapackage = linux_modules_candidate
     except KeyError:
