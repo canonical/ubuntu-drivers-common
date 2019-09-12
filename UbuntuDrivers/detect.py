@@ -856,10 +856,6 @@ def get_linux_modules_metapackage(apt_cache, candidate):
     linux_flavour = linux_meta.replace('linux-', '')
     candidate_flavour = candidate[candidate.rfind('-')+1:]
 
-    print('linux_meta = %s' % (linux_meta))
-    print('linux_flavour = %s' % (linux_flavour))
-    print('candidate_flavour = %s' % (candidate_flavour))
-
     try:
         int(candidate_flavour)
     except ValueError:
@@ -875,16 +871,18 @@ def get_linux_modules_metapackage(apt_cache, candidate):
                 package.candidate.architecture in ('all', system_architecture)):
             linux_version = get_linux_version(apt_cache)
             linux_modules_abi_candidate = 'linux-modules-nvidia-%s-%s' % (candidate_flavour, linux_version)
-            print('linux_modules_abi_candidate: %s' % (linux_modules_abi_candidate))
+            logging.debug('linux_modules_abi_candidate: %s' % (linux_modules_abi_candidate))
 
+            # Let's check if there is a candidate that is specific to
+            # our kernel ABI. If not, things will fail.
             abi_specific = apt_cache.__getitem__(linux_modules_abi_candidate)
             # skip foreign architectures, we usually only want native
             if (abi_specific.candidate and
                 abi_specific.candidate.architecture in ('all', system_architecture)):
-                print('found %s' % (linux_modules_abi_candidate))
+                logging.debug('Found ABI compatible %s' % (linux_modules_abi_candidate))
                 metapackage = linux_modules_candidate
     except KeyError:
-        logging.error('No "%s" can be found.', linux_modules_candidate)
+        logging.debug('No "%s" can be found.', linux_modules_candidate)
         pass
 
     # Add an extra layer of paranoia, and check the availability
@@ -895,7 +893,7 @@ def get_linux_modules_metapackage(apt_cache, candidate):
     # If no linux-modules-nvidia package is available for the current kernel
     # we should install the relevant DKMS package
     dkms_package = 'nvidia-dkms-%s' % candidate_flavour
-    print('Falling back to %s' % (dkms_package))
+    logging.debug('Falling back to %s' % (dkms_package))
 
     try:
         package = apt_cache.__getitem__(dkms_package)
