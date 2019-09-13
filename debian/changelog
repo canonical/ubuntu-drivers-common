@@ -1,8 +1,35 @@
-ubuntu-drivers-common (1:0.7.6) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.7.6) eoan; urgency=medium
 
-  * 
+  [ Alberto Milone ]
+  * gpu-manager.c:
+    - Drop prime_is_action_on() (now that it isn't on/off any more)
+      and update the description.
+  * UbuntuDrivers/detect.py,
+    UbuntuDrivers/kerneldetection.py,
+    tests/ubuntu_drivers.py,
+    ubuntu-drivers:
+    - Provide DKMS fallback for the "install --gpgpu" case
+      when no linux-modules-nvidia are available for the driver
+      and for a specific kernel (LP: #1843796).
+      We have new tests to cover this scenario now.
+    - Show provider of kernel modules in list --gpgpu
+    - Fix linux metapackage detection.
+      This was meant to be driven by the latest kernel version
+      But it was only partially implemented.
+      Complete the implementation and update the relevant tests.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 09 Sep 2019 11:39:51 +0200
+  [ Daniel Dadap ]
+  * gpu-manager.c:
+    - Enable power management in NVIDIA on-demand mode:
+      The NVIDIA driver can suspend the GPU when it's being used as a
+      PRIME render offload source and it isn't actively being used.
+      disable_power_management() sets the NVIDIA GPU's power/control
+      mode to "on", which prevents the GPU from suspending when it
+      might otherwise be possible to do so.
+    - Increase string storage on stack for path names. This fixes
+      the warnings that gcc emits when building up path names.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 13 Sep 2019 12:38:45 +0200
 
 ubuntu-drivers-common (1:0.7.5) eoan; urgency=medium
 
