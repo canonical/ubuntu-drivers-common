@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.5.2.4) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 17 Sep 2019 16:02:18 +0200
+
 ubuntu-drivers-common (1:0.5.2.3) bionic; urgency=medium
 
   * tests/ubuntu_drivers.py,
