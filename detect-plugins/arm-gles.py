@@ -2,7 +2,7 @@
 #
 # (C) 2012 Canonical Ltd.
 # Author: Oliver Grawert <ogra@ubuntu.com>
-# 
+#
 # This plugin detects GLES driver packages based on pattern matching
 # against the "Hardware" line in /proc/cpuinfo.
 #
@@ -20,7 +20,8 @@ db = {'OMAP4 Panda board': 'pvr-omap4',
       'cardhu': 'nvidia-tegra',
       'ventana': 'nvidia-tegra',
       'Toshiba AC100 / Dynabook AZ': 'nvidia-tegra',
-     }
+      }
+
 
 def detect(apt_cache):
     board = ''

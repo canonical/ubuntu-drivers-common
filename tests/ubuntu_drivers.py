@@ -7,7 +7,6 @@
 # (at your option) any later version.
 
 import os
-import time
 import unittest
 import subprocess
 import resource
@@ -16,7 +15,7 @@ import tempfile
 import shutil
 import logging
 
-from gi.repository import GLib
+# from gi.repository import GLib
 from gi.repository import UMockdev
 import apt
 import aptdaemon.test
@@ -40,6 +39,7 @@ dbus_address = None
 # modalias of an nvidia card covered by our nvidia-* packages
 modalias_nv = 'pci:v000010DEd000010C3sv00003842sd00002670bc03sc03i00'
 
+
 def gen_fakehw():
     '''Generate an UMockdev.Testbed object for testing'''
 
@@ -62,28 +62,32 @@ def gen_fakehw():
 
     return t
 
+
 def gen_fakearchive():
     '''Generate a fake archive for testing'''
 
     a = testarchive.Archive()
-    a.create_deb('vanilla', extra_tags={'Modaliases': 
-        'vanilla(pci:v00001234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)'}) 
+    a.create_deb('vanilla', extra_tags={'Modaliases':
+                 'vanilla(pci:v00001234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)'})
     a.create_deb('chocolate', dependencies={'Depends': 'xserver-xorg-core'},
-        extra_tags={'Modaliases': 
-            'chocolate(usb:v9876dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'}) 
+                 extra_tags={'Modaliases':
+                 'chocolate(usb:v9876dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'})
 
     # packages for testing X.org driver ABI installability
     a.create_deb('xserver-xorg-core', version='99:1',  # higher than system installed one
-            dependencies={'Provides': 'xorg-video-abi-4'})
+                 dependencies={'Provides': 'xorg-video-abi-4'})
     a.create_deb('nvidia-current', dependencies={'Depends': 'xorg-video-abi-4'},
-                 extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*, pci:v000010DEd000010C4sv*sd*bc03sc*i*,)'})
+                 extra_tags={'Modaliases':
+                 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*, pci:v000010DEd000010C4sv*sd*bc03sc*i*,)'})
     a.create_deb('nvidia-old', dependencies={'Depends': 'xorg-video-abi-3'},
-                 extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*, pci:v000010DEd000010C2sv*sd*bc03sc*i*,)'})
+                 extra_tags={'Modaliases':
+                 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*, pci:v000010DEd000010C2sv*sd*bc03sc*i*,)'})
 
     # Free package in universe
     a.create_deb('stracciatella',
                  component='universe',
-                 extra_tags={'Modaliases': 'stracciatella(pci:v98761234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)'})
+                 extra_tags={
+                     'Modaliases': 'stracciatella(pci:v98761234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)'})
 
     # Non-free packages
     a.create_deb('neapolitan',
@@ -92,7 +96,8 @@ def gen_fakearchive():
 
     a.create_deb('tuttifrutti',
                  component='multiverse',
-                 extra_tags={'Modaliases': 'tuttifrutti(usb:v1234dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'})
+                 extra_tags={
+                     'Modaliases': 'tuttifrutti(usb:v1234dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'})
 
     # packages not covered by modalises, for testing detection plugins
     a.create_deb('special')
@@ -101,15 +106,17 @@ def gen_fakearchive():
 
     return a
 
+
 def get_deb_arch():
     proc = subprocess.Popen(['dpkg', '--print-architecture'], stdout=subprocess.PIPE,
                             universal_newlines=True)
     try:
         output = proc.communicate()[0]
         output = output.strip()
-    except:
+    except Exception:
         return None
     return output
+
 
 class DetectTest(unittest.TestCase):
     '''Test UbuntuDrivers.detect'''
@@ -148,7 +155,8 @@ class DetectTest(unittest.TestCase):
         '''system_modaliases() for fake sysfs'''
 
         res = UbuntuDrivers.detect.system_modaliases(self.umockdev.get_sys_dir())
-        self.assertEqual(set(res), set(['pci:v00001234d00sv00000001sd00bc00sc00i00',
+        self.assertEqual(set(res), set([
+            'pci:v00001234d00sv00000001sd00bc00sc00i00',
             'pci:vDEADBEEFd00', 'usb:v9876dABCDsv01sd02bc00sc01i05',
             'usb:v1234dABCDsv01sd02bc00sc01i05',
             'pci:v98761234d00sv00000001sd00bc00sc00i00',
@@ -202,7 +210,7 @@ class DetectTest(unittest.TestCase):
 
             # Overwrite sources list generate by aptdaemon testsuite to add
             # options to apt and ignore unsigned repository
-            sources_list = os.path.join(chroot.path,'etc/apt/sources.list')
+            sources_list = os.path.join(chroot.path, 'etc/apt/sources.list')
             with open(sources_list, 'w') as f:
                 f.write(archive.apt_source)
 
@@ -328,7 +336,7 @@ Description: broken \xEB encoding
         with open(os.path.join(self.plugin_dir, 'extra.py'), 'w') as f:
             f.write('def detect(apt): return ["coreutils", "no_such_package"]\n')
 
-        res = UbuntuDrivers.detect.system_driver_packages(sys_path=self.umockdev.get_sys_dir()) 
+        res = UbuntuDrivers.detect.system_driver_packages(sys_path=self.umockdev.get_sys_dir())
         self.assertTrue('coreutils' in res, list(res.keys()))
         self.assertEqual(res['coreutils'], {'free': True, 'from_distro': True, 'plugin': 'extra.py'})
 
@@ -364,7 +372,6 @@ Description: broken \xEB encoding
             set([os.path.basename(d) for d in res]),
             set(['white', 'purple', 'aubergine', 'orange', 'graphics', 'black']))
 
-
         white_dict = [value for key, value in res.items() if key.endswith(white)][0]
         black_dict = [value for key, value in res.items() if key.endswith(black)][0]
         graphics_dict = [value for key, value in res.items() if key.endswith(graphics)][0]
@@ -372,12 +379,12 @@ Description: broken \xEB encoding
         self.assertEqual(white_dict,
                          {'modalias': 'pci:v00001234d00sv00000001sd00bc00sc00i00',
                           'drivers': {'vanilla': {'free': True, 'from_distro': False}}
-                         })
+                          })
 
         self.assertEqual(black_dict,
                          {'modalias': 'usb:v9876dABCDsv01sd02bc00sc01i05',
                           'drivers': {'chocolate': {'free': True, 'from_distro': False}}
-                         })
+                          })
 
         self.assertEqual(graphics_dict['modalias'], modalias_nv)
         self.assertTrue('nvidia' in graphics_dict['vendor'].lower())
@@ -390,7 +397,7 @@ Description: broken \xEB encoding
         self.assertEqual(graphics_dict['drivers']['nvidia-current-updates'],
                          {'free': True, 'from_distro': False, 'recommended': False})
         self.assertEqual(graphics_dict['drivers']['nvidia-123'],
-                          {'free': True, 'from_distro': False, 'recommended': False})
+                         {'free': True, 'from_distro': False, 'recommended': False})
         self.assertEqual(graphics_dict['drivers']['nvidia-experimental'],
                          {'free': True, 'from_distro': False, 'recommended': False})
         self.assertEqual(graphics_dict['drivers']['xserver-xorg-video-nouveau'],
@@ -450,26 +457,26 @@ exec /sbin/modinfo "$@"
 
         self.assertEqual(UbuntuDrivers.detect.auto_install_filter({}), {})
 
-        pkgs = {'bcmwl-kernel-source': {}, 
+        pkgs = {'bcmwl-kernel-source': {},
                 'nvidia-current': {},
                 'fglrx-updates': {},
                 'pvr-omap4-egl': {}}
 
-        self.assertEqual(set(UbuntuDrivers.detect.auto_install_filter(pkgs)),
+        self.assertEqual(
+            set(UbuntuDrivers.detect.auto_install_filter(pkgs)),
             set(['bcmwl-kernel-source', 'pvr-omap4-egl', 'nvidia-current']))
 
         # should not include non-recommended variants
-        pkgs = {'bcmwl-kernel-source': {}, 
+        pkgs = {'bcmwl-kernel-source': {},
                 'nvidia-current': {'recommended': False},
                 'nvidia-173': {'recommended': True}}
         self.assertEqual(set(UbuntuDrivers.detect.auto_install_filter(pkgs)),
                          set(['bcmwl-kernel-source', 'nvidia-173']))
 
-
     def test_gpgpu_install_filter(self):
         '''gpgpu_install_filter()'''
 
-        #gpgpu driver[:version][,driver[:version]]
+        # gpgpu driver[:version][,driver[:version]]
         self.assertEqual(UbuntuDrivers.detect.gpgpu_install_filter({}, 'nvidia'), {})
 
         pkgs = {'nvidia-driver-390': {'recommended': True},
@@ -477,7 +484,8 @@ exec /sbin/modinfo "$@"
                 'nvidia-driver-340': {'recommended': False}}
 
         # Nothing is specified, we return the recommended driver
-        self.assertEqual(set(UbuntuDrivers.detect.gpgpu_install_filter(pkgs, 'nvidia')),
+        self.assertEqual(
+            set(UbuntuDrivers.detect.gpgpu_install_filter(pkgs, 'nvidia')),
             set(['nvidia-driver-390']))
 
         # We specify that we want nvidia 410
@@ -516,7 +524,7 @@ exec /sbin/modinfo "$@"
 
             # Overwrite sources list generate by aptdaemon testsuite to add
             # options to apt and ignore unsigned repository
-            sources_list = os.path.join(chroot.path,'etc/apt/sources.list')
+            sources_list = os.path.join(chroot.path, 'etc/apt/sources.list')
             with open(sources_list, 'w') as f:
                 f.write(archive.apt_source)
 
@@ -524,7 +532,8 @@ exec /sbin/modinfo "$@"
             cache.update()
             cache.open()
 
-            res = set(UbuntuDrivers.detect.system_driver_packages(cache, sys_path=self.umockdev.get_sys_dir(), freeonly=True))
+            res = set(UbuntuDrivers.detect.system_driver_packages(
+                cache, sys_path=self.umockdev.get_sys_dir(), freeonly=True))
         finally:
             chroot.remove()
 
@@ -541,7 +550,7 @@ exec /sbin/modinfo "$@"
 
             # Overwrite sources list generate by aptdaemon testsuite to add
             # options to apt and ignore unsigned repository
-            sources_list = os.path.join(chroot.path,'etc/apt/sources.list')
+            sources_list = os.path.join(chroot.path, 'etc/apt/sources.list')
             with open(sources_list, 'w') as f:
                 f.write(archive.apt_source)
 
@@ -574,11 +583,11 @@ exec /sbin/modinfo "$@"
             # suppress logging the deliberate errors in our test plugins to
             # stderr
             logging.getLogger().setLevel(logging.CRITICAL)
-            self.assertEqual(UbuntuDrivers.detect.detect_plugin_packages(cache), 
+            self.assertEqual(UbuntuDrivers.detect.detect_plugin_packages(cache),
                              {'special.py': ['special']})
 
             os.mkdir(os.path.join(self.umockdev.get_sys_dir(), 'pickyon'))
-            self.assertEqual(UbuntuDrivers.detect.detect_plugin_packages(cache), 
+            self.assertEqual(UbuntuDrivers.detect.detect_plugin_packages(cache),
                              {'special.py': ['special'], 'picky.py': ['picky']})
         finally:
             logging.getLogger().setLevel(logging.INFO)
@@ -605,8 +614,8 @@ exec /sbin/modinfo "$@"
             f.write('I am not a plugin')
         with open(os.path.join(self.plugin_dir, 'picky.py'), 'w') as f:
             f.write('''import os, os.path
-            
-def detect(apt): 
+
+def detect(apt):
     if os.path.exists("/sys/pickyon"):
         return ["picky"]
 ''')
@@ -619,21 +628,21 @@ def detect(apt):
             chroot.add_test_repository()
             archive = gen_fakearchive()
             archive.create_deb('linux-image-3.2.0-23-generic',
-                                extra_tags={'Source': 'linux'})
+                               extra_tags={'Source': 'linux'})
             archive.create_deb('linux-image-3.2.0-33-generic',
-                                extra_tags={'Source': 'linux'})
+                               extra_tags={'Source': 'linux'})
             archive.create_deb('linux-image-3.5.0-18-generic',
-                                extra_tags={'Source':
-                                            'linux-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
             archive.create_deb('linux-image-3.5.0-19-generic',
-                                extra_tags={'Source':
-                                             'linux-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
             archive.create_deb('linux-image-generic',
-                                extra_tags={'Source':
-                                            'linux-meta'})
+                               extra_tags={'Source':
+                                           'linux-meta'})
             archive.create_deb('linux-image-generic-lts-quantal',
-                                extra_tags={'Source':
-                                            'linux-meta-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-meta-lts-quantal'})
             chroot.add_repository(archive.path, True, False)
 
             cache = apt.Cache(rootdir=chroot.path)
@@ -663,21 +672,21 @@ def detect(apt):
             chroot.add_test_repository()
             archive = gen_fakearchive()
             archive.create_deb('linux-image-3.2.0-23-generic',
-                                extra_tags={'Source': 'linux'})
+                               extra_tags={'Source': 'linux'})
             archive.create_deb('linux-image-3.2.0-33-generic',
-                                extra_tags={'Source': 'linux'})
+                               extra_tags={'Source': 'linux'})
             archive.create_deb('linux-image-3.5.0-18-generic',
-                                extra_tags={'Source':
-                                            'linux-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
             archive.create_deb('linux-image-3.5.0-19-generic',
-                                extra_tags={'Source':
-                                             'linux-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
             archive.create_deb('linux-image-generic',
-                                extra_tags={'Source':
-                                            'linux-meta'})
+                               extra_tags={'Source':
+                                           'linux-meta'})
             archive.create_deb('linux-image-generic-lts-quantal',
-                                extra_tags={'Source':
-                                            'linux-meta-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-meta-lts-quantal'})
             chroot.add_repository(archive.path, True, False)
 
             cache = apt.Cache(rootdir=chroot.path)
@@ -699,6 +708,7 @@ def detect(apt):
         finally:
             chroot.remove()
 
+
 class ToolTest(unittest.TestCase):
     '''Test ubuntu-drivers tool'''
 
@@ -706,8 +716,8 @@ class ToolTest(unittest.TestCase):
     def setUpClass(klass):
         klass.archive = gen_fakearchive()
         klass.archive.create_deb('noalias')
-        klass.archive.create_deb('bcmwl-kernel-source', extra_tags={'Modaliases': 
-            'wl(usb:v9876dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'}) 
+        klass.archive.create_deb('bcmwl-kernel-source', extra_tags={'Modaliases':
+                                 'wl(usb:v9876dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'})
 
         # set up a test chroot
         klass.chroot = aptdaemon.test.Chroot()
@@ -747,21 +757,22 @@ APT::Get::AllowUnauthenticated "true";
     def tearDown(self):
         # some tests install this package
         apt = subprocess.Popen(['apt-get', 'purge', '-y', 'bcmwl-kernel-source'],
-                stdout=subprocess.PIPE)
+                               stdout=subprocess.PIPE)
         apt.communicate()
         self.assertEqual(apt.returncode, 0)
 
     def test_list_chroot(self):
         '''ubuntu-drivers list for fake sysfs and chroot'''
 
-        ud = subprocess.Popen([self.tool_path, 'list'],
-                universal_newlines=True, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE)
+        ud = subprocess.Popen(
+            [self.tool_path, 'list'],
+            universal_newlines=True, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
         out, err = ud.communicate()
         self.assertEqual(err, '')
-        self.assertEqual(set(out.splitlines()), 
-                set(['vanilla', 'chocolate', 'bcmwl-kernel-source', 'nvidia-current',
-                     'stracciatella', 'tuttifrutti', 'neapolitan']))
+        self.assertEqual(set(out.splitlines()),
+                         set(['vanilla', 'chocolate', 'bcmwl-kernel-source', 'nvidia-current',
+                             'stracciatella', 'tuttifrutti', 'neapolitan']))
         self.assertEqual(ud.returncode, 0)
 
     def test_list_detect_plugins(self):
@@ -773,23 +784,25 @@ APT::Get::AllowUnauthenticated "true";
         with open(os.path.join(self.plugin_dir, 'special.py'), 'w') as f:
             f.write('def detect(apt): return ["special", "special-uninst", "special-unavail", "picky"]\n')
 
-        ud = subprocess.Popen([self.tool_path, 'list'],
-                universal_newlines=True, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE)
+        ud = subprocess.Popen(
+            [self.tool_path, 'list'],
+            universal_newlines=True, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
         out, err = ud.communicate()
         self.assertEqual(err, '')
-        self.assertEqual(set(out.splitlines()), 
-                set(['vanilla', 'chocolate', 'bcmwl-kernel-source',
-                     'nvidia-current', 'special', 'picky',
-                     'stracciatella', 'tuttifrutti', 'neapolitan']))
+        self.assertEqual(set(out.splitlines()),
+                         set(['vanilla', 'chocolate', 'bcmwl-kernel-source',
+                              'nvidia-current', 'special', 'picky',
+                              'stracciatella', 'tuttifrutti', 'neapolitan']))
         self.assertEqual(ud.returncode, 0)
 
     def test_devices_chroot(self):
         '''ubuntu-drivers devices for fake sysfs and chroot'''
 
-        ud = subprocess.Popen([self.tool_path, 'devices'],
-                universal_newlines=True, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE)
+        ud = subprocess.Popen(
+            [self.tool_path, 'devices'],
+            universal_newlines=True, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
         out, err = ud.communicate()
         self.assertEqual(err, '')
         self.assertTrue('/devices/white ==' in out)
@@ -810,9 +823,10 @@ APT::Get::AllowUnauthenticated "true";
         with open(os.path.join(self.plugin_dir, 'special.py'), 'w') as f:
             f.write('def detect(apt): return ["special", "special-uninst", "special-unavail", "picky"]\n')
 
-        ud = subprocess.Popen([self.tool_path, 'devices'],
-                universal_newlines=True, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE)
+        ud = subprocess.Popen(
+            [self.tool_path, 'devices'],
+            universal_newlines=True, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
         out, err = ud.communicate()
         self.assertEqual(err, '')
 
@@ -827,9 +841,10 @@ APT::Get::AllowUnauthenticated "true";
     def test_auto_install_chroot(self):
         '''ubuntu-drivers install for fake sysfs and chroot'''
 
-        ud = subprocess.Popen([self.tool_path, 'install'],
-                universal_newlines=True, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE, env=os.environ)
+        ud = subprocess.Popen(
+            [self.tool_path, 'install'],
+            universal_newlines=True, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, env=os.environ)
         out, err = ud.communicate()
         self.assertEqual(err, '')
         self.assertTrue('bcmwl-kernel-source' in out, out)
@@ -838,9 +853,10 @@ APT::Get::AllowUnauthenticated "true";
         self.assertEqual(ud.returncode, 0)
 
         # now all packages should be installed, so it should not do anything
-        ud = subprocess.Popen([self.tool_path, 'install'],
-                universal_newlines=True, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE, env=os.environ)
+        ud = subprocess.Popen(
+            [self.tool_path, 'install'],
+            universal_newlines=True, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, env=os.environ)
         out, err = ud.communicate()
         self.assertEqual(err, '')
         self.assertFalse('bcmwl-kernel-source' in out, out)
@@ -852,9 +868,10 @@ APT::Get::AllowUnauthenticated "true";
         listfile = os.path.join(self.chroot.path, 'pkgs')
         self.addCleanup(os.unlink, listfile)
 
-        ud = subprocess.Popen([self.tool_path, 'install', '--package-list', listfile],
-                universal_newlines=True, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE)
+        ud = subprocess.Popen(
+            [self.tool_path, 'install', '--package-list', listfile],
+            universal_newlines=True, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
         out, err = ud.communicate()
         self.assertEqual(err, '')
         self.assertEqual(ud.returncode, 0)
@@ -871,9 +888,10 @@ APT::Get::AllowUnauthenticated "true";
         with open(os.path.join(self.plugin_dir, 'special.py'), 'w') as f:
             f.write('def detect(apt): return ["special", "special-uninst", "special-unavail"]\n')
 
-        ud = subprocess.Popen([self.tool_path, 'debug'],
-                universal_newlines=True, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE)
+        ud = subprocess.Popen(
+            [self.tool_path, 'debug'],
+            universal_newlines=True, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
         out, err = ud.communicate()
         self.assertEqual(err, '', err)
         self.assertEqual(ud.returncode, 0)
@@ -885,6 +903,7 @@ APT::Get::AllowUnauthenticated "true";
         # driver packages
         self.assertTrue('available: 1 (auto-install)  [third party]  free  modalias:' in out, out)
 
+
 class PluginsTest(unittest.TestCase):
     '''Test detect-plugins/*'''
 
@@ -894,15 +913,17 @@ class PluginsTest(unittest.TestCase):
         env = os.environ.copy()
         env['UBUNTU_DRIVERS_DETECT_DIR'] = os.path.join(ROOT_DIR, 'detect-plugins')
 
-        ud = subprocess.Popen([os.path.join(ROOT_DIR, 'ubuntu-drivers'), 'debug'],
-                universal_newlines=True, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE, env=env)
+        ud = subprocess.Popen(
+            [os.path.join(ROOT_DIR, 'ubuntu-drivers'), 'debug'],
+            universal_newlines=True, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, env=env)
         out, err = ud.communicate()
         self.assertEqual(err, '')
         # real system packages should not match our fake modalises
         self.assertFalse('ERROR' in out, out)
         self.assertFalse('Traceback' in out, out)
         self.assertEqual(ud.returncode, 0)
+
 
 class KernelDectionTest(unittest.TestCase):
     '''Test UbuntuDrivers.kerneldetection'''
@@ -928,21 +949,21 @@ class KernelDectionTest(unittest.TestCase):
             chroot.add_test_repository()
             archive = gen_fakearchive()
             archive.create_deb('linux-image-3.2.0-23-generic',
-                                extra_tags={'Source': 'linux'})
+                               extra_tags={'Source': 'linux'})
             archive.create_deb('linux-image-3.2.0-33-generic',
-                                extra_tags={'Source': 'linux'})
+                               extra_tags={'Source': 'linux'})
             archive.create_deb('linux-image-3.5.0-18-generic',
-                                extra_tags={'Source':
-                                            'linux-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
             archive.create_deb('linux-image-3.5.0-19-generic',
-                                extra_tags={'Source':
-                                             'linux-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
             archive.create_deb('linux-image-generic',
-                                extra_tags={'Source':
-                                            'linux-meta'})
+                               extra_tags={'Source':
+                                           'linux-meta'})
             archive.create_deb('linux-image-generic-lts-quantal',
-                                extra_tags={'Source':
-                                            'linux-meta-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-meta-lts-quantal'})
             chroot.add_repository(archive.path, True, False)
 
             cache = apt.Cache(rootdir=chroot.path)
@@ -973,39 +994,39 @@ class KernelDectionTest(unittest.TestCase):
             chroot.add_test_repository()
             archive = gen_fakearchive()
             archive.create_deb('linux-image-nexus7',
-                                extra_tags={'Source': 'linux-meta-nexus7'})
+                               extra_tags={'Source': 'linux-meta-nexus7'})
             archive.create_deb('linux-image-3.1.10-9-nexus7',
-                                extra_tags={'Source': 'linux-nexus7'})
+                               extra_tags={'Source': 'linux-nexus7'})
             archive.create_deb('linux-image-omap4',
-                                extra_tags={'Source':
-                                            'linux-meta-ti-omap4'})
+                               extra_tags={'Source':
+                                           'linux-meta-ti-omap4'})
             archive.create_deb('linux-image-3.2.0-1419-omap4',
-                                extra_tags={'Source':
-                                            'linux-ti-omap4'})
+                               extra_tags={'Source':
+                                           'linux-ti-omap4'})
             archive.create_deb('linux-image-3.5.0-17-highbank',
-                                extra_tags={'Source':
-                                             'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-highbank',
-                                extra_tags={'Source':
-                                             'linux-meta-highbank'})
+                               extra_tags={'Source':
+                                           'linux-meta-highbank'})
             archive.create_deb('linux-image-powerpc-smp',
-                                extra_tags={'Source':
-                                            'linux-meta-powerpc-smp'})
+                               extra_tags={'Source':
+                                           'linux-meta-powerpc-smp'})
             archive.create_deb('linux-image-3.5.0-18-powerpc-smp',
-                                extra_tags={'Source':
-                                            'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-powerpc64-smp',
-                                extra_tags={'Source':
-                                            'linux-meta-powerpc64-smp'})
+                               extra_tags={'Source':
+                                           'linux-meta-powerpc64-smp'})
             archive.create_deb('linux-image-3.5.0-17-powerpc64-smp',
-                                extra_tags={'Source':
-                                            'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-ac100',
-                                extra_tags={'Source':
-                                            'linux-meta-ac100'})
+                               extra_tags={'Source':
+                                           'linux-meta-ac100'})
             archive.create_deb('linux-image-3.0.27-1-ac100',
-                                extra_tags={'Source':
-                                            'linux-ac100'})
+                               extra_tags={'Source':
+                                           'linux-ac100'})
 
             chroot.add_repository(archive.path, True, False)
 
@@ -1043,39 +1064,39 @@ class KernelDectionTest(unittest.TestCase):
             chroot.add_test_repository()
             archive = gen_fakearchive()
             archive.create_deb('linux-image-nexus7',
-                                extra_tags={'Source': 'linux-meta-nexus7'})
+                               extra_tags={'Source': 'linux-meta-nexus7'})
             archive.create_deb('linux-image-3.1.10-9-nexus7',
-                                extra_tags={'Source': 'linux-nexus7'})
+                               extra_tags={'Source': 'linux-nexus7'})
             archive.create_deb('linux-image-omap4',
-                                extra_tags={'Source':
-                                            'linux-meta-ti-omap4'})
+                               extra_tags={'Source':
+                                           'linux-meta-ti-omap4'})
             archive.create_deb('linux-image-3.2.0-1419-omap4',
-                                extra_tags={'Source':
-                                            'linux-ti-omap4'})
+                               extra_tags={'Source':
+                                           'linux-ti-omap4'})
             archive.create_deb('linux-image-3.5.0-17-highbank',
-                                extra_tags={'Source':
-                                             'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-highbank',
-                                extra_tags={'Source':
-                                             'linux-meta-highbank'})
+                               extra_tags={'Source':
+                                           'linux-meta-highbank'})
             archive.create_deb('linux-image-powerpc-smp',
-                                extra_tags={'Source':
-                                            'linux-meta-powerpc-smp'})
+                               extra_tags={'Source':
+                                           'linux-meta-powerpc-smp'})
             archive.create_deb('linux-image-3.5.0-18-powerpc-smp',
-                                extra_tags={'Source':
-                                            'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-powerpc64-smp',
-                                extra_tags={'Source':
-                                            'linux-meta-powerpc64-smp'})
+                               extra_tags={'Source':
+                                           'linux-meta-powerpc64-smp'})
             archive.create_deb('linux-image-3.5.0-19-powerpc64-smp',
-                                extra_tags={'Source':
-                                            'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-ac100',
-                                extra_tags={'Source':
-                                            'linux-meta-ac100'})
+                               extra_tags={'Source':
+                                           'linux-meta-ac100'})
             archive.create_deb('linux-image-3.0.27-1-ac100',
-                                extra_tags={'Source':
-                                            'linux-ac100'})
+                               extra_tags={'Source':
+                                           'linux-ac100'})
 
             chroot.add_repository(archive.path, True, False)
 
@@ -1113,39 +1134,39 @@ class KernelDectionTest(unittest.TestCase):
             chroot.add_test_repository()
             archive = gen_fakearchive()
             archive.create_deb('linux-image-nexus7',
-                                extra_tags={'Source': 'linux-meta-nexus7'})
+                               extra_tags={'Source': 'linux-meta-nexus7'})
             archive.create_deb('linux-image-3.1.10-9-nexus7',
-                                extra_tags={'Source': 'linux-nexus7'})
+                               extra_tags={'Source': 'linux-nexus7'})
             archive.create_deb('linux-image-omap4',
-                                extra_tags={'Source':
-                                            'linux-meta-ti-omap4'})
+                               extra_tags={'Source':
+                                           'linux-meta-ti-omap4'})
             archive.create_deb('linux-image-3.8.0-1419-omap4',
-                                extra_tags={'Source':
-                                            'linux-ti-omap4'})
+                               extra_tags={'Source':
+                                           'linux-ti-omap4'})
             archive.create_deb('linux-image-3.5.0-17-highbank',
-                                extra_tags={'Source':
-                                             'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-highbank',
-                                extra_tags={'Source':
-                                             'linux-meta-highbank'})
+                               extra_tags={'Source':
+                                           'linux-meta-highbank'})
             archive.create_deb('linux-image-powerpc-smp',
-                                extra_tags={'Source':
-                                            'linux-meta-powerpc-smp'})
+                               extra_tags={'Source':
+                                           'linux-meta-powerpc-smp'})
             archive.create_deb('linux-image-3.5.0-18-powerpc-smp',
-                                extra_tags={'Source':
-                                            'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-powerpc64-smp',
-                                extra_tags={'Source':
-                                            'linux-meta-powerpc64-smp'})
+                               extra_tags={'Source':
+                                           'linux-meta-powerpc64-smp'})
             archive.create_deb('linux-image-3.5.0-19-powerpc64-smp',
-                                extra_tags={'Source':
-                                            'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-ac100',
-                                extra_tags={'Source':
-                                            'linux-meta-ac100'})
+                               extra_tags={'Source':
+                                           'linux-meta-ac100'})
             archive.create_deb('linux-image-3.0.27-1-ac100',
-                                extra_tags={'Source':
-                                            'linux-ac100'})
+                               extra_tags={'Source':
+                                           'linux-ac100'})
 
             chroot.add_repository(archive.path, True, False)
 
@@ -1183,23 +1204,23 @@ class KernelDectionTest(unittest.TestCase):
             chroot.add_test_repository()
             archive = gen_fakearchive()
             archive.create_deb('linux-image-powerpc-smp',
-                                extra_tags={'Source':
-                                            'linux-ppc'})
+                               extra_tags={'Source':
+                                           'linux-ppc'})
             archive.create_deb('linux-image-3.8.0-3-powerpc-e500',
-                                extra_tags={'Source':
-                                            'linux-ppc'})
+                               extra_tags={'Source':
+                                           'linux-ppc'})
             archive.create_deb('linux-image-3.8.0-1-powerpc-smp',
-                                extra_tags={'Source':
-                                            'linux-ppc'})
+                               extra_tags={'Source':
+                                           'linux-ppc'})
             archive.create_deb('linux-image-3.5.0-19-powerpc64-smp',
-                                extra_tags={'Source':
-                                            'linux-ppc'})
+                               extra_tags={'Source':
+                                           'linux-ppc'})
             archive.create_deb('linux-image-3.8.0-2-powerpc64-smp',
-                                extra_tags={'Source':
-                                            'linux-ppc'})
+                               extra_tags={'Source':
+                                           'linux-ppc'})
             archive.create_deb('linux-image-3.0.27-1-ac100',
-                                extra_tags={'Source':
-                                            'linux-ac100'})
+                               extra_tags={'Source':
+                                           'linux-ac100'})
 
             chroot.add_repository(archive.path, True, False)
 
@@ -1231,21 +1252,21 @@ class KernelDectionTest(unittest.TestCase):
             chroot.add_test_repository()
             archive = gen_fakearchive()
             archive.create_deb('linux-image-3.2.0-36-lowlatency-pae',
-                                extra_tags={'Source': 'linux-lowlatency'})
+                               extra_tags={'Source': 'linux-lowlatency'})
             archive.create_deb('linux-image-3.8.0-0-lowlatency',
-                                extra_tags={'Source': 'linux-lowlatency'})
+                               extra_tags={'Source': 'linux-lowlatency'})
             archive.create_deb('linux-image-3.5.0-18-generic',
-                                extra_tags={'Source':
-                                            'linux-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
             archive.create_deb('linux-image-3.5.0-19-generic',
-                                extra_tags={'Source':
-                                             'linux-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
             archive.create_deb('linux-image-generic',
-                                extra_tags={'Source':
-                                            'linux-meta'})
+                               extra_tags={'Source':
+                                           'linux-meta'})
             archive.create_deb('linux-image-generic-lts-quantal',
-                                extra_tags={'Source':
-                                            'linux-meta-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-meta-lts-quantal'})
             chroot.add_repository(archive.path, True, False)
 
             cache = apt.Cache(rootdir=chroot.path)
@@ -1277,21 +1298,21 @@ class KernelDectionTest(unittest.TestCase):
             chroot.add_test_repository()
             archive = gen_fakearchive()
             archive.create_deb('linux-image-3.2.0-23-generic',
-                                extra_tags={'Source': 'linux'})
+                               extra_tags={'Source': 'linux'})
             archive.create_deb('linux-image-3.2.0-33-generic',
-                                extra_tags={'Source': 'linux'})
+                               extra_tags={'Source': 'linux'})
             archive.create_deb('linux-image-3.5.0-18-generic',
-                                extra_tags={'Source':
-                                            'linux-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
             archive.create_deb('linux-image-3.5.0-19-generic',
-                                extra_tags={'Source':
-                                             'linux-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
             archive.create_deb('linux-image-generic',
-                                extra_tags={'Source':
-                                            'linux-meta'})
+                               extra_tags={'Source':
+                                           'linux-meta'})
             archive.create_deb('linux-image-generic-lts-quantal',
-                                extra_tags={'Source':
-                                            'linux-meta-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-meta-lts-quantal'})
             chroot.add_repository(archive.path, True, False)
 
             cache = apt.Cache(rootdir=chroot.path)
@@ -1322,39 +1343,39 @@ class KernelDectionTest(unittest.TestCase):
             chroot.add_test_repository()
             archive = gen_fakearchive()
             archive.create_deb('linux-image-nexus7',
-                                extra_tags={'Source': 'linux-meta-nexus7'})
+                               extra_tags={'Source': 'linux-meta-nexus7'})
             archive.create_deb('linux-image-3.1.10-9-nexus7',
-                                extra_tags={'Source': 'linux-nexus7'})
+                               extra_tags={'Source': 'linux-nexus7'})
             archive.create_deb('linux-image-omap4',
-                                extra_tags={'Source':
-                                            'linux-meta-ti-omap4'})
+                               extra_tags={'Source':
+                                           'linux-meta-ti-omap4'})
             archive.create_deb('linux-image-3.2.0-1419-omap4',
-                                extra_tags={'Source':
-                                            'linux-ti-omap4'})
+                               extra_tags={'Source':
+                                           'linux-ti-omap4'})
             archive.create_deb('linux-image-3.5.0-17-highbank',
-                                extra_tags={'Source':
-                                             'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-highbank',
-                                extra_tags={'Source':
-                                             'linux-meta-highbank'})
+                               extra_tags={'Source':
+                                           'linux-meta-highbank'})
             archive.create_deb('linux-image-powerpc-smp',
-                                extra_tags={'Source':
-                                            'linux-meta-powerpc-smp'})
+                               extra_tags={'Source':
+                                           'linux-meta-powerpc-smp'})
             archive.create_deb('linux-image-3.5.0-18-powerpc-smp',
-                                extra_tags={'Source':
-                                            'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-powerpc64-smp',
-                                extra_tags={'Source':
-                                            'linux-meta-powerpc64-smp'})
+                               extra_tags={'Source':
+                                           'linux-meta-powerpc64-smp'})
             archive.create_deb('linux-image-3.5.0-17-powerpc64-smp',
-                                extra_tags={'Source':
-                                            'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-ac100',
-                                extra_tags={'Source':
-                                            'linux-meta-ac100'})
+                               extra_tags={'Source':
+                                           'linux-meta-ac100'})
             archive.create_deb('linux-image-3.0.27-1-ac100',
-                                extra_tags={'Source':
-                                            'linux-ac100'})
+                               extra_tags={'Source':
+                                           'linux-ac100'})
 
             chroot.add_repository(archive.path, True, False)
 
@@ -1392,39 +1413,39 @@ class KernelDectionTest(unittest.TestCase):
             chroot.add_test_repository()
             archive = gen_fakearchive()
             archive.create_deb('linux-image-nexus7',
-                                extra_tags={'Source': 'linux-meta-nexus7'})
+                               extra_tags={'Source': 'linux-meta-nexus7'})
             archive.create_deb('linux-image-3.1.10-9-nexus7',
-                                extra_tags={'Source': 'linux-nexus7'})
+                               extra_tags={'Source': 'linux-nexus7'})
             archive.create_deb('linux-image-omap4',
-                                extra_tags={'Source':
-                                            'linux-meta-ti-omap4'})
+                               extra_tags={'Source':
+                                           'linux-meta-ti-omap4'})
             archive.create_deb('linux-image-3.2.0-1419-omap4',
-                                extra_tags={'Source':
-                                            'linux-ti-omap4'})
+                               extra_tags={'Source':
+                                           'linux-ti-omap4'})
             archive.create_deb('linux-image-3.5.0-17-highbank',
-                                extra_tags={'Source':
-                                             'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-highbank',
-                                extra_tags={'Source':
-                                             'linux-meta-highbank'})
+                               extra_tags={'Source':
+                                           'linux-meta-highbank'})
             archive.create_deb('linux-image-powerpc-smp',
-                                extra_tags={'Source':
-                                            'linux-meta-powerpc-smp'})
+                               extra_tags={'Source':
+                                           'linux-meta-powerpc-smp'})
             archive.create_deb('linux-image-3.5.0-18-powerpc-smp',
-                                extra_tags={'Source':
-                                            'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-powerpc64-smp',
-                                extra_tags={'Source':
-                                            'linux-meta-powerpc64-smp'})
+                               extra_tags={'Source':
+                                           'linux-meta-powerpc64-smp'})
             archive.create_deb('linux-image-3.5.0-19-powerpc64-smp',
-                                extra_tags={'Source':
-                                            'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-ac100',
-                                extra_tags={'Source':
-                                            'linux-meta-ac100'})
+                               extra_tags={'Source':
+                                           'linux-meta-ac100'})
             archive.create_deb('linux-image-3.0.27-1-ac100',
-                                extra_tags={'Source':
-                                            'linux-ac100'})
+                               extra_tags={'Source':
+                                           'linux-ac100'})
 
             chroot.add_repository(archive.path, True, False)
 
@@ -1462,39 +1483,39 @@ class KernelDectionTest(unittest.TestCase):
             chroot.add_test_repository()
             archive = gen_fakearchive()
             archive.create_deb('linux-image-nexus7',
-                                extra_tags={'Source': 'linux-meta-nexus7'})
+                               extra_tags={'Source': 'linux-meta-nexus7'})
             archive.create_deb('linux-image-3.1.10-9-nexus7',
-                                extra_tags={'Source': 'linux-nexus7'})
+                               extra_tags={'Source': 'linux-nexus7'})
             archive.create_deb('linux-image-omap4',
-                                extra_tags={'Source':
-                                            'linux-meta-ti-omap4'})
+                               extra_tags={'Source':
+                                           'linux-meta-ti-omap4'})
             archive.create_deb('linux-image-3.8.0-1419-omap4',
-                                extra_tags={'Source':
-                                            'linux-ti-omap4'})
+                               extra_tags={'Source':
+                                           'linux-ti-omap4'})
             archive.create_deb('linux-image-3.5.0-17-highbank',
-                                extra_tags={'Source':
-                                             'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-highbank',
-                                extra_tags={'Source':
-                                             'linux-meta-highbank'})
+                               extra_tags={'Source':
+                                           'linux-meta-highbank'})
             archive.create_deb('linux-image-powerpc-smp',
-                                extra_tags={'Source':
-                                            'linux-meta-powerpc-smp'})
+                               extra_tags={'Source':
+                                           'linux-meta-powerpc-smp'})
             archive.create_deb('linux-image-3.5.0-18-powerpc-smp',
-                                extra_tags={'Source':
-                                            'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-powerpc64-smp',
-                                extra_tags={'Source':
-                                            'linux-meta-powerpc64-smp'})
+                               extra_tags={'Source':
+                                           'linux-meta-powerpc64-smp'})
             archive.create_deb('linux-image-3.5.0-19-powerpc64-smp',
-                                extra_tags={'Source':
-                                            'linux'})
+                               extra_tags={'Source':
+                                           'linux'})
             archive.create_deb('linux-image-ac100',
-                                extra_tags={'Source':
-                                            'linux-meta-ac100'})
+                               extra_tags={'Source':
+                                           'linux-meta-ac100'})
             archive.create_deb('linux-image-3.0.27-1-ac100',
-                                extra_tags={'Source':
-                                            'linux-ac100'})
+                               extra_tags={'Source':
+                                           'linux-ac100'})
 
             chroot.add_repository(archive.path, True, False)
 
@@ -1532,23 +1553,23 @@ class KernelDectionTest(unittest.TestCase):
             chroot.add_test_repository()
             archive = gen_fakearchive()
             archive.create_deb('linux-image-powerpc-smp',
-                                extra_tags={'Source':
-                                            'linux-ppc'})
+                               extra_tags={'Source':
+                                           'linux-ppc'})
             archive.create_deb('linux-image-3.8.0-3-powerpc-e500',
-                                extra_tags={'Source':
-                                            'linux-ppc'})
+                               extra_tags={'Source':
+                                           'linux-ppc'})
             archive.create_deb('linux-image-3.8.0-1-powerpc-smp',
-                                extra_tags={'Source':
-                                            'linux-ppc'})
+                               extra_tags={'Source':
+                                           'linux-ppc'})
             archive.create_deb('linux-image-3.5.0-19-powerpc64-smp',
-                                extra_tags={'Source':
-                                            'linux-ppc'})
+                               extra_tags={'Source':
+                                           'linux-ppc'})
             archive.create_deb('linux-image-3.8.0-2-powerpc64-smp',
-                                extra_tags={'Source':
-                                            'linux-ppc'})
+                               extra_tags={'Source':
+                                           'linux-ppc'})
             archive.create_deb('linux-image-3.0.27-1-ac100',
-                                extra_tags={'Source':
-                                            'linux-ac100'})
+                               extra_tags={'Source':
+                                           'linux-ac100'})
 
             chroot.add_repository(archive.path, True, False)
 
@@ -1580,21 +1601,21 @@ class KernelDectionTest(unittest.TestCase):
             chroot.add_test_repository()
             archive = gen_fakearchive()
             archive.create_deb('linux-image-3.2.0-36-lowlatency-pae',
-                                extra_tags={'Source': 'linux-lowlatency'})
+                               extra_tags={'Source': 'linux-lowlatency'})
             archive.create_deb('linux-image-3.8.0-0-lowlatency',
-                                extra_tags={'Source': 'linux-lowlatency'})
+                               extra_tags={'Source': 'linux-lowlatency'})
             archive.create_deb('linux-image-3.5.0-18-generic',
-                                extra_tags={'Source':
-                                            'linux-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
             archive.create_deb('linux-image-3.5.0-19-generic',
-                                extra_tags={'Source':
-                                             'linux-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-lts-quantal'})
             archive.create_deb('linux-image-generic',
-                                extra_tags={'Source':
-                                            'linux-meta'})
+                               extra_tags={'Source':
+                                           'linux-meta'})
             archive.create_deb('linux-image-generic-lts-quantal',
-                                extra_tags={'Source':
-                                            'linux-meta-lts-quantal'})
+                               extra_tags={'Source':
+                                           'linux-meta-lts-quantal'})
             chroot.add_repository(archive.path, True, False)
 
             cache = apt.Cache(rootdir=chroot.path)
@@ -1617,6 +1638,7 @@ class KernelDectionTest(unittest.TestCase):
             self.assertEqual(linux, 'linux-lowlatency')
         finally:
             chroot.remove()
+
 
 if __name__ == '__main__':
     if 'umockdev' not in os.environ.get('LD_PRELOAD', ''):
