@@ -6,6 +6,7 @@
 import os.path
 import os
 
+
 def detect(apt_cache):
     if os.path.exists('/sys/module/vmxnet'):
         return ['open-vm-dkms']

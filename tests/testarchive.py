@@ -41,7 +41,7 @@ class Archive:
         # For simplification Suite and Codename are the same and we nly support
         # one arch. This can be further extended to support other archs if the
         # testsuite requires it
-        self.aptftp_conf = os.path.join(self.path,'aptftp.conf')
+        self.aptftp_conf = os.path.join(self.path, 'aptftp.conf')
         with open(self.aptftp_conf, 'w') as f:
             f.write('''
 APT::FTPArchive::Release {{
@@ -55,8 +55,7 @@ Description "Test Repository";
 }};
 '''.format(suite=self.dist, codename=self.dist, archs=" ".join(self.archs), components=" ".join(self.components)))
 
-
-        self.aptftp_generate_conf = os.path.join(self.path,'aptftpgenerate.conf')
+        self.aptftp_generate_conf = os.path.join(self.path, 'aptftpgenerate.conf')
         with open(self.aptftp_generate_conf, 'w') as f:
             f.write('''
 Dir::ArchiveDir ".";
@@ -82,7 +81,6 @@ BinDirectory "dists/{dist}/{component}/binary-{arch}" {{
   Contents "dists/{dist}/Contents-{arch}";
 }};
 '''.format(dist=self.dist, arch=arch, component=component))
-
 
     def create_deb(self, name, version='1', architecture='all',
                    dependencies={}, description='test package', extra_tags={},
@@ -170,8 +168,8 @@ Architecture: %s
         old_cwd = os.getcwd()
         try:
             os.chdir(self.path)
-            devnull = open(os.devnull, 'w')     #  Make apt-ftparchive quiet
-            dists_dir = os.path.join(self.path,'dists')
+            devnull = open(os.devnull, 'w')     # Make apt-ftparchive quiet
+            dists_dir = os.path.join(self.path, 'dists')
 
             # Completely recreates the dist directory to ensure there is no
             # leftover from a previous test.
@@ -182,20 +180,20 @@ Architecture: %s
                     os.makedirs(os.path.join(dists_dir, self.dist, component, 'binary-%s' % arch))
 
             subprocess.check_call(['apt-ftparchive', 'generate', '-c',
-                    self.aptftp_conf,
-                    self.aptftp_generate_conf],
-                stderr=devnull)
+                                   self.aptftp_conf,
+                                   self.aptftp_generate_conf],
+                                  stderr=devnull)
 
             with open(os.path.join(dists_dir, self.dist, 'Release'), 'w') as f:
                 subprocess.check_call(['apt-ftparchive', 'release', '-c',
-                        self.aptftp_conf,
-                        os.path.join(dists_dir, self.dist)],
-                    stdout=f, stderr=devnull)
+                                       self.aptftp_conf,
+                                       os.path.join(dists_dir, self.dist)],
+                                      stdout=f, stderr=devnull)
 
             # This is still required by the aptdaemon test structure
             with open('Packages', 'w') as f:
                 subprocess.check_call(['apt-ftparchive', 'packages', '.'],
-                    stdout=f, stderr=devnull)
+                                      stdout=f, stderr=devnull)
 
         finally:
             os.chdir(old_cwd)
