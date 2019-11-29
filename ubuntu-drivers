@@ -21,6 +21,12 @@ import apt
 import UbuntuDrivers.detect
 
 sys_path = os.environ.get('UBUNTU_DRIVERS_SYS_DIR')
+
+# Make sure that the PATH environment variable is set
+# See LP: #1854472
+if not os.environ.get('PATH'):
+    os.environ['PATH'] = '/sbin:/usr/sbin:/bin:/usr/bin'
+
 logger = logging.getLogger()
 logger.setLevel(logging.WARNING)
 
