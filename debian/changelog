@@ -1,8 +1,8 @@
-ubuntu-drivers-common (1:0.7.6.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.7.6.0.1) eoan; urgency=medium
 
-  * 
+  * Make sure that the PATH environment variable is set (LP: #1854472).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 29 Nov 2019 10:42:24 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 29 Nov 2019 11:06:12 +0100
 
 ubuntu-drivers-common (1:0.7.6) eoan; urgency=medium
 
