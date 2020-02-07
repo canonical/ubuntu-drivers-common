@@ -845,17 +845,43 @@ def get_linux(apt_cache):
     return kernel_detection.get_linux_metapackage()
 
 
+def get_linux_image_from_meta(apt_cache, pkg):
+    if apt_cache[pkg].candidate:
+        record = apt_cache[pkg].candidate.record
+
+    try:
+        deps = record['Depends']
+    except KeyError:
+        return None
+
+    deps_list = deps.strip().split(', ')
+    for dep in deps_list:
+        if dep.startswith('linux-image-'):
+            return dep
+
+    return None
+
+
 def get_linux_modules_metapackage(apt_cache, candidate):
     '''Return the linux-modules-$driver metapackage for the system's kernel'''
     assert candidate is not None
     metapackage = None
+    linux_flavour = ''
 
     if 'nvidia' not in candidate:
         logging.debug('Non NVIDIA linux-modules packages are not supported at this time: %s. Skipping', candidate)
         return metapackage
 
-    linux_meta = get_linux(apt_cache)
-    linux_flavour = linux_meta.replace('linux-', '')
+    linux_image_meta = get_linux_image(apt_cache)
+    # Check the actual image package, and find the flavour from there
+    linux_image = get_linux_image_from_meta(apt_cache, linux_image_meta)
+
+    if linux_image:
+        linux_flavour = linux_image.split('-')[-1]
+    else:
+        logging.error('No linux-image can be found for %s. Skipping.', candidate)
+        return metapackage
+
     candidate_flavour = candidate[candidate.rfind('-')+1:]
 
     try:

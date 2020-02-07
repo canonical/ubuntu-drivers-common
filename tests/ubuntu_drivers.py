@@ -334,11 +334,11 @@ class DetectTest(unittest.TestCase):
 
             # Linux nvidia modules
             archive.create_deb('linux-modules-nvidia-410-generic',
-                               dependencies={'Depends': 'linux-modules-nvidia-410-5.0.0-27-generic'},
+                               dependencies={'Depends': 'linux-modules-nvidia-410-5.0.0-26-generic'},
                                extra_tags={})
 
-            archive.create_deb('linux-modules-nvidia-410-5.0.0-27-generic',
-                               dependencies={'Depends': 'linux-image-5.0.0-27-generic'},
+            archive.create_deb('linux-modules-nvidia-410-5.0.0-26-generic',
+                               dependencies={'Depends': 'linux-image-5.0.0-26-generic'},
                                extra_tags={})
 
             # Image packages

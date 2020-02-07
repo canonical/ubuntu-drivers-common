@@ -77,6 +77,7 @@ class KernelDetection(object):
     def _get_linux_metapackage(self, target):
         '''Get the linux headers, linux-image or linux metapackage'''
         metapackage = ''
+        image_package = ''
         version = ''
         prefix = 'linux-%s' % ('headers' if target == 'headers' else 'image')
 
@@ -95,6 +96,7 @@ class KernelDetection(object):
                 # Here we filter out packages other than
                 # the actual image or header packages
                 if match:
+                    current_package = match.group(0)
                     current_version = '%s-%s' % (match.group(1),
                                                  match.group(2))
                     # See if the current version is greater than
@@ -102,11 +104,14 @@ class KernelDetection(object):
                     if self._is_greater_than(current_version,
                                              version):
                         version = current_version
+                        image_package = current_package
 
         if version:
-            linux_target = '%s-%s' % (prefix, version)
-            reverse_dependencies = self._find_reverse_dependencies(linux_target, prefix)
-
+            if target == 'headers':
+                target_package = image_package.replace('image', 'headers')
+            else:
+                target_package = image_package
+            reverse_dependencies = self._find_reverse_dependencies(target_package, prefix)
             if reverse_dependencies:
                 # This should be something like linux-image-$flavour
                 # or linux-headers-$flavour
@@ -114,7 +119,6 @@ class KernelDetection(object):
                     if candidate.startswith(prefix):
                         metapackage = candidate
                         break
-
                 # if we are looking for headers, then we are good
                 if target == 'meta':
                     # Let's get the metapackage
