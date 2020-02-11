@@ -2271,7 +2271,9 @@ int main(int argc, char *argv[]) {
             }
         }
         else if (boot_vga_vendor_id == NVIDIA) {
-            fprintf(log_handle, "Nothing to do\n");
+            if (remove_offload_serverlayout() == -ENOENT) {
+                fprintf(log_handle, "Nothing to do\n");
+            }
         }
     }
     else if (cards_n > 1) {
