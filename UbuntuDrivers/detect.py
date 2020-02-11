@@ -615,7 +615,7 @@ def auto_install_filter(packages):
     '''
     # any package which matches any of those globs will be accepted
     whitelist = ['bcmwl*', 'pvr-omap*', 'virtualbox-guest*', 'nvidia-*',
-                 'open-vm-tools*']
+                 'open-vm-tools*', 'oem-*-meta']
     allow = []
     for pattern in whitelist:
         allow.extend(fnmatch.filter(packages, pattern))
