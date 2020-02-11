@@ -392,6 +392,59 @@ def _get_headless_no_dkms_metapackage(pkg, apt_cache):
     return metapackage
 
 
+def system_device_specific_metapackages(apt_cache=None, sys_path=None):
+    '''Get device specific metapackages for this system
+
+    This calls system_modaliases() to determine the system's hardware and then
+    queries apt about which packages provide hardware enablement support for
+    those.
+
+    If you already have an apt.Cache() object, you should pass it as an
+    argument for efficiency. If not given, this function creates a temporary
+    one by itself.
+
+    Return a dictionary which maps package names to information about them:
+
+      driver_package → {'modalias': 'pci:...', ...}
+
+    Available information keys are:
+      'modalias':    Modalias for the device that needs this driver (not for
+                     drivers from detect plugins)
+      'syspath':     sysfs directory for the device that needs this driver
+                     (not for drivers from detect plugins)
+      'plugin':      Name of plugin that detected this package (only for
+                     drivers from detect plugins)
+      'free':        Boolean flag whether driver is free, i. e. in the "main"
+                     or "universe" component.
+      'from_distro': Boolean flag whether the driver is shipped by the distro;
+                     if not, it comes from a (potentially less tested/trusted)
+                     third party source.
+      'vendor':      Human readable vendor name, if available.
+      'model':       Human readable product name, if available.
+      'recommended': Always True; we always recommend you install these
+                     packages.
+    '''
+    modaliases = system_modaliases(sys_path)
+
+    if not apt_cache:
+        apt_cache = apt.Cache()
+
+    packages = {}
+    for alias, syspath in modaliases.items():
+        for p in packages_for_modalias(apt_cache, alias):
+            if not fnmatch.fnmatch(p.name, 'oem-*-meta'):
+                continue
+            packages[p.name] = {
+                    'modalias': alias,
+                    'syspath': syspath,
+                    'free': _is_package_free(p),
+                    'from_distro': _is_package_from_distro(p),
+                    'recommended': True,
+                }
+
+    return packages
+
+
 def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
     '''Get driver packages, for gpgpu purposes, that are available for the system.
 

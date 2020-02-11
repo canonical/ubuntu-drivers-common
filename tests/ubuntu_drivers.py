@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 # (C) 2012 Canonical Ltd.
 # Author: Martin Pitt <martin.pitt@ubuntu.com>
 #
@@ -59,6 +61,8 @@ def gen_fakehw():
     t.add_device('pci', 'purple', None, ['modalias', 'pci:v67891234d00sv00000001sd00bc00sc00i00'], [])
     # covered by tuttifrutti.deb / multiverse
     t.add_device('usb', 'aubergine', None, ['modalias', 'usb:v1234dABCDsv01sd02bc00sc01i05'], [])
+    # covered by oem-pistacchio-meta.deb
+    t.add_device('dmi', 'pistacchio', None, ['modalias', 'dmi:aaapnXPS137390:a'], [])
 
     return t
 
@@ -151,7 +155,7 @@ class DetectTest(unittest.TestCase):
             self.assertGreater(len(res), 3)
             self.assertTrue(':' in list(res)[0])
 
-    def test_system_modalises_fake(self):
+    def test_system_modaliases_fake(self):
         '''system_modaliases() for fake sysfs'''
 
         res = UbuntuDrivers.detect.system_modaliases(self.umockdev.get_sys_dir())
@@ -161,6 +165,7 @@ class DetectTest(unittest.TestCase):
             'usb:v1234dABCDsv01sd02bc00sc01i05',
             'pci:v98761234d00sv00000001sd00bc00sc00i00',
             'pci:v67891234d00sv00000001sd00bc00sc00i00',
+            'dmi:aaapnXPS137390:a',
             modalias_nv]))
         self.assertTrue(res['pci:vDEADBEEFd00'].endswith('/sys/devices/grey'))
 
@@ -568,6 +573,25 @@ class DetectTest(unittest.TestCase):
         # Get the linux-modules-nvidia module for the kernel
         # So we expect the DKMS package as a fallback
         self.assertEqual(modules_package, 'linux-modules-nvidia-410-generic')
+
+    def test_system_device_specific_metapackages_chroot1(self):
+        '''system_device_specific_metapackages() for test package repository'''
+
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            # SKU specific package for our hardware
+            archive.create_deb('oem-pistacchio-meta',
+                               extra_tags={'Modaliases':
+                                           'meta(dmi:*pnXPS137390:*, pci:*sv00001028sd00000962*)'})
+            chroot.add_repository(archive.path, True, False)
+            cache = apt.Cache(rootdir=chroot.path)
+            res = UbuntuDrivers.detect.system_device_specific_metapackages(cache, sys_path=self.umockdev.get_sys_dir())
+        finally:
+            chroot.remove()
+        self.assertTrue('oem-pistacchio-meta' in res)
 
     def test_system_driver_packages_bad_encoding(self):
         '''system_driver_packages() with badly encoded Packages index'''
