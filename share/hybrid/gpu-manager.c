@@ -1402,20 +1402,29 @@ static bool create_offload_serverlayout(void) {
     return false;
 }
 
-static void remove_prime_outputclass(void) {
-    char xorg_d_custom[PATH_MAX];
-    snprintf(xorg_d_custom, sizeof(xorg_d_custom), "%s/11-nvidia-prime.conf",
-            xorg_conf_d_path);
-    fprintf(log_handle, "Removing %s\n", xorg_d_custom);
-    unlink(xorg_d_custom);
+/* Attempt to remove a file named "name" in xorg_conf_d_path. Returns 0 if the
+ * file is successfully removed, or -errno on failure. */
+static int remove_xorg_d_custom_file(const char *name) {
+    char path[PATH_MAX];
+    struct stat st;
+
+    snprintf(path, sizeof(path), "%s/%s", xorg_conf_d_path, name);
+    if (stat(path, &st) == 0) {
+        fprintf(log_handle, "Removing %s\n", path);
+        if (unlink(path) == 0) {
+            return 0;
+        }
+    }
+
+    return -errno;
 }
 
-static void remove_offload_serverlayout(void) {
-    char xorg_d_custom[PATH_MAX];
-    snprintf(xorg_d_custom, sizeof(xorg_d_custom), "%s/11-nvidia-offload.conf",
-            xorg_conf_d_path);
-    fprintf(log_handle, "Removing %s\n", xorg_d_custom);
-    unlink(xorg_d_custom);
+static int remove_prime_outputclass(void) {
+    return remove_xorg_d_custom_file("11-nvidia-prime.conf");
+}
+
+static int remove_offload_serverlayout(void) {
+    return remove_xorg_d_custom_file("11-nvidia-offload.conf");
 }
 
 static bool manage_power_management(const struct device *device, bool enabled) {
