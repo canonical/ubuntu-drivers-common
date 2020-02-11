@@ -60,17 +60,22 @@ def create_parser():
 
     parser.add_argument('--free-only', action="store_true", default=False,
                         help='Only consider free packages')
+    parser.add_argument('--no-oem', action="store_false", default=True,
+                        dest='install_oem_meta',
+                        help='Do not include OEM enablement packages (these enable an external archive)')
     return parser
 
 def command_list(args):
     '''Show all driver packages which apply to the current system.'''
 
     packages = UbuntuDrivers.detect.system_driver_packages(
-        sys_path=sys_path, freeonly=args.free_only)
+        sys_path=sys_path, freeonly=args.free_only, include_oem=args.install_oem_meta)
+
     if packages:
         print('\n'.join(packages))
 
     return 0
+
 
 def list_gpgpu(args):
     '''Show all GPGPU driver packages which apply to the current system.'''
@@ -119,7 +124,8 @@ def command_install(args):
     cache = apt.Cache()
 
     packages = UbuntuDrivers.detect.system_driver_packages(
-        cache, sys_path, freeonly=args.free_only)
+        cache, sys_path, freeonly=args.free_only,
+        include_oem=args.install_oem_meta)
     packages = UbuntuDrivers.detect.auto_install_filter(packages)
     if not packages:
         print('No drivers found for installation.')
@@ -240,7 +246,7 @@ def command_debug(args):
     aliases = UbuntuDrivers.detect.system_modaliases()
     cache = apt.Cache()
     packages = UbuntuDrivers.detect.system_driver_packages(
-        cache, sys_path, freeonly=args.free_only)
+        cache, sys_path, freeonly=args.free_only, include_oem=args.install_oem_meta)
     auto_packages = UbuntuDrivers.detect.auto_install_filter(packages)
 
     print('=== modaliases in the system ===')

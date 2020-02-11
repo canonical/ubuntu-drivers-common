@@ -263,7 +263,7 @@ def _get_db_name(syspath, alias):
     return (vendor, model)
 
 
-def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False):
+def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, include_oem=True):
     '''Get driver packages that are available for the system.
 
     This calls system_modaliases() to determine the system's hardware and then
@@ -308,6 +308,8 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False):
     for alias, syspath in modaliases.items():
         for p in packages_for_modalias(apt_cache, alias):
             if freeonly and not _is_package_free(p):
+                continue
+            if not include_oem and fnmatch.fnmatch(p.name, 'oem-*-meta'):
                 continue
             packages[p.name] = {
                     'modalias': alias,
@@ -392,7 +394,7 @@ def _get_headless_no_dkms_metapackage(pkg, apt_cache):
     return metapackage
 
 
-def system_device_specific_metapackages(apt_cache=None, sys_path=None):
+def system_device_specific_metapackages(apt_cache=None, sys_path=None, include_oem=True):
     '''Get device specific metapackages for this system
 
     This calls system_modaliases() to determine the system's hardware and then
@@ -424,6 +426,9 @@ def system_device_specific_metapackages(apt_cache=None, sys_path=None):
       'recommended': Always True; we always recommend you install these
                      packages.
     '''
+    if not include_oem:
+        return {}
+
     modaliases = system_modaliases(sys_path)
 
     if not apt_cache:
