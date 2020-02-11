@@ -138,13 +138,41 @@ def command_install(args):
     ret = subprocess.call(['apt-get', 'install', '-o',
         'DPkg::options::=--force-confnew', '-y'] + to_install)
 
+    oem_meta_to_install = fnmatch.filter(to_install, 'oem-*-meta')
+
     # create package list
     if ret == 0 and args.package_list:
         with open(args.package_list, 'a') as f:
             f.write('\n'.join(to_install))
             f.write('\n')
+    elif ret != 0:
+        return ret
+
+    for package_to_install in oem_meta_to_install:
+        sources_list_path = os.path.join(os.path.sep,
+                                         'etc',
+                                         'apt',
+                                         'sources.list.d',
+                                         F'{package_to_install}.list')
+
+        update_ret = subprocess.call(['apt',
+                                      '-o', F'Dir::Etc::SourceList={sources_list_path}',
+                                      '-o', 'Dir::Etc::SourceParts=/dev/null',
+                                      '--no-list-cleanup',
+                                      'update'])
+
+        if update_ret != 0:
+            return update_ret
+
+    # All updates completed successfully, now let's upgrade the packages
+    if oem_meta_to_install:
+        ret = subprocess.call(['apt',
+                               'install',
+                               '-o', 'DPkg::Options::=--force-confnew',
+                               '-y'] + oem_meta_to_install)
 
     return ret
+
 
 def command_autoinstall(args):
     '''Install drivers that are appropriate for automatic installation. [DEPRECATED]'''
