@@ -39,7 +39,7 @@ def create_parser():
     command_help = 'Available commands:'
     for c in globals():
         if c.startswith('command_'):
-            name = c.split('_', 1)[1]
+            name = c.split('_', 1)[1].replace('_','-')
             commands.append(name)
             if not fnmatch.filter(deprecated, name):
                 command_help += '\n   %s: %s' % (name, globals()[c].__doc__)
@@ -73,6 +73,25 @@ def command_list(args):
 
     if packages:
         print('\n'.join(packages))
+
+    return 0
+
+def command_list_oem(args):
+    '''Show all OEM enablement packages which apply to this system'''
+
+    if not args.install_oem_meta:
+        return 0
+
+    packages = UbuntuDrivers.detect.system_device_specific_metapackages(
+        sys_path=sys_path, include_oem=args.install_oem_meta)
+
+    if packages:
+        print('\n'.join(packages))
+
+        if args.package_list:
+            with open(args.package_list, 'a') as f:
+                f.write('\n'.join(packages))
+                f.write('\n')
 
     return 0
 
@@ -304,5 +323,5 @@ else:
         parser.print_help()
         sys.exit(1)
     # run the function corresponding to the specified command
-    command = globals()['command_' + args.command]
+    command = globals()['command_' + args.command.replace('-', '_')]
     sys.exit(command(args))
