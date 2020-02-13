@@ -107,16 +107,16 @@ def _apt_cache_modalias_map(apt_cache):
     '''
     result = {}
     for package in apt_cache:
-        # skip foreign architectures, we usually only want native
-        # driver packages
-        if (not package.candidate or
-                package.candidate.architecture not in ('all', system_architecture)):
-            continue
-
         # skip packages without a modalias field
         try:
             m = package.candidate.record['Modaliases']
         except (KeyError, AttributeError, UnicodeDecodeError):
+            continue
+
+        # skip foreign architectures, we usually only want native
+        # driver packages
+        if (not package.candidate or
+                package.candidate.architecture not in ('all', system_architecture)):
             continue
 
         # skip incompatible video drivers
