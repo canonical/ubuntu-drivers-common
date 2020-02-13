@@ -1,8 +1,26 @@
-ubuntu-drivers-common (1:0.7.7) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.7.7) focal; urgency=medium
 
-  * 
+  [ Alberto Milone ]
+  * UbuntuDrivers/detect.py,
+    UbuntuDrivers/kerneldetection.py,
+    tests/ubuntu_drivers.py:
+    - Rely on the linux-image metapackage to find the flavour and
+      linux-modules.
+      This is for cases such as linux-virtual, which depend on the
+      "-generic" flavour.
+    - Fix test case where the linux-modules for the ABI shouldn't have
+      been available.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 13 Feb 2020 11:57:03 +0100
+  [ Daniel Dadap ]
+  * gpu-manager.c:
+    - Add helper to remove /usr/share/X11/xorg.conf.d files.
+      remove_prime_outputclass() and remove_offload_serverlayout() are
+      basically the same function with different target filenames, so
+      add a helper function and make both call into the new helper.
+      Also give the new helper (and the original functions) a return
+      type and value to inform callers of whether removal was successful.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 13 Feb 2020 12:03:24 +0100
 
 ubuntu-drivers-common (1:0.7.6.1) focal; urgency=medium
 
