@@ -1,8 +1,12 @@
-ubuntu-drivers-common (1:0.7.8) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.7.8) focal; urgency=medium
 
-  * 
+  * 71-u-d-c-gpu-detection.rules:
+    - Look only for the actual nvidia module.
+  * gpu-manager.c:
+    - Stricter module name matching in is_module_loaded()
+      (LP: #1848326).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 19 Feb 2020 12:28:58 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 19 Feb 2020 13:35:12 +0100
 
 ubuntu-drivers-common (1:0.7.7) focal; urgency=medium
 
