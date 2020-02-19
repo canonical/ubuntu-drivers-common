@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.7.8) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 19 Feb 2020 12:28:58 +0100
+
 ubuntu-drivers-common (1:0.7.7) focal; urgency=medium
 
   [ Alberto Milone ]
