@@ -859,7 +859,7 @@ static bool is_module_loaded(const char *module) {
     while (fgets(line, sizeof(line), file)) {
         char *tok;
         tok = strtok(line, " \t");
-        if (strstr(tok, module) != NULL) {
+        if (strcmp(tok, module) == 0) {
             status = true;
             break;
         }
