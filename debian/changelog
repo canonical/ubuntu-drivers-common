@@ -1,8 +1,12 @@
-ubuntu-drivers-common (1:0.7.8.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.7.8.1) focal; urgency=medium
 
-  * 
+  * tests/gpu-manager.py:
+    - Do not test against renamed intel modules.
+      We don't rename intel modules (such as i915-brw) any more.
+      This fixes a test failure now that we have switched to exact
+      module matching.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 20 Feb 2020 11:29:43 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 20 Feb 2020 11:31:12 +0100
 
 ubuntu-drivers-common (1:0.7.8) focal; urgency=medium
 
