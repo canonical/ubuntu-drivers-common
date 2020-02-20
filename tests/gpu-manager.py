@@ -693,7 +693,7 @@ class GpuManagerTest(unittest.TestCase):
         # Collect data
         gpu_test = self.run_manager_and_get_data(['intel'],
                                                  ['intel'],
-                                                 ['i915-brw'],
+                                                 ['i915'],
                                                  ['mesa'])
 
         # Check the variables
