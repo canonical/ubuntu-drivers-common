@@ -1,8 +1,18 @@
-ubuntu-drivers-common (1:0.8) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8) focal; urgency=medium
 
-  * 
+  [ Iain Lane ]
+  * tests:
+    - Rename ubuntu_drivers.py to test_ubuntu_drivers.py.
+  * UbuntuDrivers/detect.py:
+    - Update oem-*-meta packages after we install them.
+    - Offer oem-*-meta for installation with "ubuntu-drivers install".
+    - Check for 'Modaliases' first when building modalias -> package map.
+  * ubuntu-drivers:
+    - Add a new 'list-oem' command.
+    - Add a --no-oem flag.
+    - Allow installing device specific metapackages (LP: #1866035).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 05 Mar 2020 17:02:20 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 05 Mar 2020 17:06:28 +0100
 
 ubuntu-drivers-common (1:0.7.8.1) focal; urgency=medium
 
