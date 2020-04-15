@@ -1125,23 +1125,16 @@ static void add_connected_outputs_info(struct device **devices,
 }
 
 
-/* Check if any outputs are still connected to card0.
- *
- * By default we only check cards driver by i915.
+/* Check if any outputs are still connected the default display controller.
  * If so, then claim support for RandR offloading
  */
 static bool requires_offloading(struct device **devices,
                                 int cards_n) {
-
-    /* Let's check only /dev/dri/card0 and look
-     * for driver i915. We don't want to enable
-     * offloading to any other driver, as results
-     * may be unpredictable
-     */
     int i;
     bool status = false;
+
     for(i = 0; i < cards_n; i++) {
-        if (devices[i]->vendor_id == INTEL) {
+        if (devices[i]->boot_vga) {
             status = (devices[i]->has_connected_outputs == 1);
             break;
         }
@@ -2230,15 +2223,14 @@ int main(int argc, char *argv[]) {
                      &boot_vga_vendor_id,
                      &boot_vga_device_id);
 
-        if (boot_vga_vendor_id == INTEL) {
-            if (offloading && nvidia_unloaded) {
-                /* NVIDIA PRIME */
-                fprintf(log_handle, "PRIME detected\n");
+        if (offloading && nvidia_unloaded) {
+            fprintf(log_handle, "NVIDIA PRIME detected\n");
 
-                /* Get the details of the disabled discrete from a file */
-                find_disabled_cards(gpu_detection_path, current_devices,
-                                    &cards_n, add_gpu_from_file);
+            /* Get the details of the disabled discrete from a file */
+            find_disabled_cards(gpu_detection_path, current_devices,
+                                &cards_n, add_gpu_from_file);
 
+            if (cards_n > 1) {
                 /* Get data about the first discrete card */
                 get_first_discrete(current_devices, cards_n,
                                    &discrete_device);
@@ -2250,12 +2242,8 @@ int main(int argc, char *argv[]) {
                     /* Write permanent settings about offloading */
                     set_offloading();
                 }
-                goto end;
             }
-            else {
-                fprintf(log_handle, "Nothing to do\n");
-                }
-            }
+        }
         else if (boot_vga_vendor_id == AMD) {
             if (has_changed && amdgpu_loaded && amdgpu_is_pro && amdgpu_pro_px_installed) {
                 /* If amdgpu-pro-px exists, we can assume it's a pxpress system. But now the
@@ -2275,62 +2263,44 @@ int main(int argc, char *argv[]) {
                 fprintf(log_handle, "Nothing to do\n");
             }
         }
+        else {
+            fprintf(log_handle, "Nothing to do\n");
+        }
     }
     else if (cards_n > 1) {
-        /* Get data about the boot_vga card */
-        get_boot_vga(current_devices, cards_n,
-                     &boot_vga_vendor_id,
-                     &boot_vga_device_id);
-
         /* Get data about the first discrete card */
         get_first_discrete(current_devices, cards_n,
                            &discrete_device);
 
-        /* Intel + another GPU */
-        if (boot_vga_vendor_id == INTEL) {
-            fprintf(log_handle, "Intel IGP detected\n");
-            /* AMDGPU-Pro Switchable */
-            if (has_changed && amdgpu_loaded && amdgpu_is_pro && amdgpu_pro_px_installed) {
-                /* Similar to switchable enabled -> disabled case, but this time
-                 * to deal with switchable disabled -> enabled change.
-                 */
-                fprintf(log_handle, "AMDGPU-Pro switchable graphics detected\n");
+        if (discrete_device.vendor_id == AMD && has_changed &&
+            amdgpu_loaded && amdgpu_is_pro && amdgpu_pro_px_installed) {
+            /* Similar to switchable enabled -> disabled case, but this time
+             * to deal with switchable disabled -> enabled change.
+             */
+            fprintf(log_handle, "AMDGPU-Pro switchable graphics detected\n");
 
-                run_amdgpu_pro_px(MODE_POWERSAVING);
-            }
-            /* NVIDIA Optimus */
-            else if (offloading && (intel_loaded && !nouveau_loaded &&
-                                 (nvidia_loaded || nvidia_kmod_available))) {
-                fprintf(log_handle, "Intel hybrid system\n");
+            run_amdgpu_pro_px(MODE_POWERSAVING);
+        }
+        else if (offloading && !nouveau_loaded &&
+                 (nvidia_loaded || nvidia_kmod_available)) {
+            fprintf(log_handle, "NVIDIA PRIME detected\n");
 
-                /* Try to enable prime */
-                if (enable_prime(prime_settings,
-                             &discrete_device, current_devices, cards_n)) {
-
-                    /* Write permanent settings about offloading */
-                    set_offloading();
-                }
-                else {
-                    fprintf(log_handle, "Nothing to do\n");
-                }
-
-                goto end;
+            /* Try to enable prime */
+            if (enable_prime(prime_settings,
+                         &discrete_device, current_devices, cards_n)) {
+                /* Write permanent settings about offloading */
+                set_offloading();
             }
             else {
-                /* Desktop system or Laptop with open drivers only */
-                fprintf(log_handle, "Desktop system detected\n");
-                fprintf(log_handle, "or laptop with open drivers\n");
                 fprintf(log_handle, "Nothing to do\n");
             }
         }
         else {
-                fprintf(log_handle, "Unsupported discrete card vendor: %x\n", discrete_device.vendor_id);
-                fprintf(log_handle, "Nothing to do\n");
+            /* Desktop system or Laptop with open drivers only */
+            fprintf(log_handle, "System with free drivers detected\n");
+            fprintf(log_handle, "Nothing to do\n");
         }
     }
-
-
-
 
 end:
     if (pci_init == 0)
