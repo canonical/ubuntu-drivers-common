@@ -71,8 +71,19 @@ def command_list(args):
     packages = UbuntuDrivers.detect.system_driver_packages(
         sys_path=sys_path, freeonly=args.free_only, include_oem=args.install_oem_meta)
 
-    if packages:
-        print('\n'.join(packages))
+    cache = apt.Cache()
+    for package in packages:
+        try:
+            linux_modules = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, package)
+            if (not linux_modules and package.find('dkms') != -1):
+                linux_modules = package
+
+            if linux_modules:
+                print('%s, (kernel modules provided by %s)' % (package, linux_modules))
+            else:
+                print(package)
+        except KeyError:
+            print(package)
 
     return 0
 
@@ -155,6 +166,13 @@ def command_install(args):
     for p in packages:
         if not cache[p].installed:
             to_install.append(p)
+            # Add the matching linux modules package when available
+            try:
+                modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, p)
+                if modules_package and not cache[modules_package].installed:
+                    to_install.append(modules_package)
+            except KeyError:
+                pass
 
     if not packages:
         print('All the available drivers are already installed.')
