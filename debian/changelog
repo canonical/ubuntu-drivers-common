@@ -1,8 +1,26 @@
-ubuntu-drivers-common (1:0.8.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8.1) focal; urgency=medium
 
-  * 
+  [ Alberto Milone ]
+  * UbuntuDrivers/detect.py,
+    UbuntuDrivers/kerneldetection.py,
+    tests/test_ubuntu_drivers.py,
+    ubuntu-drivers:
+    - Add tests for the -generic-hwe-20.04 flavour and for
+      the -oem-20.04 linux flavour.
+    - Add detection logic to get the linux metapackage and
+      linux-modules for -hwe-20.04 (LP: #1873867).
+    - List the modules provider when it is either a dkms package
+      or a linux-modules package.
+    - Install linux-modules packages when available.
+      This makes the NVIDIA drivers work with Secure Boot.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 20 Apr 2020 17:04:37 +0200
+  [ Dimitri John Ledkov ]
+  * UbuntuDrivers/detect.py,
+    UbuntuDrivers/kerneldetection.py:
+    - Use exact matching in find_reverse_deps() with both
+      installed and candidate.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 21 Apr 2020 21:14:15 +0200
 
 ubuntu-drivers-common (1:0.8) focal; urgency=medium
 
