@@ -2279,6 +2279,124 @@ class KernelDectionTest(unittest.TestCase):
         finally:
             chroot.remove()
 
+    def test_linux_detection_names_chroot8(self):
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            archive.create_deb('linux-image-5.4.0-25-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-5.3.0-29-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-5.4.0-24-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-5.6.0-1007-oem',
+                               extra_tags={'Source': 'linux-signed-oem-5.6'})
+
+            archive.create_deb('linux-headers-5.4.0-24-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-headers-5.4.0-25-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-headers-5.6.0-1007-oem',
+                               extra_tags={'Source': 'linux-oem-5.6'})
+
+            archive.create_deb('linux-image-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic, '
+                                                        'linux-headers-5.4.0-25-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-image-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-image-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-image-generic-hwe-20.04, '
+                                                        'linux-headers-generic-hwe-20.04'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-oem-20.04',
+                               dependencies={'Depends': 'linux-image-oem-20.04, '
+                                                        'linux-headers-oem-20.04'},
+                               extra_tags={'Source': 'linux-meta-oem-5.6'})
+
+            archive.create_deb('linux-image-oem-20.04',
+                               dependencies={'Depends': 'linux-image-5.6.0-1007-oem'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-headers-oem-20.04',
+                               dependencies={'Depends': 'linux-headers-5.6.0-1007-oem'},
+                               extra_tags={'Source': 'linux-meta-oem-5.6'})
+
+            archive.create_deb('linux-headers-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-headers-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-headers-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-headers-generic'},
+                               extra_tags={})
+            archive.create_deb('linux-headers-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-headers-generic'},
+                               extra_tags={})
+
+            chroot.add_repository(archive.path, True, False)
+
+            cache = apt.Cache(rootdir=chroot.path)
+
+            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
+            linux = kernel_detection.get_linux_metapackage()
+            self.assertEqual(linux, '')
+
+            # Install kernel packages
+            for pkg in ('linux-image-5.4.0-25-generic',
+                        'linux-image-5.4.0-24-generic',
+                        'linux-image-5.3.0-29-generic',
+                        'linux-image-5.6.0-1007-oem',
+                        'linux-headers-5.4.0-24-generic',
+                        'linux-headers-5.4.0-25-generic',
+                        'linux-headers-5.6.0-1007-oem',
+                        'linux-image-generic-hwe-18.04',
+                        'linux-image-generic-hwe-18.04-edge',
+                        'linux-image-generic-hwe-20.04',
+                        'linux-image-oem-20.04',
+                        'linux-headers-generic-hwe-18.04',
+                        'linux-headers-generic-hwe-18.04-edge',
+                        'linux-headers-generic-hwe-20.04',
+                        'linux-headers-oem-20.04',
+                        'linux-generic-hwe-18.04',
+                        'linux-generic-hwe-18.04-edge',
+                        'linux-generic-hwe-20.04',
+                        'linux-oem-20.04',
+                        'linux-image-generic'):
+                cache[pkg].mark_install()
+
+            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
+            linux = kernel_detection.get_linux_metapackage()
+            self.assertEqual(linux, 'linux-oem-20.04')
+        finally:
+            chroot.remove()
+
 
 if __name__ == '__main__':
     if 'umockdev' not in os.environ.get('LD_PRELOAD', ''):
