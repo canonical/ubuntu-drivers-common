@@ -74,6 +74,17 @@ class KernelDetection(object):
                     deps.append(pkg.name)
         return deps
 
+    def _get_linux_flavour(self, candidates, image):
+        pattern = re.compile('linux-image-([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)-(.+)')
+        match = pattern.match(image)
+        flavour = ''
+        if match:
+            version = match.group(1)
+            abi = match.group(2)
+            flavour = match.group(3)
+
+        return flavour
+
     def _get_linux_metapackage(self, target):
         '''Get the linux headers, linux-image or linux metapackage'''
         metapackage = ''
@@ -115,19 +126,30 @@ class KernelDetection(object):
             if reverse_dependencies:
                 # This should be something like linux-image-$flavour
                 # or linux-headers-$flavour
+                metapackage = ''
                 for candidate in reverse_dependencies:
-                    if candidate.startswith(prefix):
+                    if (candidate.startswith(prefix) and
+                        candidate.replace(prefix, '') > metapackage.replace(prefix, '')):
                         metapackage = candidate
-                        break
+
                 # if we are looking for headers, then we are good
                 if target == 'meta':
                     # Let's get the metapackage
                     reverse_dependencies = self._find_reverse_dependencies(metapackage, 'linux-')
-
                     if reverse_dependencies:
+                        flavour = self._get_linux_flavour(reverse_dependencies, target_package)
+                        linux_meta = ''
+                        for meta in reverse_dependencies:
+                            # For example linux-generic-hwe-20.04
+                            if meta.startswith('linux-%s-' % (flavour)):
+                                linux_meta = meta
+                                break
                         # This should be something like linux-$flavour
-                        metapackage = reverse_dependencies[0]
-
+                        if not linux_meta:
+                            # Try the 1st reverse dependency
+                            metapackage = reverse_dependencies[0]
+                        else:
+                            metapackage = linux_meta
         return metapackage
 
     def get_linux_headers_metapackage(self):
