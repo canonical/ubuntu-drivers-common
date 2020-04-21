@@ -902,6 +902,7 @@ def get_linux(apt_cache):
     kernel_detection = kerneldetection.KernelDetection(apt_cache)
     return kernel_detection.get_linux_metapackage()
 
+
 def find_reverse_dependencies(apt_cache, package, prefix):
     '''Return the reverse dependencies for a package'''
     # prefix to restrict the searching
@@ -918,6 +919,7 @@ def find_reverse_dependencies(apt_cache, package, prefix):
             if package in dependencies:
                 deps.append(pkg.name)
     return deps
+
 
 def get_linux_image_from_meta(apt_cache, pkg):
     if apt_cache[pkg].candidate:

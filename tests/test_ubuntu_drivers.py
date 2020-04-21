@@ -630,7 +630,6 @@ class DetectTest(unittest.TestCase):
                                dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
                                extra_tags={})
 
-
             archive.create_deb('linux-modules-nvidia-435-generic',
                                dependencies={'Depends': 'linux-modules-nvidia-435-5.4.0-25-generic'},
                                extra_tags={})
@@ -720,7 +719,6 @@ class DetectTest(unittest.TestCase):
             chroot.add_repository(archive.path, True, False)
             cache = apt.Cache(rootdir=chroot.path)
 
-
             # Install kernel packages
             for pkg in ('linux-image-5.4.0-25-generic',
                         'linux-image-5.4.0-24-generic',
@@ -756,7 +754,6 @@ class DetectTest(unittest.TestCase):
         # Get the linux-modules-nvidia module for the kernel
         # So we expect the DKMS package as a fallback
         self.assertEqual(modules_package, 'linux-modules-nvidia-440-generic-hwe-20.04')
-
 
     def test_system_device_specific_metapackages_chroot1(self):
         '''system_device_specific_metapackages() for test package repository'''
@@ -2183,7 +2180,6 @@ class KernelDectionTest(unittest.TestCase):
             self.assertEqual(linux, 'linux-generic-hwe-18.04')
         finally:
             chroot.remove()
-
 
     def test_linux_detection_names_chroot7(self):
         chroot = aptdaemon.test.Chroot()

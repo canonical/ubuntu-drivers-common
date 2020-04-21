@@ -75,12 +75,10 @@ class KernelDetection(object):
         return deps
 
     def _get_linux_flavour(self, candidates, image):
-        pattern = re.compile('linux-image-([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)-(.+)')
+        pattern = re.compile(r'linux-image-([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)-(.+)')
         match = pattern.match(image)
         flavour = ''
         if match:
-            version = match.group(1)
-            abi = match.group(2)
             flavour = match.group(3)
 
         return flavour
@@ -129,7 +127,7 @@ class KernelDetection(object):
                 metapackage = ''
                 for candidate in reverse_dependencies:
                     if (candidate.startswith(prefix) and
-                        candidate.replace(prefix, '') > metapackage.replace(prefix, '')):
+                            candidate.replace(prefix, '') > metapackage.replace(prefix, '')):
                         metapackage = candidate
 
                 # if we are looking for headers, then we are good
