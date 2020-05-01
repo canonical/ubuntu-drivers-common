@@ -1335,19 +1335,21 @@ static bool run_amdgpu_pro_px(amdgpu_pro_px_action action) {
 
 static bool create_prime_outputclass(void) {
     _cleanup_fclose_ FILE *file = NULL;
-    _cleanup_free_ char *multiarch = NULL;
+    _cleanup_free_ char *machine = NULL;
+    char multiarch[30];
     char command[100];
     char xorg_d_custom[PATH_MAX];
 
     snprintf(xorg_d_custom, sizeof(xorg_d_custom), "%s/11-nvidia-prime.conf",
              xorg_conf_d_path);
 
-    snprintf(command, sizeof(command),
-             "/usr/bin/dpkg-architecture -qDEB_HOST_MULTIARCH");
+    snprintf(command, sizeof(command), "uname -m"); // x86_64, etc.
 
-    multiarch = get_output(command, NULL, NULL);
-    if (!multiarch)
+    machine = get_output(command, NULL, NULL);
+    if (!machine)
         return false;
+
+    snprintf(multiarch, sizeof(multiarch), "%s-linux-gnu", machine); // x86_64, etc.
 
     fprintf(log_handle, "Creating %s\n", xorg_d_custom);
     file = fopen(xorg_d_custom, "w");
