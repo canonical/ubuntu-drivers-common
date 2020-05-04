@@ -49,6 +49,7 @@ Depends: ${python3:Depends},
  usbutils,
  alsa-utils,
  kmod | module-init-tools,
+ dpkg-dev
 Suggests: python3-aptdaemon.pkcompat
 Replaces: nvidia-common (<< 1:0.2.46), jockey-common, jockey-gtk, jockey-kde
 Conflicts: nvidia-common (<< 1:0.2.46), jockey-common, jockey-gtk, jockey-kde
