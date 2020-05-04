@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.8.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8.3) groovy; urgency=medium
 
-  * 
+  * debian/control:
+    - Replace build dependency on lib32gcc1 with lib32gcc-s1.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 04 May 2020 16:18:39 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 04 May 2020 16:21:39 +0200
 
 ubuntu-drivers-common (1:0.8.2) groovy; urgency=medium
 
