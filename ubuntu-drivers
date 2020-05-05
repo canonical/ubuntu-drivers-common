@@ -10,7 +10,7 @@
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 
-import argparse
+import click
 import subprocess
 import fnmatch
 import sys
@@ -30,40 +30,41 @@ if not os.environ.get('PATH'):
 logger = logging.getLogger()
 logger.setLevel(logging.WARNING)
 
-def create_parser():
-    '''Create parser for command line arguments.'''
-    deprecated = ('autoinstall',)
+CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
-    # build help for commands
-    commands = []
-    command_help = 'Available commands:'
-    for c in globals():
-        if c.startswith('command_'):
-            name = c.split('_', 1)[1].replace('_','-')
-            commands.append(name)
-            if not fnmatch.filter(deprecated, name):
-                command_help += '\n   %s: %s' % (name, globals()[c].__doc__)
+class Config(object):
+    def __init__(self):
+        self.gpgpu = False
+        self.free_only = False
+        self.package_list = ''
+        self.install_oem_meta = True
 
-    parser = argparse.ArgumentParser(description='List/install driver packages for Ubuntu.',
-            epilog=command_help, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('command', metavar='<command>', nargs='?', choices=commands,
-            help='See the "Available commands" section below')
+pass_config = click.make_pass_decorator(Config, ensure=True)
 
-    parser.add_argument('--package-list', metavar='PATH', 
-            help='Create file with list of installed packages (in install mode)')
+# def create_parser():
+#     '''Create parser for command line arguments.'''
+#     parser = argparse.ArgumentParser()
+#     #parser.add_argument('manifest-file', help='The .manifest file of the NVIDIA installer')
 
-    if sys.version_info.major == 3 and sys.version_info.minor >= 6:
-        parser.add_argument("--gpgpu", const='default', nargs='?', metavar='driver[:version][,driver[:version]]', help="Install GPGPU drivers")
-    else:
-        # Python 3.5.2 in Xenial will crash when matching square brackets
-        parser.add_argument("--gpgpu", const='default', nargs='?', metavar='driver{:version}{,driver{:version}}', help="Install GPGPU drivers")
+#     if sys.version_info.major == 3 and sys.version_info.minor >= 6:
+#         parser.add_argument("install", nargs='?', default='', metavar='install [--gpgpu]driver[:version][,driver[:version]]', help="Install drivers")
+#     else:
+#         # Python 3.5.2 in Xenial will crash when matching square brackets
+#         parser.add_argument("install", nargs='?', default='', metavar='install {--gpgpu}driver{:version}{,driver{:version}}', help="Install drivers")
 
-    parser.add_argument('--free-only', action="store_true", default=False,
-                        help='Only consider free packages')
-    parser.add_argument('--no-oem', action="store_false", default=True,
-                        dest='install_oem_meta',
-                        help='Do not include OEM enablement packages (these enable an external archive)')
-    return parser
+#     parser.add_argument("list", default='', metavar='list [--gpgpu]', help="List drivers")
+#     parser.add_argument("debug", default='', metavar='debug', help="")
+#     parser.add_argument('--package-list', metavar='PATH',
+#                 help='Create file with list of installed packages (in install mode)')
+#     parser.add_argument('--free-only', action="store_true", default=False,
+#                         help='Only consider free packages')
+#     parser.add_argument('--no-oem', action="store_false", default=True,
+#                         dest='install_oem_meta',
+#                         help='Do not include OEM enablement packages (these enable an external archive)')
+#     parser.add_argument('--gpgpu', action="store_true", default=False, help='To be used with the "install" and list "commands"')
+
+
+#     return parser
 
 def command_list(args):
     '''Show all driver packages which apply to the current system.'''
@@ -329,17 +330,134 @@ def command_debug(args):
 #
 # main
 #
-parser = create_parser()
-args = parser.parse_args()
 
-if args.command == 'install' and args.gpgpu != None:
-    sys.exit(install_gpgpu(args))
-elif args.command == 'list' and args.gpgpu != None:
-    sys.exit(list_gpgpu(args))
-else:
-    if not args.command:
-        parser.print_help()
-        sys.exit(1)
-    # run the function corresponding to the specified command
-    command = globals()['command_' + args.command.replace('-', '_')]
-    sys.exit(command(args))
+
+@click.group(context_settings=CONTEXT_SETTINGS)
+@click.option('--gpgpu', is_flag=True, help='gpgpu drivers')
+@click.option('--free-only', is_flag=True, help='Only consider free packages')
+@click.option('--package-list', nargs=1, metavar='PATH', help='Create file with list of installed packages (in install mode)')
+@click.option('--no-oem', is_flag=True, default=False, show_default=True, metavar='install_oem_meta', help='Do not include OEM enablement packages (these enable an external archive)')
+@pass_config
+def greet(config, gpgpu, free_only, package_list, no_oem, **kwargs):
+    if gpgpu:
+        click.echo('This is gpgpu mode')
+        config.gpu = True
+    if free_only:
+        config.free_only = True
+    if package_list:
+        config.package_list = package_list
+    if no_oem:
+        config.no_oem = install_oem_meta
+
+
+@greet.command()
+@click.argument('driver', nargs=-1)  # add the name argument
+@click.option('--gpgpu', is_flag=True, help='gpgpu drivers')
+@click.option('--free-only', is_flag=True, help='Only consider free packages')
+@click.option('--package-list', nargs=1, metavar='PATH', help='Create file with list of installed packages (in install mode)')
+@click.option('--no-oem', is_flag=True, metavar='install_oem_meta', help='Do not include OEM enablement packages (these enable an external archive)')
+@pass_config
+def install(config, **kwargs):
+    '''Install a driver [driver[:version][,driver[:version]]]'''
+    if kwargs.get('gpgpu'):
+        config.gpgpu = True
+    if kwargs.get('free_only'):
+        config.free_only = True
+    if kwargs.get('package_list'):
+        config.package_list = kwargs.get('package_list')
+    if kwargs.get('no_oem'):
+        config.package_list = kwargs.get('no_oem')
+
+    if config.gpgpu:
+        install_gpgpu(config)
+    else:
+        command_install(config)
+
+@greet.command()
+@click.argument('driver', nargs=-1)  # add the name argument
+@pass_config
+def autoinstall(config, **kwargs):
+    '''Deprecated, please use "install" instead'''
+    #print('install, {0}'.format(kwargs['driver']))
+    install(kwargs['driver'])
+
+
+@greet.command()
+@click.argument('list', nargs=-1)
+@click.option('--gpgpu', is_flag=True, help='gpgpu drivers')
+@click.option('--free-only', is_flag=True, help='Only consider free packages')
+@pass_config
+def list(config, **kwargs):
+    '''Show all driver packages which apply to the current system.'''
+
+    packages = UbuntuDrivers.detect.system_driver_packages(
+        sys_path=sys_path, freeonly=config.free_only, include_oem=config.install_oem_meta)
+
+    cache = apt.Cache()
+    for package in packages:
+        try:
+            linux_modules = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, package)
+            if (not linux_modules and package.find('dkms') != -1):
+                linux_modules = package
+
+            if linux_modules:
+                print('%s, (kernel modules provided by %s)' % (package, linux_modules))
+            else:
+                print(package)
+        except KeyError:
+            print(package)
+
+    return 0
+
+@greet.command()
+@click.argument('list-oem', nargs=-1)
+@pass_config
+def list_oem(config, **kwargs):
+    '''Show all OEM enablement packages which apply to this system'''
+    command_list_oem(config)
+
+@greet.command()
+@click.argument('debug', nargs=-1)  # add the name argument
+@pass_config
+def debug(config, **kwargs):
+    '''Print all available information and debug data about drivers.'''
+    command_debug(config)
+
+@greet.command()
+@click.argument('devices', nargs=-1)  # add the name argument
+@click.option('--free-only', is_flag=True, help='Only consider free packages')
+@pass_config
+def devices(config, **kwargs):
+    '''Show all devices which need drivers, and which packages apply to them.'''
+    if kwargs.get('free_only'):
+        config.free_only = True
+    command_devices(config)
+
+
+if __name__ == '__main__':
+    greet()
+
+
+
+
+# parser = create_parser()
+# args = parser.parse_args()
+
+# if args.debug:
+#     sys.exit(command_debug(args))
+
+# if args.list:
+#     if args.gpgpu:
+#         sys.exit(list_gpgpu(args))
+#     else:
+#         sys.exit(command_list(args))
+# elif args.install:
+#     if args.gpgpu:
+#         sys.exit(install_gpgpu(args))
+#     else:
+#         sys.exit(command_install(args))
+
+# else:
+#     if not args.command:
+#         parser.print_help()
+#         sys.exit(1)
