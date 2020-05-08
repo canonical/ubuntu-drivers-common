@@ -38,6 +38,7 @@ class Config(object):
         self.free_only = False
         self.package_list = ''
         self.install_oem_meta = True
+        self.driver_string = ''
 
 pass_config = click.make_pass_decorator(Config, ensure=True)
 
@@ -157,7 +158,7 @@ def command_install(args):
     packages = UbuntuDrivers.detect.system_driver_packages(
         cache, sys_path, freeonly=args.free_only,
         include_oem=args.install_oem_meta)
-    packages = UbuntuDrivers.detect.auto_install_filter(packages)
+    packages = UbuntuDrivers.detect.auto_install_filter(packages, args.driver_string)
     if not packages:
         print('No drivers found for installation.')
         return
@@ -225,10 +226,7 @@ def command_autoinstall(args):
 def install_gpgpu(args):
     '''Install GPGPU drivers that are appropriate for your hardware.'''
     candidate = ''
-    # No args, just --gpgpu
-    if args.gpgpu == 'default':
-        not_found_exit_status = 0
-    else:
+    if args.driver_string:
         # Just one driver
         # e.g. --gpgpu 390
         #      --gpgpu nvidia:390
@@ -236,11 +234,14 @@ def install_gpgpu(args):
         # Or Multiple drivers
         # e.g. --gpgpu nvidia:390,amdgpu
         not_found_exit_status = 1
+    else:
+        # No args, just --gpgpu
+        not_found_exit_status = 0
 
     cache = apt.Cache()
 
     packages = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path)
-    packages = UbuntuDrivers.detect.gpgpu_install_filter(packages, args.gpgpu)
+    packages = UbuntuDrivers.detect.gpgpu_install_filter(packages, args.driver_string)
     if not packages:
         print('No drivers found for installation.')
         return not_found_exit_status
@@ -363,10 +364,16 @@ def install(config, **kwargs):
         config.gpgpu = True
     if kwargs.get('free_only'):
         config.free_only = True
+
+    # if kwargs.get('package_list'):
+    #     config.package_list = kwargs.get('package_list')
     if kwargs.get('package_list'):
-        config.package_list = kwargs.get('package_list')
+        config.package_list = ''.join(kwargs.get('package_list'))
     if kwargs.get('no_oem'):
-        config.package_list = kwargs.get('no_oem')
+        config.no_oem = kwargs.get('no_oem')
+
+    if kwargs.get('driver'):
+        config.driver_string = ''.join(kwargs.get('driver'))
 
     if config.gpgpu:
         install_gpgpu(config)
@@ -379,7 +386,18 @@ def install(config, **kwargs):
 def autoinstall(config, **kwargs):
     '''Deprecated, please use "install" instead'''
     #print('install, {0}'.format(kwargs['driver']))
-    install(kwargs['driver'])
+
+    if kwargs.get('free_only'):
+        config.free_only = True
+    # if kwargs.get('package_list'):
+    #     config.package_list = kwargs.get('package_list')
+    if kwargs.get('package_list'):
+        config.package_list = ''.join(kwargs.get('package_list'))
+
+    if kwargs.get('driver'):
+        config.driver_string = ''.join(kwargs.get('driver'))
+
+    install(config)
 
 
 @greet.command()
@@ -389,23 +407,30 @@ def autoinstall(config, **kwargs):
 @pass_config
 def list(config, **kwargs):
     '''Show all driver packages which apply to the current system.'''
-
-    packages = UbuntuDrivers.detect.system_driver_packages(
-        sys_path=sys_path, freeonly=config.free_only, include_oem=config.install_oem_meta)
-
     cache = apt.Cache()
-    for package in packages:
-        try:
-            linux_modules = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, package)
-            if (not linux_modules and package.find('dkms') != -1):
-                linux_modules = package
 
-            if linux_modules:
-                print('%s, (kernel modules provided by %s)' % (package, linux_modules))
-            else:
+    if kwargs.get('gpgpu'):
+        packages = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path)
+        for package in packages:
+            candidate = packages[package]['metapackage']
+            if candidate:
+                print('%s, (kernel modules provided by %s)' % (candidate, UbuntuDrivers.detect.get_linux_modules_metapackage(cache, candidate)))
+    else:
+        packages = UbuntuDrivers.detect.system_driver_packages(
+            sys_path=sys_path, freeonly=config.free_only, include_oem=config.install_oem_meta)
+
+        for package in packages:
+            try:
+                linux_modules = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, package)
+                if (not linux_modules and package.find('dkms') != -1):
+                    linux_modules = package
+
+                if linux_modules:
+                    print('%s, (kernel modules provided by %s)' % (package, linux_modules))
+                else:
+                    print(package)
+            except KeyError:
                 print(package)
-        except KeyError:
-            print(package)
 
     return 0
 
