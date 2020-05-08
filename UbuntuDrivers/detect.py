@@ -389,15 +389,15 @@ def _get_headless_no_dkms_metapackage(pkg, apt_cache):
     This is useful when dealing with packages such as nvidia-driver-$flavour
     whose headless-no-dkms metapackage would be nvidia-headless-no-dkms-$flavour
     '''
-    headless_template = 'nvidia-headless-no-dkms-%s'
     name = pkg.shortname
-    flavour = name[name.rfind('-')+1:]
-    try:
-        int(flavour)
-    except ValueError:
+    pattern = re.compile('nvidia-driver-([0-9]+)(.*)')
+    match = pattern.match(name)
+    if not match:
+        logging.error('No flavour can be found in %s. Skipping.', name)
         return metapackage
 
-    candidate = headless_template % flavour
+    candidate_flavour = '%s%s' % (match.group(1), match.group(2))
+    candidate = 'nvidia-headless-no-dkms-%s' % (candidate_flavour)
 
     try:
         package = apt_cache.__getitem__(candidate)
@@ -533,7 +533,7 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
     # Add "recommended" flags for NVidia alternatives
     nvidia_packages = [p for p in packages if p.startswith('nvidia-')]
     if nvidia_packages:
-        nvidia_packages.sort(key=functools.cmp_to_key(_cmp_gfx_alternatives))
+        nvidia_packages.sort(key=functools.cmp_to_key(_cmp_gfx_alternatives_gpgpu))
         recommended = nvidia_packages[-1]
         for p in nvidia_packages:
             packages[p]['recommended'] = (p == recommended)
@@ -629,29 +629,6 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
     return result
 
 
-def auto_install_filter(packages):
-    '''Get packages which are appropriate for automatic installation.
-
-    Return the subset of the given list of packages which are appropriate for
-    automatic installation by the installer. This applies to e. g. the Broadcom
-    Wifi driver (as there is no alternative), but not to the FGLRX proprietary
-    graphics driver (as the free driver works well and FGLRX does not provide
-    KMS).
-    '''
-    # any package which matches any of those globs will be accepted
-    whitelist = ['bcmwl*', 'pvr-omap*', 'virtualbox-guest*', 'nvidia-*',
-                 'open-vm-tools*', 'oem-*-meta']
-    allow = []
-    for pattern in whitelist:
-        allow.extend(fnmatch.filter(packages, pattern))
-
-    result = {}
-    for p in allow:
-        if 'recommended' not in packages[p] or packages[p]['recommended']:
-            result[p] = packages[p]
-    return result
-
-
 class _GpgpuDriver(object):
 
     def __init__(self, vendor=None, flavour=None):
@@ -670,26 +647,22 @@ class _GpgpuDriver(object):
 def _process_driver_string(string):
     '''Returns a _GpgpuDriver object'''
     driver = _GpgpuDriver()
-    if string.find(':') != -1:
-        details = string.split(':')
-        # Remove empty strings
-        details = [x for x in details if x.strip()]
-        if len(details) != 2:
-            return None
-        for elem in details:
-            try:
-                int(elem)
-            except ValueError:
-                driver.vendor = elem
-            else:
-                driver.flavour = elem
-    else:
-        try:
-            int(string)
-        except ValueError:
-            driver.vendor = string
-        else:
-            driver.flavour = string
+
+    full_pattern = re.compile('(.+):([0-9]+)(.*)')
+    vendor_only_pattern = re.compile('([a-z]+)')
+    series_only_pattern = re.compile('([0-9]+)(.*)')
+
+    full_match = full_pattern.match(string)
+    vendor_match = vendor_only_pattern.match(string)
+    series_match = series_only_pattern.match(string)
+
+    if full_match:
+        driver.vendor = full_match.group(1)
+        driver.flavour = '%s%s' % (full_match.group(2), full_match.group(3))
+    elif vendor_match:
+        driver.vendor = string
+    elif series_match:
+        driver.flavour = '%s%s' % (series_match.group(1), series_match.group(2))
 
     return driver
 
@@ -717,15 +690,10 @@ def gpgpu_install_filter(packages, drivers_str):
     ubuntu-drivers autoinstall --gpgpu nvidia:390,amdgpu
     ubuntu-drivers autoinstall --gpgpu amdgpu:version
     '''
-
     if not packages:
         return result
 
-    # No args, just --gpgpu
-    if drivers_str == 'default':
-        driver = _GpgpuDriver()
-        drivers.append(driver)
-    else:
+    if drivers_str:
         # Just one driver
         # e.g. --gpgpu 390
         #      --gpgpu nvidia:390
@@ -736,6 +704,10 @@ def gpgpu_install_filter(packages, drivers_str):
             driver = _process_driver_string(item)
             if driver and driver.is_valid():
                 drivers.append(driver)
+    else:
+        # No args, just --gpgpu
+        driver = _GpgpuDriver()
+        drivers.append(driver)
 
     if len(drivers) < 1:
         return result
@@ -771,10 +743,9 @@ def gpgpu_install_filter(packages, drivers_str):
     # any package which matches any of those globs will be accepted
     for driver in drivers:
         if driver.flavour:
-            pattern = '%s*%s*' % (driver.vendor, driver.flavour)
+            pattern = '%s*%s' % (driver.vendor, driver.flavour)
         else:
             pattern = '%s*' % (driver.vendor)
-        # print('pattern: %s' % pattern)
         allow.extend(fnmatch.filter(packages, pattern))
         # print(allow)
 
@@ -793,6 +764,35 @@ def gpgpu_install_filter(packages, drivers_str):
                         result[p] = packages[p]
                         # print('Found "recommended" flavour in %s' % (packages[p]))
                 break
+    return result
+
+
+def auto_install_filter(packages, drivers_str=''):
+    '''Get packages which are appropriate for automatic installation.
+
+    Return the subset of the given list of packages which are appropriate for
+    automatic installation by the installer. This applies to e. g. the Broadcom
+    Wifi driver (as there is no alternative), but not to the FGLRX proprietary
+    graphics driver (as the free driver works well and FGLRX does not provide
+    KMS).
+    '''
+    # any package which matches any of those globs will be accepted
+    whitelist = ['bcmwl*', 'pvr-omap*', 'virtualbox-guest*', 'nvidia-*',
+                 'open-vm-tools*', 'oem-*-meta']
+
+    # If users specify a driver, use gpgpu_install_filter()
+    if drivers_str:
+        results = gpgpu_install_filter(packages, drivers_str)
+        return results
+
+    allow = []
+    for pattern in whitelist:
+        allow.extend(fnmatch.filter(packages, pattern))
+
+    result = {}
+    for p in allow:
+        if 'recommended' not in packages[p] or packages[p]['recommended']:
+            result[p] = packages[p]
     return result
 
 
@@ -860,11 +860,45 @@ def _cmp_gfx_alternatives(x, y):
     only want to offer -updates when the one from release does not support the
     card. We never want to recommend -experimental unless it's the only one
     available, so sort this last.
+    -server always sorts after non-server.
     '''
     if x.endswith('-updates') and not y.endswith('-updates'):
         return -1
     if not x.endswith('-updates') and y.endswith('-updates'):
         return 1
+    if x.endswith('-server') and not y.endswith('-server'):
+        return -1
+    if not x.endswith('-server') and y.endswith('-server'):
+        return 1
+    if 'experiment' in x and 'experiment' not in y:
+        return -1
+    if 'experiment' not in x and 'experiment' in y:
+        return 1
+    if x < y:
+        return -1
+    if x > y:
+        return 1
+    assert x == y
+    return 0
+
+
+def _cmp_gfx_alternatives_gpgpu(x, y):
+    '''Compare two graphics driver names in terms of preference.
+
+    -updates always sort after non-updates, as we prefer the stable driver and
+    only want to offer -updates when the one from release does not support the
+    card. We never want to recommend -experimental unless it's the only one
+    available, so sort this last.
+    -server always sorts before non-server.
+    '''
+    if x.endswith('-updates') and not y.endswith('-updates'):
+        return -1
+    if not x.endswith('-updates') and y.endswith('-updates'):
+        return 1
+    if x.endswith('-server') and not y.endswith('-server'):
+        return 1
+    if not x.endswith('-server') and y.endswith('-server'):
+        return -1
     if 'experiment' in x and 'experiment' not in y:
         return -1
     if 'experiment' not in x and 'experiment' in y:
@@ -983,14 +1017,13 @@ def get_linux_modules_metapackage(apt_cache, candidate):
         logging.error('No linux-image can be found for %s. Skipping.', candidate)
         return metapackage
 
-    candidate_flavour = candidate[candidate.rfind('-')+1:]
-
-    try:
-        int(candidate_flavour)
-    except ValueError:
+    pattern = re.compile('nvidia-.*-([0-9]+)(.*)')
+    match = pattern.match(candidate)
+    if not match:
         logging.error('No flavour can be found in %s. Skipping.', candidate)
         return metapackage
 
+    candidate_flavour = '%s%s' % (match.group(1), match.group(2))
     linux_modules_candidate = 'linux-modules-nvidia-%s-%s' % (candidate_flavour, linux_flavour)
 
     try:
