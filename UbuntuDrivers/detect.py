@@ -205,6 +205,23 @@ def _pkg_get_module(pkg):
     return module
 
 
+def _pkg_get_support(pkg):
+    '''Determine support level from apt Package object'''
+
+    try:
+        support = pkg.candidate.record['Support']
+    except (KeyError, AttributeError):
+        logging.debug('_pkg_get_support %s: package has no Support header, cannot determine support level', pkg.name)
+        return None
+
+    if support not in ('NFB', 'LTSB'):
+        logging.warning('_pkg_get_support %s: package has invalid Support %s'
+                        'header, cannot determine support level', pkg.name, support)
+        return None
+
+    return support
+
+
 def _is_manual_install(pkg):
     '''Determine if the kernel module from an apt.Package is manually installed.'''
 
@@ -316,6 +333,7 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
                     'syspath': syspath,
                     'free': _is_package_free(p),
                     'from_distro': _is_package_from_distro(p),
+                    'support': _pkg_get_support(p),
                 }
             (vendor, model) = _get_db_name(syspath, alias)
             if vendor is not None:
@@ -445,6 +463,7 @@ def system_device_specific_metapackages(apt_cache=None, sys_path=None, include_o
                     'free': _is_package_free(p),
                     'from_distro': _is_package_from_distro(p),
                     'recommended': True,
+                    'support': _pkg_get_support(p),
                 }
 
     return packages
@@ -500,6 +519,7 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
                         'syspath': syspath,
                         'free': _is_package_free(p),
                         'from_distro': _is_package_from_distro(p),
+                        'support': _pkg_get_support(p),
                     }
                 if vendor is not None:
                     packages[p.name]['vendor'] = vendor
