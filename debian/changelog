@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.8.4) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8.4~0.18.04.1) bionic; urgency=medium
 
-  * 
+  * Add support for the new -server flavours and for
+    specifying drivers with the "install" parameter.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 05 May 2020 15:13:59 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 15 May 2020 16:40:54 +0200
 
 ubuntu-drivers-common (1:0.8.3) groovy; urgency=medium
 
