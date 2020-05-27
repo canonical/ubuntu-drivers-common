@@ -181,6 +181,24 @@ static void trim(char *str) {
 }
 
 
+static char* get_system_architecture() {
+    struct utsname buffer;
+    char * arch = NULL;
+
+    errno = 0;
+    if (uname(&buffer) != 0) {
+        return NULL;
+    }
+    /* We can get away with this since we
+     * only build gpu-manager on x86
+     */
+    asprintf(&arch, "%s-linux-gnu",
+             buffer.machine);
+
+    return arch;
+}
+
+
 static bool starts_with(const char *string, const char *prefix) {
     size_t prefix_len = strlen(prefix);
     size_t string_len = strlen(string);
@@ -1336,16 +1354,12 @@ static bool run_amdgpu_pro_px(amdgpu_pro_px_action action) {
 static bool create_prime_outputclass(void) {
     _cleanup_fclose_ FILE *file = NULL;
     _cleanup_free_ char *multiarch = NULL;
-    char command[100];
     char xorg_d_custom[PATH_MAX];
 
     snprintf(xorg_d_custom, sizeof(xorg_d_custom), "%s/11-nvidia-prime.conf",
              xorg_conf_d_path);
 
-    snprintf(command, sizeof(command),
-             "/usr/bin/dpkg-architecture -qDEB_HOST_MULTIARCH");
-
-    multiarch = get_output(command, NULL, NULL);
+    multiarch = get_system_architecture();
     if (!multiarch)
         return false;
 
