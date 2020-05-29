@@ -1,6 +1,15 @@
-ubuntu-drivers-common (1:0.8.4) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8.4) groovy; urgency=medium
 
-  * 
+  * ubuntu-drivers:
+    - Rework the argument parser.
+  * debian/control:
+    - Depend on python3-click.
+    - Drop dependency on dpkg-dev (LP: #1880564).
+  * Add support for the "Support" field in packages.
+  * Add support for passing in driver and vendor for
+    the "install" case (LP: #1881586).
+  * gpu-manager.c:
+    - Add get_system_architecture().
 
  -- Alberto Milone <alberto.milone@canonical.com>  Mon, 01 Jun 2020 12:08:39 +0200
 
