@@ -1,8 +1,14 @@
-ubuntu-drivers-common (1:0.8.5) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8.5) groovy; urgency=medium
 
-  * 
+  * ubuntu-drivers:
+    - Remove leftover code from argparse
+  * UbuntuDrivers/detect.py,
+    tests/test_ubuntu_drivers.py:
+    - Add test_legacy_nvidia_driver_packages_chroot1.
+    - Do not print an error when linux-modules cannot
+      be found. Use debugging lines instead.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 15 Jun 2020 16:10:22 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 15 Jun 2020 18:04:40 +0200
 
 ubuntu-drivers-common (1:0.8.4) groovy; urgency=medium
 
