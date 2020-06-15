@@ -42,31 +42,6 @@ class Config(object):
 
 pass_config = click.make_pass_decorator(Config, ensure=True)
 
-# def create_parser():
-#     '''Create parser for command line arguments.'''
-#     parser = argparse.ArgumentParser()
-#     #parser.add_argument('manifest-file', help='The .manifest file of the NVIDIA installer')
-
-#     if sys.version_info.major == 3 and sys.version_info.minor >= 6:
-#         parser.add_argument("install", nargs='?', default='', metavar='install [--gpgpu]driver[:version][,driver[:version]]', help="Install drivers")
-#     else:
-#         # Python 3.5.2 in Xenial will crash when matching square brackets
-#         parser.add_argument("install", nargs='?', default='', metavar='install {--gpgpu}driver{:version}{,driver{:version}}', help="Install drivers")
-
-#     parser.add_argument("list", default='', metavar='list [--gpgpu]', help="List drivers")
-#     parser.add_argument("debug", default='', metavar='debug', help="")
-#     parser.add_argument('--package-list', metavar='PATH',
-#                 help='Create file with list of installed packages (in install mode)')
-#     parser.add_argument('--free-only', action="store_true", default=False,
-#                         help='Only consider free packages')
-#     parser.add_argument('--no-oem', action="store_false", default=True,
-#                         dest='install_oem_meta',
-#                         help='Do not include OEM enablement packages (these enable an external archive)')
-#     parser.add_argument('--gpgpu', action="store_true", default=False, help='To be used with the "install" and list "commands"')
-
-
-#     return parser
-
 def command_list(args):
     '''Show all driver packages which apply to the current system.'''
 
@@ -107,7 +82,6 @@ def command_list_oem(args):
                 f.write('\n')
 
     return 0
-
 
 def list_gpgpu(args):
     '''Show all GPGPU driver packages which apply to the current system.'''
@@ -217,7 +191,6 @@ def command_install(args):
                                '-y'] + oem_meta_to_install)
 
     return ret
-
 
 def command_autoinstall(args):
     '''Install drivers that are appropriate for automatic installation. [DEPRECATED]'''
@@ -350,7 +323,6 @@ def greet(config, gpgpu, free_only, package_list, no_oem, **kwargs):
     if no_oem:
         config.no_oem = install_oem_meta
 
-
 @greet.command()
 @click.argument('driver', nargs=-1)  # add the name argument
 @click.option('--gpgpu', is_flag=True, help='gpgpu drivers')
@@ -398,7 +370,6 @@ def autoinstall(config, **kwargs):
         config.driver_string = ''.join(kwargs.get('driver'))
 
     install(config)
-
 
 @greet.command()
 @click.argument('list', nargs=-1)
@@ -461,28 +432,3 @@ def devices(config, **kwargs):
 
 if __name__ == '__main__':
     greet()
-
-
-
-
-# parser = create_parser()
-# args = parser.parse_args()
-
-# if args.debug:
-#     sys.exit(command_debug(args))
-
-# if args.list:
-#     if args.gpgpu:
-#         sys.exit(list_gpgpu(args))
-#     else:
-#         sys.exit(command_list(args))
-# elif args.install:
-#     if args.gpgpu:
-#         sys.exit(install_gpgpu(args))
-#     else:
-#         sys.exit(command_install(args))
-
-# else:
-#     if not args.command:
-#         parser.print_help()
-#         sys.exit(1)
