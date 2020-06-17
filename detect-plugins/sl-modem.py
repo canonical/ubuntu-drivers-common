@@ -17,9 +17,9 @@ pkg = 'sl-modem-daemon'
 def detect(apt_cache):
     # Check in /proc/asound/cards
     try:
-        with open('/proc/asound/cards') as f:
-            for l in f:
-                if modem_re.match(l):
+        with open('/proc/asound/cards') as fd:
+            for line in fd:
+                if modem_re.match(line):
                     return [pkg]
     except IOError as e:
         logging.debug('could not open /proc/asound/cards: %s', e)

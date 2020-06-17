@@ -48,10 +48,10 @@ def system_modaliases(sys_path=None):
         # devices on SSB bus only mention the modalias in the uevent file (as
         # of 2.6.24)
         elif 'ssb' in path and 'uevent' in files:
-            with open(os.path.join(path, 'uevent')) as f:
-                for l in f:
-                    if l.startswith('MODALIAS='):
-                        modalias = l.split('=', 1)[1].strip()
+            with open(os.path.join(path, 'uevent')) as fd:
+                for line in fd:
+                    if line.startswith('MODALIAS='):
+                        modalias = line.split('=', 1)[1].strip()
                         break
 
         if not modalias:
