@@ -1,8 +1,10 @@
-ubuntu-drivers-common (1:0.8.5.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8.5.1) groovy; urgency=medium
 
-  * 
+  * UbuntuDrivers/detect.py,
+    detect-plugins/sl-modem.py:
+    - Avoid triggering test_static.py "E741 ambiguous variable name 'l'".
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 17 Jun 2020 12:18:28 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 17 Jun 2020 12:26:01 +0200
 
 ubuntu-drivers-common (1:0.8.5) groovy; urgency=medium
 
