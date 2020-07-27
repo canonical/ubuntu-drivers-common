@@ -1378,7 +1378,7 @@ static bool create_prime_outputclass(void) {
                 "    Option \"AllowEmptyInitialConfiguration\"\n"
                 "    Option \"IgnoreDisplayDevices\" \"CRT\"\n"
                 "    Option \"PrimaryGPU\" \"Yes\"\n"
-                "    ModulePath \"/%s/nvidia/xorg\"\n"
+                "    ModulePath \"/lib/%s/nvidia/xorg\"\n"
                 "EndSection\n\n",
                 multiarch);
 
