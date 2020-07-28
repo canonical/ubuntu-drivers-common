@@ -1,8 +1,10 @@
-ubuntu-drivers-common (1:0.8.4~0.20.04.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8.4~0.20.04.3) focal; urgency=medium
 
-  * 
+  * ubuntu-drivers:
+    - Fix failure when using the deprecated "autoinstall"
+      argument (LP: #1889181).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 28 Jul 2020 10:21:32 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 28 Jul 2020 10:42:55 +0200
 
 ubuntu-drivers-common (1:0.8.4~0.20.04.2) focal; urgency=medium
 
