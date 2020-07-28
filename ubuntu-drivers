@@ -369,7 +369,7 @@ def autoinstall(config, **kwargs):
     if kwargs.get('driver'):
         config.driver_string = ''.join(kwargs.get('driver'))
 
-    install(config)
+    command_install(config)
 
 @greet.command()
 @click.argument('list', nargs=-1)
