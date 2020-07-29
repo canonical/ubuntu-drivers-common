@@ -1,8 +1,11 @@
-ubuntu-drivers-common (1:0.8.5.4) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8.5.4) groovy; urgency=medium
 
-  * 
+  * ubuntu-drivers:
+    - Do not assume that the metapackage tag is available.
+  * NvidiaDetector/nvidiadetector.py:
+    - Fix failure with the -server drivers.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 29 Jul 2020 17:23:24 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 29 Jul 2020 17:24:08 +0200
 
 ubuntu-drivers-common (1:0.8.5.3) groovy; urgency=medium
 
