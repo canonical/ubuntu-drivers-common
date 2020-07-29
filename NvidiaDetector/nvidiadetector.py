@@ -89,6 +89,8 @@ class NvidiaDetection(object):
         '''Get the integer associated to the name of a driver'''
         v = self.__driver_aliases.get(name)
         if v is None:
+            if name.endswith('-server'):
+                v = int(name.replace('-server', ''))
             v = int(name)
         return v
 
