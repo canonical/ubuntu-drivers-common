@@ -1730,6 +1730,66 @@ unload_again:
 }
 
 
+static bool get_nvidia_driver_major_version(char  *major) {
+
+    size_t len = 0;
+    _cleanup_free_ char *driver_version = NULL;
+    _cleanup_fclose_ FILE *file = NULL;
+    char *nv_driver_version_path = "/sys/module/nvidia/version";
+    char *ret;
+    /* Check the driver version */
+    file = fopen(nv_driver_version_path, "r");
+    if (file == NULL) {
+        fprintf(log_handle, "can't open %s\n", nv_driver_version_path);
+        return false;
+    }
+    if (getline(&driver_version, &len, file) == -1) {
+        fprintf(log_handle, "can't get line from %s\n", nv_driver_version_path);
+        return false;
+    }
+
+    ret = strtok(driver_version, ".");
+    major = strcpy(major, ret);
+
+    if (major == NULL) {
+        fprintf(log_handle, "Warning: couldn't get the driver version from %s\n",
+                nv_driver_version_path);
+        return false;
+    }
+    return true;
+}
+
+static bool find_supported_gpus_json(char *the_json_file){
+    char nv_major_version[3];
+    _cleanup_fclose_ FILE *file = NULL;
+
+    if (get_nvidia_driver_major_version(nv_major_version) && atoi(nv_major_version) >= 450){
+        sprintf( the_json_file, "/usr/share/doc/nvidia-driver-%s/supported-gpus.json.gz", nv_major_version);
+        file = fopen(the_json_file, "r");
+        if (file == NULL) {
+            fprintf(log_handle, "Can not open %s\n", the_json_file);
+            return false;
+        }
+        return true;
+    }
+    return false;
+
+}
+static bool is_nv_runtimepm_supported(int nv_device_id) {
+    char command[150];
+    char *runtimepm_supported = NULL;
+    char supported_gpus_json_file[60];
+
+    if(find_supported_gpus_json(supported_gpus_json_file)){
+        sprintf(command,  "zcat %s | jq '.chips[]| select(.devid==\"0x%X\")|.features|contains([\"runtimepm\"])'",supported_gpus_json_file, nv_device_id);
+        runtimepm_supported = get_output(command, "true", NULL);
+        if (runtimepm_supported){
+            return true;
+        }
+    }
+    return false;
+}
+
 int main(int argc, char *argv[]) {
 
     int opt, i;
@@ -1757,6 +1817,7 @@ int main(int argc, char *argv[]) {
     bool amdgpu_is_pro = false;
     int offloading = false;
     int status = 0;
+    bool nvidia_runtimepm_supported = false;
 
     /* Vendor and device id (boot vga) */
     unsigned int boot_vga_vendor_id = 0, boot_vga_device_id = 0;
@@ -2150,6 +2211,8 @@ int main(int argc, char *argv[]) {
                 /* char *driver = NULL; */
                 if (info->vendor_id == NVIDIA) {
                     has_nvidia = true;
+		    nvidia_runtimepm_supported = is_nv_runtimepm_supported(info->device_id);
+                    fprintf(log_handle, "Is nvidia runtime pm supported? %s\n", nvidia_runtimepm_supported ? "yes" : "no");
                 }
                 else if (info->vendor_id == INTEL) {
                     has_intel = true;
