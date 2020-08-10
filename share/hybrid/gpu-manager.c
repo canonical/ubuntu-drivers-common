@@ -124,6 +124,8 @@ static char *modprobe_d_path = NULL;
 static char *xorg_conf_d_path = NULL;
 static prime_intel_drv prime_intel_driver = SNA;
 static prime_mode_settings prime_mode = OFF;
+static bool nvidia_runtimepm_supported = false;
+static bool nvidia_runtimepm_enabled = false;
 
 static struct pci_slot_match match = {
     PCI_MATCH_ANY, PCI_MATCH_ANY, PCI_MATCH_ANY, PCI_MATCH_ANY, 0
@@ -1894,6 +1896,8 @@ static bool find_supported_gpus_json(char **json_file){
     return true;
 }
 
+
+/* Look up the device ID in the json file for RTD3 support */
 static bool is_nv_runtimepm_supported(int nv_device_id) {
     _cleanup_free_ char *json_file = NULL;
     _cleanup_fclose_ FILE *file = NULL;
@@ -1966,6 +1970,72 @@ static bool is_nv_runtimepm_supported(int nv_device_id) {
     return supported;
 }
 
+
+/* Check the procfs entry for the NVIDIA GPU to check the RTD3 status */
+static bool is_nv_runtimepm_enabled(struct pci_device *device) {
+    size_t read;
+    char proc_gpu_path[PATH_MAX];
+    _cleanup_fclose_ FILE *file = NULL;
+    _cleanup_free_ char *line = NULL;
+    char pattern[] = "Runtime D3 status:";
+    size_t len = 0;
+    size_t pattern_len = strlen(pattern);
+
+
+    snprintf(proc_gpu_path, sizeof(proc_gpu_path),
+             "/proc/driver/nvidia/gpus/%04x:%02x:%02x.%x/power",
+             (unsigned int)device->domain,
+             (unsigned int)device->bus,
+             (unsigned int)device->dev,
+             (unsigned int)device->func);
+
+    fprintf(log_handle, "Checking power status in %s\n", proc_gpu_path);
+    file = fopen(proc_gpu_path, "r");
+    if (!file) {
+        fprintf(log_handle, "Error while opening %s\n", proc_gpu_path);
+        return false;
+    }
+    else {
+        while ((read = getline(&line, &len, file)) != -1) {
+            if (istrstr(line, pattern) != NULL) {
+                fprintf(log_handle, "%s", line);
+                if (strncmp(line, pattern, pattern_len) == 0) {
+                    if (istrstr(line, "enabled") != NULL) {
+                        return true;
+                    }
+                    else {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+static bool create_runtime_file(const char *name) {
+    _cleanup_fclose_ FILE *file = NULL;
+    char path[PATH_MAX];
+
+    snprintf(path, sizeof(path),
+             "%s/%s", gpu_detection_path, name);
+
+    fprintf(log_handle, "Trying to create new file: %s\n",
+            path);
+
+    file = fopen(path, "w");
+    if (file == NULL) {
+        fprintf(log_handle, "I couldn't open %s for writing.\n",
+                path);
+        return false;
+    }
+    fprintf(file, "yes\n");
+    fflush(file);
+
+    return true;
+}
+
+
 int main(int argc, char *argv[]) {
 
     int opt, i;
@@ -1993,7 +2063,6 @@ int main(int argc, char *argv[]) {
     bool amdgpu_is_pro = false;
     int offloading = false;
     int status = 0;
-    bool nvidia_runtimepm_supported = false;
 
     /* Vendor and device id (boot vga) */
     unsigned int boot_vga_vendor_id = 0, boot_vga_device_id = 0;
@@ -2388,7 +2457,18 @@ int main(int argc, char *argv[]) {
                 if (info->vendor_id == NVIDIA) {
                     has_nvidia = true;
                     nvidia_runtimepm_supported = is_nv_runtimepm_supported(info->device_id);
-                    fprintf(log_handle, "Is nvidia runtime pm supported? %s\n", nvidia_runtimepm_supported ? "yes" : "no");
+                    fprintf(log_handle, "Is nvidia runtime pm supported for \"0x%x\"? %s\n", info->device_id,
+                            nvidia_runtimepm_supported ? "yes" : "no");
+
+                    if (nvidia_runtimepm_supported)
+                        create_runtime_file("nvidia_runtimepm_supported");
+
+                    nvidia_runtimepm_enabled = is_nv_runtimepm_enabled(info);
+                    fprintf(log_handle, "Is nvidia runtime pm enabled for \"0x%x\"? %s\n", info->device_id,
+                            nvidia_runtimepm_enabled ? "yes" : "no");
+
+                    if (nvidia_runtimepm_enabled)
+                        create_runtime_file("nvidia_runtimepm_enabled");
                 }
                 else if (info->vendor_id == INTEL) {
                     has_intel = true;
