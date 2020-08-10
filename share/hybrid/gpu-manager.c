@@ -61,6 +61,7 @@
 #include <libkmod.h>
 #include "xf86drm.h"
 #include "xf86drmMode.h"
+#include "json.h"
 
 static inline void freep(void *);
 static inline void fclosep(FILE **);
@@ -1234,7 +1235,7 @@ static bool create_prime_settings(const char *prime_settings) {
 }
 
 
-static bool get_nvidia_driver_version(int *major, int *minor) {
+static bool get_nvidia_driver_version(int *major, int *minor, int *extra) {
 
     int status;
     size_t len = 0;
@@ -1252,12 +1253,38 @@ static bool get_nvidia_driver_version(int *major, int *minor) {
         return false;
     }
 
-    status = sscanf(driver_version, "%d.%d\n", major, minor);
+    status = sscanf(driver_version, "%d.%d.%d\n", major, minor, extra);
 
     /* Make sure that we match "desired_matches" */
-    if (status == EOF || status != 2) {
+    if (status == EOF || status < 2 ) {
         fprintf(log_handle, "Warning: couldn't get the driver version from %s\n",
                 nvidia_driver_version_path);
+        return false;
+    }
+
+    if (status == 2)
+        *extra = -1;
+
+    return true;
+}
+
+
+static bool get_kernel_version(int *major, int *minor, int *extra) {
+    struct utsname buffer;
+    int status;
+    _cleanup_free_ char *version = NULL;
+
+    errno = 0;
+    if (uname(&buffer) != 0) {
+        return false;
+    }
+
+    status = sscanf(buffer.release, "%d.%d.%d\n", major, minor, extra);
+
+    /* Make sure that we match "desired_matches" */
+    if (status == EOF || status != 3 ) {
+        fprintf(log_handle, "Warning: couldn't get the kernel version from %s\n",
+                buffer.release);
         return false;
     }
 
@@ -1730,6 +1757,215 @@ unload_again:
 }
 
 
+static bool json_find_feature_in_array(char* feature, json_value* value)
+{
+    int length, x;
+    if (value == NULL) {
+        return false;
+    }
+
+    length = value->u.array.length;
+    fprintf(log_handle, "Looking for availability of \"%s\" feature\n", feature);
+    for (x = 0; x < length; x++) {
+        /* fprintf(log_handle, "feature string: %s\n", value->u.array.values[x]->u.string.ptr); */
+        if (strcmp(value->u.object.values[x].value->u.string.ptr, feature) == 0) {
+            fprintf(log_handle, "\"%s\" feature found\n", feature);
+            return true;
+        }
+    }
+    fprintf(log_handle, "\"%s\" feature not found\n", feature);
+    return false;
+}
+
+
+static bool json_process_object_for_device_id(int id, json_value* value)
+{
+    int length, x;
+    if (value == NULL) {
+        return false;
+    }
+    length = value->u.object.length;
+    for (x = 0; x < length; x++) {
+        if (strcmp(value->u.object.values[x].name, "devid") == 0) {
+            if (strtol(value->u.object.values[x].value->u.string.ptr, NULL, 16) == id) {
+                fprintf(log_handle, "Device ID %s found in json file\n", value->u.object.values[x].value->u.string.ptr);
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+
+static bool json_find_feature_in_object(char* feature, json_value* value)
+{
+    int length, x;
+    if (value == NULL) {
+            return false;
+    }
+    length = value->u.object.length;
+    for (x = 0; x < length; x++) {
+        if (strcmp(value->u.object.values[x].name, "name") == 0) {
+            fprintf(log_handle, "Device name: %s\n", value->u.object.values[x].value->u.string.ptr);
+        }
+        if (strcmp(value->u.object.values[x].name, "features") == 0) {
+            /* fprintf(log_handle, "features: %s\n", value->u.object.values[x].value->u.string.ptr);*/
+            return (json_find_feature_in_array(feature, value->u.object.values[x].value));
+        }
+    }
+    return false;
+}
+
+
+static json_value* json_find_device_id_in_array(int id, json_value* value)
+{
+    int length, x;
+    if (value == NULL) {
+            return NULL;
+    }
+    length = value->u.array.length;
+    for (x = 0; x < length; x++) {
+        if (json_process_object_for_device_id(id, value->u.array.values[x])) {
+            /*fprintf(log_handle, "Device ID found in object %d\n", x);*/
+            return value->u.array.values[x];
+            break;
+        }
+    }
+    fprintf(log_handle, "Device ID \"0x%x\" not found in json file\n", id);
+
+    return NULL;
+}
+
+
+static json_value* json_find_device_id(int id, json_value* value)
+{
+    fprintf(log_handle, "Looking for device ID \"0x%x\" in json file\n", id);
+    int length, x;
+    json_value* chips = NULL;
+    if (value == NULL) {
+        return NULL;
+    }
+
+
+    length = value->u.object.length;
+    for (x = 0; x < length; x++) {
+        /*fprintf(log_handle, "object[%d].name = %s\n", x, value->u.object.values[x].name);*/
+        if (strcmp(value->u.object.values[x].name, "chips") == 0) {
+            chips = value->u.object.values[x].value;
+            /*fprintf(log_handle, "Chips found\n");*/
+        }
+
+    }
+
+    if (chips) {
+        /*fprintf(log_handle, "processing chips\n");*/
+        return (json_find_device_id_in_array(id, chips));
+    }
+    else {
+        fprintf(log_handle, "Error: json chips array not found. Aborting\n");
+    }
+    return NULL;
+}
+
+
+static bool find_supported_gpus_json(char **json_file){
+    int major, minor, extra;
+    _cleanup_fclose_ FILE *file = NULL;
+
+    if (get_nvidia_driver_version(&major, &minor, &extra)) {
+        if (major >= 450) {
+            if (extra > -1) {
+                asprintf(json_file, "/usr/share/doc/nvidia-driver-%d-server/supported-gpus.json",
+                 major);
+            }
+            else {
+                asprintf(json_file, "/usr/share/doc/nvidia-driver-%d/supported-gpus.json",
+                 major);
+            }
+            fprintf(log_handle, "Found json file: %s\n", *json_file);
+        }
+    }
+    else {
+        fprintf(log_handle, "Warning: cannot check the NVIDIA driver major version\n");
+        return false;
+    }
+
+    return true;
+}
+
+static bool is_nv_runtimepm_supported(int nv_device_id) {
+    _cleanup_free_ char *json_file = NULL;
+    _cleanup_fclose_ FILE *file = NULL;
+    struct stat filestatus;
+    int file_size;
+    char* file_contents;
+    json_char* json;
+    json_value* value;
+    json_value* device_value;
+    int major, minor, extra;
+
+    bool supported = false;
+
+    if(find_supported_gpus_json(&json_file)) {
+        if ( stat(json_file, &filestatus) != 0) {
+            fprintf(log_handle, "File %s not found\n", json_file);
+            return false;
+        }
+
+        file_size = filestatus.st_size;
+        file_contents = (char*)malloc(filestatus.st_size);
+        if (file_contents == NULL) {
+            fprintf(log_handle, "Memory error: unable to allocate %d bytes\n", file_size);
+            return false;
+        }
+
+        file = fopen(json_file, "rt");
+        if (file == NULL) {
+            fprintf(log_handle, "Unable to open %s\n", json_file);
+            free(file_contents);
+            return false;
+        }
+        if (fread(file_contents, file_size, 1, file) != 1 ) {
+            fprintf(log_handle, "Unable t read content of %s\n", json_file);
+            free(file_contents);
+            return false;
+        }
+
+        json = (json_char*)file_contents;
+        value = json_parse(json,file_size);
+
+        if (value == NULL) {
+            fprintf(log_handle, "Unable to parse data\n");
+            free(file_contents);
+            return false;
+        }
+
+        device_value = json_find_device_id(nv_device_id, value);
+        supported = json_find_feature_in_object("runtimepm", device_value);
+
+        device_value = NULL;
+        json_value_free(value);
+        free(file_contents);
+    }
+
+    if (! get_kernel_version(&major, &minor, &extra)) {
+        fprintf(log_handle, "Failed to check kernel version. Disabling runtimepm.\n");
+        return false;
+    }
+
+    if (major > 4 || ((major == 4) && (minor >= 18))) {
+        fprintf(log_handle, "Linux %d.%d detected.\n", major, minor);
+    }
+    else {
+        fprintf(log_handle, "Linux %d.%d detected. Linux 4.18 or newer is required for runtimepm\n",
+                major, minor);
+        supported = false;
+    }
+
+    return supported;
+}
+
 int main(int argc, char *argv[]) {
 
     int opt, i;
@@ -1757,6 +1993,7 @@ int main(int argc, char *argv[]) {
     bool amdgpu_is_pro = false;
     int offloading = false;
     int status = 0;
+    bool nvidia_runtimepm_supported = false;
 
     /* Vendor and device id (boot vga) */
     unsigned int boot_vga_vendor_id = 0, boot_vga_device_id = 0;
@@ -2150,6 +2387,8 @@ int main(int argc, char *argv[]) {
                 /* char *driver = NULL; */
                 if (info->vendor_id == NVIDIA) {
                     has_nvidia = true;
+                    nvidia_runtimepm_supported = is_nv_runtimepm_supported(info->device_id);
+                    fprintf(log_handle, "Is nvidia runtime pm supported? %s\n", nvidia_runtimepm_supported ? "yes" : "no");
                 }
                 else if (info->vendor_id == INTEL) {
                     has_intel = true;
