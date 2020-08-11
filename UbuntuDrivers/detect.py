@@ -319,7 +319,11 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
     modaliases = system_modaliases(sys_path)
 
     if not apt_cache:
-        apt_cache = apt.Cache()
+        try:
+            apt_cache = apt.Cache()
+        except Exception as ex:
+            logging.error(ex)
+            return {}
 
     packages = {}
     for alias, syspath in modaliases.items():
@@ -457,7 +461,11 @@ def system_device_specific_metapackages(apt_cache=None, sys_path=None, include_o
     modaliases = system_modaliases(sys_path)
 
     if not apt_cache:
-        apt_cache = apt.Cache()
+        try:
+            apt_cache = apt.Cache()
+        except Exception as ex:
+            logging.error(ex)
+            return {}
 
     packages = {}
     for alias, syspath in modaliases.items():
@@ -513,7 +521,11 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
     modaliases = system_modaliases(sys_path)
 
     if not apt_cache:
-        apt_cache = apt.Cache()
+        try:
+            apt_cache = apt.Cache()
+        except Exception as ex:
+            logging.error(ex)
+            return {}
 
     packages = {}
     for alias, syspath in modaliases.items():
@@ -603,7 +615,11 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
     '''
     result = {}
     if not apt_cache:
-        apt_cache = apt.Cache()
+        try:
+            apt_cache = apt.Cache()
+        except Exception as ex:
+            logging.error(ex)
+            return {}
 
     # copy the system_driver_packages() structure into the by-device structure
     for pkg, pkginfo in system_driver_packages(apt_cache, sys_path,
@@ -826,7 +842,11 @@ def detect_plugin_packages(apt_cache=None):
         return packages
 
     if apt_cache is None:
-        apt_cache = apt.Cache()
+        try:
+            apt_cache = apt.Cache()
+        except Exception as ex:
+            logging.error(ex)
+            return {}
 
     for fname in os.listdir(plugindir):
         if not fname.endswith('.py'):
