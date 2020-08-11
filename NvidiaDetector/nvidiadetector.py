@@ -144,6 +144,7 @@ class NvidiaDetection(object):
         '''
         self.drivers = {}
         vendor_product_re = re.compile('pci:v0000(.+)d0000(.+)sv')
+        package_re = re.compile('nvidia(?:\-driver|)\-([0-9]+)(:?\-server|)(:?\:i386|)')
 
         for package in apt.Cache():
             if (not package.name.startswith('nvidia-') or
@@ -161,7 +162,14 @@ class NvidiaDetection(object):
 
             # package names can be like "nvidia-173:i386" and we need to
             # extract the driver flavour from the name e.g. "173"
-            stripped_package_name = package.name.split('-')[-1].split(':', 1)[0]
+            package_match = package_re.match(package.name)
+            if package_match:
+                stripped_package_name = package_match.group(1)
+            else:
+                logging.error('%s package has unexpected name scheme. Skipping' % (
+                    package.name))
+                continue
+
             driver_version = self.__get_value_from_name(stripped_package_name)
 
             try:
