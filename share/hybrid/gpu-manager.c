@@ -1229,8 +1229,18 @@ static bool create_prime_settings(const char *prime_settings) {
                 prime_settings);
         return false;
     }
-    /* Set prime to "on" */
-    fprintf(file, "on\n");
+    /* Make on-demand the default if
+     * runtimepm is supported.
+     */
+    if (nvidia_runtimepm_supported) {
+        /* Set prime to "on-demand" */
+        fprintf(file, "on-demand\n");
+    }
+    else {
+        /* Set prime to "on" */
+        fprintf(file, "on\n");
+    }
+
     fflush(file);
 
     return true;
@@ -1470,6 +1480,65 @@ static int remove_offload_serverlayout(void) {
     return remove_xorg_d_custom_file("11-nvidia-offload.conf");
 }
 
+
+static bool create_runtime_file(const char *name) {
+    _cleanup_fclose_ FILE *file = NULL;
+    char path[PATH_MAX];
+
+    snprintf(path, sizeof(path),
+             "%s/%s", gpu_detection_path, name);
+
+    fprintf(log_handle, "Trying to create new file: %s\n",
+            path);
+
+    file = fopen(path, "w");
+    if (file == NULL) {
+        fprintf(log_handle, "I couldn't open %s for writing.\n",
+                path);
+        return false;
+    }
+    fprintf(file, "yes\n");
+    fflush(file);
+
+    return true;
+}
+
+
+static bool create_nvidia_runtime_config(void) {
+    _cleanup_fclose_ FILE *file = NULL;
+    char path[] = "/lib/modprobe.d/nvidia-runtimepm.conf";
+
+    fprintf(log_handle, "Trying to create new file: %s\n",
+            path);
+
+    file = fopen(path, "w");
+    if (file == NULL) {
+        fprintf(log_handle, "I couldn't open %s for writing.\n",
+                path);
+        return false;
+    }
+    fprintf(file, "options nvidia \"NVreg_DynamicPowerManagement=0x02\"\n");
+    fflush(file);
+
+    return true;
+}
+
+
+static int remove_nvidia_runtime_config(void) {
+    struct stat st;
+    char path[] = "/lib/modprobe.d/nvidia-runtimepm.conf";
+
+    if (stat(path, &st) == 0) {
+        fprintf(log_handle, "Trying to remove file: %s\n",
+        path);
+        if (unlink(path) == 0) {
+            return 0;
+        }
+    }
+    return -errno;
+}
+
+
 static bool manage_power_management(const struct device *device, bool enabled) {
     _cleanup_fclose_ FILE *file = NULL;
     char pci_device_path[PATH_MAX];
@@ -1497,10 +1566,14 @@ static bool manage_power_management(const struct device *device, bool enabled) {
 
 static void enable_power_management(const struct device *device) {
     manage_power_management(device, true);
+    if (nvidia_runtimepm_supported && ! nvidia_runtimepm_enabled) {
+        create_nvidia_runtime_config();
+    }
 }
 
 static void disable_power_management(const struct device *device) {
     manage_power_management(device, false);
+    remove_nvidia_runtime_config();
 }
 
 static bool unload_nvidia(void) {
@@ -2011,28 +2084,6 @@ static bool is_nv_runtimepm_enabled(struct pci_device *device) {
         }
     }
     return false;
-}
-
-static bool create_runtime_file(const char *name) {
-    _cleanup_fclose_ FILE *file = NULL;
-    char path[PATH_MAX];
-
-    snprintf(path, sizeof(path),
-             "%s/%s", gpu_detection_path, name);
-
-    fprintf(log_handle, "Trying to create new file: %s\n",
-            path);
-
-    file = fopen(path, "w");
-    if (file == NULL) {
-        fprintf(log_handle, "I couldn't open %s for writing.\n",
-                path);
-        return false;
-    }
-    fprintf(file, "yes\n");
-    fflush(file);
-
-    return true;
 }
 
 
