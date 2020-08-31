@@ -196,6 +196,16 @@ def command_install(args):
         if update_ret != 0:
             return update_ret
 
+    # If we are dealing with NVIDIA PRIME, and runtimepm
+    # is supported, enable it
+    if (os.path.isfile('/run/nvidia_runtimepm_supported') and
+        os.path.isfile('/usr/bin/prime-select')):
+        print('Trying to select the on-demand PRIME profile')
+        try:
+            subprocess.call(['prime-select', 'on-demand'])
+        except:
+            pass
+
     # All updates completed successfully, now let's upgrade the packages
     if oem_meta_to_install:
         ret = subprocess.call(['apt',
