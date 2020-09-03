@@ -222,6 +222,21 @@ def _pkg_get_support(pkg):
     return support
 
 
+def _is_runtimepm_supported(pkg, alias):
+    '''Check if the package supports runtimepm for the given modalias'''
+    try:
+        m = pkg.candidate.record['PmAliases']
+    except (KeyError, AttributeError, UnicodeDecodeError):
+        return False
+    else:
+        if m.find('nvidia(') != 0:
+            return False
+
+        n = m[m.find('(')+1: m.find(')')]
+        modaliases = n.split(', ')
+        return any(fnmatch.fnmatch(alias.lower(), regex.lower()) for regex in modaliases)
+
+
 def _is_manual_install(pkg):
     '''Determine if the kernel module from an apt.Package is manually installed.'''
 
@@ -338,6 +353,7 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
                     'free': _is_package_free(p),
                     'from_distro': _is_package_from_distro(p),
                     'support': _pkg_get_support(p),
+                    'runtimepm': _is_runtimepm_supported(p, alias)
                 }
             (vendor, model) = _get_db_name(syspath, alias)
             if vendor is not None:
