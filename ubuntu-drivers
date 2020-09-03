@@ -135,7 +135,6 @@ def command_devices(args):
 
 def command_install(args):
     '''Install drivers that are appropriate for your hardware.'''
-
     try:
         cache = apt.Cache()
     except Exception as ex:
@@ -155,6 +154,12 @@ def command_install(args):
     for p in packages:
         if not cache[p].installed:
             to_install.append(p)
+            # See if runtimepm is supported
+            if packages[p].get('runtimepm'):
+                # Create a file for nvidia-prime
+                pm_fd = open('/run/nvidia_runtimepm_supported', 'w')
+                pm_fd.write('\n')
+                pm_fd.close()
             # Add the matching linux modules package when available
             try:
                 modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, p)
