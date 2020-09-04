@@ -1162,7 +1162,7 @@ static bool requires_offloading(struct device **devices,
     int i;
     bool status = false;
     for(i = 0; i < cards_n; i++) {
-        if (devices[i]->vendor_id == INTEL) {
+        if (devices[i]->boot_vga) {
             status = (devices[i]->has_connected_outputs == 1);
             break;
         }
@@ -2614,7 +2614,7 @@ int main(int argc, char *argv[]) {
                      &boot_vga_vendor_id,
                      &boot_vga_device_id);
 
-        if (boot_vga_vendor_id == INTEL) {
+        if ((boot_vga_vendor_id == INTEL) || (boot_vga_vendor_id == AMD)) {
             if (offloading && nvidia_unloaded) {
                 /* NVIDIA PRIME */
                 fprintf(log_handle, "PRIME detected\n");
@@ -2636,12 +2636,7 @@ int main(int argc, char *argv[]) {
                 }
                 goto end;
             }
-            else {
-                fprintf(log_handle, "Nothing to do\n");
-                }
-            }
-        else if (boot_vga_vendor_id == AMD) {
-            if (has_changed && amdgpu_loaded && amdgpu_is_pro && amdgpu_pro_px_installed) {
+            else if (has_changed && amdgpu_loaded && amdgpu_is_pro && amdgpu_pro_px_installed) {
                 /* If amdgpu-pro-px exists, we can assume it's a pxpress system. But now the
                  * system has one card only, user probably disabled Switchable Graphics in
                  * BIOS. So we need to use discrete config file here.
@@ -2670,9 +2665,9 @@ int main(int argc, char *argv[]) {
         get_first_discrete(current_devices, cards_n,
                            &discrete_device);
 
-        /* Intel + another GPU */
-        if (boot_vga_vendor_id == INTEL) {
-            fprintf(log_handle, "Intel IGP detected\n");
+        /* Intel or AMD + another GPU */
+        if ((boot_vga_vendor_id == INTEL) || (boot_vga_vendor_id == AMD)) {
+            fprintf(log_handle, "%s IGP detected\n", (boot_vga_vendor_id == INTEL) ? "Intel" : "AMD");
             /* AMDGPU-Pro Switchable */
             if (has_changed && amdgpu_loaded && amdgpu_is_pro && amdgpu_pro_px_installed) {
                 /* Similar to switchable enabled -> disabled case, but this time
@@ -2683,9 +2678,9 @@ int main(int argc, char *argv[]) {
                 run_amdgpu_pro_px(MODE_POWERSAVING);
             }
             /* NVIDIA Optimus */
-            else if (offloading && (intel_loaded && !nouveau_loaded &&
+            else if (offloading && ((intel_loaded || amdgpu_loaded) && !nouveau_loaded &&
                                  (nvidia_loaded || nvidia_kmod_available))) {
-                fprintf(log_handle, "Intel hybrid system\n");
+                fprintf(log_handle, "NVIDIA hybrid system\n");
 
                 /* Try to enable prime */
                 if (enable_prime(prime_settings,
