@@ -20,7 +20,7 @@ import apt
 from UbuntuDrivers import kerneldetection
 
 system_architecture = apt.apt_pkg.get_architectures()[0]
-
+lookup_cache = {}
 
 def system_modaliases(sys_path=None):
     '''Get modaliases present in the system.
@@ -331,6 +331,7 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
                      versions; these have this flag, where exactly one has
                      recommended == True, and all others False.
     '''
+    global lookup_cache
     modaliases = system_modaliases(sys_path)
 
     if not apt_cache:
@@ -364,17 +365,14 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
     # Add "recommended" flags for NVidia alternatives
     nvidia_packages = [p for p in packages if p.startswith('nvidia-')]
     if nvidia_packages:
+        # Create a cache for looking up drivers to pick the best
+        # candidate
+        for key, value in packages.items():
+            if key.startswith('nvidia-'):
+                lookup_cache[key] = value
         nvidia_packages.sort(key=functools.cmp_to_key(_cmp_gfx_alternatives))
         recommended = nvidia_packages[-1]
         for p in nvidia_packages:
-            packages[p]['recommended'] = (p == recommended)
-
-    # Add "recommended" flags for fglrx alternatives
-    fglrx_packages = [p for p in packages if p.startswith('fglrx-')]
-    if fglrx_packages:
-        fglrx_packages.sort(key=functools.cmp_to_key(_cmp_gfx_alternatives))
-        recommended = fglrx_packages[-1]
-        for p in fglrx_packages:
             packages[p]['recommended'] = (p == recommended)
 
     # add available packages which need custom detection code
@@ -533,6 +531,7 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
                      versions; these have this flag, where exactly one has
                      recommended == True, and all others False.
     '''
+    global lookup_cache
     vendors_whitelist = ['10de']
     modaliases = system_modaliases(sys_path)
 
@@ -568,6 +567,11 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
     # Add "recommended" flags for NVidia alternatives
     nvidia_packages = [p for p in packages if p.startswith('nvidia-')]
     if nvidia_packages:
+        # Create a cache for looking up drivers to pick the best
+        # candidate
+        for key, value in packages.items():
+            if key.startswith('nvidia-'):
+                lookup_cache[key] = value
         nvidia_packages.sort(key=functools.cmp_to_key(_cmp_gfx_alternatives_gpgpu))
         recommended = nvidia_packages[-1]
         for p in nvidia_packages:
@@ -896,6 +900,13 @@ def detect_plugin_packages(apt_cache=None):
     return packages
 
 
+def _pkg_support_from_cache(x):
+    '''Look up driver package and return their support level'''
+    if lookup_cache.get(x):
+        return lookup_cache.get(x).get('support')
+    return None
+
+
 def _cmp_gfx_alternatives(x, y):
     '''Compare two graphics driver names in terms of preference.
 
@@ -904,6 +915,7 @@ def _cmp_gfx_alternatives(x, y):
     card. We never want to recommend -experimental unless it's the only one
     available, so sort this last.
     -server always sorts after non-server.
+    LTSB (Long Term Support Branch) always sorts before NFB (New Feature Branch).
     '''
     if x.endswith('-updates') and not y.endswith('-updates'):
         return -1
@@ -917,6 +929,10 @@ def _cmp_gfx_alternatives(x, y):
         return -1
     if 'experiment' not in x and 'experiment' in y:
         return 1
+    if _pkg_support_from_cache(x) == 'LTSB' and _pkg_support_from_cache(y) != 'LTSB':
+        return 1
+    if _pkg_support_from_cache(x) != 'LTSB' and _pkg_support_from_cache(y) == 'LTSB':
+        return -1
     if x < y:
         return -1
     if x > y:
@@ -933,6 +949,7 @@ def _cmp_gfx_alternatives_gpgpu(x, y):
     card. We never want to recommend -experimental unless it's the only one
     available, so sort this last.
     -server always sorts before non-server.
+    LTSB (Long Term Support Branch) always sorts before NFB (New Feature Branch).
     '''
     if x.endswith('-updates') and not y.endswith('-updates'):
         return -1
@@ -946,6 +963,10 @@ def _cmp_gfx_alternatives_gpgpu(x, y):
         return -1
     if 'experiment' not in x and 'experiment' in y:
         return 1
+    if _pkg_support_from_cache(x) == 'LTSB' and _pkg_support_from_cache(y) != 'LTSB':
+        return 1
+    if _pkg_support_from_cache(x) != 'LTSB' and _pkg_support_from_cache(y) == 'LTSB':
+        return -1
     if x < y:
         return -1
     if x > y:
