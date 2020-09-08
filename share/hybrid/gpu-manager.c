@@ -1843,7 +1843,7 @@ static bool json_find_feature_in_array(char* feature, json_value* value)
     fprintf(log_handle, "Looking for availability of \"%s\" feature\n", feature);
     for (x = 0; x < length; x++) {
         /* fprintf(log_handle, "feature string: %s\n", value->u.array.values[x]->u.string.ptr); */
-        if (strcmp(value->u.object.values[x].value->u.string.ptr, feature) == 0) {
+        if (strcmp(value->u.array.values[x]->u.string.ptr, feature) == 0) {
             fprintf(log_handle, "\"%s\" feature found\n", feature);
             return true;
         }
