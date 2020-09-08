@@ -916,6 +916,7 @@ def _cmp_gfx_alternatives(x, y):
     available, so sort this last.
     -server always sorts after non-server.
     LTSB (Long Term Support Branch) always sorts before NFB (New Feature Branch).
+    Legacy always sorts before Beta.
     '''
     if x.endswith('-updates') and not y.endswith('-updates'):
         return -1
@@ -933,6 +934,14 @@ def _cmp_gfx_alternatives(x, y):
         return 1
     if _pkg_support_from_cache(x) != 'LTSB' and _pkg_support_from_cache(y) == 'LTSB':
         return -1
+    if _pkg_support_from_cache(x) == 'Legacy' and _pkg_support_from_cache(y) != 'Legacy':
+        return -1
+    if _pkg_support_from_cache(x) != 'Legacy' and _pkg_support_from_cache(y) == 'Legacy':
+        return 1
+    if _pkg_support_from_cache(x) == 'Beta' and _pkg_support_from_cache(y) != 'Beta':
+        return -1
+    if _pkg_support_from_cache(x) != 'Beta' and _pkg_support_from_cache(y) == 'Beta':
+        return 1
     if x < y:
         return -1
     if x > y:
@@ -950,6 +959,7 @@ def _cmp_gfx_alternatives_gpgpu(x, y):
     available, so sort this last.
     -server always sorts before non-server.
     LTSB (Long Term Support Branch) always sorts before NFB (New Feature Branch).
+    Legacy always sorts before Beta.
     '''
     if x.endswith('-updates') and not y.endswith('-updates'):
         return -1
@@ -967,6 +977,14 @@ def _cmp_gfx_alternatives_gpgpu(x, y):
         return 1
     if _pkg_support_from_cache(x) != 'LTSB' and _pkg_support_from_cache(y) == 'LTSB':
         return -1
+    if _pkg_support_from_cache(x) == 'Legacy' and _pkg_support_from_cache(y) != 'Legacy':
+        return -1
+    if _pkg_support_from_cache(x) != 'Legacy' and _pkg_support_from_cache(y) == 'Legacy':
+        return 1
+    if _pkg_support_from_cache(x) == 'Beta' and _pkg_support_from_cache(y) != 'Beta':
+        return -1
+    if _pkg_support_from_cache(x) != 'Beta' and _pkg_support_from_cache(y) == 'Beta':
+        return 1
     if x < y:
         return -1
     if x > y:
