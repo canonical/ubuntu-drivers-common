@@ -14,6 +14,8 @@
  *
  * Copyright (c) 1997-2003 by The XFree86 Project, Inc.
  *
+ * PCI code based on example.c from pciutils, by Martin Mares.
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, including without limitation
@@ -48,7 +50,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <ctype.h>
-#include <pciaccess.h>
+#include <pci/pci.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
@@ -75,8 +77,8 @@ static inline void pclosep(FILE **);
 #define PCI_CLASS_DISPLAY_OTHER         0x0380
 
 #define PCIINFOCLASSES(c) \
-    ( (((c) & 0x00ff0000) \
-     == (PCI_CLASS_DISPLAY << 16)) )
+    ( (( ((c) >> 8) & 0xFF) \
+     == PCI_CLASS_DISPLAY) )
 
 #define LAST_BOOT "/var/lib/ubuntu-drivers-common/last_gfx_boot"
 #define OFFLOADING_CONF "/var/lib/ubuntu-drivers-common/requires_offloading"
@@ -127,10 +129,6 @@ static prime_mode_settings prime_mode = OFF;
 static bool nvidia_runtimepm_supported = false;
 static bool nvidia_runtimepm_enabled = false;
 
-static struct pci_slot_match match = {
-    PCI_MATCH_ANY, PCI_MATCH_ANY, PCI_MATCH_ANY, PCI_MATCH_ANY, 0
-};
-
 struct device {
     int boot_vga;
     unsigned int vendor_id;
@@ -141,6 +139,17 @@ struct device {
     unsigned int dev;
     unsigned int func;
     int has_connected_outputs;
+};
+
+
+/* Struct we use to check PME */
+struct pme_dev {
+    struct pme_dev *next;
+    struct pci_dev *dev;
+    /* Cache */
+    unsigned int config_cached, config_bufsize;
+    u8 *config;    /* Cached configuration space data */
+    u8 *present;   /* Maps which configuration bytes are present */
 };
 
 
@@ -164,6 +173,180 @@ static inline void fclosep(FILE **file) {
 static inline void pclosep(FILE **file) {
     if (*file != NULL)
         pclose(*file);
+}
+
+/* Beginning of the parts from lspci.{c|h} */
+static int
+pme_config_fetch(struct pme_dev *pm_dev, unsigned int pos, unsigned int len)
+{
+    unsigned int end = pos+len;
+    int result;
+
+    while (pos < pm_dev->config_bufsize && len && pm_dev->present[pos])
+        pos++, len--;
+    while (pos+len <= pm_dev->config_bufsize && len && pm_dev->present[pos+len-1])
+        len--;
+    if (!len)
+        return 1;
+
+    if (end > pm_dev->config_bufsize) {
+        int orig_size = pm_dev->config_bufsize;
+        while (end > pm_dev->config_bufsize)
+        pm_dev->config_bufsize *= 2;
+        pm_dev->config = realloc(pm_dev->config, pm_dev->config_bufsize);
+        if (! pm_dev->config) {
+            fprintf(log_handle, "Error: failed to reallocate pm_dev config\n");
+            return 0;
+        }
+        pm_dev->present = realloc(pm_dev->present, pm_dev->config_bufsize);
+        if (! pm_dev->present) {
+            fprintf(log_handle, "Error: failed to reallocate pm_dev present\n");
+            return 0;
+        }
+        memset(pm_dev->present + orig_size, 0, pm_dev->config_bufsize - orig_size);
+    }
+    result = pci_read_block(pm_dev->dev, pos, pm_dev->config + pos, len);
+    if (result)
+        memset(pm_dev->present + pos, 1, len);
+  return result;
+}
+
+
+/* Config space accesses */
+static void
+check_conf_range(struct pme_dev *pm_dev, unsigned int pos, unsigned int len)
+{
+    while (len)
+        if (!pm_dev->present[pos]) {
+            fprintf(log_handle,
+                    "Internal bug: Accessing non-read configuration byte at position %x\n",
+                    pos);
+        }
+        else {
+            pos++, len--;
+        }
+}
+
+
+static u8
+get_conf_byte(struct pme_dev *pm_dev, unsigned int pos)
+{
+    check_conf_range(pm_dev, pos, 1);
+    return pm_dev->config[pos];
+}
+
+
+static u16
+get_conf_word(struct pme_dev *pm_dev, unsigned int pos)
+{
+    check_conf_range(pm_dev, pos, 2);
+    return pm_dev->config[pos] | (pm_dev->config[pos+1] << 8);
+}
+
+
+static bool get_d3_substates(struct pme_dev *d, bool *d3cold, bool *d3hot) {
+    bool status = false;
+    int where = PCI_CAPABILITY_LIST;
+
+    if (get_conf_word(d, PCI_STATUS) & PCI_STATUS_CAP_LIST) {
+        u8 been_there[256];
+        where = get_conf_byte(d, where) & ~3;
+        memset(been_there, 0, 256);
+        while (where) {
+            int id, cap;
+            /* Look for the capabilities */
+            if (!pme_config_fetch(d, where, 4)) {
+                fprintf(log_handle, "Warning: access to PME Capabilities was denied\n");
+                break;
+            }
+            id = get_conf_byte(d, where + PCI_CAP_LIST_ID);
+            cap = get_conf_word(d, where + PCI_CAP_FLAGS);
+            if (been_there[where]++) {
+                /* chain looped */
+                break;
+            }
+            if (id == 0xff) {
+                /* chain broken */
+                break;
+            }
+            switch (id) {
+            case PCI_CAP_ID_NULL:
+                break;
+            case PCI_CAP_ID_PM:
+                *d3hot = (cap & PCI_PM_CAP_PME_D3_HOT);
+                *d3cold = (cap & PCI_PM_CAP_PME_D3_COLD);
+                status = true;
+                break;
+            }
+        }
+    }
+    return status;
+}
+
+
+static struct pme_dev *
+scan_device(struct pci_dev *p) {
+    struct pme_dev *pm_dev = NULL;
+
+    pm_dev = malloc(sizeof(struct pme_dev));
+    if (!pm_dev) {
+        fprintf(log_handle, "Error: failed to allocate pme_dev\n");
+        return NULL;
+    }
+    memset(pm_dev, 0, sizeof(*pm_dev));
+    pm_dev->dev = p;
+    pm_dev->config_cached = pm_dev->config_bufsize = 64;
+    pm_dev->config = malloc(64);
+    if (!pm_dev->config) {
+        fprintf(log_handle, "Error: failed to allocate pme_dev config\n");
+        return NULL;
+    }
+    pm_dev->present = malloc(64);
+    if (!pm_dev->present) {
+        fprintf(log_handle, "Error: failed to allocate pme_dev present\n");
+        return NULL;
+    }
+    memset(pm_dev->present, 1, 64);
+    if (!pci_read_block(p, 0, pm_dev->config, 64)) {
+        fprintf(log_handle, "lspci: Unable to read the standard configuration space header of pm_dev %04x:%02x:%02x.%d\n",
+                p->domain, p->bus, p->dev, p->func);
+        return NULL;
+    }
+    if ((pm_dev->config[PCI_HEADER_TYPE] & 0x7f) == PCI_HEADER_TYPE_CARDBUS) {
+      /* For cardbus bridges, we need to fetch 64 bytes more to get the
+       * full standard header... */
+        if (pme_config_fetch(pm_dev, 64, 64))
+            pm_dev->config_cached += 64;
+    }
+    pci_setup_cache(p, pm_dev->config, pm_dev->config_cached);
+    /* We don't need this again */
+    //pci_fill_info(p, PCI_FILL_IDENT | PCI_FILL_CLASS);
+    return pm_dev;
+}
+/* End parts from lspci.{c|h} */
+
+
+static bool pci_device_is_boot_vga(struct pci_dev *info) {
+    size_t len = 0;
+    _cleanup_free_ char *boot_vga_str = NULL;
+    _cleanup_fclose_ FILE *file = NULL;
+    char sysfs_path[1024];
+
+    snprintf(sysfs_path, sizeof(sysfs_path),
+             "/sys/bus/pci/devices/%04x:%02x:%02x.%d/boot_vga",
+             info->domain, info->bus, info->dev, info->func);
+
+    /* Check the driver version */
+    file = fopen(sysfs_path, "r");
+    if (file == NULL) {
+        fprintf(log_handle, "can't open %s\n", sysfs_path);
+        return false;
+    }
+    if (getline(&boot_vga_str, &len, file) == -1) {
+        fprintf(log_handle, "can't get line from %s\n", sysfs_path);
+        return false;
+    }
+    return (strcmp(boot_vga_str, "1\n") == 0);
 }
 
 
@@ -950,7 +1133,7 @@ static bool is_link(char *file) {
 
 
 /* See if the device is bound to a driver */
-static bool is_device_bound_to_driver(struct pci_device *info) {
+static bool is_device_bound_to_driver(struct pci_dev *info) {
     char sysfs_path[1024];
     snprintf(sysfs_path, sizeof(sysfs_path),
              "/sys/bus/pci/devices/%04x:%02x:%02x.%d/driver",
@@ -961,7 +1144,7 @@ static bool is_device_bound_to_driver(struct pci_device *info) {
 
 
 /* See if the device is a pci passthrough */
-static bool is_device_pci_passthrough(struct pci_device *info) {
+static bool is_device_pci_passthrough(struct pci_dev *info) {
     enum { BUFFER_SIZE = 1024 };
     char buf[BUFFER_SIZE], sysfs_path[BUFFER_SIZE], *drv, *name;
     ssize_t length;
@@ -2045,7 +2228,7 @@ static bool is_nv_runtimepm_supported(int nv_device_id) {
 
 
 /* Check the procfs entry for the NVIDIA GPU to check the RTD3 status */
-static bool is_nv_runtimepm_enabled(struct pci_device *device) {
+static bool is_nv_runtimepm_enabled(struct pci_dev *device) {
     size_t read;
     char proc_gpu_path[PATH_MAX];
     _cleanup_fclose_ FILE *file = NULL;
@@ -2124,10 +2307,12 @@ int main(int argc, char *argv[]) {
     /* The number of cards from last boot*/
     int last_cards_n = 0;
 
-    /* Variables for pciaccess */
-    int pci_init = -1;
-    struct pci_device_iterator *iter = NULL;
-    struct pci_device *info = NULL;
+    /* Variables for pci capabilities */
+    bool d3hot = false;
+    bool d3cold = false;
+    struct pci_access *pacc = NULL;
+    struct pme_dev *pm_dev = NULL;
+    struct pci_dev *dev = NULL;
 
     /* Store the devices here */
     struct device *current_devices[MAX_CARDS_N];
@@ -2479,89 +2664,119 @@ int main(int argc, char *argv[]) {
         offloading = fake_offloading;
     }
     else {
-        /* Get the current system data */
-        pci_init = pci_system_init();
-        if (pci_init != 0)
+        /* Get the pci_access structure */
+        pacc = pci_alloc();
+
+        if (!pacc) {
+            fprintf(log_handle, "Error: failed to acces the PCI library\n");
             goto end;
+        }
+        /* Initialize the PCI library */
+        pci_init(pacc);
+        pci_scan_bus(pacc);
 
-        iter = pci_slot_match_iterator_create(&match);
-        if (!iter)
-            goto end;
+        /* Iterate over all devices */
+        for (dev=pacc->devices; dev; dev=dev->next) {
+             /* Fill in header info we need */
+            pci_fill_info(dev, PCI_FILL_IDENT | PCI_FILL_BASES | PCI_FILL_CLASS);
+            if (PCIINFOCLASSES(dev->device_class)) {
+                pm_dev = scan_device(dev);
+                if (pm_dev) {
+                    fprintf(log_handle, "Vendor/Device Id: %x:%x\n", dev->vendor_id, dev->device_id);
+                    fprintf(log_handle, "BusID \"PCI:%d@%d:%d:%d\"\n",
+                            (int)dev->bus, (int)dev->domain, (int)dev->dev, (int)dev->func);
+                    fprintf(log_handle, "Is boot vga? %s\n", (pci_device_is_boot_vga(dev) ? "yes" : "no"));
 
-        while ((info = pci_device_next(iter)) != NULL) {
-            if (PCIINFOCLASSES(info->device_class)) {
-                fprintf(log_handle, "Vendor/Device Id: %x:%x\n", info->vendor_id, info->device_id);
-                fprintf(log_handle, "BusID \"PCI:%d@%d:%d:%d\"\n",
-                        (int)info->bus, (int)info->domain, (int)info->dev, (int)info->func);
-                fprintf(log_handle, "Is boot vga? %s\n", (pci_device_is_boot_vga(info) ? "yes" : "no"));
+                    if (!is_device_bound_to_driver(dev)) {
+                        fprintf(log_handle, "The device is not bound to any driver.\n");
+                    }
 
-                if (!is_device_bound_to_driver(info)) {
-                    fprintf(log_handle, "The device is not bound to any driver.\n");
+                    if (is_device_pci_passthrough(dev)) {
+                        fprintf(log_handle, "The device is a pci passthrough. Skipping...\n");
+                        continue;
+                    }
+
+                    /* We don't support more than MAX_CARDS_N */
+                    if (cards_n < MAX_CARDS_N) {
+                        current_devices[cards_n] = malloc(sizeof(struct device));
+                        if (!current_devices[cards_n]) {
+                            if (pm_dev->config)
+                                free(pm_dev->config);
+                            if (pm_dev->present)
+                                free(pm_dev->present);
+                            free(pm_dev);
+                            goto end;
+                        }
+                        current_devices[cards_n]->boot_vga = pci_device_is_boot_vga(dev);
+                        current_devices[cards_n]->vendor_id = dev->vendor_id;
+                        current_devices[cards_n]->device_id = dev->device_id;
+                        current_devices[cards_n]->domain = dev->domain;
+                        current_devices[cards_n]->bus = dev->bus;
+                        current_devices[cards_n]->dev = dev->dev;
+                        current_devices[cards_n]->func = dev->func;
+
+                    if (dev->vendor_id == NVIDIA) {
+                        has_nvidia = true;
+
+                        if (!current_devices[cards_n]->boot_vga) {
+                            nvidia_runtimepm_supported = is_nv_runtimepm_supported(dev->device_id);
+
+                            if (!nvidia_runtimepm_supported) {
+                                /* This is a fairly expensive call, so check the database first */
+                                get_d3_substates(pm_dev, &d3cold, &d3hot);
+                                nvidia_runtimepm_supported = d3hot;
+                            }
+
+                            fprintf(log_handle, "Is nvidia runtime pm supported for \"0x%x\"? %s\n", dev->device_id,
+                                    nvidia_runtimepm_supported ? "yes" : "no");
+
+                            if (nvidia_runtimepm_supported)
+                                create_runtime_file("nvidia_runtimepm_supported");
+
+                            nvidia_runtimepm_enabled = is_nv_runtimepm_enabled(dev);
+                            fprintf(log_handle, "Is nvidia runtime pm enabled for \"0x%x\"? %s\n", dev->device_id,
+                                    nvidia_runtimepm_enabled ? "yes" : "no");
+
+                            if (nvidia_runtimepm_enabled)
+                                create_runtime_file("nvidia_runtimepm_enabled");
+                        }
+                    }
+                    else if (dev->vendor_id == INTEL) {
+                        has_intel = true;
+                    }
+                    else if (dev->vendor_id == AMD) {
+                        has_amd = true;
+                    }
+
+                    if (pm_dev->config)
+                        free(pm_dev->config);
+                    if (pm_dev->present)
+                        free(pm_dev->present);
+                    free(pm_dev);
+                    }
+                    else {
+                        fprintf(log_handle, "Warning: too many devices %d. "
+                                            "Max supported %d. Ignoring the rest.\n",
+                                            cards_n, MAX_CARDS_N);
+                        free(pm_dev->config);
+                        free(pm_dev->present);
+                        free(pm_dev);
+                        break;
+                    }
+
+                    cards_n++;
                 }
-
-                if (is_device_pci_passthrough(info)) {
-                    fprintf(log_handle, "The device is a pci passthrough. Skipping...\n");
-                    continue;
-                }
-
-                /* char *driver = NULL; */
-                if (info->vendor_id == NVIDIA) {
-                    has_nvidia = true;
-                    nvidia_runtimepm_supported = is_nv_runtimepm_supported(info->device_id);
-                    fprintf(log_handle, "Is nvidia runtime pm supported for \"0x%x\"? %s\n", info->device_id,
-                            nvidia_runtimepm_supported ? "yes" : "no");
-
-                    if (nvidia_runtimepm_supported)
-                        create_runtime_file("nvidia_runtimepm_supported");
-
-                    nvidia_runtimepm_enabled = is_nv_runtimepm_enabled(info);
-                    fprintf(log_handle, "Is nvidia runtime pm enabled for \"0x%x\"? %s\n", info->device_id,
-                            nvidia_runtimepm_enabled ? "yes" : "no");
-
-                    if (nvidia_runtimepm_enabled)
-                        create_runtime_file("nvidia_runtimepm_enabled");
-                }
-                else if (info->vendor_id == INTEL) {
-                    has_intel = true;
-                }
-                else if (info->vendor_id == AMD) {
-                    has_amd = true;
-                }
-
-                /* We don't support more than MAX_CARDS_N */
-                if (cards_n < MAX_CARDS_N) {
-                    current_devices[cards_n] = malloc(sizeof(struct device));
-                    if (!current_devices[cards_n])
-                        goto end;
-                    current_devices[cards_n]->boot_vga = pci_device_is_boot_vga(info);
-                    current_devices[cards_n]->vendor_id = info->vendor_id;
-                    current_devices[cards_n]->device_id = info->device_id;
-                    current_devices[cards_n]->domain = info->domain;
-                    current_devices[cards_n]->bus = info->bus;
-                    current_devices[cards_n]->dev = info->dev;
-                    current_devices[cards_n]->func = info->func;
-                }
-                else {
-                    fprintf(log_handle, "Warning: too many devices %d. "
-                                        "Max supported %d. Ignoring the rest.\n",
-                                        cards_n, MAX_CARDS_N);
-                    break;
-                }
-                /*
-                else {
-                    fprintf(stderr, "No hybrid graphics cards detected\n");
-                    break;
-                }
-                */
-                cards_n++;
             }
         }
-        /* Add information about connected outputs */
-        add_connected_outputs_info(current_devices, cards_n);
-
-        /* See if it requires RandR offloading */
-        offloading = requires_offloading(current_devices, cards_n);
+        /* Close everything */
+        pci_cleanup(pacc);
+        pacc = NULL;
     }
+    /* Add information about connected outputs */
+    add_connected_outputs_info(current_devices, cards_n);
+
+    /* See if it requires RandR offloading */
+    offloading = requires_offloading(current_devices, cards_n);
 
     fprintf(log_handle, "Does it require offloading? %s\n", (offloading ? "yes" : "no"));
 
@@ -2712,11 +2927,8 @@ int main(int argc, char *argv[]) {
 
 
 end:
-    if (pci_init == 0)
-        pci_system_cleanup();
-
-    if (iter)
-        free(iter);
+    if (pacc)
+        pci_cleanup(pacc);
 
     if (log_file)
         free(log_file);
@@ -2744,6 +2956,9 @@ end:
 
     if (dmi_product_version_path)
         free(dmi_product_version_path);
+
+    if (amdgpu_pro_px_file)
+        free(amdgpu_pro_px_file);
 
     if (nvidia_driver_version_path)
         free(nvidia_driver_version_path);
