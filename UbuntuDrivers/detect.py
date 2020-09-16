@@ -254,13 +254,18 @@ def _is_manual_install(pkg):
     if not module:
         return False
 
-    modinfo = subprocess.Popen(['modinfo', module], stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE)
-    modinfo.communicate()
-    if modinfo.returncode == 0:
-        logging.debug('_is_manual_install %s: builds module %s which is available, manual install',
-                      pkg.name, module)
-        return True
+    try:
+        modinfo = subprocess.Popen(['modinfo', module], stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+        modinfo.communicate()
+    except (OSError, FileNotFoundError, subprocess.CalledProcessError) as e:
+        logging.debug('_is_manual_install failed: %s', str(e))
+        return False
+    else:
+        if modinfo.returncode == 0:
+            logging.debug('_is_manual_install %s: builds module %s which is available, manual install',
+                          pkg.name, module)
+            return True
 
     logging.debug('_is_manual_install %s: builds module %s which is not available, no manual install',
                   pkg.name, module)
