@@ -1,8 +1,43 @@
-ubuntu-drivers-common (1:0.8.6) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8.6) groovy; urgency=medium
 
-  * 
+  [ Alberto Milone ]
+  * share/hybrid/json-parser, debian/copyright:
+    - Include json-parser (just C file and header).
+  * gpu-manager.c:
+    - Add json parsing code to detect support for runtimepm on NVIDIA.
+    - Check that RTD3 is enabled, and write that to a file in /run.
+    - Make on-demand mode the default when no settings are available.
+    - Add support for AMD+NVIDIA hybrid systems.
+    - Add support for checking PME capabilities for runtimepm, so that,
+      if the GPU is not boot_vga, and it is not listed in the json
+      database, we can at least check whether d3hot is supported, and
+      enable runtimepm in the NVIDIA driver.
+  * UbuntuDrivers/detect.py, ubuntu-drivers:
+    - Catch apt exceptions.
+    - Catch failure when modinfo is not available.
+    - Introduce the concept of LTSB (long term support branch), NFB
+      (new feature branch), Legacy, and Beta, which the driver packages
+      can specify.
+    - Use package support to pick the nvidia driver:
+      o Desktop case: pick the latest non-server driver, when available
+        (this preserves the current behaviour).
+      o Server case: pick the LTSB -server driver, when available.
+  * NvidiaDetector/nvidiadetector.py:
+    - Use regex to parse package names (LP: #1891183).
+  * ubuntu-drivers:
+    - Select on-demand mode if runtimepm is supported.
+    - Check RTD3 support for NVIDIA, and enable it when available.
+    - Show the package support level, when available, when using
+      "ubuntu-drivers debug".
+  * debian/control:
+    - Replace build-dep on libpciaccess-dev with libpci-dev.
+  * debian/rules: make sure to call the clean target of the Makefile
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 31 Aug 2020 17:42:08 +0200
+  [ Cyrus Lien ]
+  * gpu-manager.c:
+    - Fix segmentation fault in json_find_feature_in_array.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 16 Sep 2020 15:49:28 +0200
 
 ubuntu-drivers-common (1:0.8.5.4) groovy; urgency=medium
 
