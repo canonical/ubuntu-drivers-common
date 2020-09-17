@@ -913,32 +913,13 @@ def _pkg_support_from_cache(x):
 
 
 def _cmp_gfx_alternatives(x, y):
-    '''Compare two graphics driver names in terms of preference.
+    '''Compare two graphics driver names in terms of preference. (desktop)
 
-    -updates always sort after non-updates, as we prefer the stable driver and
-    only want to offer -updates when the one from release does not support the
-    card. We never want to recommend -experimental unless it's the only one
-    available, so sort this last.
+    NFB (New Feature Branch) or the latest is what we recommend on the desktop.
     -server always sorts after non-server.
     LTSB (Long Term Support Branch) always sorts before NFB (New Feature Branch).
     Legacy always sorts before Beta.
     '''
-    if x.endswith('-updates') and not y.endswith('-updates'):
-        return -1
-    if not x.endswith('-updates') and y.endswith('-updates'):
-        return 1
-    if x.endswith('-server') and not y.endswith('-server'):
-        return -1
-    if not x.endswith('-server') and y.endswith('-server'):
-        return 1
-    if 'experiment' in x and 'experiment' not in y:
-        return -1
-    if 'experiment' not in x and 'experiment' in y:
-        return 1
-    if _pkg_support_from_cache(x) == 'LTSB' and _pkg_support_from_cache(y) != 'LTSB':
-        return 1
-    if _pkg_support_from_cache(x) != 'LTSB' and _pkg_support_from_cache(y) == 'LTSB':
-        return -1
     if _pkg_support_from_cache(x) == 'Legacy' and _pkg_support_from_cache(y) != 'Legacy':
         return -1
     if _pkg_support_from_cache(x) != 'Legacy' and _pkg_support_from_cache(y) == 'Legacy':
@@ -946,6 +927,10 @@ def _cmp_gfx_alternatives(x, y):
     if _pkg_support_from_cache(x) == 'Beta' and _pkg_support_from_cache(y) != 'Beta':
         return -1
     if _pkg_support_from_cache(x) != 'Beta' and _pkg_support_from_cache(y) == 'Beta':
+        return 1
+    if x.endswith('-server') and not y.endswith('-server'):
+        return -1
+    if not x.endswith('-server') and y.endswith('-server'):
         return 1
     if x < y:
         return -1
@@ -956,28 +941,16 @@ def _cmp_gfx_alternatives(x, y):
 
 
 def _cmp_gfx_alternatives_gpgpu(x, y):
-    '''Compare two graphics driver names in terms of preference.
+    '''Compare two graphics driver names in terms of preference. (server)
 
-    -updates always sort after non-updates, as we prefer the stable driver and
-    only want to offer -updates when the one from release does not support the
-    card. We never want to recommend -experimental unless it's the only one
-    available, so sort this last.
     -server always sorts before non-server.
     LTSB (Long Term Support Branch) always sorts before NFB (New Feature Branch).
     Legacy always sorts before Beta.
     '''
-    if x.endswith('-updates') and not y.endswith('-updates'):
-        return -1
-    if not x.endswith('-updates') and y.endswith('-updates'):
-        return 1
     if x.endswith('-server') and not y.endswith('-server'):
         return 1
     if not x.endswith('-server') and y.endswith('-server'):
         return -1
-    if 'experiment' in x and 'experiment' not in y:
-        return -1
-    if 'experiment' not in x and 'experiment' in y:
-        return 1
     if _pkg_support_from_cache(x) == 'LTSB' and _pkg_support_from_cache(y) != 'LTSB':
         return 1
     if _pkg_support_from_cache(x) != 'LTSB' and _pkg_support_from_cache(y) == 'LTSB':
