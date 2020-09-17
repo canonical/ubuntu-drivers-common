@@ -319,6 +319,8 @@ def command_debug(args):
         else:
             auto = ''
 
+        support = info.get('support')
+
         info_str = ''
         if info['from_distro']:
             info_str += '  [distro]'
@@ -336,6 +338,8 @@ def command_debug(args):
             info_str += '  vendor: ' + info['vendor']
         if 'model' in info:
             info_str += '  model: ' + info['model']
+        if support:
+            info_str += '  support level: ' + info['support']
 
         print('%s: installed: %s   available: %s%s%s ' % (package, inst, cand, auto,  info_str))
 
