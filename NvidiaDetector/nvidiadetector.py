@@ -144,7 +144,7 @@ class NvidiaDetection(object):
         '''
         self.drivers = {}
         vendor_product_re = re.compile('pci:v0000(.+)d0000(.+)sv')
-        package_re = re.compile('nvidia(?:\-driver|)\-([0-9]+)(:?\-server|)(:?\:i386|)')
+        package_re = re.compile(r'nvidia(?:\-driver|)\-([0-9]+)(:?\-server|)(:?\:i386|)')
 
         for package in apt.Cache():
             if (not package.name.startswith('nvidia-') or

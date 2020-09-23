@@ -22,6 +22,7 @@ from UbuntuDrivers import kerneldetection
 system_architecture = apt.apt_pkg.get_architectures()[0]
 lookup_cache = {}
 
+
 def system_modaliases(sys_path=None):
     '''Get modaliases present in the system.
 
