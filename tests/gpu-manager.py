@@ -4398,7 +4398,7 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['i915', 'fake'],
                                                  ['mesa', 'nvidia'],
                                                  unloaded_module='nvidia',
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
