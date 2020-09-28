@@ -1533,7 +1533,7 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel', 'amd'],
                                                  ['i915', 'radeon'],
                                                  ['mesa'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
@@ -1567,7 +1567,7 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel'],
                                                  ['i915'],
                                                  ['mesa'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
