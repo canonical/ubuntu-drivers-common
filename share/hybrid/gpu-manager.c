@@ -1329,18 +1329,12 @@ static void add_connected_outputs_info(struct device **devices,
 }
 
 
-/* Check if any outputs are still connected to card0.
- *
- * By default we only check cards driver by i915.
- * If so, then claim support for RandR offloading
- */
+/* Check if any outputs are still connected to card0 */
 static bool requires_offloading(struct device **devices,
                                 int cards_n) {
 
     /* Let's check only /dev/dri/card0 and look
-     * for driver i915. We don't want to enable
-     * offloading to any other driver, as results
-     * may be unpredictable
+     * for the boot_vga device.
      */
     int i;
     bool status = false;
