@@ -1351,6 +1351,18 @@ static bool requires_offloading(struct device **devices,
         }
     }
 
+    if (status) {
+        if (!exists_not_empty(prime_settings)) {
+            fprintf(log_handle, "No prime-settings found. "
+                                "Assuming prime is not set "
+                                "to ON (ONDEMAND could be on).\n");
+            return false;
+        }
+
+        get_prime_action();
+        status = (prime_mode == ON);
+    }
+
     return status;
 }
 
