@@ -4,7 +4,8 @@ ubuntu-drivers-common (1:0.8.6) groovy; urgency=medium
   * share/hybrid/json-parser, debian/copyright:
     - Include json-parser (just C file and header).
   * gpu-manager.c:
-    - Add json parsing code to detect support for runtimepm on NVIDIA.
+    - Add json parsing code to detect support for runtimepm on NVIDIA
+      (LP: #1895855).
     - Check that RTD3 is enabled, and write that to a file in /run.
     - Make on-demand mode the default when no settings are available.
     - Add support for AMD+NVIDIA hybrid systems.
@@ -12,6 +13,8 @@ ubuntu-drivers-common (1:0.8.6) groovy; urgency=medium
       if the GPU is not boot_vga, and it is not listed in the json
       database, we can at least check whether d3hot is supported, and
       enable runtimepm in the NVIDIA driver.
+  * gpu-manager.py:
+    - Adjust the test suite to match the changes in gpu-manager.c.
   * UbuntuDrivers/detect.py, ubuntu-drivers:
     - Catch apt exceptions.
     - Catch failure when modinfo is not available.
@@ -37,7 +40,7 @@ ubuntu-drivers-common (1:0.8.6) groovy; urgency=medium
   * gpu-manager.c:
     - Fix segmentation fault in json_find_feature_in_array.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 16 Sep 2020 15:49:28 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 12 Oct 2020 16:00:18 +0200
 
 ubuntu-drivers-common (1:0.8.5.4) groovy; urgency=medium
 
