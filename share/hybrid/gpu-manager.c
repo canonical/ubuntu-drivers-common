@@ -2781,9 +2781,10 @@ int main(int argc, char *argv[]) {
     /* Add information about connected outputs */
     add_connected_outputs_info(current_devices, cards_n);
 
-    /* See if it requires RandR offloading */
-    offloading = requires_offloading(current_devices, cards_n);
-
+    if (!fake_lspci_file) {
+        /* See if it requires RandR offloading */
+        offloading = requires_offloading(current_devices, cards_n);
+    }
     fprintf(log_handle, "Does it require offloading? %s\n", (offloading ? "yes" : "no"));
 
     /* Remove a file that will tell other apps such as
