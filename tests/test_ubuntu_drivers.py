@@ -201,14 +201,14 @@ class DetectTest(unittest.TestCase):
             chroot.setup()
             chroot.add_test_repository()
             archive = gen_fakearchive()
-            # older applicable driver which is not the recommended one
-            archive.create_deb('nvidia-123', dependencies={'Depends': 'xorg-video-abi-4'},
+            archive.create_deb('nvidia-driver-440', dependencies={'Depends': 'xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
-            # -updates driver which also should not be recommended
-            archive.create_deb('nvidia-current-updates', dependencies={'Depends': 'xorg-video-abi-4'},
+            archive.create_deb('nvidia-driver-450', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+            archive.create_deb('nvidia-driver-390', dependencies={'Depends': 'xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             # driver package which supports multiple ABIs
-            archive.create_deb('nvidia-34',
+            archive.create_deb('nvidia-340',
                                dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             chroot.add_repository(archive.path, True, False)
@@ -225,9 +225,9 @@ class DetectTest(unittest.TestCase):
             res = UbuntuDrivers.detect.system_driver_packages(cache, sys_path=self.umockdev.get_sys_dir())
         finally:
             chroot.remove()
-        self.assertEqual(set(res), set(['chocolate', 'vanilla', 'nvidia-current',
-                                        'nvidia-current-updates', 'nvidia-123',
-                                        'nvidia-34',
+        self.assertEqual(set(res), set(['chocolate', 'vanilla', 'nvidia-current', 'nvidia-driver-450',
+                                        'nvidia-driver-390', 'nvidia-driver-440',
+                                        'nvidia-340',
                                         'neapolitan',
                                         'tuttifrutti',
                                         'stracciatella',
@@ -246,25 +246,25 @@ class DetectTest(unittest.TestCase):
         self.assertFalse('model' in res['chocolate'])
         self.assertFalse('recommended' in res['chocolate'])
 
-        self.assertEqual(res['nvidia-current']['modalias'], modalias_nv)
-        self.assertTrue('nvidia' in res['nvidia-current']['vendor'].lower(),
-                        res['nvidia-current']['vendor'])
-        self.assertTrue('GeForce' in res['nvidia-current']['model'],
-                        res['nvidia-current']['model'])
-        self.assertEqual(res['nvidia-current']['recommended'], True)
+        self.assertEqual(res['nvidia-driver-450']['modalias'], modalias_nv)
+        self.assertTrue('nvidia' in res['nvidia-driver-450']['vendor'].lower(),
+                        res['nvidia-driver-450']['vendor'])
+        self.assertTrue('GeForce' in res['nvidia-driver-450']['model'],
+                        res['nvidia-driver-450']['model'])
+        self.assertEqual(res['nvidia-driver-450']['recommended'], True)
 
-        self.assertEqual(res['nvidia-123']['modalias'], modalias_nv)
-        self.assertTrue('nvidia' in res['nvidia-123']['vendor'].lower(),
-                        res['nvidia-123']['vendor'])
-        self.assertTrue('GeForce' in res['nvidia-123']['model'],
-                        res['nvidia-123']['model'])
-        self.assertEqual(res['nvidia-123']['recommended'], False)
+        self.assertEqual(res['nvidia-driver-390']['modalias'], modalias_nv)
+        self.assertTrue('nvidia' in res['nvidia-driver-390']['vendor'].lower(),
+                        res['nvidia-driver-390']['vendor'])
+        self.assertTrue('GeForce' in res['nvidia-driver-390']['model'],
+                        res['nvidia-driver-390']['model'])
+        self.assertEqual(res['nvidia-driver-390']['recommended'], False)
 
-        self.assertEqual(res['nvidia-current-updates']['modalias'], modalias_nv)
-        self.assertEqual(res['nvidia-current-updates']['recommended'], False)
+        self.assertEqual(res['nvidia-driver-440']['modalias'], modalias_nv)
+        self.assertEqual(res['nvidia-driver-440']['recommended'], False)
 
-        self.assertEqual(res['nvidia-34']['modalias'], modalias_nv)
-        self.assertEqual(res['nvidia-34']['recommended'], False)
+        self.assertEqual(res['nvidia-340']['modalias'], modalias_nv)
+        self.assertEqual(res['nvidia-340']['recommended'], False)
 
         self.assertFalse(res['neapolitan']['free'])
 
@@ -1121,19 +1121,20 @@ class DetectTest(unittest.TestCase):
                                                                     sys_path=self.umockdev.get_sys_dir())
             linux_package = UbuntuDrivers.detect.get_linux(cache)
             modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache,
-                                                                                 'nvidia-driver-440-server')
+                                                                                 'nvidia-driver-418-server')
         finally:
             chroot.remove()
 
-        self.assertTrue('nvidia-driver-440-server' in res)
+        self.assertTrue('nvidia-driver-418-server' in res)
         packages = UbuntuDrivers.detect.gpgpu_install_filter(res, 'nvidia')
-        self.assertEqual(set(packages), set(['nvidia-driver-440-server']))
+        # LTSB always wins on the server
+        self.assertEqual(set(packages), set(['nvidia-driver-418-server']))
         driver = list(packages.keys())[0]
-        self.assertEqual(packages[driver].get('metapackage'), 'nvidia-headless-no-dkms-440-server')
+        self.assertEqual(packages[driver].get('metapackage'), 'nvidia-headless-no-dkms-418-server')
         self.assertEqual(linux_package, 'linux-generic-hwe-20.04')
         # Get the linux-modules-nvidia module for the kernel
         # So we expect the DKMS package as a fallback
-        self.assertEqual(modules_package, 'linux-modules-nvidia-440-server-generic-hwe-20.04')
+        self.assertEqual(modules_package, 'linux-modules-nvidia-418-server-generic-hwe-20.04')
 
     def test_system_device_specific_metapackages_chroot1(self):
         '''system_device_specific_metapackages() for test package repository'''
@@ -1204,14 +1205,14 @@ Description: broken \xEB encoding
             chroot.add_test_repository()
             archive = gen_fakearchive()
             # older applicable driver which is not the recommended one
-            archive.create_deb('nvidia-123', dependencies={'Depends': 'xorg-video-abi-4'},
+            archive.create_deb('nvidia-driver-440', dependencies={'Depends': 'xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             # -updates driver which also should not be recommended
-            archive.create_deb('nvidia-current-updates', dependencies={'Depends': 'xorg-video-abi-4'},
+            archive.create_deb('nvidia-driver-450', dependencies={'Depends': 'xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
 
             # -experimental driver which also should not be recommended
-            archive.create_deb('nvidia-experimental', dependencies={'Depends': 'xorg-video-abi-4'},
+            archive.create_deb('nvidia-driver-450-server', dependencies={'Depends': 'xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             chroot.add_repository(archive.path, True, False)
             cache = apt.Cache(rootdir=chroot.path)
@@ -1247,13 +1248,11 @@ Description: broken \xEB encoding
 
         # should contain nouveau driver; note that free is True here because
         # these come from the fake archive
-        self.assertEqual(graphics_dict['drivers']['nvidia-current'],
+        self.assertEqual(graphics_dict['drivers']['nvidia-driver-450'],
                          {'free': True, 'from_distro': False, 'recommended': True})
-        self.assertEqual(graphics_dict['drivers']['nvidia-current-updates'],
+        self.assertEqual(graphics_dict['drivers']['nvidia-driver-440'],
                          {'free': True, 'from_distro': False, 'recommended': False})
-        self.assertEqual(graphics_dict['drivers']['nvidia-123'],
-                         {'free': True, 'from_distro': False, 'recommended': False})
-        self.assertEqual(graphics_dict['drivers']['nvidia-experimental'],
+        self.assertEqual(graphics_dict['drivers']['nvidia-driver-450-server'],
                          {'free': True, 'from_distro': False, 'recommended': False})
         self.assertEqual(graphics_dict['drivers']['xserver-xorg-video-nouveau'],
                          {'free': True, 'from_distro': True, 'recommended': False, 'builtin': True})
