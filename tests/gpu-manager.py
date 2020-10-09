@@ -734,7 +734,7 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['nvidia'],
                                                  ['mesa', 'nvidia'],
                                                  'nvidia',
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
         self.assertTrue(gpu_test.has_single_card)
