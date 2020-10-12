@@ -4582,6 +4582,11 @@ class GpuManagerTest(unittest.TestCase):
 
         # Case 2b: no hybrid script is available
 
+        try:
+            os.unlink(self.amdgpu_pro_px_file.name)
+        except:
+            pass
+
         # Collect data
         gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
                                                  ['amd'],
