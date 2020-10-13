@@ -1246,14 +1246,13 @@ Description: broken \xEB encoding
         self.assertTrue('nvidia' in graphics_dict['vendor'].lower())
         self.assertTrue('GeForce' in graphics_dict['model'])
 
-        # should contain nouveau driver; note that free is True here because
-        # these come from the fake archive
+        # should contain nouveau driver
         self.assertEqual(graphics_dict['drivers']['nvidia-driver-450'],
-                         {'free': True, 'from_distro': False, 'recommended': True})
+                         {'free': False, 'from_distro': False, 'recommended': True})
         self.assertEqual(graphics_dict['drivers']['nvidia-driver-440'],
-                         {'free': True, 'from_distro': False, 'recommended': False})
+                         {'free': False, 'from_distro': False, 'recommended': False})
         self.assertEqual(graphics_dict['drivers']['nvidia-driver-450-server'],
-                         {'free': True, 'from_distro': False, 'recommended': False})
+                         {'free': False, 'from_distro': False, 'recommended': False})
         self.assertEqual(graphics_dict['drivers']['xserver-xorg-video-nouveau'],
                          {'free': True, 'from_distro': True, 'recommended': False, 'builtin': True})
         self.assertEqual(len(graphics_dict['drivers']), 5, list(graphics_dict['drivers'].keys()))

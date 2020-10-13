@@ -172,6 +172,10 @@ def _is_package_free(pkg):
     # it would be better to check the actual license, as we do not have
     # the component for third-party packages; but this is the best we can do
     # at the moment
+    #
+    # We can assume the NVIDIA packages to be non-free
+    if pkg.name.startswith('nvidia'):
+        return False
     for o in pkg.candidate.origins:
         if o.component in ('restricted', 'multiverse'):
             return False
