@@ -1,3 +1,18 @@
+ubuntu-drivers-common (1:0.8.6.1) UNRELEASED; urgency=medium
+
+  * UbuntuDrivers/detect.py:
+    - Assume the NVIDIA packages to be non-free (LP: #1899630).
+  * gpu-manager.{c|py}:
+    - Handle the xorg conf file in all supported PRIME
+      scenarios (LP: #1900137).
+  * tests/test_ubuntu_drivers.py,
+    tests/gpu-manager.py:
+    - Expect a xorg conf file to be created in on-demand
+      mode (11-nvidia-offload.conf) in the test suite.
+    - Fix test cases now that nvidia is marked as non-free.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 16 Oct 2020 16:29:17 +0200
+
 ubuntu-drivers-common (1:0.8.6) groovy; urgency=medium
 
   [ Alberto Milone ]
