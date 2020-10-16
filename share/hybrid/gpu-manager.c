@@ -2900,8 +2900,8 @@ int main(int argc, char *argv[]) {
                 run_amdgpu_pro_px(MODE_POWERSAVING);
             }
             /* NVIDIA Optimus */
-            else if (offloading && ((intel_loaded || amdgpu_loaded) && !nouveau_loaded &&
-                                 (nvidia_loaded || nvidia_kmod_available))) {
+            else if ((intel_loaded || amdgpu_loaded) && !nouveau_loaded &&
+                                 (nvidia_loaded || nvidia_kmod_available)) {
                 fprintf(log_handle, "NVIDIA hybrid system\n");
 
                 /* Try to enable prime */
