@@ -1390,7 +1390,7 @@ exec /sbin/modinfo "$@"
         finally:
             chroot.remove()
 
-        self.assertEqual(res, set(['stracciatella', 'vanilla', 'chocolate', 'nvidia-current']))
+        self.assertEqual(res, set(['stracciatella', 'vanilla', 'chocolate']))
 
     def test_system_device_drivers_freeonly(self):
         '''system_device_drivers() returns only devices with free drivers'''
@@ -1414,9 +1414,10 @@ exec /sbin/modinfo "$@"
             res = UbuntuDrivers.detect.system_device_drivers(cache, sys_path=self.umockdev.get_sys_dir(), freeonly=True)
         finally:
             chroot.remove()
+        # Leave 'graphics' out, since it's covered by nvidia
         self.assertEqual(
             set([os.path.basename(d) for d in res]),
-            set(['black', 'white', 'graphics', 'orange']))
+            set(['black', 'white', 'orange']))
 
     def test_detect_plugin_packages(self):
         '''detect_plugin_packages()'''
@@ -1748,7 +1749,7 @@ APT::Get::AllowUnauthenticated "true";
         self.assertTrue('/devices/black ==' in out)
         self.assertTrue('/devices/graphics ==' in out)
         self.assertTrue('xserver-xorg-video-nouveau - distro free builtin' in out)
-        self.assertTrue('nvidia-current - third-party free recommended' in out)
+        self.assertTrue('nvidia-current - third-party non-free recommended' in out)
         self.assertEqual(ud.returncode, 0)
 
     def test_devices_detect_plugins(self):
