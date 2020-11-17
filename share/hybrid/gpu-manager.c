@@ -159,6 +159,7 @@ static bool is_dir(char *directory);
 static bool is_dir_empty(char *directory);
 static bool is_link(char *file);
 static bool is_module_loaded(const char *module);
+static bool get_nvidia_driver_version(int *major, int *minor, int *extra);
 
 static inline void freep(void *p) {
     free(*(void**) p);
@@ -1408,6 +1409,7 @@ static bool move_log(void) {
 
 
 static bool create_prime_settings(const char *prime_settings) {
+    int major, minor, extra;
     _cleanup_fclose_ FILE *file = NULL;
 
     fprintf(log_handle, "Trying to create new settings for prime. Path: %s\n",
@@ -1427,8 +1429,16 @@ static bool create_prime_settings(const char *prime_settings) {
         fprintf(file, "on-demand\n");
     }
     else {
-        /* Set prime to "on" */
-        fprintf(file, "on\n");
+        if (get_nvidia_driver_version(&major, &minor, &extra)) {
+            if (major >= 450) {
+                /* Set prime to "on-demand" */
+                fprintf(file, "on-demand\n");
+            }
+            else {
+                /* Set prime to "on" */
+                fprintf(file, "on\n");
+            }
+        }
     }
 
     fflush(file);
