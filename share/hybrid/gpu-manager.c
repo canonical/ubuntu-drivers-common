@@ -82,6 +82,7 @@ static inline void pclosep(FILE **);
 
 #define LAST_BOOT "/var/lib/ubuntu-drivers-common/last_gfx_boot"
 #define OFFLOADING_CONF "/var/lib/ubuntu-drivers-common/requires_offloading"
+#define RUNTIMEPM_OVERRIDE "/etc/u-d-c-nvidia-runtimepm-override"
 #define XORG_CONF "/etc/X11/xorg.conf"
 #define KERN_PARAM "nogpumanager"
 #define AMDGPU_PRO_PX  "/opt/amdgpu-pro/bin/amdgpu-pro-px"
@@ -2173,7 +2174,11 @@ static bool is_nv_runtimepm_supported(int nv_device_id) {
 
     bool supported = false;
 
-    if(find_supported_gpus_json(&json_file)) {
+    if (is_file(RUNTIMEPM_OVERRIDE)) {
+        fprintf(log_handle, "%s found. Will try runtimepm if the kernel supports it.\n", RUNTIMEPM_OVERRIDE);
+        supported = true;
+    }
+    else if(find_supported_gpus_json(&json_file)) {
         if ( stat(json_file, &filestatus) != 0) {
             fprintf(log_handle, "File %s not found\n", json_file);
             return false;
@@ -2213,6 +2218,12 @@ static bool is_nv_runtimepm_supported(int nv_device_id) {
         device_value = NULL;
         json_value_free(value);
         free(file_contents);
+    }
+    else {
+        fprintf(log_handle, "Support for runtimepm not detected.\n"
+                "You can override this check at your own risk by creating the %s file.\n",
+                RUNTIMEPM_OVERRIDE);
+        return false;
     }
 
     if (! get_kernel_version(&major, &minor, &extra)) {

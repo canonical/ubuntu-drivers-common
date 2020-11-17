@@ -211,6 +211,10 @@ def command_install(args):
         except:
             pass
 
+        # Create the override file for gpu-manager
+        with open('/etc/u-d-c-nvidia-runtimepm-override', 'w') as f:
+            f.write('# File created by ubuntu-drivers\n')
+
     # All updates completed successfully, now let's upgrade the packages
     if oem_meta_to_install:
         ret = subprocess.call(['apt',
