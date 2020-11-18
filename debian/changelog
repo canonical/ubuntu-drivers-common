@@ -1,8 +1,15 @@
-ubuntu-drivers-common (1:0.8.6.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8.6.3) hirsute; urgency=medium
 
-  * 
+  * UbuntuDrivers/detect.py,
+    tests/test_ubuntu_drivers.py:
+    - Prefer LTSB releases over NFB ones for non gpgpu cases too.
+  * gpu-manager.c:
+    - Make it possible to force runtimepm by creating the
+      /etc/u-d-c-nvidia-runtimepm-override file.
+    - Make on-demand default on nvidia >= 450, when no
+      previous settings are available.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 09 Nov 2020 16:07:59 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 18 Nov 2020 15:44:11 +0100
 
 ubuntu-drivers-common (1:0.8.6.2) groovy; urgency=medium
 
