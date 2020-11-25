@@ -26,9 +26,9 @@ def usage():
     instructionsList = ['The only accepted (optional) parameters are:'
     '\n  -o, --output=<dirname>', '\tthe directory where the results \n\
 \t\t\t\tof the tests are saved.'
-
+    
     '\n  -i, --input=<filename>', '\tthe xorg.conf used for the tests.'
-
+    
     '\n  -h, --help', '\t\t\thelp page.'
 
     '\n  [Test ...]', '\t\t\tList of tests, the entire testsuite will be executed otherwise.'
@@ -40,7 +40,7 @@ def main():
     inputFile = os.path.join(cwd, 'xorg.conf')
     outputDir = cwd
     err = 'Error: parameters not recognised'
-
+    
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'h:o:i:', ['help', 'output=', 'input='])
     except getopt.GetoptError as err:
@@ -60,15 +60,16 @@ def main():
             sys.exit()
         else:
             assert False, 'unhandled option'
-
+    
+    
     settingsFile = open('settings.py', 'w')
     atexit.register(os.unlink, 'settings.py')
     if inputFile == os.path.join(cwd, 'xorg.conf') and outputDir == cwd:
         settingsFile.write('import os\ncwd = os.getcwd()\ninputFile = os.path.join(cwd, "xorg.conf")\noutputDir = cwd\ninputDir = cwd.replace("tests", "quirks")')
-    else:
+    else:    
         settingsFile.write('inputFile = "%s"\noutputDir = "%s"' % (inputFile, outputDir))
     settingsFile.close()
-
+        
     # run all tests in our directory
     if args:
         suite = unittest.TestLoader().loadTestsFromNames(args)

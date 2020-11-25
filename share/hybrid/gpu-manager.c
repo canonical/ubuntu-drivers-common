@@ -14,6 +14,8 @@
  *
  * Copyright (c) 1997-2003 by The XFree86 Project, Inc.
  *
+ * PCI code based on example.c from pciutils, by Martin Mares.
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, including without limitation
@@ -48,7 +50,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <ctype.h>
-#include <pciaccess.h>
+#include <pci/pci.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
@@ -61,6 +63,7 @@
 #include <libkmod.h>
 #include "xf86drm.h"
 #include "xf86drmMode.h"
+#include "json.h"
 
 static inline void freep(void *);
 static inline void fclosep(FILE **);
@@ -74,11 +77,12 @@ static inline void pclosep(FILE **);
 #define PCI_CLASS_DISPLAY_OTHER         0x0380
 
 #define PCIINFOCLASSES(c) \
-    ( (((c) & 0x00ff0000) \
-     == (PCI_CLASS_DISPLAY << 16)) )
+    ( (( ((c) >> 8) & 0xFF) \
+     == PCI_CLASS_DISPLAY) )
 
 #define LAST_BOOT "/var/lib/ubuntu-drivers-common/last_gfx_boot"
 #define OFFLOADING_CONF "/var/lib/ubuntu-drivers-common/requires_offloading"
+#define RUNTIMEPM_OVERRIDE "/etc/u-d-c-nvidia-runtimepm-override"
 #define XORG_CONF "/etc/X11/xorg.conf"
 #define KERN_PARAM "nogpumanager"
 #define AMDGPU_PRO_PX  "/opt/amdgpu-pro/bin/amdgpu-pro-px"
@@ -102,6 +106,12 @@ typedef enum {
     ISPX,
 } amdgpu_pro_px_action;
 
+typedef enum {
+    ON,
+    OFF,
+    ONDEMAND
+} prime_mode_settings;
+
 static char *log_file = NULL;
 static FILE *log_handle = NULL;
 static char *last_boot_file = NULL;
@@ -116,10 +126,9 @@ static char *amdgpu_pro_px_file = NULL;
 static char *modprobe_d_path = NULL;
 static char *xorg_conf_d_path = NULL;
 static prime_intel_drv prime_intel_driver = SNA;
-
-static struct pci_slot_match match = {
-    PCI_MATCH_ANY, PCI_MATCH_ANY, PCI_MATCH_ANY, PCI_MATCH_ANY, 0
-};
+static prime_mode_settings prime_mode = OFF;
+static bool nvidia_runtimepm_supported = false;
+static bool nvidia_runtimepm_enabled = false;
 
 struct device {
     int boot_vga;
@@ -134,11 +143,23 @@ struct device {
 };
 
 
+/* Struct we use to check PME */
+struct pme_dev {
+    struct pme_dev *next;
+    struct pci_dev *dev;
+    /* Cache */
+    unsigned int config_cached, config_bufsize;
+    u8 *config;    /* Cached configuration space data */
+    u8 *present;   /* Maps which configuration bytes are present */
+};
+
+
 static bool is_file(char *file);
 static bool is_dir(char *directory);
 static bool is_dir_empty(char *directory);
 static bool is_link(char *file);
 static bool is_module_loaded(const char *module);
+static bool get_nvidia_driver_version(int *major, int *minor, int *extra);
 
 static inline void freep(void *p) {
     free(*(void**) p);
@@ -156,6 +177,180 @@ static inline void pclosep(FILE **file) {
         pclose(*file);
 }
 
+/* Beginning of the parts from lspci.{c|h} */
+static int
+pme_config_fetch(struct pme_dev *pm_dev, unsigned int pos, unsigned int len)
+{
+    unsigned int end = pos+len;
+    int result;
+
+    while (pos < pm_dev->config_bufsize && len && pm_dev->present[pos])
+        pos++, len--;
+    while (pos+len <= pm_dev->config_bufsize && len && pm_dev->present[pos+len-1])
+        len--;
+    if (!len)
+        return 1;
+
+    if (end > pm_dev->config_bufsize) {
+        int orig_size = pm_dev->config_bufsize;
+        while (end > pm_dev->config_bufsize)
+        pm_dev->config_bufsize *= 2;
+        pm_dev->config = realloc(pm_dev->config, pm_dev->config_bufsize);
+        if (! pm_dev->config) {
+            fprintf(log_handle, "Error: failed to reallocate pm_dev config\n");
+            return 0;
+        }
+        pm_dev->present = realloc(pm_dev->present, pm_dev->config_bufsize);
+        if (! pm_dev->present) {
+            fprintf(log_handle, "Error: failed to reallocate pm_dev present\n");
+            return 0;
+        }
+        memset(pm_dev->present + orig_size, 0, pm_dev->config_bufsize - orig_size);
+    }
+    result = pci_read_block(pm_dev->dev, pos, pm_dev->config + pos, len);
+    if (result)
+        memset(pm_dev->present + pos, 1, len);
+  return result;
+}
+
+
+/* Config space accesses */
+static void
+check_conf_range(struct pme_dev *pm_dev, unsigned int pos, unsigned int len)
+{
+    while (len)
+        if (!pm_dev->present[pos]) {
+            fprintf(log_handle,
+                    "Internal bug: Accessing non-read configuration byte at position %x\n",
+                    pos);
+        }
+        else {
+            pos++, len--;
+        }
+}
+
+
+static u8
+get_conf_byte(struct pme_dev *pm_dev, unsigned int pos)
+{
+    check_conf_range(pm_dev, pos, 1);
+    return pm_dev->config[pos];
+}
+
+
+static u16
+get_conf_word(struct pme_dev *pm_dev, unsigned int pos)
+{
+    check_conf_range(pm_dev, pos, 2);
+    return pm_dev->config[pos] | (pm_dev->config[pos+1] << 8);
+}
+
+
+static bool get_d3_substates(struct pme_dev *d, bool *d3cold, bool *d3hot) {
+    bool status = false;
+    int where = PCI_CAPABILITY_LIST;
+
+    if (get_conf_word(d, PCI_STATUS) & PCI_STATUS_CAP_LIST) {
+        u8 been_there[256];
+        where = get_conf_byte(d, where) & ~3;
+        memset(been_there, 0, 256);
+        while (where) {
+            int id, cap;
+            /* Look for the capabilities */
+            if (!pme_config_fetch(d, where, 4)) {
+                fprintf(log_handle, "Warning: access to PME Capabilities was denied\n");
+                break;
+            }
+            id = get_conf_byte(d, where + PCI_CAP_LIST_ID);
+            cap = get_conf_word(d, where + PCI_CAP_FLAGS);
+            if (been_there[where]++) {
+                /* chain looped */
+                break;
+            }
+            if (id == 0xff) {
+                /* chain broken */
+                break;
+            }
+            switch (id) {
+            case PCI_CAP_ID_NULL:
+                break;
+            case PCI_CAP_ID_PM:
+                *d3hot = (cap & PCI_PM_CAP_PME_D3_HOT);
+                *d3cold = (cap & PCI_PM_CAP_PME_D3_COLD);
+                status = true;
+                break;
+            }
+        }
+    }
+    return status;
+}
+
+
+static struct pme_dev *
+scan_device(struct pci_dev *p) {
+    struct pme_dev *pm_dev = NULL;
+
+    pm_dev = malloc(sizeof(struct pme_dev));
+    if (!pm_dev) {
+        fprintf(log_handle, "Error: failed to allocate pme_dev\n");
+        return NULL;
+    }
+    memset(pm_dev, 0, sizeof(*pm_dev));
+    pm_dev->dev = p;
+    pm_dev->config_cached = pm_dev->config_bufsize = 64;
+    pm_dev->config = malloc(64);
+    if (!pm_dev->config) {
+        fprintf(log_handle, "Error: failed to allocate pme_dev config\n");
+        return NULL;
+    }
+    pm_dev->present = malloc(64);
+    if (!pm_dev->present) {
+        fprintf(log_handle, "Error: failed to allocate pme_dev present\n");
+        return NULL;
+    }
+    memset(pm_dev->present, 1, 64);
+    if (!pci_read_block(p, 0, pm_dev->config, 64)) {
+        fprintf(log_handle, "lspci: Unable to read the standard configuration space header of pm_dev %04x:%02x:%02x.%d\n",
+                p->domain, p->bus, p->dev, p->func);
+        return NULL;
+    }
+    if ((pm_dev->config[PCI_HEADER_TYPE] & 0x7f) == PCI_HEADER_TYPE_CARDBUS) {
+      /* For cardbus bridges, we need to fetch 64 bytes more to get the
+       * full standard header... */
+        if (pme_config_fetch(pm_dev, 64, 64))
+            pm_dev->config_cached += 64;
+    }
+    pci_setup_cache(p, pm_dev->config, pm_dev->config_cached);
+    /* We don't need this again */
+    //pci_fill_info(p, PCI_FILL_IDENT | PCI_FILL_CLASS);
+    return pm_dev;
+}
+/* End parts from lspci.{c|h} */
+
+
+static bool pci_device_is_boot_vga(struct pci_dev *info) {
+    size_t len = 0;
+    _cleanup_free_ char *boot_vga_str = NULL;
+    _cleanup_fclose_ FILE *file = NULL;
+    char sysfs_path[1024];
+
+    snprintf(sysfs_path, sizeof(sysfs_path),
+             "/sys/bus/pci/devices/%04x:%02x:%02x.%d/boot_vga",
+             info->domain, info->bus, info->dev, info->func);
+
+    /* Check the driver version */
+    file = fopen(sysfs_path, "r");
+    if (file == NULL) {
+        fprintf(log_handle, "can't open %s\n", sysfs_path);
+        return false;
+    }
+    if (getline(&boot_vga_str, &len, file) == -1) {
+        fprintf(log_handle, "can't get line from %s\n", sysfs_path);
+        return false;
+    }
+    return (strcmp(boot_vga_str, "1\n") == 0);
+}
+
 
 /* Trim string in place */
 static void trim(char *str) {
@@ -171,6 +366,24 @@ static void trim(char *str) {
     }
 
     memmove(str, pointer, len + 1);
+}
+
+
+static char* get_system_architecture() {
+    struct utsname buffer;
+    char * arch = NULL;
+
+    errno = 0;
+    if (uname(&buffer) != 0) {
+        return NULL;
+    }
+    /* We can get away with this since we
+     * only build gpu-manager on x86
+     */
+    asprintf(&arch, "%s-linux-gnu",
+             buffer.machine);
+
+    return arch;
 }
 
 
@@ -518,43 +731,33 @@ static bool copy_file(const char *src_path, const char *dst_path)
 }
 
 
-/* Open a file and check if it contains "on"
- * or "off".
- *
- * Return false if the file doesn't exist or is empty.
- */
-static bool check_on_off(const char *path) {
-    bool status = false;
+/* Get prime action, which can be "on", "off", or "on-demand" */
+static void get_prime_action() {
     char line[100];
     _cleanup_fclose_ FILE *file = NULL;
 
-    file = fopen(path, "r");
+    file = fopen(prime_settings, "r");
 
     if (!file) {
-        fprintf(log_handle, "Error: can't open %s\n", path);
-        return false;
+        fprintf(log_handle, "Error: can't open %s\n", prime_settings);
+        prime_mode = OFF;
     }
 
     while (fgets(line, sizeof(line), file)) {
-        if (istrstr(line, "on") != NULL) {
-            status = true;
+        if (istrstr(line, "on-demand") != NULL) {
+            prime_mode = ONDEMAND;
+            break;
+        }
+        else if (istrstr(line, "on") != NULL) {
+            prime_mode = ON;
+            break;
+        }
+        else {
+            prime_mode = OFF;
             break;
         }
     }
-
-    return status;
 }
-
-
-/* Get the settings for PRIME.
- *
- * This tells us whether the discrete card should be
- * on or off.
- */
-static bool prime_is_action_on() {
-    return (check_on_off(prime_settings));
-}
-
 
 static void get_boot_vga(struct device **devices,
                         int cards_number,
@@ -862,7 +1065,7 @@ static bool is_module_loaded(const char *module) {
     while (fgets(line, sizeof(line), file)) {
         char *tok;
         tok = strtok(line, " \t");
-        if (strstr(tok, module) != NULL) {
+        if (strcmp(tok, module) == 0) {
             status = true;
             break;
         }
@@ -932,7 +1135,7 @@ static bool is_link(char *file) {
 
 
 /* See if the device is bound to a driver */
-static bool is_device_bound_to_driver(struct pci_device *info) {
+static bool is_device_bound_to_driver(struct pci_dev *info) {
     char sysfs_path[1024];
     snprintf(sysfs_path, sizeof(sysfs_path),
              "/sys/bus/pci/devices/%04x:%02x:%02x.%d/driver",
@@ -943,7 +1146,7 @@ static bool is_device_bound_to_driver(struct pci_device *info) {
 
 
 /* See if the device is a pci passthrough */
-static bool is_device_pci_passthrough(struct pci_device *info) {
+static bool is_device_pci_passthrough(struct pci_dev *info) {
     enum { BUFFER_SIZE = 1024 };
     char buf[BUFFER_SIZE], sysfs_path[BUFFER_SIZE], *drv, *name;
     ssize_t length;
@@ -997,7 +1200,7 @@ static bool is_connector_connected(const char *connector) {
 
 /* Count the number of outputs connected to the card */
 int count_connected_outputs(const char *device_name) {
-    char name[50];
+    char name[PATH_MAX];
     struct dirent *dp;
     DIR *dfd;
     int connected_outputs = 0;
@@ -1016,7 +1219,8 @@ int count_connected_outputs(const char *device_name) {
                     drm_dir, dp->d_name);
         else {
             /* Open the file for the connector */
-            sprintf(name, "%s/%s/status", drm_dir, dp->d_name);
+            snprintf(name, sizeof(name), "%s/%s/status", drm_dir, dp->d_name);
+            name[sizeof(name) - 1] = 0;
             if (is_connector_connected(name)) {
                 fprintf(log_handle, "output %d:\n", connected_outputs);
                 fprintf(log_handle, "\t%s\n", dp->d_name);
@@ -1036,7 +1240,7 @@ int count_connected_outputs(const char *device_name) {
 static int has_driver_connected_outputs(const char *driver) {
     DIR *dir;
     struct dirent* dir_entry;
-    char path[20];
+    char path[PATH_MAX];
     int fd = 1;
     drmVersionPtr version;
     int connected_outputs = 0;
@@ -1055,6 +1259,7 @@ static int has_driver_connected_outputs(const char *driver) {
             continue;
 
         snprintf(path, sizeof(path), "%s/%s", dri_dir, dir_entry->d_name);
+        path[sizeof(path) - 1] = 0;
         fd = open(path, O_RDWR);
         if (fd) {
             if ((version = drmGetVersion(fd))) {
@@ -1126,26 +1331,32 @@ static void add_connected_outputs_info(struct device **devices,
 }
 
 
-/* Check if any outputs are still connected to card0.
- *
- * By default we only check cards driver by i915.
- * If so, then claim support for RandR offloading
- */
+/* Check if any outputs are still connected to card0 */
 static bool requires_offloading(struct device **devices,
                                 int cards_n) {
 
     /* Let's check only /dev/dri/card0 and look
-     * for driver i915. We don't want to enable
-     * offloading to any other driver, as results
-     * may be unpredictable
+     * for the boot_vga device.
      */
     int i;
     bool status = false;
     for(i = 0; i < cards_n; i++) {
-        if (devices[i]->vendor_id == INTEL) {
+        if (devices[i]->boot_vga) {
             status = (devices[i]->has_connected_outputs == 1);
             break;
         }
+    }
+
+    if (status) {
+        if (!exists_not_empty(prime_settings)) {
+            fprintf(log_handle, "No prime-settings found. "
+                                "Assuming prime is not set "
+                                "to ON (ONDEMAND could be on).\n");
+            return false;
+        }
+
+        get_prime_action();
+        status = (prime_mode == ON);
     }
 
     return status;
@@ -1198,6 +1409,7 @@ static bool move_log(void) {
 
 
 static bool create_prime_settings(const char *prime_settings) {
+    int major, minor, extra;
     _cleanup_fclose_ FILE *file = NULL;
 
     fprintf(log_handle, "Trying to create new settings for prime. Path: %s\n",
@@ -1209,15 +1421,33 @@ static bool create_prime_settings(const char *prime_settings) {
                 prime_settings);
         return false;
     }
-    /* Set prime to "on" */
-    fprintf(file, "on\n");
+    /* Make on-demand the default if
+     * runtimepm is supported.
+     */
+    if (nvidia_runtimepm_supported) {
+        /* Set prime to "on-demand" */
+        fprintf(file, "on-demand\n");
+    }
+    else {
+        if (get_nvidia_driver_version(&major, &minor, &extra)) {
+            if (major >= 450) {
+                /* Set prime to "on-demand" */
+                fprintf(file, "on-demand\n");
+            }
+            else {
+                /* Set prime to "on" */
+                fprintf(file, "on\n");
+            }
+        }
+    }
+
     fflush(file);
 
     return true;
 }
 
 
-static bool get_nvidia_driver_version(int *major, int *minor) {
+static bool get_nvidia_driver_version(int *major, int *minor, int *extra) {
 
     int status;
     size_t len = 0;
@@ -1235,12 +1465,38 @@ static bool get_nvidia_driver_version(int *major, int *minor) {
         return false;
     }
 
-    status = sscanf(driver_version, "%d.%d\n", major, minor);
+    status = sscanf(driver_version, "%d.%d.%d\n", major, minor, extra);
 
     /* Make sure that we match "desired_matches" */
-    if (status == EOF || status != 2) {
+    if (status == EOF || status < 2 ) {
         fprintf(log_handle, "Warning: couldn't get the driver version from %s\n",
                 nvidia_driver_version_path);
+        return false;
+    }
+
+    if (status == 2)
+        *extra = -1;
+
+    return true;
+}
+
+
+static bool get_kernel_version(int *major, int *minor, int *extra) {
+    struct utsname buffer;
+    int status;
+    _cleanup_free_ char *version = NULL;
+
+    errno = 0;
+    if (uname(&buffer) != 0) {
+        return false;
+    }
+
+    status = sscanf(buffer.release, "%d.%d.%d\n", major, minor, extra);
+
+    /* Make sure that we match "desired_matches" */
+    if (status == EOF || status != 3 ) {
+        fprintf(log_handle, "Warning: couldn't get the kernel version from %s\n",
+                buffer.release);
         return false;
     }
 
@@ -1337,16 +1593,12 @@ static bool run_amdgpu_pro_px(amdgpu_pro_px_action action) {
 static bool create_prime_outputclass(void) {
     _cleanup_fclose_ FILE *file = NULL;
     _cleanup_free_ char *multiarch = NULL;
-    char command[100];
     char xorg_d_custom[PATH_MAX];
 
     snprintf(xorg_d_custom, sizeof(xorg_d_custom), "%s/11-nvidia-prime.conf",
              xorg_conf_d_path);
 
-    snprintf(command, sizeof(command),
-             "/usr/bin/dpkg-architecture -qDEB_HOST_MULTIARCH");
-
-    multiarch = get_output(command, NULL, NULL);
+    multiarch = get_system_architecture();
     if (!multiarch)
         return false;
 
@@ -1365,7 +1617,7 @@ static bool create_prime_outputclass(void) {
                 "    Option \"AllowEmptyInitialConfiguration\"\n"
                 "    Option \"IgnoreDisplayDevices\" \"CRT\"\n"
                 "    Option \"PrimaryGPU\" \"Yes\"\n"
-                "    ModulePath \"/%s/nvidia/xorg\"\n"
+                "    ModulePath \"/lib/%s/nvidia/xorg\"\n"
                 "EndSection\n\n",
                 multiarch);
 
@@ -1376,12 +1628,114 @@ static bool create_prime_outputclass(void) {
     return false;
 }
 
-static void remove_prime_outputclass(void) {
+static bool create_offload_serverlayout(void) {
+    _cleanup_fclose_ FILE *file = NULL;
     char xorg_d_custom[PATH_MAX];
-    snprintf(xorg_d_custom, sizeof(xorg_d_custom), "%s/11-nvidia-prime.conf",
-            xorg_conf_d_path);
-    fprintf(log_handle, "Removing %s\n", xorg_d_custom);
-    unlink(xorg_d_custom);
+
+    snprintf(xorg_d_custom, sizeof(xorg_d_custom), "%s/11-nvidia-offload.conf",
+             xorg_conf_d_path);
+
+    fprintf(log_handle, "Creating %s\n", xorg_d_custom);
+    file = fopen(xorg_d_custom, "w");
+    if (!file) {
+        fprintf(log_handle, "Error while creating %s\n", xorg_d_custom);
+    }
+    else {
+        fprintf(file,
+                "# DO NOT EDIT. AUTOMATICALLY GENERATED BY gpu-manager\n\n"
+                "Section \"ServerLayout\"\n"
+                "    Identifier \"layout\"\n"
+                "    Option \"AllowNVIDIAGPUScreens\"\n"
+                "EndSection\n\n");
+
+        fflush(file);
+        return true;
+    }
+
+    return false;
+}
+
+/* Attempt to remove a file named "name" in xorg_conf_d_path. Returns 0 if the
+ * file is successfully removed, or -errno on failure. */
+static int remove_xorg_d_custom_file(const char *name) {
+    char path[PATH_MAX];
+    struct stat st;
+
+    snprintf(path, sizeof(path), "%s/%s", xorg_conf_d_path, name);
+    if (stat(path, &st) == 0) {
+        fprintf(log_handle, "Removing %s\n", path);
+        if (unlink(path) == 0) {
+            return 0;
+        }
+    }
+
+    return -errno;
+}
+
+static int remove_prime_outputclass(void) {
+    return remove_xorg_d_custom_file("11-nvidia-prime.conf");
+}
+
+static int remove_offload_serverlayout(void) {
+    return remove_xorg_d_custom_file("11-nvidia-offload.conf");
+}
+
+
+static bool create_runtime_file(const char *name) {
+    _cleanup_fclose_ FILE *file = NULL;
+    char path[PATH_MAX];
+
+    snprintf(path, sizeof(path),
+             "%s/%s", gpu_detection_path, name);
+
+    fprintf(log_handle, "Trying to create new file: %s\n",
+            path);
+
+    file = fopen(path, "w");
+    if (file == NULL) {
+        fprintf(log_handle, "I couldn't open %s for writing.\n",
+                path);
+        return false;
+    }
+    fprintf(file, "yes\n");
+    fflush(file);
+
+    return true;
+}
+
+
+static bool create_nvidia_runtime_config(void) {
+    _cleanup_fclose_ FILE *file = NULL;
+    char path[] = "/lib/modprobe.d/nvidia-runtimepm.conf";
+
+    fprintf(log_handle, "Trying to create new file: %s\n",
+            path);
+
+    file = fopen(path, "w");
+    if (file == NULL) {
+        fprintf(log_handle, "I couldn't open %s for writing.\n",
+                path);
+        return false;
+    }
+    fprintf(file, "options nvidia \"NVreg_DynamicPowerManagement=0x02\"\n");
+    fflush(file);
+
+    return true;
+}
+
+
+static int remove_nvidia_runtime_config(void) {
+    struct stat st;
+    char path[] = "/lib/modprobe.d/nvidia-runtimepm.conf";
+
+    if (stat(path, &st) == 0) {
+        fprintf(log_handle, "Trying to remove file: %s\n",
+        path);
+        if (unlink(path) == 0) {
+            return 0;
+        }
+    }
+    return -errno;
 }
 
 
@@ -1410,12 +1764,16 @@ static bool manage_power_management(const struct device *device, bool enabled) {
     }
 }
 
-static bool enable_power_management(const struct device *device) {
+static void enable_power_management(const struct device *device) {
     manage_power_management(device, true);
+    if (nvidia_runtimepm_supported && ! nvidia_runtimepm_enabled) {
+        create_nvidia_runtime_config();
+    }
 }
 
-static bool disable_power_management(const struct device *device) {
+static void disable_power_management(const struct device *device) {
     manage_power_management(device, false);
+    remove_nvidia_runtime_config();
 }
 
 static bool unload_nvidia(void) {
@@ -1617,18 +1975,33 @@ static bool enable_prime(const char *prime_settings,
         }
     }
 
-    if (prime_is_action_on()) {
+    get_prime_action();
+    if (prime_mode == ON) {
         /* Create an OutputClass just for PRIME, to override
          * the default NVIDIA settings
          */
         create_prime_outputclass();
+        /* Remove the ServerLayout */
+        remove_offload_serverlayout();
         disable_power_management(device);
         if (!is_module_loaded("nvidia"))
             load_module("nvidia");
     }
-    else {
+    else if (prime_mode == ONDEMAND) {
+        /* Create the ServerLayout required to enabling offload
+         * for NVIDIA.
+         */
+        create_offload_serverlayout();
         /* Remove the OutputClass */
         remove_prime_outputclass();
+        enable_power_management(device);
+        if (!is_module_loaded("nvidia"))
+            load_module("nvidia");
+    }
+    else {
+        /* Remove the OutputClass and ServerLayout */
+        remove_prime_outputclass();
+        remove_offload_serverlayout();
 
 unload_again:
         /* Unload the NVIDIA modules and enable pci power management */
@@ -1656,6 +2029,271 @@ unload_again:
     }
 
     return true;
+}
+
+
+static bool json_find_feature_in_array(char* feature, json_value* value)
+{
+    int length, x;
+    if (value == NULL) {
+        return false;
+    }
+
+    length = value->u.array.length;
+    fprintf(log_handle, "Looking for availability of \"%s\" feature\n", feature);
+    for (x = 0; x < length; x++) {
+        /* fprintf(log_handle, "feature string: %s\n", value->u.array.values[x]->u.string.ptr); */
+        if (strcmp(value->u.array.values[x]->u.string.ptr, feature) == 0) {
+            fprintf(log_handle, "\"%s\" feature found\n", feature);
+            return true;
+        }
+    }
+    fprintf(log_handle, "\"%s\" feature not found\n", feature);
+    return false;
+}
+
+
+static bool json_process_object_for_device_id(int id, json_value* value)
+{
+    int length, x;
+    if (value == NULL) {
+        return false;
+    }
+    length = value->u.object.length;
+    for (x = 0; x < length; x++) {
+        if (strcmp(value->u.object.values[x].name, "devid") == 0) {
+            if (strtol(value->u.object.values[x].value->u.string.ptr, NULL, 16) == id) {
+                fprintf(log_handle, "Device ID %s found in json file\n", value->u.object.values[x].value->u.string.ptr);
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+
+static bool json_find_feature_in_object(char* feature, json_value* value)
+{
+    int length, x;
+    if (value == NULL) {
+            return false;
+    }
+    length = value->u.object.length;
+    for (x = 0; x < length; x++) {
+        if (strcmp(value->u.object.values[x].name, "name") == 0) {
+            fprintf(log_handle, "Device name: %s\n", value->u.object.values[x].value->u.string.ptr);
+        }
+        if (strcmp(value->u.object.values[x].name, "features") == 0) {
+            /* fprintf(log_handle, "features: %s\n", value->u.object.values[x].value->u.string.ptr);*/
+            return (json_find_feature_in_array(feature, value->u.object.values[x].value));
+        }
+    }
+    return false;
+}
+
+
+static json_value* json_find_device_id_in_array(int id, json_value* value)
+{
+    int length, x;
+    if (value == NULL) {
+            return NULL;
+    }
+    length = value->u.array.length;
+    for (x = 0; x < length; x++) {
+        if (json_process_object_for_device_id(id, value->u.array.values[x])) {
+            /*fprintf(log_handle, "Device ID found in object %d\n", x);*/
+            return value->u.array.values[x];
+            break;
+        }
+    }
+    fprintf(log_handle, "Device ID \"0x%x\" not found in json file\n", id);
+
+    return NULL;
+}
+
+
+static json_value* json_find_device_id(int id, json_value* value)
+{
+    fprintf(log_handle, "Looking for device ID \"0x%x\" in json file\n", id);
+    int length, x;
+    json_value* chips = NULL;
+    if (value == NULL) {
+        return NULL;
+    }
+
+
+    length = value->u.object.length;
+    for (x = 0; x < length; x++) {
+        /*fprintf(log_handle, "object[%d].name = %s\n", x, value->u.object.values[x].name);*/
+        if (strcmp(value->u.object.values[x].name, "chips") == 0) {
+            chips = value->u.object.values[x].value;
+            /*fprintf(log_handle, "Chips found\n");*/
+        }
+
+    }
+
+    if (chips) {
+        /*fprintf(log_handle, "processing chips\n");*/
+        return (json_find_device_id_in_array(id, chips));
+    }
+    else {
+        fprintf(log_handle, "Error: json chips array not found. Aborting\n");
+    }
+    return NULL;
+}
+
+
+static bool find_supported_gpus_json(char **json_file){
+    int major, minor, extra;
+    _cleanup_fclose_ FILE *file = NULL;
+
+    if (get_nvidia_driver_version(&major, &minor, &extra)) {
+        if (major >= 450) {
+            if (extra > -1) {
+                asprintf(json_file, "/usr/share/doc/nvidia-driver-%d-server/supported-gpus.json",
+                 major);
+            }
+            else {
+                asprintf(json_file, "/usr/share/doc/nvidia-driver-%d/supported-gpus.json",
+                 major);
+            }
+            fprintf(log_handle, "Found json file: %s\n", *json_file);
+        }
+    }
+    else {
+        fprintf(log_handle, "Warning: cannot check the NVIDIA driver major version\n");
+        return false;
+    }
+
+    return true;
+}
+
+
+/* Look up the device ID in the json file for RTD3 support */
+static bool is_nv_runtimepm_supported(int nv_device_id) {
+    _cleanup_free_ char *json_file = NULL;
+    _cleanup_fclose_ FILE *file = NULL;
+    struct stat filestatus;
+    int file_size;
+    char* file_contents;
+    json_char* json;
+    json_value* value;
+    json_value* device_value;
+    int major, minor, extra;
+
+    bool supported = false;
+
+    if (is_file(RUNTIMEPM_OVERRIDE)) {
+        fprintf(log_handle, "%s found. Will try runtimepm if the kernel supports it.\n", RUNTIMEPM_OVERRIDE);
+        supported = true;
+    }
+    else if(find_supported_gpus_json(&json_file)) {
+        if ( stat(json_file, &filestatus) != 0) {
+            fprintf(log_handle, "File %s not found\n", json_file);
+            return false;
+        }
+
+        file_size = filestatus.st_size;
+        file_contents = (char*)malloc(filestatus.st_size);
+        if (file_contents == NULL) {
+            fprintf(log_handle, "Memory error: unable to allocate %d bytes\n", file_size);
+            return false;
+        }
+
+        file = fopen(json_file, "rt");
+        if (file == NULL) {
+            fprintf(log_handle, "Unable to open %s\n", json_file);
+            free(file_contents);
+            return false;
+        }
+        if (fread(file_contents, file_size, 1, file) != 1 ) {
+            fprintf(log_handle, "Unable t read content of %s\n", json_file);
+            free(file_contents);
+            return false;
+        }
+
+        json = (json_char*)file_contents;
+        value = json_parse(json,file_size);
+
+        if (value == NULL) {
+            fprintf(log_handle, "Unable to parse data\n");
+            free(file_contents);
+            return false;
+        }
+
+        device_value = json_find_device_id(nv_device_id, value);
+        supported = json_find_feature_in_object("runtimepm", device_value);
+
+        device_value = NULL;
+        json_value_free(value);
+        free(file_contents);
+    }
+    else {
+        fprintf(log_handle, "Support for runtimepm not detected.\n"
+                "You can override this check at your own risk by creating the %s file.\n",
+                RUNTIMEPM_OVERRIDE);
+        return false;
+    }
+
+    if (! get_kernel_version(&major, &minor, &extra)) {
+        fprintf(log_handle, "Failed to check kernel version. Disabling runtimepm.\n");
+        return false;
+    }
+
+    if (major > 4 || ((major == 4) && (minor >= 18))) {
+        fprintf(log_handle, "Linux %d.%d detected.\n", major, minor);
+    }
+    else {
+        fprintf(log_handle, "Linux %d.%d detected. Linux 4.18 or newer is required for runtimepm\n",
+                major, minor);
+        supported = false;
+    }
+
+    return supported;
+}
+
+
+/* Check the procfs entry for the NVIDIA GPU to check the RTD3 status */
+static bool is_nv_runtimepm_enabled(struct pci_dev *device) {
+    size_t read;
+    char proc_gpu_path[PATH_MAX];
+    _cleanup_fclose_ FILE *file = NULL;
+    _cleanup_free_ char *line = NULL;
+    char pattern[] = "Runtime D3 status:";
+    size_t len = 0;
+    size_t pattern_len = strlen(pattern);
+
+
+    snprintf(proc_gpu_path, sizeof(proc_gpu_path),
+             "/proc/driver/nvidia/gpus/%04x:%02x:%02x.%x/power",
+             (unsigned int)device->domain,
+             (unsigned int)device->bus,
+             (unsigned int)device->dev,
+             (unsigned int)device->func);
+
+    fprintf(log_handle, "Checking power status in %s\n", proc_gpu_path);
+    file = fopen(proc_gpu_path, "r");
+    if (!file) {
+        fprintf(log_handle, "Error while opening %s\n", proc_gpu_path);
+        return false;
+    }
+    else {
+        while ((read = getline(&line, &len, file)) != -1) {
+            if (istrstr(line, pattern) != NULL) {
+                fprintf(log_handle, "%s", line);
+                if (strncmp(line, pattern, pattern_len) == 0) {
+                    if (istrstr(line, "enabled") != NULL) {
+                        return true;
+                    }
+                    else {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    return false;
 }
 
 
@@ -1696,10 +2334,12 @@ int main(int argc, char *argv[]) {
     /* The number of cards from last boot*/
     int last_cards_n = 0;
 
-    /* Variables for pciaccess */
-    int pci_init = -1;
-    struct pci_device_iterator *iter = NULL;
-    struct pci_device *info = NULL;
+    /* Variables for pci capabilities */
+    bool d3hot = false;
+    bool d3cold = false;
+    struct pci_access *pacc = NULL;
+    struct pme_dev *pm_dev = NULL;
+    struct pci_dev *dev = NULL;
 
     /* Store the devices here */
     struct device *current_devices[MAX_CARDS_N];
@@ -2051,77 +2691,121 @@ int main(int argc, char *argv[]) {
         offloading = fake_offloading;
     }
     else {
-        /* Get the current system data */
-        pci_init = pci_system_init();
-        if (pci_init != 0)
+        /* Get the pci_access structure */
+        pacc = pci_alloc();
+
+        if (!pacc) {
+            fprintf(log_handle, "Error: failed to acces the PCI library\n");
             goto end;
+        }
+        /* Initialize the PCI library */
+        pci_init(pacc);
+        pci_scan_bus(pacc);
 
-        iter = pci_slot_match_iterator_create(&match);
-        if (!iter)
-            goto end;
+        /* Iterate over all devices */
+        for (dev=pacc->devices; dev; dev=dev->next) {
+             /* Fill in header info we need */
+            pci_fill_info(dev, PCI_FILL_IDENT | PCI_FILL_BASES | PCI_FILL_CLASS);
+            if (PCIINFOCLASSES(dev->device_class)) {
+                pm_dev = scan_device(dev);
+                if (pm_dev) {
+                    fprintf(log_handle, "Vendor/Device Id: %x:%x\n", dev->vendor_id, dev->device_id);
+                    fprintf(log_handle, "BusID \"PCI:%d@%d:%d:%d\"\n",
+                            (int)dev->bus, (int)dev->domain, (int)dev->dev, (int)dev->func);
+                    fprintf(log_handle, "Is boot vga? %s\n", (pci_device_is_boot_vga(dev) ? "yes" : "no"));
 
-        while ((info = pci_device_next(iter)) != NULL) {
-            if (PCIINFOCLASSES(info->device_class)) {
-                fprintf(log_handle, "Vendor/Device Id: %x:%x\n", info->vendor_id, info->device_id);
-                fprintf(log_handle, "BusID \"PCI:%d@%d:%d:%d\"\n",
-                        (int)info->bus, (int)info->domain, (int)info->dev, (int)info->func);
-                fprintf(log_handle, "Is boot vga? %s\n", (pci_device_is_boot_vga(info) ? "yes" : "no"));
+                    if (!is_device_bound_to_driver(dev)) {
+                        fprintf(log_handle, "The device is not bound to any driver.\n");
+                    }
 
-                if (!is_device_bound_to_driver(info)) {
-                    fprintf(log_handle, "The device is not bound to any driver.\n");
-                }
+                    if (is_device_pci_passthrough(dev)) {
+                        fprintf(log_handle, "The device is a pci passthrough. Skipping...\n");
+                        continue;
+                    }
 
-                if (is_device_pci_passthrough(info)) {
-                    fprintf(log_handle, "The device is a pci passthrough. Skipping...\n");
-                    continue;
-                }
+                    /* We don't support more than MAX_CARDS_N */
+                    if (cards_n < MAX_CARDS_N) {
+                        current_devices[cards_n] = malloc(sizeof(struct device));
+                        if (!current_devices[cards_n]) {
+                            if (pm_dev->config)
+                                free(pm_dev->config);
+                            if (pm_dev->present)
+                                free(pm_dev->present);
+                            free(pm_dev);
+                            goto end;
+                        }
+                        current_devices[cards_n]->boot_vga = pci_device_is_boot_vga(dev);
+                        current_devices[cards_n]->vendor_id = dev->vendor_id;
+                        current_devices[cards_n]->device_id = dev->device_id;
+                        current_devices[cards_n]->domain = dev->domain;
+                        current_devices[cards_n]->bus = dev->bus;
+                        current_devices[cards_n]->dev = dev->dev;
+                        current_devices[cards_n]->func = dev->func;
 
-                /* char *driver = NULL; */
-                if (info->vendor_id == NVIDIA) {
-                    has_nvidia = true;
-                }
-                else if (info->vendor_id == INTEL) {
-                    has_intel = true;
-                }
-                else if (info->vendor_id == AMD) {
-                    has_amd = true;
-                }
+                    if (dev->vendor_id == NVIDIA) {
+                        has_nvidia = true;
 
-                /* We don't support more than MAX_CARDS_N */
-                if (cards_n < MAX_CARDS_N) {
-                    current_devices[cards_n] = malloc(sizeof(struct device));
-                    if (!current_devices[cards_n])
-                        goto end;
-                    current_devices[cards_n]->boot_vga = pci_device_is_boot_vga(info);
-                    current_devices[cards_n]->vendor_id = info->vendor_id;
-                    current_devices[cards_n]->device_id = info->device_id;
-                    current_devices[cards_n]->domain = info->domain;
-                    current_devices[cards_n]->bus = info->bus;
-                    current_devices[cards_n]->dev = info->dev;
-                    current_devices[cards_n]->func = info->func;
+                        if (!current_devices[cards_n]->boot_vga) {
+                            nvidia_runtimepm_supported = is_nv_runtimepm_supported(dev->device_id);
+
+                            if (!nvidia_runtimepm_supported) {
+                                /* This is a fairly expensive call, so check the database first */
+                                get_d3_substates(pm_dev, &d3cold, &d3hot);
+                                nvidia_runtimepm_supported = d3hot;
+                            }
+
+                            fprintf(log_handle, "Is nvidia runtime pm supported for \"0x%x\"? %s\n", dev->device_id,
+                                    nvidia_runtimepm_supported ? "yes" : "no");
+
+                            if (nvidia_runtimepm_supported)
+                                create_runtime_file("nvidia_runtimepm_supported");
+
+                            nvidia_runtimepm_enabled = is_nv_runtimepm_enabled(dev);
+                            fprintf(log_handle, "Is nvidia runtime pm enabled for \"0x%x\"? %s\n", dev->device_id,
+                                    nvidia_runtimepm_enabled ? "yes" : "no");
+
+                            if (nvidia_runtimepm_enabled)
+                                create_runtime_file("nvidia_runtimepm_enabled");
+                        }
+                    }
+                    else if (dev->vendor_id == INTEL) {
+                        has_intel = true;
+                    }
+                    else if (dev->vendor_id == AMD) {
+                        has_amd = true;
+                    }
+
+                    if (pm_dev->config)
+                        free(pm_dev->config);
+                    if (pm_dev->present)
+                        free(pm_dev->present);
+                    free(pm_dev);
+                    }
+                    else {
+                        fprintf(log_handle, "Warning: too many devices %d. "
+                                            "Max supported %d. Ignoring the rest.\n",
+                                            cards_n, MAX_CARDS_N);
+                        free(pm_dev->config);
+                        free(pm_dev->present);
+                        free(pm_dev);
+                        break;
+                    }
+
+                    cards_n++;
                 }
-                else {
-                    fprintf(log_handle, "Warning: too many devices %d. "
-                                        "Max supported %d. Ignoring the rest.\n",
-                                        cards_n, MAX_CARDS_N);
-                    break;
-                }
-                /*
-                else {
-                    fprintf(stderr, "No hybrid graphics cards detected\n");
-                    break;
-                }
-                */
-                cards_n++;
             }
         }
-        /* Add information about connected outputs */
-        add_connected_outputs_info(current_devices, cards_n);
+        /* Close everything */
+        pci_cleanup(pacc);
+        pacc = NULL;
+    }
+    /* Add information about connected outputs */
+    add_connected_outputs_info(current_devices, cards_n);
 
+    if (!fake_lspci_file) {
         /* See if it requires RandR offloading */
         offloading = requires_offloading(current_devices, cards_n);
     }
-
     fprintf(log_handle, "Does it require offloading? %s\n", (offloading ? "yes" : "no"));
 
     /* Remove a file that will tell other apps such as
@@ -2173,7 +2857,7 @@ int main(int argc, char *argv[]) {
                      &boot_vga_vendor_id,
                      &boot_vga_device_id);
 
-        if (boot_vga_vendor_id == INTEL) {
+        if ((boot_vga_vendor_id == INTEL) || (boot_vga_vendor_id == AMD)) {
             if (offloading && nvidia_unloaded) {
                 /* NVIDIA PRIME */
                 fprintf(log_handle, "PRIME detected\n");
@@ -2195,12 +2879,7 @@ int main(int argc, char *argv[]) {
                 }
                 goto end;
             }
-            else {
-                fprintf(log_handle, "Nothing to do\n");
-                }
-            }
-        else if (boot_vga_vendor_id == AMD) {
-            if (has_changed && amdgpu_loaded && amdgpu_is_pro && amdgpu_pro_px_installed) {
+            else if (has_changed && amdgpu_loaded && amdgpu_is_pro && amdgpu_pro_px_installed) {
                 /* If amdgpu-pro-px exists, we can assume it's a pxpress system. But now the
                  * system has one card only, user probably disabled Switchable Graphics in
                  * BIOS. So we need to use discrete config file here.
@@ -2214,7 +2893,9 @@ int main(int argc, char *argv[]) {
             }
         }
         else if (boot_vga_vendor_id == NVIDIA) {
-            fprintf(log_handle, "Nothing to do\n");
+            if (remove_offload_serverlayout() == -ENOENT) {
+                fprintf(log_handle, "Nothing to do\n");
+            }
         }
     }
     else if (cards_n > 1) {
@@ -2227,9 +2908,9 @@ int main(int argc, char *argv[]) {
         get_first_discrete(current_devices, cards_n,
                            &discrete_device);
 
-        /* Intel + another GPU */
-        if (boot_vga_vendor_id == INTEL) {
-            fprintf(log_handle, "Intel IGP detected\n");
+        /* Intel or AMD + another GPU */
+        if ((boot_vga_vendor_id == INTEL) || (boot_vga_vendor_id == AMD)) {
+            fprintf(log_handle, "%s IGP detected\n", (boot_vga_vendor_id == INTEL) ? "Intel" : "AMD");
             /* AMDGPU-Pro Switchable */
             if (has_changed && amdgpu_loaded && amdgpu_is_pro && amdgpu_pro_px_installed) {
                 /* Similar to switchable enabled -> disabled case, but this time
@@ -2240,9 +2921,9 @@ int main(int argc, char *argv[]) {
                 run_amdgpu_pro_px(MODE_POWERSAVING);
             }
             /* NVIDIA Optimus */
-            else if (offloading && (intel_loaded && !nouveau_loaded &&
-                                 (nvidia_loaded || nvidia_kmod_available))) {
-                fprintf(log_handle, "Intel hybrid system\n");
+            else if ((intel_loaded || amdgpu_loaded) && !nouveau_loaded &&
+                                 (nvidia_loaded || nvidia_kmod_available)) {
+                fprintf(log_handle, "NVIDIA hybrid system\n");
 
                 /* Try to enable prime */
                 if (enable_prime(prime_settings,
@@ -2274,11 +2955,8 @@ int main(int argc, char *argv[]) {
 
 
 end:
-    if (pci_init == 0)
-        pci_system_cleanup();
-
-    if (iter)
-        free(iter);
+    if (pacc)
+        pci_cleanup(pacc);
 
     if (log_file)
         free(log_file);
@@ -2306,6 +2984,9 @@ end:
 
     if (dmi_product_version_path)
         free(dmi_product_version_path);
+
+    if (amdgpu_pro_px_file)
+        free(amdgpu_pro_px_file);
 
     if (nvidia_driver_version_path)
         free(nvidia_driver_version_path);

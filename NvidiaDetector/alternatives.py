@@ -20,9 +20,9 @@
 #       MA 02110-1301, USA.
 
 import os
-import re
 import subprocess
 from subprocess import Popen, PIPE, CalledProcessError
+
 
 class MultiArchUtils(object):
 
@@ -56,6 +56,7 @@ class MultiArchUtils(object):
     def get_other_alternative_name(self):
         return self._get_alternative_name_from_arch(self._other_arch)
 
+
 class Alternatives(object):
 
     def __init__(self, master_link):
@@ -85,7 +86,6 @@ class Alternatives(object):
     def get_current_alternative(self):
         '''Get the alternative in use'''
         dev_null = open('/dev/null', 'w')
-        current_alternative = None
         p1 = Popen([self._command, '--query', self._master_link],
                    stdout=PIPE, stderr=dev_null, universal_newlines=True)
         p = p1.communicate()[0]
@@ -151,7 +151,6 @@ class Alternatives(object):
     def resolve_module_alias(self, alias):
         '''Get the 1st kernel module name matching an alias'''
         dev_null = open('/dev/null', 'w')
-        current_alternative = None
         p1 = Popen(['modprobe', '--resolve-alias', alias], stdout=PIPE,
                    stderr=dev_null, universal_newlines=True)
         p = p1.communicate()[0]

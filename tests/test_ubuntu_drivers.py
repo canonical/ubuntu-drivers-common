@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 # (C) 2012 Canonical Ltd.
 # Author: Martin Pitt <martin.pitt@ubuntu.com>
 #
@@ -59,6 +61,8 @@ def gen_fakehw():
     t.add_device('pci', 'purple', None, ['modalias', 'pci:v67891234d00sv00000001sd00bc00sc00i00'], [])
     # covered by tuttifrutti.deb / multiverse
     t.add_device('usb', 'aubergine', None, ['modalias', 'usb:v1234dABCDsv01sd02bc00sc01i05'], [])
+    # covered by oem-pistacchio-meta.deb
+    t.add_device('dmi', 'pistacchio', None, ['modalias', 'dmi:aaapnXPS137390:a'], [])
 
     return t
 
@@ -151,7 +155,7 @@ class DetectTest(unittest.TestCase):
             self.assertGreater(len(res), 3)
             self.assertTrue(':' in list(res)[0])
 
-    def test_system_modalises_fake(self):
+    def test_system_modaliases_fake(self):
         '''system_modaliases() for fake sysfs'''
 
         res = UbuntuDrivers.detect.system_modaliases(self.umockdev.get_sys_dir())
@@ -161,6 +165,7 @@ class DetectTest(unittest.TestCase):
             'usb:v1234dABCDsv01sd02bc00sc01i05',
             'pci:v98761234d00sv00000001sd00bc00sc00i00',
             'pci:v67891234d00sv00000001sd00bc00sc00i00',
+            'dmi:aaapnXPS137390:a',
             modalias_nv]))
         self.assertTrue(res['pci:vDEADBEEFd00'].endswith('/sys/devices/grey'))
 
@@ -196,14 +201,14 @@ class DetectTest(unittest.TestCase):
             chroot.setup()
             chroot.add_test_repository()
             archive = gen_fakearchive()
-            # older applicable driver which is not the recommended one
-            archive.create_deb('nvidia-123', dependencies={'Depends': 'xorg-video-abi-4'},
+            archive.create_deb('nvidia-driver-440', dependencies={'Depends': 'xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
-            # -updates driver which also should not be recommended
-            archive.create_deb('nvidia-current-updates', dependencies={'Depends': 'xorg-video-abi-4'},
+            archive.create_deb('nvidia-driver-450', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+            archive.create_deb('nvidia-driver-390', dependencies={'Depends': 'xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             # driver package which supports multiple ABIs
-            archive.create_deb('nvidia-34',
+            archive.create_deb('nvidia-340',
                                dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             chroot.add_repository(archive.path, True, False)
@@ -220,9 +225,9 @@ class DetectTest(unittest.TestCase):
             res = UbuntuDrivers.detect.system_driver_packages(cache, sys_path=self.umockdev.get_sys_dir())
         finally:
             chroot.remove()
-        self.assertEqual(set(res), set(['chocolate', 'vanilla', 'nvidia-current',
-                                        'nvidia-current-updates', 'nvidia-123',
-                                        'nvidia-34',
+        self.assertEqual(set(res), set(['chocolate', 'vanilla', 'nvidia-current', 'nvidia-driver-450',
+                                        'nvidia-driver-390', 'nvidia-driver-440',
+                                        'nvidia-340',
                                         'neapolitan',
                                         'tuttifrutti',
                                         'stracciatella',
@@ -241,27 +246,327 @@ class DetectTest(unittest.TestCase):
         self.assertFalse('model' in res['chocolate'])
         self.assertFalse('recommended' in res['chocolate'])
 
-        self.assertEqual(res['nvidia-current']['modalias'], modalias_nv)
-        self.assertTrue('nvidia' in res['nvidia-current']['vendor'].lower(),
-                        res['nvidia-current']['vendor'])
-        self.assertTrue('GeForce' in res['nvidia-current']['model'],
-                        res['nvidia-current']['model'])
-        self.assertEqual(res['nvidia-current']['recommended'], True)
+        self.assertEqual(res['nvidia-driver-450']['modalias'], modalias_nv)
+        self.assertTrue('nvidia' in res['nvidia-driver-450']['vendor'].lower(),
+                        res['nvidia-driver-450']['vendor'])
+        self.assertTrue('GeForce' in res['nvidia-driver-450']['model'],
+                        res['nvidia-driver-450']['model'])
+        self.assertEqual(res['nvidia-driver-450']['recommended'], True)
 
-        self.assertEqual(res['nvidia-123']['modalias'], modalias_nv)
-        self.assertTrue('nvidia' in res['nvidia-123']['vendor'].lower(),
-                        res['nvidia-123']['vendor'])
-        self.assertTrue('GeForce' in res['nvidia-123']['model'],
-                        res['nvidia-123']['model'])
-        self.assertEqual(res['nvidia-123']['recommended'], False)
+        self.assertEqual(res['nvidia-driver-390']['modalias'], modalias_nv)
+        self.assertTrue('nvidia' in res['nvidia-driver-390']['vendor'].lower(),
+                        res['nvidia-driver-390']['vendor'])
+        self.assertTrue('GeForce' in res['nvidia-driver-390']['model'],
+                        res['nvidia-driver-390']['model'])
+        self.assertEqual(res['nvidia-driver-390']['recommended'], False)
 
-        self.assertEqual(res['nvidia-current-updates']['modalias'], modalias_nv)
-        self.assertEqual(res['nvidia-current-updates']['recommended'], False)
+        self.assertEqual(res['nvidia-driver-440']['modalias'], modalias_nv)
+        self.assertEqual(res['nvidia-driver-440']['recommended'], False)
 
-        self.assertEqual(res['nvidia-34']['modalias'], modalias_nv)
-        self.assertEqual(res['nvidia-34']['recommended'], False)
+        self.assertEqual(res['nvidia-340']['modalias'], modalias_nv)
+        self.assertEqual(res['nvidia-340']['recommended'], False)
 
         self.assertFalse(res['neapolitan']['free'])
+
+    def test_system_driver_packages_chroot_support_branch(self):
+        '''system_driver_packages() LTSB vs NFB'''
+
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            # older applicable driver which is not the recommended one
+            archive.create_deb('nvidia-driver-390', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+            # -updates driver which also should not be recommended
+            archive.create_deb('nvidia-driver-440', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+
+            archive.create_deb('nvidia-driver-440-server', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)',
+                                           'Support': 'NFB'})
+
+            archive.create_deb('nvidia-driver-418-server', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)',
+                                           'Support': 'LTSB'})
+
+            archive.create_deb('nvidia-driver-450-server', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)',
+                                           'Support': 'LTSB'})
+
+            archive.create_deb('nvidia-driver-450', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)',
+                                           'Support': 'LTSB'})
+
+            archive.create_deb('nvidia-driver-455', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)',
+                                           'Support': 'NFB'})
+
+            archive.create_deb('nvidia-driver-435', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+
+            # driver package which supports multiple ABIs
+            archive.create_deb('nvidia-340',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+
+            archive.create_deb('nvidia-headless-no-dkms-440',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-headless-no-dkms-440-server',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-headless-no-dkms-450-server',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-headless-no-dkms-418-server',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-headless-no-dkms-418',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-headless-no-dkms-435',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-headless-no-dkms-390',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-440',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-450',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-455',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-440-server',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-450-server',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-418-server',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-418',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-435',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-390',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            # Linux nvidia modules
+            archive.create_deb('linux-modules-nvidia-440-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-440-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-440-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-450-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-450-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-450-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-455-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-455-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-455-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-440-server-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-440-server-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-440-server-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-450-server-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-450-server-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-450-server-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-418-server-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-418-server-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-418-server-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-435-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-435-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-435-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-390-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-390-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-390-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            # Linux nvidia modules hwe-20.04 flavours
+            archive.create_deb('linux-modules-nvidia-440-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-440-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-450-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-450-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-455-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-455-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-440-server-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-440-server-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-450-server-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-450-server-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-418-server-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-418-server-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-435-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-435-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-390-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-390-5.4.0-25-generic'},
+                               extra_tags={})
+
+            # Image packages
+            archive.create_deb('linux-image-5.4.0-25-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-5.3.0-29-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-5.4.0-24-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-headers-5.4.0-24-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-headers-5.4.0-25-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic, '
+                                                        'linux-headers-5.4.0-25-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-image-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-image-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-image-generic-hwe-20.04, '
+                                                        'linux-headers-generic-hwe-20.04'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-headers-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-headers-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-headers-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-headers-generic'},
+                               extra_tags={})
+            archive.create_deb('linux-headers-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-headers-generic'},
+                               extra_tags={})
+
+            chroot.add_repository(archive.path, True, False)
+            cache = apt.Cache(rootdir=chroot.path)
+
+            # Install kernel packages
+            for pkg in ('linux-image-5.4.0-25-generic',
+                        'linux-image-5.4.0-24-generic',
+                        'linux-image-5.3.0-29-generic',
+                        'linux-headers-5.4.0-24-generic',
+                        'linux-headers-5.4.0-25-generic',
+                        'linux-image-generic-hwe-18.04',
+                        'linux-image-generic-hwe-18.04-edge',
+                        'linux-image-generic-hwe-20.04',
+                        'linux-headers-generic-hwe-18.04',
+                        'linux-headers-generic-hwe-18.04-edge',
+                        'linux-headers-generic-hwe-20.04',
+                        'linux-generic-hwe-18.04',
+                        'linux-generic-hwe-18.04-edge',
+                        'linux-generic-hwe-20.04',
+                        'linux-image-generic'):
+                cache[pkg].mark_install()
+
+            res = UbuntuDrivers.detect.system_driver_packages(cache,
+                                                              sys_path=self.umockdev.get_sys_dir())
+            linux_package = UbuntuDrivers.detect.get_linux(cache)
+            modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache,
+                                                                                 'nvidia-driver-450')
+        finally:
+            chroot.remove()
+
+        self.assertTrue('nvidia-driver-450' in res)
+        packages = UbuntuDrivers.detect.gpgpu_install_filter(res, 'nvidia')
+        # LTSB always wins on the server
+        self.assertEqual(set(packages), set(['nvidia-driver-450']))
+        self.assertEqual(linux_package, 'linux-generic-hwe-20.04')
+        # Get the linux-modules-nvidia module for the kernel
+        # So we expect the DKMS package as a fallback
+        self.assertEqual(modules_package, 'linux-modules-nvidia-450-generic-hwe-20.04')
 
     def test_system_gpgpu_driver_packages_chroot1(self):
         '''system_gpgpu_driver_packages() for test package repository'''
@@ -334,11 +639,11 @@ class DetectTest(unittest.TestCase):
 
             # Linux nvidia modules
             archive.create_deb('linux-modules-nvidia-410-generic',
-                               dependencies={'Depends': 'linux-modules-nvidia-410-5.0.0-27-generic'},
+                               dependencies={'Depends': 'linux-modules-nvidia-410-5.0.0-26-generic'},
                                extra_tags={})
 
-            archive.create_deb('linux-modules-nvidia-410-5.0.0-27-generic',
-                               dependencies={'Depends': 'linux-image-5.0.0-27-generic'},
+            archive.create_deb('linux-modules-nvidia-410-5.0.0-26-generic',
+                               dependencies={'Depends': 'linux-image-5.0.0-26-generic'},
                                extra_tags={})
 
             # Image packages
@@ -569,6 +874,587 @@ class DetectTest(unittest.TestCase):
         # So we expect the DKMS package as a fallback
         self.assertEqual(modules_package, 'linux-modules-nvidia-410-generic')
 
+    def test_system_gpgpu_driver_packages_chroot4(self):
+        '''system_gpgpu_driver_packages() for test package repository'''
+
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            # older applicable driver which is not the recommended one
+            archive.create_deb('nvidia-driver-390', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+            # -updates driver which also should not be recommended
+            archive.create_deb('nvidia-driver-440', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+
+            archive.create_deb('nvidia-driver-435', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+
+            # driver package which supports multiple ABIs
+            archive.create_deb('nvidia-340',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+
+            archive.create_deb('nvidia-headless-no-dkms-440',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-headless-no-dkms-435',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-headless-no-dkms-390',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-440',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-435',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-390',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            # Linux nvidia modules
+            archive.create_deb('linux-modules-nvidia-440-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-440-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-440-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-435-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-435-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-435-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-390-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-390-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-390-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            # Linux nvidia modules hwe-20.04 flavours
+            archive.create_deb('linux-modules-nvidia-440-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-440-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-435-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-435-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-390-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-390-5.4.0-25-generic'},
+                               extra_tags={})
+
+            # Image packages
+            archive.create_deb('linux-image-5.4.0-25-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-5.3.0-29-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-5.4.0-24-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-headers-5.4.0-24-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-headers-5.4.0-25-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic, '
+                                                        'linux-headers-5.4.0-25-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-image-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-image-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-image-generic-hwe-20.04, '
+                                                        'linux-headers-generic-hwe-20.04'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-headers-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-headers-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-headers-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-headers-generic'},
+                               extra_tags={})
+            archive.create_deb('linux-headers-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-headers-generic'},
+                               extra_tags={})
+
+            chroot.add_repository(archive.path, True, False)
+            cache = apt.Cache(rootdir=chroot.path)
+
+            # Install kernel packages
+            for pkg in ('linux-image-5.4.0-25-generic',
+                        'linux-image-5.4.0-24-generic',
+                        'linux-image-5.3.0-29-generic',
+                        'linux-headers-5.4.0-24-generic',
+                        'linux-headers-5.4.0-25-generic',
+                        'linux-image-generic-hwe-18.04',
+                        'linux-image-generic-hwe-18.04-edge',
+                        'linux-image-generic-hwe-20.04',
+                        'linux-headers-generic-hwe-18.04',
+                        'linux-headers-generic-hwe-18.04-edge',
+                        'linux-headers-generic-hwe-20.04',
+                        'linux-generic-hwe-18.04',
+                        'linux-generic-hwe-18.04-edge',
+                        'linux-generic-hwe-20.04',
+                        'linux-image-generic'):
+                cache[pkg].mark_install()
+
+            res = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache,
+                                                                    sys_path=self.umockdev.get_sys_dir())
+            linux_package = UbuntuDrivers.detect.get_linux(cache)
+            modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache,
+                                                                                 'nvidia-driver-440')
+        finally:
+            chroot.remove()
+
+        self.assertTrue('nvidia-driver-440' in res)
+        packages = UbuntuDrivers.detect.gpgpu_install_filter(res, 'nvidia')
+        self.assertEqual(set(packages), set(['nvidia-driver-440']))
+        driver = list(packages.keys())[0]
+        self.assertEqual(packages[driver].get('metapackage'), 'nvidia-headless-no-dkms-440')
+        self.assertEqual(linux_package, 'linux-generic-hwe-20.04')
+        # Get the linux-modules-nvidia module for the kernel
+        # So we expect the DKMS package as a fallback
+        self.assertEqual(modules_package, 'linux-modules-nvidia-440-generic-hwe-20.04')
+
+    def test_legacy_nvidia_driver_packages_chroot1(self):
+        '''legacy_nvidia_driver_packages for test package repository'''
+
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            # driver package which supports multiple ABIs
+            archive.create_deb('nvidia-340',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+
+            # Linux nvidia modules
+            archive.create_deb('linux-modules-nvidia-440-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-440-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-440-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-435-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-435-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-435-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-390-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-390-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-390-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            # Linux nvidia modules hwe-20.04 flavours
+            archive.create_deb('linux-modules-nvidia-440-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-440-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-435-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-435-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-390-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-390-5.4.0-25-generic'},
+                               extra_tags={})
+
+            # Image packages
+            archive.create_deb('linux-image-5.4.0-25-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-5.3.0-29-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-5.4.0-24-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-headers-5.4.0-24-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-headers-5.4.0-25-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic, '
+                                                        'linux-headers-5.4.0-25-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-image-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-image-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-image-generic-hwe-20.04, '
+                                                        'linux-headers-generic-hwe-20.04'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-headers-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-headers-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-headers-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-headers-generic'},
+                               extra_tags={})
+            archive.create_deb('linux-headers-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-headers-generic'},
+                               extra_tags={})
+
+            chroot.add_repository(archive.path, True, False)
+            cache = apt.Cache(rootdir=chroot.path)
+
+            # Install kernel packages
+            for pkg in ('linux-image-5.4.0-25-generic',
+                        'linux-image-5.4.0-24-generic',
+                        'linux-image-5.3.0-29-generic',
+                        'linux-headers-5.4.0-24-generic',
+                        'linux-headers-5.4.0-25-generic',
+                        'linux-image-generic-hwe-18.04',
+                        'linux-image-generic-hwe-18.04-edge',
+                        'linux-image-generic-hwe-20.04',
+                        'linux-headers-generic-hwe-18.04',
+                        'linux-headers-generic-hwe-18.04-edge',
+                        'linux-headers-generic-hwe-20.04',
+                        'linux-generic-hwe-18.04',
+                        'linux-generic-hwe-18.04-edge',
+                        'linux-generic-hwe-20.04',
+                        'linux-image-generic'):
+                cache[pkg].mark_install()
+
+            res = UbuntuDrivers.detect.system_driver_packages(cache,
+                                                              sys_path=self.umockdev.get_sys_dir())
+            linux_package = UbuntuDrivers.detect.get_linux(cache)
+            modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache,
+                                                                                 'nvidia-340')
+        finally:
+            chroot.remove()
+
+        self.assertTrue('nvidia-340' in res)
+        self.assertEqual(linux_package, 'linux-generic-hwe-20.04')
+        # Get the linux-modules-nvidia module for the kernel
+        # So we expect the DKMS package as a fallback
+        self.assertEqual(modules_package, None)
+
+    def test_system_server_driver_packages_chroot1(self):
+        '''system_gpgpu_driver_packages() server for test package repository'''
+
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            # older applicable driver which is not the recommended one
+            archive.create_deb('nvidia-driver-390', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+            # -updates driver which also should not be recommended
+            archive.create_deb('nvidia-driver-440', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+
+            archive.create_deb('nvidia-driver-440-server', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)',
+                                           'Support': 'NFB'})
+
+            archive.create_deb('nvidia-driver-418-server', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)',
+                                           'Support': 'LTSB'})
+
+            archive.create_deb('nvidia-driver-435', dependencies={'Depends': 'xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+
+            # driver package which supports multiple ABIs
+            archive.create_deb('nvidia-340',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
+
+            archive.create_deb('nvidia-headless-no-dkms-440',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-headless-no-dkms-440-server',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-headless-no-dkms-418-server',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-headless-no-dkms-418',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-headless-no-dkms-435',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-headless-no-dkms-390',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-440',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-440-server',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-418-server',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-418',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-435',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            archive.create_deb('nvidia-dkms-390',
+                               dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
+                               extra_tags={})
+
+            # Linux nvidia modules
+            archive.create_deb('linux-modules-nvidia-440-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-440-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-440-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-440-server-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-440-server-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-440-server-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-418-server-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-418-server-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-418-server-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-435-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-435-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-435-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-390-generic',
+                               dependencies={'Depends': 'linux-modules-nvidia-390-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-390-5.4.0-25-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={})
+
+            # Linux nvidia modules hwe-20.04 flavours
+            archive.create_deb('linux-modules-nvidia-440-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-440-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-440-server-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-440-server-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-418-server-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-418-server-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-435-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-435-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-modules-nvidia-390-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-modules-nvidia-390-5.4.0-25-generic'},
+                               extra_tags={})
+
+            # Image packages
+            archive.create_deb('linux-image-5.4.0-25-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-5.3.0-29-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-5.4.0-24-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-headers-5.4.0-24-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-headers-5.4.0-25-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic, '
+                                                        'linux-headers-5.4.0-25-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-image-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-image-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-image-generic-hwe-20.04, '
+                                                        'linux-headers-generic-hwe-20.04'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-headers-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-headers-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-headers-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-headers-generic'},
+                               extra_tags={})
+            archive.create_deb('linux-headers-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-headers-generic'},
+                               extra_tags={})
+
+            chroot.add_repository(archive.path, True, False)
+            cache = apt.Cache(rootdir=chroot.path)
+
+            # Install kernel packages
+            for pkg in ('linux-image-5.4.0-25-generic',
+                        'linux-image-5.4.0-24-generic',
+                        'linux-image-5.3.0-29-generic',
+                        'linux-headers-5.4.0-24-generic',
+                        'linux-headers-5.4.0-25-generic',
+                        'linux-image-generic-hwe-18.04',
+                        'linux-image-generic-hwe-18.04-edge',
+                        'linux-image-generic-hwe-20.04',
+                        'linux-headers-generic-hwe-18.04',
+                        'linux-headers-generic-hwe-18.04-edge',
+                        'linux-headers-generic-hwe-20.04',
+                        'linux-generic-hwe-18.04',
+                        'linux-generic-hwe-18.04-edge',
+                        'linux-generic-hwe-20.04',
+                        'linux-image-generic'):
+                cache[pkg].mark_install()
+
+            res = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache,
+                                                                    sys_path=self.umockdev.get_sys_dir())
+            linux_package = UbuntuDrivers.detect.get_linux(cache)
+            modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache,
+                                                                                 'nvidia-driver-418-server')
+        finally:
+            chroot.remove()
+
+        self.assertTrue('nvidia-driver-418-server' in res)
+        packages = UbuntuDrivers.detect.gpgpu_install_filter(res, 'nvidia')
+        # LTSB always wins on the server
+        self.assertEqual(set(packages), set(['nvidia-driver-418-server']))
+        driver = list(packages.keys())[0]
+        self.assertEqual(packages[driver].get('metapackage'), 'nvidia-headless-no-dkms-418-server')
+        self.assertEqual(linux_package, 'linux-generic-hwe-20.04')
+        # Get the linux-modules-nvidia module for the kernel
+        # So we expect the DKMS package as a fallback
+        self.assertEqual(modules_package, 'linux-modules-nvidia-418-server-generic-hwe-20.04')
+
+    def test_system_device_specific_metapackages_chroot1(self):
+        '''system_device_specific_metapackages() for test package repository'''
+
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            # SKU specific package for our hardware
+            archive.create_deb('oem-pistacchio-meta',
+                               extra_tags={'Modaliases':
+                                           'meta(dmi:*pnXPS137390:*, pci:*sv00001028sd00000962*)'})
+            chroot.add_repository(archive.path, True, False)
+            cache = apt.Cache(rootdir=chroot.path)
+            res = UbuntuDrivers.detect.system_device_specific_metapackages(cache, sys_path=self.umockdev.get_sys_dir())
+        finally:
+            chroot.remove()
+        self.assertTrue('oem-pistacchio-meta' in res)
+
     def test_system_driver_packages_bad_encoding(self):
         '''system_driver_packages() with badly encoded Packages index'''
 
@@ -619,14 +1505,14 @@ Description: broken \xEB encoding
             chroot.add_test_repository()
             archive = gen_fakearchive()
             # older applicable driver which is not the recommended one
-            archive.create_deb('nvidia-123', dependencies={'Depends': 'xorg-video-abi-4'},
+            archive.create_deb('nvidia-driver-440', dependencies={'Depends': 'xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             # -updates driver which also should not be recommended
-            archive.create_deb('nvidia-current-updates', dependencies={'Depends': 'xorg-video-abi-4'},
+            archive.create_deb('nvidia-driver-450', dependencies={'Depends': 'xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
 
             # -experimental driver which also should not be recommended
-            archive.create_deb('nvidia-experimental', dependencies={'Depends': 'xorg-video-abi-4'},
+            archive.create_deb('nvidia-driver-450-server', dependencies={'Depends': 'xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             chroot.add_repository(archive.path, True, False)
             cache = apt.Cache(rootdir=chroot.path)
@@ -660,16 +1546,13 @@ Description: broken \xEB encoding
         self.assertTrue('nvidia' in graphics_dict['vendor'].lower())
         self.assertTrue('GeForce' in graphics_dict['model'])
 
-        # should contain nouveau driver; note that free is True here because
-        # these come from the fake archive
-        self.assertEqual(graphics_dict['drivers']['nvidia-current'],
-                         {'free': True, 'from_distro': False, 'recommended': True})
-        self.assertEqual(graphics_dict['drivers']['nvidia-current-updates'],
-                         {'free': True, 'from_distro': False, 'recommended': False})
-        self.assertEqual(graphics_dict['drivers']['nvidia-123'],
-                         {'free': True, 'from_distro': False, 'recommended': False})
-        self.assertEqual(graphics_dict['drivers']['nvidia-experimental'],
-                         {'free': True, 'from_distro': False, 'recommended': False})
+        # should contain nouveau driver
+        self.assertEqual(graphics_dict['drivers']['nvidia-driver-450'],
+                         {'free': False, 'from_distro': False, 'recommended': True})
+        self.assertEqual(graphics_dict['drivers']['nvidia-driver-440'],
+                         {'free': False, 'from_distro': False, 'recommended': False})
+        self.assertEqual(graphics_dict['drivers']['nvidia-driver-450-server'],
+                         {'free': False, 'from_distro': False, 'recommended': False})
         self.assertEqual(graphics_dict['drivers']['xserver-xorg-video-nouveau'],
                          {'free': True, 'from_distro': True, 'recommended': False, 'builtin': True})
         self.assertEqual(len(graphics_dict['drivers']), 5, list(graphics_dict['drivers'].keys()))
@@ -807,7 +1690,7 @@ exec /sbin/modinfo "$@"
         finally:
             chroot.remove()
 
-        self.assertEqual(res, set(['stracciatella', 'vanilla', 'chocolate', 'nvidia-current']))
+        self.assertEqual(res, set(['stracciatella', 'vanilla', 'chocolate']))
 
     def test_system_device_drivers_freeonly(self):
         '''system_device_drivers() returns only devices with free drivers'''
@@ -831,9 +1714,10 @@ exec /sbin/modinfo "$@"
             res = UbuntuDrivers.detect.system_device_drivers(cache, sys_path=self.umockdev.get_sys_dir(), freeonly=True)
         finally:
             chroot.remove()
+        # Leave 'graphics' out, since it's covered by nvidia
         self.assertEqual(
             set([os.path.basename(d) for d in res]),
-            set(['black', 'white', 'graphics', 'orange']))
+            set(['black', 'white', 'orange']))
 
     def test_detect_plugin_packages(self):
         '''detect_plugin_packages()'''
@@ -1165,7 +2049,7 @@ APT::Get::AllowUnauthenticated "true";
         self.assertTrue('/devices/black ==' in out)
         self.assertTrue('/devices/graphics ==' in out)
         self.assertTrue('xserver-xorg-video-nouveau - distro free builtin' in out)
-        self.assertTrue('nvidia-current - third-party free recommended' in out)
+        self.assertTrue('nvidia-current - third-party non-free recommended' in out)
         self.assertEqual(ud.returncode, 0)
 
     def test_devices_detect_plugins(self):
@@ -1973,6 +2857,218 @@ class KernelDectionTest(unittest.TestCase):
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_metapackage()
             self.assertEqual(linux, 'linux-generic-hwe-18.04')
+        finally:
+            chroot.remove()
+
+    def test_linux_detection_names_chroot7(self):
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            archive.create_deb('linux-image-5.4.0-25-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-5.3.0-29-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-5.4.0-24-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-headers-5.4.0-24-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-headers-5.4.0-25-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic, '
+                                                        'linux-headers-5.4.0-25-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-image-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-image-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-image-generic-hwe-20.04, '
+                                                        'linux-headers-generic-hwe-20.04'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-headers-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-headers-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-headers-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-headers-generic'},
+                               extra_tags={})
+            archive.create_deb('linux-headers-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-headers-generic'},
+                               extra_tags={})
+
+            chroot.add_repository(archive.path, True, False)
+
+            cache = apt.Cache(rootdir=chroot.path)
+
+            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
+            linux = kernel_detection.get_linux_metapackage()
+            self.assertEqual(linux, '')
+
+            # Install kernel packages
+            for pkg in ('linux-image-5.4.0-25-generic',
+                        'linux-image-5.4.0-24-generic',
+                        'linux-image-5.3.0-29-generic',
+                        'linux-headers-5.4.0-24-generic',
+                        'linux-headers-5.4.0-25-generic',
+                        'linux-image-generic-hwe-18.04',
+                        'linux-image-generic-hwe-18.04-edge',
+                        'linux-image-generic-hwe-20.04',
+                        'linux-headers-generic-hwe-18.04',
+                        'linux-headers-generic-hwe-18.04-edge',
+                        'linux-headers-generic-hwe-20.04',
+                        'linux-generic-hwe-18.04',
+                        'linux-generic-hwe-18.04-edge',
+                        'linux-generic-hwe-20.04',
+                        'linux-image-generic'):
+                cache[pkg].mark_install()
+
+            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
+            linux = kernel_detection.get_linux_metapackage()
+            self.assertEqual(linux, 'linux-generic-hwe-20.04')
+        finally:
+            chroot.remove()
+
+    def test_linux_detection_names_chroot8(self):
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            archive.create_deb('linux-image-5.4.0-25-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-5.3.0-29-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-5.4.0-24-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-image-5.6.0-1007-oem',
+                               extra_tags={'Source': 'linux-signed-oem-5.6'})
+
+            archive.create_deb('linux-headers-5.4.0-24-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-headers-5.4.0-25-generic',
+                               extra_tags={'Source': 'linux-signed'})
+
+            archive.create_deb('linux-headers-5.6.0-1007-oem',
+                               extra_tags={'Source': 'linux-oem-5.6'})
+
+            archive.create_deb('linux-image-generic',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic, '
+                                                        'linux-headers-5.4.0-25-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-image-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-image-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-image-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-image-generic-hwe-20.04, '
+                                                        'linux-headers-generic-hwe-20.04'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-oem-20.04',
+                               dependencies={'Depends': 'linux-image-oem-20.04, '
+                                                        'linux-headers-oem-20.04'},
+                               extra_tags={'Source': 'linux-meta-oem-5.6'})
+
+            archive.create_deb('linux-image-oem-20.04',
+                               dependencies={'Depends': 'linux-image-5.6.0-1007-oem'},
+                               extra_tags={'Source': 'linux-meta'})
+
+            archive.create_deb('linux-headers-oem-20.04',
+                               dependencies={'Depends': 'linux-headers-5.6.0-1007-oem'},
+                               extra_tags={'Source': 'linux-meta-oem-5.6'})
+
+            archive.create_deb('linux-headers-generic-hwe-20.04',
+                               dependencies={'Depends': 'linux-headers-5.4.0-25-generic'},
+                               extra_tags={})
+
+            archive.create_deb('linux-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-generic'},
+                               extra_tags={'Source':
+                                           'linux-meta'})
+            archive.create_deb('linux-headers-generic-hwe-18.04',
+                               dependencies={'Depends': 'linux-headers-generic'},
+                               extra_tags={})
+            archive.create_deb('linux-headers-generic-hwe-18.04-edge',
+                               dependencies={'Depends': 'linux-headers-generic'},
+                               extra_tags={})
+
+            chroot.add_repository(archive.path, True, False)
+
+            cache = apt.Cache(rootdir=chroot.path)
+
+            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
+            linux = kernel_detection.get_linux_metapackage()
+            self.assertEqual(linux, '')
+
+            # Install kernel packages
+            for pkg in ('linux-image-5.4.0-25-generic',
+                        'linux-image-5.4.0-24-generic',
+                        'linux-image-5.3.0-29-generic',
+                        'linux-image-5.6.0-1007-oem',
+                        'linux-headers-5.4.0-24-generic',
+                        'linux-headers-5.4.0-25-generic',
+                        'linux-headers-5.6.0-1007-oem',
+                        'linux-image-generic-hwe-18.04',
+                        'linux-image-generic-hwe-18.04-edge',
+                        'linux-image-generic-hwe-20.04',
+                        'linux-image-oem-20.04',
+                        'linux-headers-generic-hwe-18.04',
+                        'linux-headers-generic-hwe-18.04-edge',
+                        'linux-headers-generic-hwe-20.04',
+                        'linux-headers-oem-20.04',
+                        'linux-generic-hwe-18.04',
+                        'linux-generic-hwe-18.04-edge',
+                        'linux-generic-hwe-20.04',
+                        'linux-oem-20.04',
+                        'linux-image-generic'):
+                cache[pkg].mark_install()
+
+            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
+            linux = kernel_detection.get_linux_metapackage()
+            self.assertEqual(linux, 'linux-oem-20.04')
         finally:
             chroot.remove()
 
