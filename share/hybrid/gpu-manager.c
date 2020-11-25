@@ -91,6 +91,10 @@ static inline void pclosep(FILE **);
 #define INTEL 0x8086
 #define NVIDIA 0x10de
 
+#ifndef PCI_CAP_ID_NULL
+#define PCI_CAP_ID_NULL 0x0
+#endif
+
 #define MAX_CARDS_N 10
 
 typedef enum {
