@@ -1,8 +1,11 @@
-ubuntu-drivers-common (1:0.8.6.3~0.18.04.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8.6.3~0.18.04.1) bionic; urgency=medium
 
-  * 
+  * Backport 1:0.8.6.3 (LP: #1904583).
+  * gpu-manager.c:
+    - Add PCI_CAP_ID_NULL definition that is missing from
+      libpci.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 25 Nov 2020 13:13:39 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 25 Nov 2020 13:14:35 +0100
 
 ubuntu-drivers-common (1:0.5.2.5) bionic; urgency=medium
 
