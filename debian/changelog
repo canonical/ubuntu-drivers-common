@@ -1,8 +1,8 @@
-ubuntu-drivers-common (1:0.8.4~0.20.04.4) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8.6.3~0.20.04.1) focal; urgency=medium
 
-  * 
+  * Backport 1:0.8.6.3 (LP: #1904583).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 29 Jul 2020 17:21:23 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 25 Nov 2020 12:47:31 +0100
 
 ubuntu-drivers-common (1:0.8.4~0.20.04.3) focal; urgency=medium
 
