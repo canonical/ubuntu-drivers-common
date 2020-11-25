@@ -565,9 +565,15 @@ class GpuManagerTest(unittest.TestCase):
             self.fake_modules.close()
 
     def request_prime_discrete_on(self, is_on=True):
-        '''Request that discrete is switched on or off'''
+        '''Request that discrete be switched on or off'''
         self.prime_settings = open(self.prime_settings.name, 'w')
         self.prime_settings.write(is_on and 'ON' or 'OFF')
+        self.prime_settings.close()
+
+    def request_prime_on_demand(self):
+        '''Request on-demand mode'''
+        self.prime_settings = open(self.prime_settings.name, 'w')
+        self.prime_settings.write('on-demand')
         self.prime_settings.close()
 
     def set_dmi_product_version(self, label):
@@ -728,13 +734,13 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['nvidia'],
                                                  ['mesa', 'nvidia'],
                                                  'nvidia',
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
         self.assertTrue(gpu_test.has_single_card)
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -1499,12 +1505,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel', 'amd'],
                                                  ['i915', 'radeon'],
                                                  ['mesa'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -1533,12 +1539,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel', 'amd'],
                                                  ['i915', 'radeon'],
                                                  ['mesa'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -1567,12 +1573,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel'],
                                                  ['i915'],
                                                  ['mesa'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -1708,12 +1714,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel', 'nvidia'],
                                                  ['i915', 'nouveau'],
                                                  ['mesa'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -1741,12 +1747,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel', 'nvidia'],
                                                  ['i915', 'nouveau'],
                                                  ['mesa'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -1774,12 +1780,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel'],
                                                  ['i915'],
                                                  ['mesa'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2090,12 +2096,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel', 'nvidia'],
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -2212,13 +2218,13 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel', 'nvidia'],
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True,
+                                                 requires_offloading=False,
                                                  nvidia_version="304.123")
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -2376,12 +2382,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel', 'nvidia'],
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -2417,12 +2423,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel', 'nvidia'],
                                                  ['i915', 'fake'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -2459,12 +2465,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel', 'nvidia'],
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -2491,6 +2497,9 @@ class GpuManagerTest(unittest.TestCase):
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
+
+        # Request action from bbswitch
+        self.request_prime_discrete_on(True)
 
         # Case 3a: the discrete card is no longer available (BIOS)
         gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
@@ -2535,11 +2544,11 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['i915', 'fake'],
                                                  ['mesa', 'nvidia'],
                                                  'nvidia',
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2561,7 +2570,7 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.has_selected_driver)
 
         # Check that the xorg.conf.d file was created
-        self.assertTrue(gpu_test.has_created_xorg_conf_d)
+        self.assertFalse(gpu_test.has_created_xorg_conf_d)
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
@@ -2576,12 +2585,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['i915', 'fake'],
                                                  ['mesa', 'nvidia'],
                                                  unloaded_module='nvidia',
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2656,12 +2665,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel'],
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2694,12 +2703,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
                                                  'prime',
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2731,12 +2740,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel'],
                                                  ['i915'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2768,12 +2777,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel'],
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -2799,6 +2808,46 @@ class GpuManagerTest(unittest.TestCase):
 
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
+
+        # Case 4a: the discrete card is available and we want on-demand mode
+        self.request_prime_on_demand()
+
+        gpu_test = self.run_manager_and_get_data(['intel'],
+                                                 ['intel', 'nvidia'],
+                                                 ['i915', 'nvidia'],
+                                                 ['mesa', 'nvidia'],
+                                                 requires_offloading=False)
+
+        # Check the variables
+
+        # Check if laptop
+        self.assertFalse(gpu_test.requires_offloading)
+
+        self.assertFalse(gpu_test.has_single_card)
+
+        # Intel
+        self.assertTrue(gpu_test.has_intel)
+        self.assertTrue(gpu_test.intel_loaded)
+
+        # No AMD
+        self.assertFalse(gpu_test.has_amd)
+        self.assertFalse(gpu_test.radeon_loaded)
+        self.assertFalse(gpu_test.amdgpu_loaded)
+        # NVIDIA
+        self.assertTrue(gpu_test.has_nvidia)
+        self.assertFalse(gpu_test.nouveau_loaded)
+        self.assertTrue(gpu_test.nvidia_loaded)
+        # Has changed
+        self.assertTrue(gpu_test.has_changed)
+
+        self.assertFalse(gpu_test.has_selected_driver)
+
+        # Check that the xorg.conf.d file was created
+        self.assertTrue(gpu_test.has_created_xorg_conf_d)
+
+        # No further action is required
+        self.assertTrue(gpu_test.has_not_acted)
+
 
     def test_laptop_one_intel_one_nvidia_binary_egl(self):
         '''laptop: intel + nvidia - EGL'''
@@ -2935,12 +2984,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel', 'nvidia'],
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -3048,13 +3097,13 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel', 'nvidia'],
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True,
+                                                 requires_offloading=False,
                                                  nvidia_version="304.123")
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -3204,12 +3253,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel', 'nvidia'],
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -3242,12 +3291,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel', 'nvidia'],
                                                  ['i915', 'fake'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -3281,12 +3330,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel', 'nvidia'],
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertFalse(gpu_test.has_single_card)
 
@@ -3316,12 +3365,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel'],
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -3350,11 +3399,11 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['i915', 'fake'],
                                                  ['mesa', 'nvidia'],
                                                  'nvidia',
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -3387,12 +3436,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['i915', 'fake'],
                                                  ['mesa', 'nvidia'],
                                                  unloaded_module='nvidia',
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -3459,12 +3508,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel'],
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -3492,12 +3541,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel'],
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -3525,12 +3574,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel'],
                                                  ['i915'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -3558,12 +3607,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['intel'],
                                                  ['i915', 'nvidia'],
                                                  ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        self.assertFalse(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -4398,12 +4447,12 @@ class GpuManagerTest(unittest.TestCase):
                                                  ['i915', 'fake'],
                                                  ['mesa', 'nvidia'],
                                                  unloaded_module='nvidia',
-                                                 requires_offloading=True)
+                                                 requires_offloading=False)
 
         # Check the variables
 
         # Check if laptop
-        self.assertTrue(gpu_test.requires_offloading)
+        #self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -4427,7 +4476,7 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Check that the GPU was added from the file
-        self.assertTrue(gpu_test.has_added_gpu_from_file)
+        #self.assertTrue(gpu_test.has_added_gpu_from_file)
 
     def test_laptop_one_intel_one_amd_amdgpu_pro(self):
         '''laptop: intel + amdgpu-pro'''
@@ -4533,6 +4582,11 @@ class GpuManagerTest(unittest.TestCase):
 
         # Case 2b: no hybrid script is available
 
+        try:
+            os.unlink(self.amdgpu_pro_px_file.name)
+        except:
+            pass
+
         # Collect data
         gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
                                                  ['amd'],
@@ -4570,10 +4624,10 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.has_selected_driver)
         self.assertFalse(gpu_test.amdgpu_pro_powersaving)
         self.assertFalse(gpu_test.amdgpu_pro_performance)
-        self.assertTrue(gpu_test.amdgpu_pro_reset)
+        self.assertFalse(gpu_test.amdgpu_pro_reset)
 
         # No further action is required
-        self.assertFalse(gpu_test.has_not_acted)
+        self.assertTrue(gpu_test.has_not_acted)
 
 
 if __name__ == '__main__':

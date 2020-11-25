@@ -48,7 +48,12 @@ def command_list(args):
     packages = UbuntuDrivers.detect.system_driver_packages(
         sys_path=sys_path, freeonly=args.free_only, include_oem=args.install_oem_meta)
 
-    cache = apt.Cache()
+    try:
+        cache = apt.Cache()
+    except Exception as ex:
+        print(ex)
+        return 1
+
     for package in packages:
         try:
             linux_modules = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, package)
@@ -86,7 +91,11 @@ def command_list_oem(args):
 def list_gpgpu(args):
     '''Show all GPGPU driver packages which apply to the current system.'''
     found = False
-    cache = apt.Cache()
+    try:
+        cache = apt.Cache()
+    except Exception as ex:
+        print(ex)
+        return 1
     packages = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path)
     for package in packages:
         candidate = packages[package]['metapackage']
@@ -126,8 +135,11 @@ def command_devices(args):
 
 def command_install(args):
     '''Install drivers that are appropriate for your hardware.'''
-
-    cache = apt.Cache()
+    try:
+        cache = apt.Cache()
+    except Exception as ex:
+        print(ex)
+        return 1
 
     packages = UbuntuDrivers.detect.system_driver_packages(
         cache, sys_path, freeonly=args.free_only,
@@ -142,6 +154,12 @@ def command_install(args):
     for p in packages:
         if not cache[p].installed:
             to_install.append(p)
+            # See if runtimepm is supported
+            if packages[p].get('runtimepm'):
+                # Create a file for nvidia-prime
+                pm_fd = open('/run/nvidia_runtimepm_supported', 'w')
+                pm_fd.write('\n')
+                pm_fd.close()
             # Add the matching linux modules package when available
             try:
                 modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, p)
@@ -183,6 +201,20 @@ def command_install(args):
         if update_ret != 0:
             return update_ret
 
+    # If we are dealing with NVIDIA PRIME, and runtimepm
+    # is supported, enable it
+    if (os.path.isfile('/run/nvidia_runtimepm_supported') and
+        os.path.isfile('/usr/bin/prime-select')):
+        print('Trying to select the on-demand PRIME profile')
+        try:
+            subprocess.call(['prime-select', 'on-demand'])
+        except:
+            pass
+
+        # Create the override file for gpu-manager
+        with open('/etc/u-d-c-nvidia-runtimepm-override', 'w') as f:
+            f.write('# File created by ubuntu-drivers\n')
+
     # All updates completed successfully, now let's upgrade the packages
     if oem_meta_to_install:
         ret = subprocess.call(['apt',
@@ -211,7 +243,11 @@ def install_gpgpu(args):
         # No args, just --gpgpu
         not_found_exit_status = 0
 
-    cache = apt.Cache()
+    try:
+        cache = apt.Cache()
+    except Exception as ex:
+        print(ex)
+        return 1
 
     packages = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path)
     packages = UbuntuDrivers.detect.gpgpu_install_filter(packages, args.driver_string)
@@ -256,7 +292,13 @@ def command_debug(args):
 
     print('=== log messages from detection ===')
     aliases = UbuntuDrivers.detect.system_modaliases()
-    cache = apt.Cache()
+
+    try:
+        cache = apt.Cache()
+    except Exception as ex:
+        print(ex)
+        return 1
+
     packages = UbuntuDrivers.detect.system_driver_packages(
         cache, sys_path, freeonly=args.free_only, include_oem=args.install_oem_meta)
     auto_packages = UbuntuDrivers.detect.auto_install_filter(packages)
@@ -281,6 +323,8 @@ def command_debug(args):
         else:
             auto = ''
 
+        support = info.get('support')
+
         info_str = ''
         if info['from_distro']:
             info_str += '  [distro]'
@@ -298,6 +342,8 @@ def command_debug(args):
             info_str += '  vendor: ' + info['vendor']
         if 'model' in info:
             info_str += '  model: ' + info['model']
+        if support:
+            info_str += '  support level: ' + info['support']
 
         print('%s: installed: %s   available: %s%s%s ' % (package, inst, cand, auto,  info_str))
 
@@ -378,30 +424,30 @@ def autoinstall(config, **kwargs):
 @pass_config
 def list(config, **kwargs):
     '''Show all driver packages which apply to the current system.'''
-    cache = apt.Cache()
+    try:
+        cache = apt.Cache()
+    except Exception as ex:
+        print(ex)
+        return 1
 
     if kwargs.get('gpgpu'):
         packages = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path)
-        for package in packages:
-            candidate = packages[package].get('metapackage')
-            if candidate:
-                print('%s, (kernel modules provided by %s)' % (candidate, UbuntuDrivers.detect.get_linux_modules_metapackage(cache, candidate)))
     else:
         packages = UbuntuDrivers.detect.system_driver_packages(
             sys_path=sys_path, freeonly=config.free_only, include_oem=config.install_oem_meta)
 
-        for package in packages:
-            try:
-                linux_modules = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, package)
-                if (not linux_modules and package.find('dkms') != -1):
-                    linux_modules = package
+    for package in packages:
+        try:
+            linux_modules = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, package)
+            if (not linux_modules and package.find('dkms') != -1):
+                linux_modules = package
 
-                if linux_modules:
-                    print('%s, (kernel modules provided by %s)' % (package, linux_modules))
-                else:
-                    print(package)
-            except KeyError:
+            if linux_modules:
+                print('%s, (kernel modules provided by %s)' % (package, linux_modules))
+            else:
                 print(package)
+        except KeyError:
+            print(package)
 
     return 0
 

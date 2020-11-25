@@ -20,6 +20,7 @@ import apt
 from UbuntuDrivers import kerneldetection
 
 system_architecture = apt.apt_pkg.get_architectures()[0]
+lookup_cache = {}
 
 
 def system_modaliases(sys_path=None):
@@ -171,6 +172,10 @@ def _is_package_free(pkg):
     # it would be better to check the actual license, as we do not have
     # the component for third-party packages; but this is the best we can do
     # at the moment
+    #
+    # We can assume the NVIDIA packages to be non-free
+    if pkg.name.startswith('nvidia'):
+        return False
     for o in pkg.candidate.origins:
         if o.component in ('restricted', 'multiverse'):
             return False
@@ -222,6 +227,21 @@ def _pkg_get_support(pkg):
     return support
 
 
+def _is_runtimepm_supported(pkg, alias):
+    '''Check if the package supports runtimepm for the given modalias'''
+    try:
+        m = pkg.candidate.record['PmAliases']
+    except (KeyError, AttributeError, UnicodeDecodeError):
+        return False
+    else:
+        if m.find('nvidia(') != 0:
+            return False
+
+        n = m[m.find('(')+1: m.find(')')]
+        modaliases = n.split(', ')
+        return any(fnmatch.fnmatch(alias.lower(), regex.lower()) for regex in modaliases)
+
+
 def _is_manual_install(pkg):
     '''Determine if the kernel module from an apt.Package is manually installed.'''
 
@@ -239,13 +259,18 @@ def _is_manual_install(pkg):
     if not module:
         return False
 
-    modinfo = subprocess.Popen(['modinfo', module], stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE)
-    modinfo.communicate()
-    if modinfo.returncode == 0:
-        logging.debug('_is_manual_install %s: builds module %s which is available, manual install',
-                      pkg.name, module)
-        return True
+    try:
+        modinfo = subprocess.Popen(['modinfo', module], stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+        modinfo.communicate()
+    except (OSError, FileNotFoundError, subprocess.CalledProcessError) as e:
+        logging.debug('_is_manual_install failed: %s', str(e))
+        return False
+    else:
+        if modinfo.returncode == 0:
+            logging.debug('_is_manual_install %s: builds module %s which is available, manual install',
+                          pkg.name, module)
+            return True
 
     logging.debug('_is_manual_install %s: builds module %s which is not available, no manual install',
                   pkg.name, module)
@@ -316,10 +341,15 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
                      versions; these have this flag, where exactly one has
                      recommended == True, and all others False.
     '''
+    global lookup_cache
     modaliases = system_modaliases(sys_path)
 
     if not apt_cache:
-        apt_cache = apt.Cache()
+        try:
+            apt_cache = apt.Cache()
+        except Exception as ex:
+            logging.error(ex)
+            return {}
 
     packages = {}
     for alias, syspath in modaliases.items():
@@ -334,6 +364,7 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
                     'free': _is_package_free(p),
                     'from_distro': _is_package_from_distro(p),
                     'support': _pkg_get_support(p),
+                    'runtimepm': _is_runtimepm_supported(p, alias)
                 }
             (vendor, model) = _get_db_name(syspath, alias)
             if vendor is not None:
@@ -344,17 +375,14 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
     # Add "recommended" flags for NVidia alternatives
     nvidia_packages = [p for p in packages if p.startswith('nvidia-')]
     if nvidia_packages:
+        # Create a cache for looking up drivers to pick the best
+        # candidate
+        for key, value in packages.items():
+            if key.startswith('nvidia-'):
+                lookup_cache[key] = value
         nvidia_packages.sort(key=functools.cmp_to_key(_cmp_gfx_alternatives))
         recommended = nvidia_packages[-1]
         for p in nvidia_packages:
-            packages[p]['recommended'] = (p == recommended)
-
-    # Add "recommended" flags for fglrx alternatives
-    fglrx_packages = [p for p in packages if p.startswith('fglrx-')]
-    if fglrx_packages:
-        fglrx_packages.sort(key=functools.cmp_to_key(_cmp_gfx_alternatives))
-        recommended = fglrx_packages[-1]
-        for p in fglrx_packages:
             packages[p]['recommended'] = (p == recommended)
 
     # add available packages which need custom detection code
@@ -457,7 +485,11 @@ def system_device_specific_metapackages(apt_cache=None, sys_path=None, include_o
     modaliases = system_modaliases(sys_path)
 
     if not apt_cache:
-        apt_cache = apt.Cache()
+        try:
+            apt_cache = apt.Cache()
+        except Exception as ex:
+            logging.error(ex)
+            return {}
 
     packages = {}
     for alias, syspath in modaliases.items():
@@ -509,11 +541,16 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
                      versions; these have this flag, where exactly one has
                      recommended == True, and all others False.
     '''
+    global lookup_cache
     vendors_whitelist = ['10de']
     modaliases = system_modaliases(sys_path)
 
     if not apt_cache:
-        apt_cache = apt.Cache()
+        try:
+            apt_cache = apt.Cache()
+        except Exception as ex:
+            logging.error(ex)
+            return {}
 
     packages = {}
     for alias, syspath in modaliases.items():
@@ -540,6 +577,11 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
     # Add "recommended" flags for NVidia alternatives
     nvidia_packages = [p for p in packages if p.startswith('nvidia-')]
     if nvidia_packages:
+        # Create a cache for looking up drivers to pick the best
+        # candidate
+        for key, value in packages.items():
+            if key.startswith('nvidia-'):
+                lookup_cache[key] = value
         nvidia_packages.sort(key=functools.cmp_to_key(_cmp_gfx_alternatives_gpgpu))
         recommended = nvidia_packages[-1]
         for p in nvidia_packages:
@@ -603,7 +645,11 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
     '''
     result = {}
     if not apt_cache:
-        apt_cache = apt.Cache()
+        try:
+            apt_cache = apt.Cache()
+        except Exception as ex:
+            logging.error(ex)
+            return {}
 
     # copy the system_driver_packages() structure into the by-device structure
     for pkg, pkginfo in system_driver_packages(apt_cache, sys_path,
@@ -826,7 +872,11 @@ def detect_plugin_packages(apt_cache=None):
         return packages
 
     if apt_cache is None:
-        apt_cache = apt.Cache()
+        try:
+            apt_cache = apt.Cache()
+        except Exception as ex:
+            logging.error(ex)
+            return {}
 
     for fname in os.listdir(plugindir):
         if not fname.endswith('.py'):
@@ -860,26 +910,35 @@ def detect_plugin_packages(apt_cache=None):
     return packages
 
 
-def _cmp_gfx_alternatives(x, y):
-    '''Compare two graphics driver names in terms of preference.
+def _pkg_support_from_cache(x):
+    '''Look up driver package and return their support level'''
+    if lookup_cache.get(x):
+        return lookup_cache.get(x).get('support')
+    return None
 
-    -updates always sort after non-updates, as we prefer the stable driver and
-    only want to offer -updates when the one from release does not support the
-    card. We never want to recommend -experimental unless it's the only one
-    available, so sort this last.
+
+def _cmp_gfx_alternatives(x, y):
+    '''Compare two graphics driver names in terms of preference. (desktop)
+
     -server always sorts after non-server.
+    LTSB (Long Term Support Branch) always sorts before NFB (New Feature Branch).
+    Legacy always sorts before Beta.
     '''
-    if x.endswith('-updates') and not y.endswith('-updates'):
-        return -1
-    if not x.endswith('-updates') and y.endswith('-updates'):
-        return 1
     if x.endswith('-server') and not y.endswith('-server'):
         return -1
     if not x.endswith('-server') and y.endswith('-server'):
         return 1
-    if 'experiment' in x and 'experiment' not in y:
+    if _pkg_support_from_cache(x) == 'LTSB' and _pkg_support_from_cache(y) != 'LTSB':
+        return 1
+    if _pkg_support_from_cache(x) != 'LTSB' and _pkg_support_from_cache(y) == 'LTSB':
         return -1
-    if 'experiment' not in x and 'experiment' in y:
+    if _pkg_support_from_cache(x) == 'Legacy' and _pkg_support_from_cache(y) != 'Legacy':
+        return -1
+    if _pkg_support_from_cache(x) != 'Legacy' and _pkg_support_from_cache(y) == 'Legacy':
+        return 1
+    if _pkg_support_from_cache(x) == 'Beta' and _pkg_support_from_cache(y) != 'Beta':
+        return -1
+    if _pkg_support_from_cache(x) != 'Beta' and _pkg_support_from_cache(y) == 'Beta':
         return 1
     if x < y:
         return -1
@@ -890,25 +949,27 @@ def _cmp_gfx_alternatives(x, y):
 
 
 def _cmp_gfx_alternatives_gpgpu(x, y):
-    '''Compare two graphics driver names in terms of preference.
+    '''Compare two graphics driver names in terms of preference. (server)
 
-    -updates always sort after non-updates, as we prefer the stable driver and
-    only want to offer -updates when the one from release does not support the
-    card. We never want to recommend -experimental unless it's the only one
-    available, so sort this last.
     -server always sorts before non-server.
+    LTSB (Long Term Support Branch) always sorts before NFB (New Feature Branch).
+    Legacy always sorts before Beta.
     '''
-    if x.endswith('-updates') and not y.endswith('-updates'):
-        return -1
-    if not x.endswith('-updates') and y.endswith('-updates'):
-        return 1
     if x.endswith('-server') and not y.endswith('-server'):
         return 1
     if not x.endswith('-server') and y.endswith('-server'):
         return -1
-    if 'experiment' in x and 'experiment' not in y:
+    if _pkg_support_from_cache(x) == 'LTSB' and _pkg_support_from_cache(y) != 'LTSB':
+        return 1
+    if _pkg_support_from_cache(x) != 'LTSB' and _pkg_support_from_cache(y) == 'LTSB':
         return -1
-    if 'experiment' not in x and 'experiment' in y:
+    if _pkg_support_from_cache(x) == 'Legacy' and _pkg_support_from_cache(y) != 'Legacy':
+        return -1
+    if _pkg_support_from_cache(x) != 'Legacy' and _pkg_support_from_cache(y) == 'Legacy':
+        return 1
+    if _pkg_support_from_cache(x) == 'Beta' and _pkg_support_from_cache(y) != 'Beta':
+        return -1
+    if _pkg_support_from_cache(x) != 'Beta' and _pkg_support_from_cache(y) == 'Beta':
         return 1
     if x < y:
         return -1
