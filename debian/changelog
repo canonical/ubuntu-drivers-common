@@ -1,3 +1,11 @@
+ubuntu-drivers-common (1:0.8.6.3~0.20.04.2) focal; urgency=medium
+
+  * Skip tests on riscv64, replacing powerpc which is no longer part of
+    focal. Thus make ubuntu-drivers-common available on focal on
+    riscv64. LP: #1912202
+
+ -- Dimitri John Ledkov <xnox@ubuntu.com>  Mon, 18 Jan 2021 22:22:29 +0000
+
 ubuntu-drivers-common (1:0.8.6.3~0.20.04.1) focal; urgency=medium
 
   * Backport 1:0.8.6.3 (LP: #1904583).
