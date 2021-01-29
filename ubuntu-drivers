@@ -157,9 +157,14 @@ def command_install(args):
             # See if runtimepm is supported
             if packages[p].get('runtimepm'):
                 # Create a file for nvidia-prime
-                pm_fd = open('/run/nvidia_runtimepm_supported', 'w')
-                pm_fd.write('\n')
-                pm_fd.close()
+                try:
+                    pm_fd = open('/run/nvidia_runtimepm_supported', 'w')
+                    pm_fd.write('\n')
+                    pm_fd.close()
+                except PermissionError:
+                    # No need to error out here, since package
+                    # installation will fail
+                    pass
             # Add the matching linux modules package when available
             try:
                 modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, p)
