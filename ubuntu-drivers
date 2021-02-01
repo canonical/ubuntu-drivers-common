@@ -453,9 +453,13 @@ def list(config, **kwargs):
 
 @greet.command()
 @click.argument('list-oem', nargs=-1)
+@click.option('--package-list', nargs=1, metavar='PATH', help='Create file with a list of the available packages')
 @pass_config
 def list_oem(config, **kwargs):
     '''Show all OEM enablement packages which apply to this system'''
+    if kwargs.get('package_list'):
+        config.package_list = ''.join(kwargs.get('package_list'))
+
     command_list_oem(config)
 
 @greet.command()
