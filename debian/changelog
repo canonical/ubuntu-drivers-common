@@ -1,8 +1,19 @@
-ubuntu-drivers-common (1:0.8.6.4) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8.6.4) hirsute; urgency=medium
 
-  * 
+  [ Alberto Milone ]
+  * ubuntu-drivers:
+    - Don't error out when failing to write to /run without
+      root privileges (LP: #1913651), since package
+      installation will fail later.
+    - Restore "--package-list" for list-oem, which was supported
+      but accidentally not exposed in the transition to click.
+      (LP: #1914051).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 29 Jan 2021 12:00:59 +0100
+  [ Dimitri John Ledkov ]
+  * debian/rules:
+    - Make tests on riscv64 non-fatal.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 01 Feb 2021 18:43:34 +0100
 
 ubuntu-drivers-common (1:0.8.6.3) hirsute; urgency=medium
 
