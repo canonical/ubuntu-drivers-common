@@ -2013,6 +2013,30 @@ APT::Get::AllowUnauthenticated "true";
                              'stracciatella', 'tuttifrutti', 'neapolitan']))
         self.assertEqual(ud.returncode, 0)
 
+    def test_list_oem_chroot(self):
+        '''ubuntu-drivers list-oem for fake sysfs and chroot'''
+        listfile = os.path.join(self.chroot.path, 'pkgs')
+        self.addCleanup(os.unlink, listfile)
+
+        # Add an oem metapackage
+        self.archive.create_deb('oem-pistacchio-meta',
+                                extra_tags={'Modaliases':
+                                            'meta(dmi:*pnXPS137390:*, pci:*sv00001028sd00000962*)'})
+        self.chroot.add_repository(self.archive.path, True, False)
+
+        ud = subprocess.Popen(
+            [self.tool_path, 'list-oem', '--package-list', listfile],
+            universal_newlines=True, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        out, err = ud.communicate()
+        self.assertEqual(err, '')
+        self.assertEqual(set(out.splitlines()),
+                         set(['oem-pistacchio-meta']))
+        self.assertEqual(ud.returncode, 0)
+
+        with open(listfile) as f:
+            self.assertEqual(f.read(), 'oem-pistacchio-meta\n')
+
     def test_list_detect_plugins(self):
         '''ubuntu-drivers list includes custom detection plugins'''
 
