@@ -1,8 +1,12 @@
-ubuntu-drivers-common (1:0.8.6.5) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8.6.5) hirsute; urgency=medium
 
-  * 
+  * tests/test_ubuntu_drivers.py:
+    - Add testcase for list-oem --package-list.
+  * UbuntuDrivers/detect.py:
+    - Fix the way we validate the nvidia modules metapackages
+      (LP: #1914374).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 02 Feb 2021 18:14:18 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 03 Feb 2021 19:13:21 +0100
 
 ubuntu-drivers-common (1:0.8.6.4) hirsute; urgency=medium
 
