@@ -1128,8 +1128,10 @@ def get_linux_modules_metapackage(apt_cache, candidate):
         # dependencies
         reverse_deps = find_reverse_dependencies(apt_cache, linux_modules_match, 'linux-modules-nvidia-')
         pick = ''
+        modules_candidate = 'linux-modules-nvidia-%s-%s' % (candidate_flavour,
+                                                            get_linux_image(apt_cache).replace('linux-image-', ''))
         for dep in reverse_deps:
-            if dep > pick:
+            if dep == modules_candidate:
                 pick = dep
         if pick:
             metapackage = pick
