@@ -1,8 +1,12 @@
-ubuntu-drivers-common (1:0.8.6.5~0.20.04.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8.6.5~0.20.04.1) focal; urgency=medium
 
-  * 
+  * tests/test_ubuntu_drivers.py:
+    - Add testcase for list-oem --package-list (LP: #1914051).
+  * UbuntuDrivers/detect.py:
+    - Fix the way we validate the nvidia modules metapackages
+      (LP: #1914374).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 03 Feb 2021 19:22:32 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 03 Feb 2021 19:23:18 +0100
 
 ubuntu-drivers-common (1:0.8.6.4~0.20.04.1) focal; urgency=medium
 
