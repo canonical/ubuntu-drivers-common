@@ -280,7 +280,8 @@ def install_gpgpu(args):
         return 0
 
     ret = subprocess.call(['apt-get', 'install', '-o',
-        'DPkg::options::=--force-confnew', '-y'] + to_install)
+        'DPkg::options::=--force-confnew',
+        '--no-install-recommends', '-y'] + to_install)
 
     # create package list
     if ret == 0 and args.package_list:
