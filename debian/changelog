@@ -1,8 +1,12 @@
-ubuntu-drivers-common (1:0.8.7) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8.7) hirsute; urgency=medium
 
-  * 
+  * ubuntu-drivers:
+    - Do not install recommended dependencies when calling
+      "install --gpgpu" (LP: #1898601). The whole point of
+      having --gpgpu was to reduce the amount of the
+      installed dependencies.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 19 Mar 2021 11:09:26 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 23 Mar 2021 16:14:36 +0100
 
 ubuntu-drivers-common (1:0.8.6.5) hirsute; urgency=medium
 
