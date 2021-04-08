@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.8.9) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.8.9) hirsute; urgency=medium
 
+  [ Michael Hudson-Doyle ]
   * Fix previous change: I removed alsa-utils from Build-Depends not Depends.
 
- -- Michael Hudson-Doyle <michael.hudson@ubuntu.com>  Thu, 08 Apr 2021 15:50:35 +1200
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 08 Apr 2021 13:15:57 +0200
 
 ubuntu-drivers-common (1:0.8.8) hirsute; urgency=medium
 
