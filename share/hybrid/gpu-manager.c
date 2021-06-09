@@ -1009,6 +1009,10 @@ void find_disabled_cards(char *dir, struct device **devices,
     closedir(dfd);
 }
 
+int nvidia_filter(const struct dirent *entry)
+{
+    return (strncmp(entry->d_name, "nvidia", 6) == 0);
+}
 
 /* Check if a kernel module is available for the current kernel */
 static bool is_module_available(const char *module)
@@ -1024,6 +1028,50 @@ static bool is_module_available(const char *module)
         return false;
     }
 
+    if (strncmp(module, "nvidia", 6) == 0) {
+        int n = 0, m = 0;
+        struct dirent **dirlist;
+        struct dirent **filelist;
+        char kernel_dir[NAME_MAX];
+        char nv_dir[PATH_MAX];
+        sprintf(kernel_dir, "/lib/modules/%s/kernel", uname_data.release);
+        n = scandir(kernel_dir, &dirlist, nvidia_filter, alphasort);
+        if (n > 0) {
+            int i = n;
+            // Check the nvidia version from high to low
+            while (i--) {
+                snprintf(nv_dir,sizeof(nv_dir), "%s/%s", kernel_dir, dirlist[i]->d_name);
+                fprintf(log_handle, "Looking for %s modules in %s\n", module, nv_dir);
+                m = scandir(nv_dir, &filelist, nvidia_filter, alphasort);
+                if (m > 0) {
+                    int j = m;
+                    status = true;
+                    // Print the last file
+                    //fprintf(log_handle, "Found %s module: %s\n", module, filelist[m-1]->d_name);
+                    // Print all files, nvidia-drm.ko, nvidia-modeset.ko, nvidia-uvm.ko, nvidia.ko
+                    fprintf(log_handle, "Found %s module:", module);
+                    while (j--)
+                        fprintf(log_handle, " %s", filelist[j]->d_name);
+                    fprintf(log_handle, "\n");
+                    for (j = 0; j < m; j++) {
+                        if (filelist[j] != NULL)
+                            free(filelist[j]);
+                    }
+                    if (filelist != NULL)
+                        free(filelist);
+                    break;
+                }
+            }
+            for (i = 0; i < n; i++) {
+                if (dirlist[i] != NULL)
+                    free(dirlist[i]);
+            }
+            if (dirlist != NULL)
+                free(dirlist);
+            if (status)
+                return status;
+        }
+    }
     sprintf(dir, "/lib/modules/%s/updates/dkms", uname_data.release);
 
     fprintf(log_handle, "Looking for %s modules in %s\n", module, dir);
