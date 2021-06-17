@@ -1010,40 +1010,124 @@ void find_disabled_cards(char *dir, struct device **devices,
 }
 
 
-/* Check if a kernel module is available for the current kernel */
+static int nvidia_dir_filter(const struct dirent *entry)
+{
+    return (strncmp(entry->d_name, "nvidia", 6) == 0);
+}
+
+
+static int nvidia_module_filter(const struct dirent *entry)
+{
+    return (strncmp(entry->d_name, "nvidia.ko", 9) == 0);
+}
+
+
+static int amdgpu_dir_filter(const struct dirent *entry)
+{
+    return (strncmp(entry->d_name, "amdgpu", 6) == 0);
+}
+
+
+static int amdgpu_module_filter(const struct dirent *entry)
+{
+    return (strncmp(entry->d_name, "amdgpu.ko", 9) == 0);
+}
+
+
+/* Go through a directory, looking for a kernel module
+ *
+ */
+static int search_dir_for_module(const char *kernel_path, int (*dir_filter)(const struct dirent *),
+                                 int (*mod_filter)(const struct dirent *), const char *module)
+{
+    int status = 0;
+    int n = 0, m = 0;
+    struct dirent **dirlist;
+    char current_path[PATH_MAX];
+    char module_name[strlen(module)+4];
+
+    snprintf(module_name, sizeof(module_name), "%s.ko", module);
+    n = scandir(kernel_path, &dirlist, dir_filter, alphasort);
+    if (n > 0) {
+        int i = n;
+        /* Check the nvidia version from high to low */
+        while (i--) {
+            snprintf(current_path, sizeof(current_path), "%s/%s", kernel_path, dirlist[i]->d_name);
+            if (strstr(dirlist[i]->d_name, module_name) != NULL) {
+                status = 1;
+                fprintf(log_handle, "Found %s module in %s\n", module_name, current_path);
+                break;
+            }
+            else {
+                fprintf(log_handle, "Looking for %s modules in %s\n", module, current_path);
+                m = search_dir_for_module(current_path, mod_filter, dir_filter, module);
+                if (m > 0) {
+                    status = 1;
+                    break;
+                }
+            }
+        }
+        for (i = 0; i < n; i++) {
+            if (dirlist[i] != NULL)
+                free(dirlist[i]);
+        }
+        if (dirlist != NULL)
+            free(dirlist);
+        if (status)
+            return status;
+    }
+    return status;
+}
+
+
+/* Check if a kernel module is available for the current kernel
+ *
+ * NOTE: This is only meant to check extra modules such as
+ *       nvidia, or amdgpu pro.
+ */
 static bool is_module_available(const char *module)
 {
-    char dir[PATH_MAX];
-    struct dirent *dp;
-    DIR *dfd;
+    int (*dir_filter)(const struct dirent *);
+    int (*mod_filter)(const struct dirent *);
+    char kernel_path[PATH_MAX];
     struct utsname uname_data;
-    bool status = false;
+    int status = 0;
+
+    if (strcmp(module, "nvidia") == 0) {
+        dir_filter = nvidia_dir_filter;
+        mod_filter = nvidia_module_filter;
+    }
+    else if (strcmp(module, "amdgpu") == 0) {
+        dir_filter = amdgpu_dir_filter;
+        mod_filter = amdgpu_module_filter;
+    }
+    else {
+        fprintf(log_handle, "Checking for the %s module avilability is not supported\n", module);
+        return false;
+    }
 
     if (uname(&uname_data) < 0) {
         fprintf(stderr, "Error: uname failed\n");
         return false;
     }
 
-    sprintf(dir, "/lib/modules/%s/updates/dkms", uname_data.release);
+    sprintf(kernel_path, "/lib/modules/%s/kernel", uname_data.release);
+    fprintf(log_handle, "Looking for %s modules in %s\n", module, kernel_path);
 
-    fprintf(log_handle, "Looking for %s modules in %s\n", module, dir);
+    /* Look for the linux-restricted-modules first */
+    status = search_dir_for_module(kernel_path, dir_filter, mod_filter, module);
 
-    if ((dfd = opendir(dir)) == NULL) {
-        fprintf(stderr, "Error: can't open %s\n", dir);
-        return false;
+    if (status > 0) {
+        return true;
     }
+    else {
+        /* Look for dkms modules */
+        sprintf(kernel_path, "/lib/modules/%s/updates/dkms", uname_data.release);
+        fprintf(log_handle, "Looking for %s modules in %s\n", module, kernel_path);
+        status = search_dir_for_module(kernel_path, dir_filter, mod_filter, module);
 
-    while ((dp = readdir(dfd)) != NULL) {
-        if (!starts_with(dp->d_name, module))
-            continue;
-
-        status = true;
-        fprintf(log_handle, "Found %s module: %s\n", module, dp->d_name);
-        break;
+        return (status > 0);
     }
-    closedir(dfd);
-
-    return status;
 }
 
 
