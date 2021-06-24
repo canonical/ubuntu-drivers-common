@@ -1,8 +1,28 @@
-ubuntu-drivers-common (1:0.9.0.5~0.20.04.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.0~0.20.04.1) focal; urgency=medium
 
-  * 
+  [ Alberto Milone ]
+  * gpu-manager.c:
+    - Make sure to also search the signed modules (LP: #1931514).
+      Credit goes to Bin Li for the first version of this patch.
+  * debian/tests/control:
+    - Add dependency on alsa-utils, since the autopkgtest requires it
+      for the sl-modem detection plugin.
+  * ubuntu-drivers:
+    - Do not install recommended dependencies when calling
+      "install --gpgpu" (LP: #1898601). The whole point of
+      having --gpgpu was to reduce the amount of the
+      installed dependencies.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 24 Jun 2021 12:58:27 +0200
+  [ Michael Hudson-Doyle ]
+  * debian/control:
+    - Drop dependency on alsa-utils as we want to start using ubuntu-drivers in
+      the server installer but do not want alsa-utils there. The code using
+      aplay to detect certain kinds of modem will fail to detect them if aplay
+      is not installed but will not crash. As alsa-utils is in the
+      desktop-common seed there should be no loss of functionality anywhere
+      ubuntu-drivers is used today.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 24 Jun 2021 16:22:54 +0200
 
 ubuntu-drivers-common (1:0.8.6.5~0.20.04.1) focal; urgency=medium
 
