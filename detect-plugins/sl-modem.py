@@ -43,7 +43,7 @@ def detect(apt_cache):
                           aplay_err))
             return None
     except OSError:
-        logging.exception('could not open aplay -l')
+        logging.debug('could not open aplay -l. Skipping sl-modem detection')
         return None
 
     for row in aplay_out.splitlines():
