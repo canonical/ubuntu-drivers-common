@@ -1,8 +1,10 @@
-ubuntu-drivers-common (1:0.9.1.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.1.1) impish; urgency=medium
 
-  * 
+  * tests/test_ubuntu_drivers.py:
+    - Skip checking the error output for apt install. Just
+      make sure the process doesn't fail.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 15 Jul 2021 16:37:56 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 15 Jul 2021 16:38:49 +0200
 
 ubuntu-drivers-common (1:0.9.1) impish; urgency=medium
 
