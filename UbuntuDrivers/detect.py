@@ -219,7 +219,7 @@ def _pkg_get_support(pkg):
         logging.debug('_pkg_get_support %s: package has no Support header, cannot determine support level', pkg.name)
         return None
 
-    if support not in ('NFB', 'LTSB'):
+    if support not in ('NFB', 'LTSB', 'Legacy'):
         logging.warning('_pkg_get_support %s: package has invalid Support %s'
                         'header, cannot determine support level', pkg.name, support)
         return None
