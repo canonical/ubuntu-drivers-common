@@ -86,6 +86,7 @@ static inline void pclosep(FILE **);
 #define XORG_CONF "/etc/X11/xorg.conf"
 #define KERN_PARAM "nogpumanager"
 #define AMDGPU_PRO_PX  "/opt/amdgpu-pro/bin/amdgpu-pro-px"
+#define CHASSIS_PATH "/sys/devices/virtual/dmi/id/chassis_type"
 
 #define AMD 0x1002
 #define INTEL 0x8086
@@ -2380,6 +2381,89 @@ static bool is_nv_runtimepm_enabled(struct pci_dev *device) {
     return false;
 }
 
+static bool is_laptop(void) {
+    /*
+        Chassis types:
+
+        01 Other
+        02 Unknown
+        03 Desktop
+        04 Low Profile Desktop
+        05 Pizza Box
+        06 Mini Tower
+        07 Tower
+        08 Portable
+        09 Laptop
+        10 Notebook
+        11 Hand Held
+        12 Docking Station
+        13 All In One
+        14 Sub Notebook
+        15 Space-saving
+        16 Lunch Box
+        17 Main Server Chassis
+        18 Expansion Chassis
+        19 Sub Chassis
+        20 Bus Expansion Chassis
+        21 Peripheral Chassis
+        22 RAID Chassis
+        23 Rack Mount Chassis
+        24 Sealed-case PC
+        25 Multi-system
+        26 CompactPCI
+        27 AdvancedTCA
+        28 Blade
+        29 Blade Enclosing
+        30 Tablet
+        31 Convertible
+        32 Detachable
+        33 IoT Gateway
+        34 Embedded PC
+        35 Mini PC
+        36 Stick PC
+    */
+
+    _cleanup_free_ char *line = NULL;
+    _cleanup_fclose_ FILE *file = NULL;
+    size_t len = 0;
+    size_t read;
+    int code = 0;
+    int status;
+    bool is_laptop = false;
+
+    file = fopen(CHASSIS_PATH, "r");
+    if (file == NULL) {
+        fprintf(log_handle, "Error: can't open %s\n", CHASSIS_PATH);
+        return false;
+    }
+    else {
+        while ((read = getline(&line, &len, file)) != -1) {
+            status = sscanf(line, "%d\n", &code);
+            if (status) {
+                fprintf(log_handle, "Chassis type: \"%d\"\n", code);
+
+                switch (code)
+                {
+                    case 8:
+                    case 9:
+                    case 10:
+                    case 31:
+                        fprintf(log_handle,"Laptop detected\n");
+                        is_laptop = true;
+                        break;
+
+                    default:
+                        fprintf(log_handle,"Laptop not detected\n");
+                        break;
+                }
+
+                break;
+            }
+        }
+    }
+    return is_laptop;
+}
+
 
 int main(int argc, char *argv[]) {
 
@@ -2830,12 +2914,18 @@ int main(int argc, char *argv[]) {
                         has_nvidia = true;
 
                         if (!current_devices[cards_n]->boot_vga) {
-                            nvidia_runtimepm_supported = is_nv_runtimepm_supported(dev->device_id);
+                            /* Do not enable RTD3 unless it's a laptop */
+                            if (is_laptop()) {
+                                nvidia_runtimepm_supported = is_nv_runtimepm_supported(dev->device_id);
 
-                            if (!nvidia_runtimepm_supported) {
-                                /* This is a fairly expensive call, so check the database first */
-                                get_d3_substates(pm_dev, &d3cold, &d3hot);
-                                nvidia_runtimepm_supported = d3hot;
+                                if (!nvidia_runtimepm_supported) {
+                                    /* This is a fairly expensive call, so check the database first */
+                                    get_d3_substates(pm_dev, &d3cold, &d3hot);
+                                    nvidia_runtimepm_supported = d3hot;
+                                }
+                            }
+                            else {
+                                nvidia_runtimepm_supported = false;
                             }
 
                             fprintf(log_handle, "Is nvidia runtime pm supported for \"0x%x\"? %s\n", dev->device_id,
