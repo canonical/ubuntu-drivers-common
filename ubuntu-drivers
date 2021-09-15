@@ -141,6 +141,8 @@ def command_install(args):
         print(ex)
         return 1
 
+    is_nvidia = False
+
     packages = UbuntuDrivers.detect.system_driver_packages(
         cache, sys_path, freeonly=args.free_only,
         include_oem=args.install_oem_meta)
@@ -177,6 +179,15 @@ def command_install(args):
         print('All the available drivers are already installed.')
         return
 
+    for package in to_install:
+        if 'nvidia' in package:
+            is_nvidia = True
+            break
+
+    # Enable KMS if we are on Wayland
+    if is_nvidia and UbuntuDrivers.detect.is_wayland_session():
+        UbuntuDrivers.detect.set_nvidia_kms(1)
+
     ret = subprocess.call(['apt-get', 'install', '-o',
         'DPkg::options::=--force-confnew', '-y'] + to_install)
 
@@ -212,7 +223,7 @@ def command_install(args):
         os.path.isfile('/usr/bin/prime-select')):
         print('Trying to select the on-demand PRIME profile')
         try:
-            subprocess.call(['prime-select', 'on-demand'])
+            subprocess.call(['/usr/bin/prime-select', 'on-demand'])
         except:
             pass
 
