@@ -15,10 +15,17 @@ import subprocess
 import fnmatch
 import sys
 import os
+import locale
 import logging
 import apt
 
 import UbuntuDrivers.detect
+
+# click crashes on invalid locale, so fix this up beforehand
+try:
+    locale.setlocale(locale.LC_ALL, '')
+except locale.Error:
+    locale.setlocale(locale.LC_ALL, 'C.UTF-8')
 
 sys_path = os.environ.get('UBUNTU_DRIVERS_SYS_DIR')
 

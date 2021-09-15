@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.8.6.3~0.18.04.2) bionic; urgency=medium
+
+  * Don't crash on invalid locale environment.  LP: #1943614.
+
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Tue, 14 Sep 2021 10:08:30 -0700
+
 ubuntu-drivers-common (1:0.8.6.3~0.18.04.1) bionic; urgency=medium
 
   * Backport 1:0.8.6.3 (LP: #1904583).
