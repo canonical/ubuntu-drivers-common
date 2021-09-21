@@ -1,8 +1,10 @@
-ubuntu-drivers-common (1:0.9.2.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.2.1) impish; urgency=medium
 
-  * 
+  * UbuntuDrivers/detect.py:
+    - Fix E302 expected 2 blank lines, found 1.
+    - Fix E711 comparison to None should be "if cond is not None".
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 20 Sep 2021 17:04:29 +0200
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 21 Sep 2021 11:46:07 +0200
 
 ubuntu-drivers-common (1:0.9.2) impish; urgency=medium
 
