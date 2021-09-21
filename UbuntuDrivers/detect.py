@@ -241,9 +241,11 @@ def _is_runtimepm_supported(pkg, alias):
         modaliases = n.split(', ')
         return any(fnmatch.fnmatch(alias.lower(), regex.lower()) for regex in modaliases)
 
+
 def is_wayland_session():
     '''Check if the current session in on Wayland'''
     return os.environ.get('WAYLAND_DISPLAY') != None
+
 
 def _is_manual_install(pkg):
     '''Determine if the kernel module from an apt.Package is manually installed.'''
