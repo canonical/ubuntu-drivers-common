@@ -244,7 +244,7 @@ def _is_runtimepm_supported(pkg, alias):
 
 def is_wayland_session():
     '''Check if the current session in on Wayland'''
-    return os.environ.get('WAYLAND_DISPLAY') != None
+    return os.environ.get('WAYLAND_DISPLAY') is not None
 
 
 def _is_manual_install(pkg):
