@@ -184,6 +184,13 @@ def command_install(args):
             is_nvidia = True
             break
 
+    # --package-list should not install any packages
+    if args.package_list:
+        with open(args.package_list, 'a') as f:
+            f.write('\n'.join(to_install))
+            f.write('\n')
+            return 0
+
     # Enable KMS if we are on Wayland
     if is_nvidia and UbuntuDrivers.detect.is_wayland_session():
         UbuntuDrivers.detect.set_nvidia_kms(1)
@@ -193,12 +200,8 @@ def command_install(args):
 
     oem_meta_to_install = fnmatch.filter(to_install, 'oem-*-meta')
 
-    # create package list
-    if ret == 0 and args.package_list:
-        with open(args.package_list, 'a') as f:
-            f.write('\n'.join(to_install))
-            f.write('\n')
-    elif ret != 0:
+    # Abort if the installation failed
+    if ret != 0:
         return ret
 
     for package_to_install in oem_meta_to_install:
