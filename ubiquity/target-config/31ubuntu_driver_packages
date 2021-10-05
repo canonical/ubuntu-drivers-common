@@ -7,7 +7,17 @@ set -e
 PKGLIST=/run/ubuntu-drivers.autoinstall
 [ -e $PKGLIST ] || exit 0
 
-for p in `cat $PKGLIST`; do
-    apt-install $p
-done
+
+unset DEBIAN_HAS_FRONTEND
+export DEBIAN_FRONTEND=noninteractive
+unset DEBCONF_FRONTEND
+unset DEBCONF_REDIR
+export DEBCONF_ADMIN_EMAIL=
+export APT_LISTCHANGES_FRONTEND=none
+
+if [ -e /run/nvidia_runtimepm_supported ] && [ -e /target/run ]; then
+    cp /run/nvidia_runtimepm_supported /target/run/nvidia_runtimepm_supported
+fi
+
+chroot /target ubuntu-drivers install </dev/null
 
