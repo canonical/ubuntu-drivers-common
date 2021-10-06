@@ -141,6 +141,7 @@ def command_install(args):
         print(ex)
         return 1
 
+    with_nvidia_kms = False
     is_nvidia = False
 
     packages = UbuntuDrivers.detect.system_driver_packages(
@@ -184,8 +185,24 @@ def command_install(args):
             is_nvidia = True
             break
 
-    # Enable KMS if we are on Wayland
-    if is_nvidia and UbuntuDrivers.detect.is_wayland_session():
+    # --package-list should not install any packages
+    if args.package_list:
+        with open(args.package_list, 'a') as f:
+            f.write('\n'.join(to_install))
+            f.write('\n')
+            return 0
+
+    # Enable KMS if nvidia >= 470
+    for package in to_install:
+        if package.startswith('nvidia-driver-'):
+            try:
+                version = int(package.split('-')[-1])
+            except:
+                pass
+            finally:
+                with_nvidia_kms = version >= 470
+
+    if with_nvidia_kms:
         UbuntuDrivers.detect.set_nvidia_kms(1)
 
     ret = subprocess.call(['apt-get', 'install', '-o',
@@ -193,12 +210,8 @@ def command_install(args):
 
     oem_meta_to_install = fnmatch.filter(to_install, 'oem-*-meta')
 
-    # create package list
-    if ret == 0 and args.package_list:
-        with open(args.package_list, 'a') as f:
-            f.write('\n'.join(to_install))
-            f.write('\n')
-    elif ret != 0:
+    # Abort if the installation failed
+    if ret != 0:
         return ret
 
     for package_to_install in oem_meta_to_install:
