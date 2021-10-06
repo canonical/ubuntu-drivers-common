@@ -141,6 +141,7 @@ def command_install(args):
         print(ex)
         return 1
 
+    with_nvidia_kms = False
     is_nvidia = False
 
     packages = UbuntuDrivers.detect.system_driver_packages(
@@ -191,8 +192,17 @@ def command_install(args):
             f.write('\n')
             return 0
 
-    # Enable KMS if we are on Wayland
-    if is_nvidia and UbuntuDrivers.detect.is_wayland_session():
+    # Enable KMS if nvidia >= 470
+    for package in to_install:
+        if package.startswith('nvidia-driver-'):
+            try:
+                version = int(package.split('-')[-1])
+            except:
+                pass
+            finally:
+                with_nvidia_kms = version >= 470
+
+    if with_nvidia_kms:
         UbuntuDrivers.detect.set_nvidia_kms(1)
 
     ret = subprocess.call(['apt-get', 'install', '-o',
