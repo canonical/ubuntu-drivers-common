@@ -7,7 +7,19 @@ set -e
 PKGLIST=/run/ubuntu-drivers.autoinstall
 [ -e $PKGLIST ] || exit 0
 
+# Copy the kms settings before installing the packages
+if [ -e /lib/modprobe.d/nvidia-kms.conf ]; then
+    cp /lib/modprobe.d/nvidia-kms.conf /target/lib/modprobe.d/nvidia-kms.conf
+fi
+
 for p in `cat $PKGLIST`; do
     apt-install $p
 done
 
+# Call prime-select, if needed
+if [ -e /run/nvidia_runtimepm_supported ]; then
+    apt-install nvidia-prime
+    cp /run/nvidia_runtimepm_supported /target/run/nvidia_runtimepm_supported
+    rm -f /target/etc/prime-discrete
+    chroot /target prime-select on-demand </dev/null
+fi
