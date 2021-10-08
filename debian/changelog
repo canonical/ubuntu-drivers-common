@@ -1,3 +1,19 @@
+ubuntu-drivers-common (1:0.9.2.2) impish; urgency=medium
+
+  * ubuntu-drivers:
+    - Make sure --package-list doesn't try to install packages.
+    - Enable KMS Wayland if nvidia >= 470. This only affects
+      the UDA drivers. This is more effective than checking
+      if Wayland is running, since the live image uses X11.
+  * UbuntuDrivers/detect.py:
+    - Add newline when setting kms.
+  * ubiquity/target-config/31ubuntu_driver_packages:
+    - Install nvidia-prime, so that we can handle hybrid
+      systems, and pick up the NVIDIA driver configuration
+      (LP: #1943816).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 08 Oct 2021 15:40:04 +0200
+
 ubuntu-drivers-common (1:0.9.2.1) impish; urgency=medium
 
   * UbuntuDrivers/detect.py:
