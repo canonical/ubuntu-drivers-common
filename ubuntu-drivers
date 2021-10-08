@@ -185,13 +185,6 @@ def command_install(args):
             is_nvidia = True
             break
 
-    # --package-list should not install any packages
-    if args.package_list:
-        with open(args.package_list, 'a') as f:
-            f.write('\n'.join(to_install))
-            f.write('\n')
-            return 0
-
     # Enable KMS if nvidia >= 470
     for package in to_install:
         if package.startswith('nvidia-driver-'):
@@ -204,6 +197,13 @@ def command_install(args):
 
     if with_nvidia_kms:
         UbuntuDrivers.detect.set_nvidia_kms(1)
+
+    # --package-list should not install any packages
+    if args.package_list:
+        with open(args.package_list, 'a') as f:
+            f.write('\n'.join(to_install))
+            f.write('\n')
+            return 0
 
     ret = subprocess.call(['apt-get', 'install', '-o',
         'DPkg::options::=--force-confnew', '-y'] + to_install)
