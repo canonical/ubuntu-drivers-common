@@ -144,39 +144,11 @@ def command_install(args):
     with_nvidia_kms = False
     is_nvidia = False
 
-    packages = UbuntuDrivers.detect.system_driver_packages(
-        cache, sys_path, freeonly=args.free_only,
-        include_oem=args.install_oem_meta)
-    packages = UbuntuDrivers.detect.auto_install_filter(packages, args.driver_string)
-    if not packages:
-        print('No drivers found for installation.')
-        return
+    to_install = UbuntuDrivers.detect.get_desktop_package_list(cache, sys_path,
+        free_only=args.free_only, include_oem=args.install_oem_meta,
+        driver_string=args.driver_string)
 
-    # ignore packages which are already installed
-    to_install = []
-    for p in packages:
-        if not cache[p].installed:
-            to_install.append(p)
-            # See if runtimepm is supported
-            if packages[p].get('runtimepm'):
-                # Create a file for nvidia-prime
-                try:
-                    pm_fd = open('/run/nvidia_runtimepm_supported', 'w')
-                    pm_fd.write('\n')
-                    pm_fd.close()
-                except PermissionError:
-                    # No need to error out here, since package
-                    # installation will fail
-                    pass
-            # Add the matching linux modules package when available
-            try:
-                modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, p)
-                if modules_package and not cache[modules_package].installed:
-                    to_install.append(modules_package)
-            except KeyError:
-                pass
-
-    if not packages:
+    if not to_install:
         print('All the available drivers are already installed.')
         return
 
@@ -185,18 +157,8 @@ def command_install(args):
             is_nvidia = True
             break
 
-    # Enable KMS if nvidia >= 470
-    for package in to_install:
-        if package.startswith('nvidia-driver-'):
-            try:
-                version = int(package.split('-')[-1])
-            except:
-                pass
-            finally:
-                with_nvidia_kms = version >= 470
-
-    if with_nvidia_kms:
-        UbuntuDrivers.detect.set_nvidia_kms(1)
+    if is_nvidia:
+        UbuntuDrivers.detect.nvidia_desktop_pre_installation_hook(to_install)
 
     ret = subprocess.call(['apt-get', 'install', '-o',
         'DPkg::options::=--force-confnew', '-y'] + to_install)
@@ -227,19 +189,8 @@ def command_install(args):
         if update_ret != 0:
             return update_ret
 
-    # If we are dealing with NVIDIA PRIME, and runtimepm
-    # is supported, enable it
-    if (os.path.isfile('/run/nvidia_runtimepm_supported') and
-        os.path.isfile('/usr/bin/prime-select')):
-        print('Trying to select the on-demand PRIME profile')
-        try:
-            subprocess.call(['/usr/bin/prime-select', 'on-demand'])
-        except:
-            pass
-
-        # Create the override file for gpu-manager
-        with open('/etc/u-d-c-nvidia-runtimepm-override', 'w') as f:
-            f.write('# File created by ubuntu-drivers\n')
+    if is_nvidia:
+        UbuntuDrivers.detect.nvidia_desktop_post_installation_hook()
 
     # All updates completed successfully, now let's upgrade the packages
     if oem_meta_to_install:

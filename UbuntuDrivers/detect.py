@@ -698,6 +698,76 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
     return result
 
 
+def get_desktop_package_list(apt_cache, sys_path=None, free_only=False, include_oem=True, driver_string=''):
+    '''Return the list of packages that should be installed'''
+    packages = system_driver_packages(
+        apt_cache, sys_path, freeonly=free_only,
+        include_oem=include_oem)
+    packages = auto_install_filter(packages, driver_string)
+    if not packages:
+        logging.debug('No drivers found for installation.')
+        return packages
+
+    # ignore packages which are already installed
+    to_install = []
+    for p in packages:
+        if not apt_cache[p].installed:
+            to_install.append(p)
+            # See if runtimepm is supported
+            if packages[p].get('runtimepm'):
+                # Create a file for nvidia-prime
+                try:
+                    pm_fd = open('/run/nvidia_runtimepm_supported', 'w')
+                    pm_fd.write('\n')
+                    pm_fd.close()
+                except PermissionError:
+                    # No need to error out here, since package
+                    # installation will fail
+                    pass
+            # Add the matching linux modules package when available
+            try:
+                modules_package = get_linux_modules_metapackage(apt_cache, p)
+                if modules_package and not apt_cache[modules_package].installed:
+                    to_install.append(modules_package)
+            except KeyError:
+                pass
+
+    return to_install
+
+
+def nvidia_desktop_pre_installation_hook(to_install):
+    '''Applies changes that need to happen before installing the NVIDIA drivers'''
+    with_nvidia_kms = False
+
+    # Enable KMS if nvidia >= 470
+    for package_name in to_install:
+        if package_name.startswith('nvidia-driver-'):
+            try:
+                version = int(package_name.split('-')[-1])
+            except ValueError:
+                pass
+            finally:
+                with_nvidia_kms = version >= 470
+
+    if with_nvidia_kms:
+        set_nvidia_kms(1)
+
+
+def nvidia_desktop_post_installation_hook():
+    # If we are dealing with NVIDIA PRIME, and runtimepm
+    # is supported, enable it
+    if os.path.isfile('/run/nvidia_runtimepm_supported'):
+        logging.debug('Trying to select the on-demand PRIME profile')
+        try:
+            subprocess.call(['/usr/bin/prime-select', 'on-demand'])
+        except FileNotFoundError:
+            pass
+
+        # Create the override file for gpu-manager
+        with open('/etc/u-d-c-nvidia-runtimepm-override', 'w') as f:
+            f.write('# File created by ubuntu-drivers\n')
+
+
 class _GpgpuDriver(object):
 
     def __init__(self, vendor=None, flavour=None):
