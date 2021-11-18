@@ -1,8 +1,26 @@
-ubuntu-drivers-common (1:0.9.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.3) jammy; urgency=medium
 
-  * 
+  * UbuntuDrivers/detect.py,
+    ubuntu-drivers:
+    - Provide helper functions for NVIDIA on the desktop:
+      o get_desktop_package_list()
+      o nvidia_desktop_pre_installation_hook()
+      o nvidia_desktop_post_installation_hook()
+      The new functions, which are now used by ubuntu-drivers
+      (only for the desktop i.e. "ubuntu-drivers install"),
+      allow reusing the hardware detection and the customisations
+      from ubuntu-drivers in other applications such as the
+      Software Properties UIsi (LP: #1942208).
+    - Add the "--recommended" option to the "list" command
+      (LP: #1952147).
+      This allows to show only the packages that will be
+      installed using auto-detection i.e. one specific
+      driver and its kernel module, instead of all the
+      compatible drivers.
+      This works with and without --gpgpu, yielding different
+      results.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 18 Nov 2021 11:16:56 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 18 Nov 2021 18:05:53 +0100
 
 ubuntu-drivers-common (1:0.9.2.2) impish; urgency=medium
 
