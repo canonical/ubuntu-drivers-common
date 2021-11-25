@@ -350,6 +350,7 @@ def greet(config, gpgpu, free_only, package_list, no_oem, **kwargs):
 @greet.command()
 @click.argument('driver', nargs=-1)  # add the name argument
 @click.option('--gpgpu', is_flag=True, help='gpgpu drivers')
+@click.option('--recommended', is_flag=True, help='Only show the recommended driver packages')
 @click.option('--free-only', is_flag=True, help='Only consider free packages')
 @click.option('--package-list', nargs=1, metavar='PATH', help='Create file with list of installed packages (in install mode)')
 @click.option('--no-oem', is_flag=True, metavar='install_oem_meta', help='Do not include OEM enablement packages (these enable an external archive)')
@@ -398,6 +399,7 @@ def autoinstall(config, **kwargs):
 @greet.command()
 @click.argument('list', nargs=-1)
 @click.option('--gpgpu', is_flag=True, help='gpgpu drivers')
+@click.option('--recommended', is_flag=True, help='Only show the recommended driver packages')
 @click.option('--free-only', is_flag=True, help='Only consider free packages')
 @pass_config
 def list(config, **kwargs):
@@ -414,6 +416,12 @@ def list(config, **kwargs):
         packages = UbuntuDrivers.detect.system_driver_packages(
             sys_path=sys_path, freeonly=config.free_only, include_oem=config.install_oem_meta)
 
+    if kwargs.get('recommended'):
+        if kwargs.get('gpgpu'):
+            packages = UbuntuDrivers.detect.gpgpu_install_filter(packages, '')
+        else:
+            packages = UbuntuDrivers.detect.auto_install_filter(packages, '')
+
     for package in packages:
         try:
             linux_modules = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, package)
@@ -421,7 +429,12 @@ def list(config, **kwargs):
                 linux_modules = package
 
             if linux_modules:
-                print('%s, (kernel modules provided by %s)' % (package, linux_modules))
+                if kwargs.get('recommended'):
+                    # This is just a space separated two item line
+                    # Such as "nvidia-headless-no-dkms-470-server linux-modules-nvidia-470-server-generic"
+                    print('%s %s' % (package, linux_modules))
+                else:
+                    print('%s, (kernel modules provided by %s)' % (package, linux_modules))
             else:
                 print(package)
         except KeyError:
