@@ -88,6 +88,15 @@ class KernelDetection(object):
 
         return flavour
 
+    def _filter_cache(self, pkg):
+        package_name = pkg.name
+        if (package_name.startswith('linux-image') and
+                self.apt_cache[package_name].is_installed or
+                self.apt_cache[package_name].marked_install):
+            return package_name
+        else:
+            return None
+
     def _get_linux_metapackage(self, target):
         '''Get the linux headers, linux-image or linux metapackage'''
         metapackage = ''
@@ -97,16 +106,9 @@ class KernelDetection(object):
 
         pattern = re.compile('linux-image-(.+)-([0-9]+)-(.+)')
 
-        for pkg in self.apt_cache:
-            # We always start with "linux-image"
-            # since installing headers or metapackages
-            # for kernels that are not installed
-            # won't help
-            if (pkg.name.startswith('linux-image') and
-                    'extra' not in pkg.name and
-                    self.apt_cache[pkg.name].is_installed or
-                    self.apt_cache[pkg.name].marked_install):
-                match = pattern.match(pkg.name)
+        for package_name in map(self._filter_cache, self.apt_cache):
+            if package_name:
+                match = pattern.match(package_name)
                 # Here we filter out packages other than
                 # the actual image or header packages
                 if match:
