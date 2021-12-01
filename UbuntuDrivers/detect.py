@@ -138,7 +138,15 @@ def _apt_cache_modalias_map(apt_cache):
             logging.error('Package %s has invalid modalias header: %s' % (
                 package.name, m))
 
-    return result
+    result2 = {}
+
+    for bus, alias_map in result.items():
+        pat = re.compile(
+            '|'.join([fnmatch.translate(pat) for pat in alias_map.keys()]),
+            re.IGNORECASE)
+        result2[bus] = (pat, alias_map)
+
+    return result2
 
 
 def packages_for_modalias(apt_cache, modalias):
@@ -155,9 +163,11 @@ def packages_for_modalias(apt_cache, modalias):
         cache_map = _apt_cache_modalias_map(apt_cache)
         packages_for_modalias.cache_maps[apt_cache_hash] = cache_map
 
-    bus_map = cache_map.get(modalias.split(':', 1)[0], {})
+    pat, bus_map = cache_map.get(modalias.split(':', 1)[0], (None, {}))
+    if pat is None or not pat.match(modalias):
+        return []
     for alias in bus_map:
-        if fnmatch.fnmatch(modalias.lower(), alias.lower()):
+        if fnmatch.fnmatchcase(modalias.lower(), alias.lower()):
             for p in bus_map[alias]:
                 pkgs.add(p)
 
