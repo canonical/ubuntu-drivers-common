@@ -15,11 +15,11 @@ import subprocess
 import functools
 import re
 
-import apt
+import apt_pkg
 
 from UbuntuDrivers import kerneldetection
 
-system_architecture = apt.apt_pkg.get_architectures()[0]
+system_architecture = apt_pkg.get_architectures()[0]
 lookup_cache = {}
 
 
@@ -70,35 +70,63 @@ def system_modaliases(sys_path=None):
     return aliases
 
 
-def _check_video_abi_compat(apt_cache, record):
+def _check_video_abi_compat(apt_cache, package):
     xorg_video_abi = None
+
+    if package.name.startswith('nvidia-driver-'):
+        xorg_driver_name = package.name.replace('nvidia-driver-', 'xserver-xorg-video-nvidia-')
+        try:
+            package = apt_cache.__getitem__(xorg_driver_name)
+        except KeyError:
+            logging.debug('Cannot find %s package in the cache. Cannot check ABI' % (xorg_driver_name))
+            return True
+
+    records = apt_pkg.PackageRecords(apt_cache)
+    depcache = apt_pkg.DepCache(apt_cache)
+    candidate = depcache.get_candidate_ver(package)
+    records.lookup(candidate.file_list[0])
+    deps = records.__getitem__('Depends').split(', ')
+    needs_video_abi = False
+    for dep in deps:
+        if dep.startswith('xorg-video-abi-'):
+            needs_video_abi = True
+            break
+
+    if not needs_video_abi:
+        logging.debug('Skipping check for %s since it does not depend on video abi' % package.name)
+        return True
 
     # determine current X.org video driver ABI
     try:
-        for p in apt_cache['xserver-xorg-core'].candidate.provides:
-            if p.startswith('xorg-video-abi-'):
-                xorg_video_abi = p
-                # logging.debug('_check_video_abi_compat(): Current X.org video abi: %s', xorg_video_abi)
-                break
-    except (AttributeError, KeyError):
-        logging.debug('_check_video_abi_compat(): xserver-xorg-core not available, cannot check ABI')
+        xorg_core = apt_cache.__getitem__('xserver-xorg-core')
+    except KeyError:
+        logging.debug('xserver-xorg-core not available, cannot check ABI')
         return True
-    if not xorg_video_abi:
+
+    candidate = depcache.get_candidate_ver(xorg_core)
+    records.lookup(candidate.file_list[0])
+
+    provides = records.__getitem__('Provides').split(', ')
+    for provide in provides:
+        if provide.startswith('xorg-video-abi-'):
+            xorg_video_abi = provide
+
+    if xorg_video_abi:
+        abi_pkg = apt_cache.__getitem__(xorg_video_abi)
+        for dep in abi_pkg.rev_depends_list:
+            if dep.parent_pkg.name == package.name:
+                return True
+
+        logging.debug('Driver package %s is incompatible with current X.org server ABI %s',
+                      package.name, xorg_video_abi)
+        logging.debug('%s is not in %s' % (package, [x.parent_pkg for x in abi_pkg.rev_depends_list]))
         return False
 
-    try:
-        deps = record['Depends']
-    except KeyError:
-        return True
-    if 'xorg-video-abi-' in deps and xorg_video_abi not in deps:
-        logging.debug('Driver package %s is incompatible with current X.org server ABI %s',
-                      record['Package'], xorg_video_abi)
-        return False
     return True
 
 
 def _apt_cache_modalias_map(apt_cache):
-    '''Build a modalias map from an apt.Cache object.
+    '''Build a modalias map from an apt_pkg.Cache object.
 
     This filters out uninstallable video drivers (i. e. which depend on a video
     ABI that xserver-xorg-core does not provide).
@@ -106,22 +134,27 @@ def _apt_cache_modalias_map(apt_cache):
     Return a map bus -> modalias -> [package, ...], where "bus" is the prefix of
     the modalias up to the first ':' (e. g. "pci" or "usb").
     '''
+    depcache = apt_pkg.DepCache(apt_cache)
+    records = apt_pkg.PackageRecords(apt_cache)
+
     result = {}
-    for package in apt_cache:
+    for package in apt_cache.packages:
         # skip packages without a modalias field
         try:
-            m = package.candidate.record['Modaliases']
+            candidate = depcache.get_candidate_ver(package)
+            records.lookup(candidate.file_list[0])
+            m = records.__getitem__('Modaliases')
+            if not m:
+                continue
         except (KeyError, AttributeError, UnicodeDecodeError):
             continue
 
         # skip foreign architectures, we usually only want native
         # driver packages
-        if (not package.candidate or
-                package.candidate.architecture not in ('all', system_architecture)):
+        if (package.architecture not in ('all', system_architecture)):
             continue
 
-        # skip incompatible video drivers
-        if not _check_video_abi_compat(apt_cache, package.candidate.record):
+        if not _check_video_abi_compat(apt_cache, package):
             continue
 
         try:
@@ -139,7 +172,6 @@ def _apt_cache_modalias_map(apt_cache):
                 package.name, m))
 
     result2 = {}
-
     for bus, alias_map in result.items():
         pat = re.compile(
             '|'.join([fnmatch.translate(pat) for pat in alias_map.keys()]),
@@ -156,7 +188,7 @@ def packages_for_modalias(apt_cache, modalias):
     '''
     pkgs = set()
 
-    apt_cache_hash = hash(apt_cache)
+    apt_cache_hash = hash(package.get_fullname() for package in apt_cache.packages)
     try:
         cache_map = packages_for_modalias.cache_maps[apt_cache_hash]
     except KeyError:
@@ -171,14 +203,16 @@ def packages_for_modalias(apt_cache, modalias):
             for p in bus_map[alias]:
                 pkgs.add(p)
 
-    return [apt_cache[p] for p in pkgs]
+    return [apt_cache.__getitem__(p) for p in pkgs]
 
 
 packages_for_modalias.cache_maps = {}
 
 
-def _is_package_free(pkg):
-    assert pkg.candidate is not None
+def _is_package_free(apt_cache, pkg):
+    depcache = apt_pkg.DepCache(apt_cache)
+    candidate = depcache.get_candidate_ver(pkg)
+    assert candidate is not None
     # it would be better to check the actual license, as we do not have
     # the component for third-party packages; but this is the best we can do
     # at the moment
@@ -186,52 +220,79 @@ def _is_package_free(pkg):
     # We can assume the NVIDIA packages to be non-free
     if pkg.name.startswith('nvidia'):
         return False
-    for o in pkg.candidate.origins:
-        if o.component in ('restricted', 'multiverse'):
-            return False
+
+    records = apt_pkg.PackageRecords(apt_cache)
+    records.lookup(candidate.file_list[0])
+
+    for pfile, _ in pkg.version_list[0].file_list:
+        if not pfile.component:
+            # This is probably from the test suite
+            try:
+                component = records.__getitem__('Component')
+                return (component not in ('restricted', 'multiverse'))
+            except KeyError:
+                return False
+        else:
+            if pfile.component in ('restricted', 'multiverse'):
+                return False
     return True
 
 
-def _is_package_from_distro(pkg):
-    if pkg.candidate is None:
+def _is_package_from_distro(apt_cache, pkg):
+    depcache = apt_pkg.DepCache(apt_cache)
+    candidate = depcache.get_candidate_ver(pkg)
+    if candidate is None:
         return False
 
-    for o in pkg.candidate.origins:
-        if o.origin == 'Ubuntu':
-            return True
-    return False
-
-
-def _pkg_get_module(pkg):
-    '''Determine module name from apt Package object'''
+    records = apt_pkg.PackageRecords(apt_cache)
+    records.lookup(candidate.file_list[0])
 
     try:
-        m = pkg.candidate.record['Modaliases']
+        origin = records.__getitem__('Origin')
+        return (origin == 'Ubuntu')
+    except KeyError:
+        return False
+
+
+def _pkg_get_module(apt_cache, pkg):
+    '''Determine module name from apt Package object'''
+    depcache = apt_pkg.DepCache(apt_cache)
+    candidate = depcache.get_candidate_ver(pkg)
+    records = apt_pkg.PackageRecords(apt_cache)
+    records.lookup(candidate.file_list[0])
+
+    try:
+        m = records.__getitem__('Modaliases')
     except (KeyError, AttributeError):
         logging.debug('_pkg_get_module %s: package has no Modaliases header, cannot determine module', pkg.name)
         return None
 
     paren = m.find('(')
     if paren <= 0:
-        logging.warning('_pkg_get_module %s: package has invalid Modaliases header, cannot determine module', pkg.name)
+        logging.debug('_pkg_get_module %s: package has invalid Modaliases header, cannot determine module', pkg.name)
         return None
 
     module = m[:paren]
     return module
 
 
-def _pkg_get_support(pkg):
+def _pkg_get_support(apt_cache, pkg):
     '''Determine support level from apt Package object'''
 
+    depcache = apt_pkg.DepCache(apt_cache)
+    candidate = depcache.get_candidate_ver(pkg)
+    records = apt_pkg.PackageRecords(apt_cache)
+    records.lookup(candidate.file_list[0])
+
     try:
-        support = pkg.candidate.record['Support']
+        support = records.__getitem__('Support')
     except (KeyError, AttributeError):
         logging.debug('_pkg_get_support %s: package has no Support header, cannot determine support level', pkg.name)
         return None
 
     if support not in ('NFB', 'LTSB', 'Legacy'):
-        logging.warning('_pkg_get_support %s: package has invalid Support %s'
-                        'header, cannot determine support level', pkg.name, support)
+        logging.debug('_pkg_get_support %s: package has invalid Support %s'
+                      'header, cannot determine support level', pkg.name, support)
         return None
 
     return support
@@ -257,10 +318,10 @@ def is_wayland_session():
     return os.environ.get('WAYLAND_DISPLAY') is not None
 
 
-def _is_manual_install(pkg):
+def _is_manual_install(apt_cache, pkg):
     '''Determine if the kernel module from an apt.Package is manually installed.'''
 
-    if pkg.installed:
+    if pkg.current_ver:
         return False
 
     # special case, as our packages suffix the kmod with _version
@@ -269,7 +330,7 @@ def _is_manual_install(pkg):
     elif pkg.name.startswith('fglrx'):
         module = 'fglrx'
     else:
-        module = _pkg_get_module(pkg)
+        module = _pkg_get_module(apt_cache, pkg)
 
     if not module:
         return False
@@ -338,7 +399,7 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
     queries apt about which packages provide drivers for those. It also adds
     available packages from detect_plugin_packages().
 
-    If you already have an apt.Cache() object, you should pass it as an
+    If you already have an apt_pkg.Cache() object, you should pass it as an
     argument for efficiency. If not given, this function creates a temporary
     one by itself.
 
@@ -372,7 +433,7 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
 
     if not apt_cache:
         try:
-            apt_cache = apt.Cache()
+            apt_cache = apt_pkg.Cache(None)
         except Exception as ex:
             logging.error(ex)
             return {}
@@ -380,16 +441,16 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
     packages = {}
     for alias, syspath in modaliases.items():
         for p in packages_for_modalias(apt_cache, alias):
-            if freeonly and not _is_package_free(p):
+            if freeonly and not _is_package_free(apt_cache, p):
                 continue
             if not include_oem and fnmatch.fnmatch(p.name, 'oem-*-meta'):
                 continue
             packages[p.name] = {
                     'modalias': alias,
                     'syspath': syspath,
-                    'free': _is_package_free(p),
-                    'from_distro': _is_package_from_distro(p),
-                    'support': _pkg_get_support(p),
+                    'free': _is_package_free(apt_cache, p),
+                    'from_distro': _is_package_from_distro(apt_cache, p),
+                    'support': _pkg_get_support(apt_cache, p),
                     'runtimepm': _is_runtimepm_supported(p, alias)
                 }
             (vendor, model) = _get_db_name(syspath, alias)
@@ -414,12 +475,15 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
     # add available packages which need custom detection code
     for plugin, pkgs in detect_plugin_packages(apt_cache).items():
         for p in pkgs:
-            apt_p = apt_cache[p]
-            packages[p] = {
-                    'free': _is_package_free(apt_p),
-                    'from_distro': _is_package_from_distro(apt_p),
-                    'plugin': plugin,
-                }
+            try:
+                apt_p = apt_cache.__getitem__(p)
+                packages[p] = {
+                        'free': _is_package_free(apt_cache, apt_p),
+                        'from_distro': _is_package_from_distro(apt_cache, apt_p),
+                        'plugin': plugin,
+                    }
+            except KeyError:
+                logging.debug('Package %s plugin not available. Skipping.' % p)
 
     return packages
 
@@ -436,14 +500,16 @@ def _get_vendor_model_from_alias(alias):
 
 
 def _get_headless_no_dkms_metapackage(pkg, apt_cache):
-    assert pkg.candidate is not None
+    assert pkg is not None
     metapackage = None
     '''Return headless-no-dkms metapackage from the main metapackage.
 
     This is useful when dealing with packages such as nvidia-driver-$flavour
     whose headless-no-dkms metapackage would be nvidia-headless-no-dkms-$flavour
     '''
-    name = pkg.shortname
+    depcache = apt_pkg.DepCache(apt_cache)
+    records = apt_pkg.PackageRecords(apt_cache)
+    name = pkg.name
 
     pattern = re.compile('nvidia-([0-9]+)')
     match = pattern.match(name)
@@ -464,8 +530,10 @@ def _get_headless_no_dkms_metapackage(pkg, apt_cache):
         package = apt_cache.__getitem__(candidate)
         # skip foreign architectures, we usually only want native
         # driver packages
-        if (package.candidate and
-                package.candidate.architecture in ('all', system_architecture)):
+        package_candidate = depcache.get_candidate_ver(package)
+        records.lookup(package_candidate.file_list[0])
+        if (candidate and
+                package_candidate.arch in ('all', system_architecture)):
             metapackage = candidate
     except KeyError:
         pass
@@ -480,7 +548,7 @@ def system_device_specific_metapackages(apt_cache=None, sys_path=None, include_o
     queries apt about which packages provide hardware enablement support for
     those.
 
-    If you already have an apt.Cache() object, you should pass it as an
+    If you already have an apt_pkg.Cache() object, you should pass it as an
     argument for efficiency. If not given, this function creates a temporary
     one by itself.
 
@@ -512,7 +580,7 @@ def system_device_specific_metapackages(apt_cache=None, sys_path=None, include_o
 
     if not apt_cache:
         try:
-            apt_cache = apt.Cache()
+            apt_cache = apt_pkg.Cache(None)
         except Exception as ex:
             logging.error(ex)
             return {}
@@ -525,10 +593,10 @@ def system_device_specific_metapackages(apt_cache=None, sys_path=None, include_o
             packages[p.name] = {
                     'modalias': alias,
                     'syspath': syspath,
-                    'free': _is_package_free(p),
-                    'from_distro': _is_package_from_distro(p),
+                    'free': _is_package_free(apt_cache, p),
+                    'from_distro': _is_package_from_distro(apt_cache, p),
                     'recommended': True,
-                    'support': _pkg_get_support(p),
+                    'support': _pkg_get_support(apt_cache, p),
                 }
 
     return packages
@@ -541,7 +609,7 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
     queries apt about which packages provide drivers for those. Finally, it looks
     for the correct metapackage, by calling _get_headless_no_dkms_metapackage().
 
-    If you already have an apt.Cache() object, you should pass it as an
+    If you already have an apt_pkg.Cache() object, you should pass it as an
     argument for efficiency. If not given, this function creates a temporary
     one by itself.
 
@@ -573,7 +641,7 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
 
     if not apt_cache:
         try:
-            apt_cache = apt.Cache()
+            apt_cache = apt_pkg.Cache(None)
         except Exception as ex:
             logging.error(ex)
             return {}
@@ -587,9 +655,9 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
                 packages[p.name] = {
                         'modalias': alias,
                         'syspath': syspath,
-                        'free': _is_package_free(p),
-                        'from_distro': _is_package_from_distro(p),
-                        'support': _pkg_get_support(p),
+                        'free': _is_package_free(apt_cache, p),
+                        'from_distro': _is_package_from_distro(apt_cache, p),
+                        'support': _pkg_get_support(apt_cache, p),
                     }
                 if vendor is not None:
                     packages[p.name]['vendor'] = vendor
@@ -624,7 +692,7 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
     adds available packages from detect_plugin_packages(), using the name of
     the detction plugin as device name.
 
-    If you already have an apt.Cache() object, you should pass it as an
+    If you already have an apt_pkg.Cache() object, you should pass it as an
     argument for efficiency. If not given, this function creates a temporary
     one by itself.
 
@@ -672,7 +740,7 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
     result = {}
     if not apt_cache:
         try:
-            apt_cache = apt.Cache()
+            apt_cache = apt_pkg.Cache(None)
         except Exception as ex:
             logging.error(ex)
             return {}
@@ -697,7 +765,7 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
     # packages are "manually installed"
     for driver, info in result.items():
         for pkg in info['drivers']:
-            if not _is_manual_install(apt_cache[pkg]):
+            if not _is_manual_install(apt_cache, apt_cache.__getitem__(pkg)):
                 break
         else:
             info['manual_install'] = True
@@ -718,13 +786,21 @@ def get_desktop_package_list(apt_cache, sys_path=None, free_only=False, include_
         logging.debug('No drivers found for installation.')
         return packages
 
+    depcache = apt_pkg.DepCache(apt_cache)
+    records = apt_pkg.PackageRecords(apt_cache)
+
     # ignore packages which are already installed
     to_install = []
     for p in packages:
-        if not apt_cache[p].installed:
+        package_obj = apt_cache.__getitem__(p)
+        if not package_obj.current_ver:
             to_install.append(p)
+
+            candidate = depcache.get_candidate_ver(package_obj)
+            records.lookup(candidate.file_list[0])
+
             # See if runtimepm is supported
-            if packages[p].get('runtimepm'):
+            if records.__getitem__('runtimepm'):
                 # Create a file for nvidia-prime
                 try:
                     pm_fd = open('/run/nvidia_runtimepm_supported', 'w')
@@ -955,7 +1031,7 @@ def detect_plugin_packages(apt_cache=None):
     returned lists for packages which are available for installation, and
     return the joined results.
 
-    If you already have an existing apt.Cache() object, you can pass it as an
+    If you already have an existing apt_pkg.Cache() object, you can pass it as an
     argument for efficiency.
 
     Return pluginname -> [package, ...] map.
@@ -969,7 +1045,7 @@ def detect_plugin_packages(apt_cache=None):
 
     if apt_cache is None:
         try:
-            apt_cache = apt.Cache()
+            apt_cache = apt_pkg.Cache(None)
         except Exception as ex:
             logging.error(ex)
             return {}
@@ -997,10 +1073,11 @@ def detect_plugin_packages(apt_cache=None):
                 continue
 
             for pkg in result:
-                if pkg in apt_cache and apt_cache[pkg].candidate:
-                    if _check_video_abi_compat(apt_cache, apt_cache[pkg].candidate.record):
+                try:
+                    package = apt_cache.__getitem__(pkg)
+                    if _check_video_abi_compat(apt_cache, package):
                         packages.setdefault(fname, []).append(pkg)
-                else:
+                except KeyError:
                     logging.debug('Ignoring unavailable package %s from plugin %s', pkg, plugin)
 
     return packages
@@ -1144,18 +1221,33 @@ def find_reverse_dependencies(apt_cache, package, prefix):
 
 
 def get_linux_image_from_meta(apt_cache, pkg):
-    if apt_cache[pkg].candidate:
-        record = apt_cache[pkg].candidate.record
+    depcache = apt_pkg.DepCache(apt_cache)
+    records = apt_pkg.PackageRecords(apt_cache)
 
     try:
-        deps = record['Depends']
+        candidate = depcache.get_candidate_ver(apt_cache.__getitem__(pkg))
     except KeyError:
+        logging.debug('No candidate for %s found' % pkg)
         return None
 
-    deps_list = deps.strip().split(', ')
-    for dep in deps_list:
-        if dep.startswith('linux-image-'):
-            return dep
+    records.lookup(candidate.file_list[0])
+
+    for dep in candidate.depends_list_str.get('Depends'):
+        if dep[0][0].startswith('linux-image-'):
+            return dep[0][0]
+
+    # if apt_cache[pkg].candidate:
+    #     record = apt_cache[pkg].candidate.record
+
+    # try:
+    #     deps = record['Depends']
+    # except KeyError:
+    #     return None
+
+    # deps_list = deps.strip().split(', ')
+    # for dep in deps_list:
+    #     if dep.startswith('linux-image-'):
+    #         return dep
 
     return None
 
@@ -1166,6 +1258,8 @@ def get_linux_modules_metapackage(apt_cache, candidate):
     metapackage = None
     linux_flavour = ''
     linux_modules_match = ''
+
+    depcache = apt_pkg.DepCache(apt_cache)
 
     if 'nvidia' not in candidate:
         logging.debug('Non NVIDIA linux-modules packages are not supported at this time: %s. Skipping', candidate)
@@ -1199,8 +1293,9 @@ def get_linux_modules_metapackage(apt_cache, candidate):
     try:
         package = apt_cache.__getitem__(linux_modules_candidate)
         # skip foreign architectures, we usually only want native
-        if (package.candidate and
-                package.candidate.architecture in ('all', system_architecture)):
+        package_candidate = depcache.get_candidate_ver(package)
+
+        if (package_candidate and package_candidate.arch in ('all', system_architecture)):
             linux_version = get_linux_version(apt_cache)
             linux_modules_abi_candidate = 'linux-modules-nvidia-%s-%s' % (candidate_flavour, linux_version)
             logging.debug('linux_modules_abi_candidate: %s' % (linux_modules_abi_candidate))
@@ -1209,8 +1304,9 @@ def get_linux_modules_metapackage(apt_cache, candidate):
             # our kernel ABI. If not, things will fail.
             abi_specific = apt_cache.__getitem__(linux_modules_abi_candidate)
             # skip foreign architectures, we usually only want native
-            if (abi_specific.candidate and
-                    abi_specific.candidate.architecture in ('all', system_architecture)):
+            abi_specific_candidate = depcache.get_candidate_ver(abi_specific)
+            if (abi_specific_candidate and
+                    abi_specific_candidate.arch in ('all', system_architecture)):
                 logging.debug('Found ABI compatible %s' % (linux_modules_abi_candidate))
                 linux_modules_match = linux_modules_candidate
     except KeyError:
@@ -1222,7 +1318,9 @@ def get_linux_modules_metapackage(apt_cache, candidate):
     if linux_modules_match:
         # Look for the metapackage in the reverse
         # dependencies
-        reverse_deps = find_reverse_dependencies(apt_cache, linux_modules_match, 'linux-modules-nvidia-')
+        reverse_deps = [dep.parent_pkg.name for dep in apt_cache[linux_modules_match].rev_depends_list
+                        if dep.parent_pkg.name.startswith('linux-modules-nvidia-')]
+
         pick = ''
         modules_candidate = 'linux-modules-nvidia-%s-%s' % (candidate_flavour,
                                                             get_linux_image(apt_cache).replace('linux-image-', ''))
@@ -1240,9 +1338,11 @@ def get_linux_modules_metapackage(apt_cache, candidate):
 
     try:
         package = apt_cache.__getitem__(dkms_package)
+        package_candidate = depcache.get_candidate_ver(package)
+
         # skip foreign architectures, we usually only want native
-        if (package.candidate and
-                package.candidate.architecture in ('all', system_architecture)):
+        if (package_candidate and
+                package_candidate.arch in ('all', system_architecture)):
             metapackage = dkms_package
     except KeyError:
         logging.error('No "%s" can be found.', dkms_package)
