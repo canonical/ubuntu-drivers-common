@@ -17,8 +17,8 @@ for p in `cat $PKGLIST`; do
 done
 
 # Call prime-select, if needed
-if [ -e /run/nvidia_runtimepm_supported ]; then
-    apt-install nvidia-prime
+if grep -q "^nvidia-driver-\|^linux-modules-nvidia-" $PKGLIST; then
+    chroot /target apt install nvidia-prime
     cp /run/nvidia_runtimepm_supported /target/run/nvidia_runtimepm_supported
     rm -f /target/etc/prime-discrete
     chroot /target prime-select on-demand </dev/null
