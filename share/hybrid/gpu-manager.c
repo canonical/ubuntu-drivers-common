@@ -2043,6 +2043,7 @@ static bool enable_prime(const char *prime_settings,
                         const struct device *device,
                         struct device **devices,
                         int cards_n) {
+    int major, minor, extra;
     bool status = false;
     int tries = 0;
     /* Check if prime_settings is available
@@ -2062,6 +2063,7 @@ static bool enable_prime(const char *prime_settings,
 
     get_prime_action();
     if (prime_mode == ON) {
+prime_on_fallback:
         /* Create an OutputClass just for PRIME, to override
          * the default NVIDIA settings
          */
@@ -2073,6 +2075,16 @@ static bool enable_prime(const char *prime_settings,
             load_module("nvidia");
     }
     else if (prime_mode == ONDEMAND) {
+        if (get_nvidia_driver_version(&major, &minor, &extra)) {
+            if (major < 450) {
+                /* Set prime to "on" */
+                fprintf(log_handle, "Info: falling back to on mode for PRIME, since driver series %d < 450.\n",
+                major);
+                create_prime_settings(prime_settings);
+                goto prime_on_fallback;
+            }
+        }
+
         /* Create the ServerLayout required to enabling offload
          * for NVIDIA.
          */
