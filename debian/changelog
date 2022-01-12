@@ -1,9 +1,22 @@
-ubuntu-drivers-common (1:0.9.4) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.4) jammy; urgency=medium
 
-  * Optimize packages_for_modalias by compiling all the Modaliases into one
-    big regexp that can be used to quickly reject most devices.
+  [ Michael Hudson-Doyle ]
+  * UbuntuDrivers/detect.py:
+    - Optimize packages_for_modalias by compiling all the Modaliases
+      into one big regexp that can be used to quickly reject most
+      devices.
 
- -- Michael Hudson-Doyle <michael.hudson@ubuntu.com>  Wed, 01 Dec 2021 09:47:53 +1300
+  [ Alberto Milone ]
+  * UbuntuDrivers/kerneldetection.py:
+    - Improve performance of _get_linux_metapackage.
+  * gpu-manager.c:
+    - Fall back from on-demand to on if nvidia < 450.
+
+  [ Jeremy Szu ]
+  * ubiquity/target-config/31ubuntu_driver_packages:
+    - Install nvidia-prime in eariler stage.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 12 Jan 2022 09:37:18 +0000
 
 ubuntu-drivers-common (1:0.9.3) jammy; urgency=medium
 
