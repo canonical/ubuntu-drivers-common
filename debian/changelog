@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.9.2.3) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 18 Jan 2022 09:03:16 +0000
+
 ubuntu-drivers-common (1:0.9.2.2) impish; urgency=medium
 
   * ubuntu-drivers:
