@@ -61,6 +61,7 @@
 #include <linux/limits.h>
 #include <sys/utsname.h>
 #include <libkmod.h>
+#include <libudev.h>
 #include "xf86drm.h"
 #include "xf86drmMode.h"
 #include "json.h"
@@ -328,6 +329,70 @@ scan_device(struct pci_dev *p) {
 }
 /* End parts from lspci.{c|h} */
 
+/**
+ * Return:
+ * 1 if queued events handled.
+ * 0 if queued events not completed within 10 seconds.
+ * -1 if error
+ */
+static bool udev_wait_boot_vga_handled() {
+    int i = 0, r = 0, boot_vga_found = 0;
+    struct udev *udev = NULL;
+    struct udev_device *dev = NULL;
+    struct udev_enumerate *uenum = NULL;
+    struct udev_list_entry *udevs = NULL, *udev_entry = NULL;
+
+    for (i = 0; i < 1000; i++, usleep(1000)) {
+        r = udev_queue_get_queue_is_empty((struct udev_queue *) NULL);
+        if (r > 0)
+            break;
+
+        udev = udev_new();
+        if (!udev) {
+            fprintf(log_handle, "Not able to create udev context.\n");
+            continue;
+        }
+
+        uenum = udev_enumerate_new(udev);
+        if (!uenum) {
+            fprintf(log_handle, "Not able to create udev enumerator.\n");
+            continue;
+        }
+
+        udev_enumerate_add_match_subsystem(uenum, "drm");
+        udev_enumerate_scan_devices(uenum);
+
+        udevs = udev_enumerate_get_list_entry(uenum);
+        if (!udevs) {
+            fprintf(log_handle, "Not able to get events list.\n");
+            continue;
+        }
+
+        udev_list_entry_foreach(udev_entry, udevs) {
+            const char *path = NULL, *val = NULL;
+            path = udev_list_entry_get_name(udev_entry);
+            dev = udev_device_new_from_syspath(udev, path);
+            if (!dev) {
+                /* In some case, gpu-manager starts earlier than drm drivers
+                 * which will cause not any drm uevent be enumerated, skip to
+                 * print errors.
+                 * fprintf(log_handle, "Not able to get dev from %s.\n", path);
+                 */
+                continue;
+            }
+            val = udev_device_get_sysattr_value(dev, "device/boot_vga");
+            if (val && !strncmp(val, "1", 1)) {
+                fprintf(log_handle, "The boot_vga is %s.\n", path);
+                r = boot_vga_found = 1;
+                break;
+            }
+        }
+        if (boot_vga_found)
+            break;
+    }
+    fprintf(log_handle, "Takes %dms to wait for udev events completed.\n", i * 10);
+    return (r > 0)? 1 : 0;
+}
 
 static bool pci_device_is_boot_vga(struct pci_dev *info) {
     size_t len = 0;
@@ -2800,6 +2865,9 @@ int main(int argc, char *argv[]) {
 
     if (fake_modules_path)
         fprintf(log_handle, "fake_modules_path file: %s\n", fake_modules_path);
+
+    if (!udev_wait_boot_vga_handled())
+        fprintf(log_handle, "udev events remain queuing, timeout to wait.\n");
 
     nvidia_loaded = is_module_loaded("nvidia");
     nvidia_unloaded = nvidia_loaded ? false : has_unloaded_module("nvidia");
