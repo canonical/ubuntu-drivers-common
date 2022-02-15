@@ -83,6 +83,7 @@ static inline void pclosep(FILE **);
 #define LAST_BOOT "/var/lib/ubuntu-drivers-common/last_gfx_boot"
 #define OFFLOADING_CONF "/var/lib/ubuntu-drivers-common/requires_offloading"
 #define RUNTIMEPM_OVERRIDE "/etc/u-d-c-nvidia-runtimepm-override"
+#define UDEV_NVIDIA_COMPLETED "/run/u-d-c-nvidia-drm-was-loaded"
 #define XORG_CONF "/etc/X11/xorg.conf"
 #define KERN_PARAM "nogpumanager"
 #define AMDGPU_PRO_PX  "/opt/amdgpu-pro/bin/amdgpu-pro-px"
@@ -3025,6 +3026,12 @@ int main(int argc, char *argv[]) {
     fprintf(log_handle, "Has nvidia? %s\n", (has_nvidia ? "yes" : "no"));
     fprintf(log_handle, "How many cards? %d\n", cards_n);
 
+    /* Probe graphic drivers earlier since some graphic related application
+     * (e.g. gdm, mutter) rely on udev rules to apply extra configurations.
+     */
+    if (has_nvidia && !nvidia_blacklisted && !is_module_loaded("nvidia"))
+        load_module("nvidia");
+
     /* See if the system has changed */
     has_changed = has_system_changed(old_devices,
                                      current_devices,
@@ -3034,6 +3041,15 @@ int main(int argc, char *argv[]) {
 
     if (has_changed)
         fprintf(log_handle, "System configuration has changed\n");
+
+    /* Make sure the udev rules are applied for graphic cards. */
+    if (has_nvidia && !nvidia_blacklisted) {
+        for (i = 0; i < 500; i++, usleep(20000)) {
+            if (is_file(UDEV_NVIDIA_COMPLETED))
+                break;
+        }
+        fprintf(log_handle, "Takes %dms to wait for nvidia udev rules completed.\n", i * 20);
+    }
 
     if (cards_n == 1) {
         fprintf(log_handle, "Single card detected\n");
