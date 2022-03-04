@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.9.0~0.20.04.5) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.0~0.20.04.5) focal; urgency=medium
 
-  * 
+  * gpu-manager.c:
+    - Fall back from on-demand to on if nvidia < 450 (LP: #1957094).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 04 Mar 2022 16:31:30 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 18 Jan 2022 08:58:23 +0000
 
 ubuntu-drivers-common (1:0.9.0~0.20.04.4) focal; urgency=medium
 
