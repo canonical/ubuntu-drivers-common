@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.9.5.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.5.1) jammy; urgency=medium
 
-  * 
+  * Change maximum open file descriptors limit for the process in
+    the test suite. This should fix the FTBFS.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 07 Mar 2022 13:40:25 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 07 Mar 2022 17:16:26 +0100
 
 ubuntu-drivers-common (1:0.9.5) jammy; urgency=medium
 
