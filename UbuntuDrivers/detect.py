@@ -76,7 +76,7 @@ def _check_video_abi_compat(apt_cache, package):
     if package.name.startswith('nvidia-driver-'):
         xorg_driver_name = package.name.replace('nvidia-driver-', 'xserver-xorg-video-nvidia-')
         try:
-            package = apt_cache.__getitem__(xorg_driver_name)
+            package = apt_cache[xorg_driver_name]
         except KeyError:
             logging.debug('Cannot find %s package in the cache. Cannot check ABI' % (xorg_driver_name))
             return True
@@ -85,7 +85,7 @@ def _check_video_abi_compat(apt_cache, package):
     depcache = apt_pkg.DepCache(apt_cache)
     candidate = depcache.get_candidate_ver(package)
     records.lookup(candidate.file_list[0])
-    deps = records.__getitem__('Depends').split(', ')
+    deps = records['Depends'].split(', ')
     needs_video_abi = False
     for dep in deps:
         if dep.startswith('xorg-video-abi-'):
@@ -98,7 +98,7 @@ def _check_video_abi_compat(apt_cache, package):
 
     # determine current X.org video driver ABI
     try:
-        xorg_core = apt_cache.__getitem__('xserver-xorg-core')
+        xorg_core = apt_cache['xserver-xorg-core']
     except KeyError:
         logging.debug('xserver-xorg-core not available, cannot check ABI')
         return True
@@ -112,7 +112,7 @@ def _check_video_abi_compat(apt_cache, package):
             xorg_video_abi = provide
 
     if xorg_video_abi:
-        abi_pkg = apt_cache.__getitem__(xorg_video_abi)
+        abi_pkg = apt_cache[xorg_video_abi]
         for dep in abi_pkg.rev_depends_list:
             if dep.parent_pkg.name == package.name:
                 return True
@@ -203,7 +203,7 @@ def packages_for_modalias(apt_cache, modalias):
             for p in bus_map[alias]:
                 pkgs.add(p)
 
-    return [apt_cache.__getitem__(p) for p in pkgs]
+    return [apt_cache[p] for p in pkgs]
 
 
 packages_for_modalias.cache_maps = {}
@@ -248,7 +248,7 @@ def _is_package_from_distro(apt_cache, pkg):
     records.lookup(candidate.file_list[0])
 
     try:
-        origin = records.__getitem__('Origin')
+        origin = records['Origin']
         return (origin == 'Ubuntu')
     except KeyError:
         return False
@@ -476,7 +476,7 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
     for plugin, pkgs in detect_plugin_packages(apt_cache).items():
         for p in pkgs:
             try:
-                apt_p = apt_cache.__getitem__(p)
+                apt_p = apt_cache[p]
                 packages[p] = {
                         'free': _is_package_free(apt_cache, apt_p),
                         'from_distro': _is_package_from_distro(apt_cache, apt_p),
@@ -527,7 +527,7 @@ def _get_headless_no_dkms_metapackage(pkg, apt_cache):
     candidate = 'nvidia-headless-no-dkms-%s' % (candidate_flavour)
 
     try:
-        package = apt_cache.__getitem__(candidate)
+        package = apt_cache[candidate]
         # skip foreign architectures, we usually only want native
         # driver packages
         package_candidate = depcache.get_candidate_ver(package)
@@ -765,7 +765,7 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
     # packages are "manually installed"
     for driver, info in result.items():
         for pkg in info['drivers']:
-            if not _is_manual_install(apt_cache, apt_cache.__getitem__(pkg)):
+            if not _is_manual_install(apt_cache, apt_cache[pkg]):
                 break
         else:
             info['manual_install'] = True
@@ -792,7 +792,7 @@ def get_desktop_package_list(apt_cache, sys_path=None, free_only=False, include_
     # ignore packages which are already installed
     to_install = []
     for p in packages:
-        package_obj = apt_cache.__getitem__(p)
+        package_obj = apt_cache[p]
         if not package_obj.current_ver:
             to_install.append(p)
 
@@ -1074,7 +1074,7 @@ def detect_plugin_packages(apt_cache=None):
 
             for pkg in result:
                 try:
-                    package = apt_cache.__getitem__(pkg)
+                    package = apt_cache[pkg]
                     if _check_video_abi_compat(apt_cache, package):
                         packages.setdefault(fname, []).append(pkg)
                 except KeyError:
@@ -1225,7 +1225,7 @@ def get_linux_image_from_meta(apt_cache, pkg):
     records = apt_pkg.PackageRecords(apt_cache)
 
     try:
-        candidate = depcache.get_candidate_ver(apt_cache.__getitem__(pkg))
+        candidate = depcache.get_candidate_ver(apt_cache[pkg])
     except KeyError:
         logging.debug('No candidate for %s found' % pkg)
         return None
@@ -1291,7 +1291,7 @@ def get_linux_modules_metapackage(apt_cache, candidate):
     linux_modules_candidate = 'linux-modules-nvidia-%s-%s' % (candidate_flavour, linux_flavour)
 
     try:
-        package = apt_cache.__getitem__(linux_modules_candidate)
+        package = apt_cache[linux_modules_candidate]
         # skip foreign architectures, we usually only want native
         package_candidate = depcache.get_candidate_ver(package)
 
@@ -1302,7 +1302,7 @@ def get_linux_modules_metapackage(apt_cache, candidate):
 
             # Let's check if there is a candidate that is specific to
             # our kernel ABI. If not, things will fail.
-            abi_specific = apt_cache.__getitem__(linux_modules_abi_candidate)
+            abi_specific = apt_cache[linux_modules_abi_candidate]
             # skip foreign architectures, we usually only want native
             abi_specific_candidate = depcache.get_candidate_ver(abi_specific)
             if (abi_specific_candidate and
@@ -1337,7 +1337,7 @@ def get_linux_modules_metapackage(apt_cache, candidate):
     logging.debug('Falling back to %s' % (dkms_package))
 
     try:
-        package = apt_cache.__getitem__(dkms_package)
+        package = apt_cache[dkms_package]
         package_candidate = depcache.get_candidate_ver(package)
 
         # skip foreign architectures, we usually only want native

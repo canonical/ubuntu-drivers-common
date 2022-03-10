@@ -132,7 +132,7 @@ class KernelDetection(object):
             else:
                 target_package = image_package
 
-            reverse_dependencies = [dep.parent_pkg.name for dep in self.apt_cache.__getitem__(target_package)
+            reverse_dependencies = [dep.parent_pkg.name for dep in self.apt_cache[target_package]
                                     .rev_depends_list if dep.parent_pkg.name.startswith(prefix)]
 
             if reverse_dependencies:
@@ -141,7 +141,7 @@ class KernelDetection(object):
                 metapackage = ''
                 for candidate in reverse_dependencies:
                     try:
-                        candidate_pkg = self.apt_cache.__getitem__(candidate)
+                        candidate_pkg = self.apt_cache[candidate]
                         if (candidate.startswith(prefix) and (candidate_pkg and
                            (candidate_pkg.current_ver or self.apt_depcache.marked_install(candidate_pkg))) and
                            candidate.replace(prefix, '') > metapackage.replace(prefix, '')):
@@ -151,7 +151,7 @@ class KernelDetection(object):
                 # if we are looking for headers, then we are good
                 if target == 'meta':
                     # Let's get the metapackage
-                    reverse_dependencies = [dep.parent_pkg.name for dep in self.apt_cache.__getitem__(metapackage)
+                    reverse_dependencies = [dep.parent_pkg.name for dep in self.apt_cache[metapackage]
                                             .rev_depends_list if dep.parent_pkg.name.startswith('linux-')]
                     if reverse_dependencies:
                         flavour = self._get_linux_flavour(reverse_dependencies, target_package)

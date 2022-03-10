@@ -268,14 +268,14 @@ def install_gpgpu(args):
     for p in packages:
         candidate = packages[p].get('metapackage')
         print(candidate)
-        if candidate and not cache.__getitem__(candidate).current_ver:
+        if candidate and not cache[candidate].current_ver:
             to_install.append(candidate)
 
     if candidate:
         # Add the matching linux modules package
         modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, candidate)
         print(modules_package)
-        if modules_package and not cache.__getitem__(modules_package).current_ver:
+        if modules_package and not cache[modules_package].current_ver:
             to_install.append(modules_package)
 
     if not to_install:
