@@ -815,7 +815,7 @@ def get_desktop_package_list(apt_cache, sys_path=None, free_only=False, include_
             # Add the matching linux modules package when available
             try:
                 modules_package = get_linux_modules_metapackage(apt_cache, p)
-                if modules_package and not apt_cache[modules_package].installed:
+                if modules_package and not apt_cache[modules_package].current_ver:
                     to_install.append(modules_package)
             except KeyError:
                 pass
