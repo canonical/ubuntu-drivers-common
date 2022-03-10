@@ -85,10 +85,14 @@ def _check_video_abi_compat(apt_cache, package):
     candidate = depcache.get_candidate_ver(package)
 
     needs_video_abi = False
-    for dep_name, dep_ver, dep_op in candidate.depends_list_str.get('Depends'):
-        if dep_name.target_pkg.name.startswith('xorg-video-abi-'):
-            needs_video_abi = True
-            break
+    try:
+        for dep_name, dep_ver, dep_op in candidate.depends_list_str.get('Depends')[0]:
+            if dep_name.startswith('xorg-video-abi-'):
+                needs_video_abi = True
+                break
+    except (KeyError, TypeError):
+        logging.debug('The %s package seems to have no dependencies. Skipping ABI check' % (package))
+        needs_video_abi = False
 
     if not needs_video_abi:
         logging.debug('Skipping check for %s since it does not depend on video abi' % package.name)
@@ -106,7 +110,7 @@ def _check_video_abi_compat(apt_cache, package):
 
     for provides_name, provides_ver, p_version in candidate.provides_list:
         if provides_name.startswith('xorg-video-abi-'):
-            xorg_video_abi = provide
+            xorg_video_abi = provides_name
 
     if xorg_video_abi:
         abi_pkg = apt_cache[xorg_video_abi]
@@ -1226,10 +1230,12 @@ def get_linux_image_from_meta(apt_cache, pkg):
         logging.debug('No candidate for %s found' % pkg)
         return None
 
-    for dep_name, dep_ver, dep_op in candidate.depends_list_str.get('Depends'):
-        if dep_name.startswith('linux-image-'):
-            return dep_name
-
+    try:
+        for dep_name, dep_ver, dep_op in candidate.depends_list_str.get('Depends')[0]:
+            if dep_name.startswith('linux-image-'):
+                return dep_name
+    except (KeyError, TypeError):
+        logging.debug('Could not check dependencies for %s package' % (pkg))
     # if apt_cache[pkg].candidate:
     #     record = apt_cache[pkg].candidate.record
 
