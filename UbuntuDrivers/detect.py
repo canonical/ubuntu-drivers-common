@@ -245,12 +245,8 @@ def _is_package_from_distro(apt_cache, pkg):
     if candidate is None:
         return False
 
-    records = apt_pkg.PackageRecords(apt_cache)
-    records.lookup(candidate.file_list[0])
-
     try:
-        origin = records['Origin']
-        return (origin == 'Ubuntu')
+        return (candidate.file_list[0][0].origin == 'Ubuntu')
     except KeyError:
         return False
 
@@ -532,7 +528,6 @@ def _get_headless_no_dkms_metapackage(pkg, apt_cache):
         # skip foreign architectures, we usually only want native
         # driver packages
         package_candidate = depcache.get_candidate_ver(package)
-        records.lookup(package_candidate.file_list[0])
         if (candidate and
                 package_candidate.arch in ('all', system_architecture)):
             metapackage = candidate

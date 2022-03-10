@@ -187,9 +187,7 @@ class KernelDetection(object):
         try:
             # dependencies = self.apt_cache[linux_image_meta].candidate.\
             #                  record['Depends']
-            records = apt_pkg.PackageRecords(self.apt_cache)
             candidate = self.apt_depcache.get_candidate_ver(self.apt_cache[linux_image_meta])
-            records.lookup(candidate.file_list[0])
             for dep in candidate.depends_list_str.get('Depends'):
                 if dep[0][0].startswith('linux-image'):
                     linux_version = dep[0][0].strip().replace('linux-image-', '')
