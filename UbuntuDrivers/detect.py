@@ -144,7 +144,7 @@ def _apt_cache_modalias_map(apt_cache):
         try:
             candidate = depcache.get_candidate_ver(package)
             records.lookup(candidate.file_list[0])
-            m = records.__getitem__('Modaliases')
+            m = records['Modaliases']
             if not m:
                 continue
         except (KeyError, AttributeError, UnicodeDecodeError):
@@ -229,7 +229,7 @@ def _is_package_free(apt_cache, pkg):
         if not pfile.component:
             # This is probably from the test suite
             try:
-                component = records.__getitem__('Component')
+                component = records['Component']
                 return (component not in ('restricted', 'multiverse'))
             except KeyError:
                 return False
@@ -263,7 +263,7 @@ def _pkg_get_module(apt_cache, pkg):
     records.lookup(candidate.file_list[0])
 
     try:
-        m = records.__getitem__('Modaliases')
+        m = records['Modaliases']
     except (KeyError, AttributeError):
         logging.debug('_pkg_get_module %s: package has no Modaliases header, cannot determine module', pkg.name)
         return None
@@ -286,7 +286,7 @@ def _pkg_get_support(apt_cache, pkg):
     records.lookup(candidate.file_list[0])
 
     try:
-        support = records.__getitem__('Support')
+        support = records['Support']
     except (KeyError, AttributeError):
         logging.debug('_pkg_get_support %s: package has no Support header, cannot determine support level', pkg.name)
         return None
@@ -801,7 +801,7 @@ def get_desktop_package_list(apt_cache, sys_path=None, free_only=False, include_
             records.lookup(candidate.file_list[0])
 
             # See if runtimepm is supported
-            if records.__getitem__('runtimepm'):
+            if records['runtimepm']:
                 # Create a file for nvidia-prime
                 try:
                     pm_fd = open('/run/nvidia_runtimepm_supported', 'w')
