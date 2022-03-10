@@ -163,9 +163,11 @@ class KernelDetection(object):
             # dependencies = self.apt_cache[linux_image_meta].candidate.\
             #                  record['Depends']
             candidate = self.apt_depcache.get_candidate_ver(self.apt_cache[linux_image_meta])
-            for dep in candidate.depends_list_str.get('Depends'):
-                if dep[0][0].startswith('linux-image'):
-                    linux_version = dep[0][0].strip().replace('linux-image-', '')
+            for dep_list in candidate.depends_list_str.get('Depends'):
+                for dep_name, dep_ver, dep_op in dep_list:
+                    if dep_name.startswith('linux-image'):
+                        linux_version = dep_name.strip().replace('linux-image-', '')
+                        break
         except KeyError:
             logging.error('No dependencies can be found for %s' % (linux_image_meta))
             return None
