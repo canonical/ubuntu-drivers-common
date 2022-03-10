@@ -58,31 +58,6 @@ class KernelDetection(object):
         process.communicate()
         return not process.returncode
 
-    def _find_reverse_dependencies(self, package, prefix):
-        # prefix to restrict the searching
-        # package we want reverse dependencies for
-        deps = set()
-        for pkg in self.apt_cache:
-            if (pkg.name.startswith(prefix) and
-                    'extra' not in pkg.name and
-                    pkg.is_installed or
-                    pkg.marked_install):
-
-                dependencies = []
-                if pkg.candidate:
-                    dependencies.extend(pkg.candidate.dependencies)
-                if pkg.installed:
-                    dependencies.extend(pkg.installed.dependencies)
-
-                for ordep in dependencies:
-                    for dep in ordep:
-                        if dep.rawtype != 'Depends':
-                            continue
-                        if dep.name == package:
-                            deps.add(pkg.name)
-
-        return list(deps)
-
     def _get_linux_flavour(self, candidates, image):
         pattern = re.compile(r'linux-image-([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)-(.+)')
         match = pattern.match(image)

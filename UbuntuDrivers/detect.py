@@ -1200,28 +1200,6 @@ def get_linux(apt_cache):
     return kernel_detection.get_linux_metapackage()
 
 
-def find_reverse_dependencies(apt_cache, package, prefix):
-    '''Return the reverse dependencies for a package'''
-    # prefix to restrict the searching
-    # package we want reverse dependencies for
-    deps = set()
-    for pkg in apt_cache:
-        if pkg.name.startswith(prefix):
-            dependencies = []
-            if pkg.candidate:
-                dependencies.extend(pkg.candidate.dependencies)
-            if pkg.installed:
-                dependencies.extend(pkg.installed.dependencies)
-
-            for ordep in dependencies:
-                for dep in ordep:
-                    if dep.rawtype != 'Depends':
-                        continue
-                    if dep.name == package:
-                        deps.add(pkg.name)
-    return list(deps)
-
-
 def get_linux_image_from_meta(apt_cache, pkg):
     depcache = apt_pkg.DepCache(apt_cache)
 
