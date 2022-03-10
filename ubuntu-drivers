@@ -16,7 +16,6 @@ import fnmatch
 import sys
 import os
 import logging
-import apt
 import apt_pkg
 
 import UbuntuDrivers.detect

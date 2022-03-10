@@ -19,8 +19,16 @@ import apt_pkg
 
 from UbuntuDrivers import kerneldetection
 
-system_architecture = apt_pkg.get_architectures()[0]
+system_architecture = ''
 lookup_cache = {}
+
+
+def get_apt_arch():
+    '''Cache system architecture'''
+    global system_architecture
+    if not system_architecture:
+        system_architecture = apt_pkg.get_architectures()[0]
+    return system_architecture
 
 
 def system_modaliases(sys_path=None):
@@ -152,7 +160,7 @@ def _apt_cache_modalias_map(apt_cache):
 
         # skip foreign architectures, we usually only want native
         # driver packages
-        if (package.architecture not in ('all', system_architecture)):
+        if (package.architecture not in ('all', get_apt_arch())):
             continue
 
         if not _check_video_abi_compat(apt_cache, package):
@@ -529,7 +537,7 @@ def _get_headless_no_dkms_metapackage(pkg, apt_cache):
         # driver packages
         package_candidate = depcache.get_candidate_ver(package)
         if (candidate and
-                package_candidate.arch in ('all', system_architecture)):
+                package_candidate.arch in ('all', get_apt_arch())):
             metapackage = candidate
     except KeyError:
         pass
@@ -1290,7 +1298,7 @@ def get_linux_modules_metapackage(apt_cache, candidate):
         # skip foreign architectures, we usually only want native
         package_candidate = depcache.get_candidate_ver(package)
 
-        if (package_candidate and package_candidate.arch in ('all', system_architecture)):
+        if (package_candidate and package_candidate.arch in ('all', get_apt_arch())):
             linux_version = get_linux_version(apt_cache)
             linux_modules_abi_candidate = 'linux-modules-nvidia-%s-%s' % (candidate_flavour, linux_version)
             logging.debug('linux_modules_abi_candidate: %s' % (linux_modules_abi_candidate))
@@ -1301,7 +1309,7 @@ def get_linux_modules_metapackage(apt_cache, candidate):
             # skip foreign architectures, we usually only want native
             abi_specific_candidate = depcache.get_candidate_ver(abi_specific)
             if (abi_specific_candidate and
-                    abi_specific_candidate.arch in ('all', system_architecture)):
+                    abi_specific_candidate.arch in ('all', get_apt_arch())):
                 logging.debug('Found ABI compatible %s' % (linux_modules_abi_candidate))
                 linux_modules_match = linux_modules_candidate
     except KeyError:
@@ -1337,7 +1345,7 @@ def get_linux_modules_metapackage(apt_cache, candidate):
 
         # skip foreign architectures, we usually only want native
         if (package_candidate and
-                package_candidate.arch in ('all', system_architecture)):
+                package_candidate.arch in ('all', get_apt_arch())):
             metapackage = dkms_package
     except KeyError:
         logging.error('No "%s" can be found.', dkms_package)
