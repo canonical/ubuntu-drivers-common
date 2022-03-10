@@ -115,7 +115,6 @@ def _check_video_abi_compat(apt_cache, package):
 
     candidate = depcache.get_candidate_ver(xorg_core)
 
-
     for provides_name, provides_ver, p_version in candidate.provides_list:
         if provides_name.startswith('xorg-video-abi-'):
             xorg_video_abi = provides_name
@@ -513,7 +512,6 @@ def _get_headless_no_dkms_metapackage(pkg, apt_cache):
     whose headless-no-dkms metapackage would be nvidia-headless-no-dkms-$flavour
     '''
     depcache = apt_pkg.DepCache(apt_cache)
-    records = apt_pkg.PackageRecords(apt_cache)
     name = pkg.name
 
     pattern = re.compile('nvidia-([0-9]+)')
