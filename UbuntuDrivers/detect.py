@@ -94,10 +94,11 @@ def _check_video_abi_compat(apt_cache, package):
 
     needs_video_abi = False
     try:
-        for dep_name, dep_ver, dep_op in candidate.depends_list_str.get('Depends')[0]:
-            if dep_name.startswith('xorg-video-abi-'):
-                needs_video_abi = True
-                break
+        for dep_list in candidate.depends_list_str.get('Depends'):
+            for dep_name, dep_ver, dep_op in dep_list:
+                if dep_name.startswith('xorg-video-abi-'):
+                    needs_video_abi = True
+                    break
     except (KeyError, TypeError):
         logging.debug('The %s package seems to have no dependencies. Skipping ABI check' % (package))
         needs_video_abi = False
@@ -815,7 +816,7 @@ def get_desktop_package_list(apt_cache, sys_path=None, free_only=False, include_
             # Add the matching linux modules package when available
             try:
                 modules_package = get_linux_modules_metapackage(apt_cache, p)
-                if modules_package and not apt_cache[modules_package].installed:
+                if modules_package and not apt_cache[modules_package].current_ver:
                     to_install.append(modules_package)
             except KeyError:
                 pass
@@ -1200,28 +1201,6 @@ def get_linux(apt_cache):
     return kernel_detection.get_linux_metapackage()
 
 
-def find_reverse_dependencies(apt_cache, package, prefix):
-    '''Return the reverse dependencies for a package'''
-    # prefix to restrict the searching
-    # package we want reverse dependencies for
-    deps = set()
-    for pkg in apt_cache:
-        if pkg.name.startswith(prefix):
-            dependencies = []
-            if pkg.candidate:
-                dependencies.extend(pkg.candidate.dependencies)
-            if pkg.installed:
-                dependencies.extend(pkg.installed.dependencies)
-
-            for ordep in dependencies:
-                for dep in ordep:
-                    if dep.rawtype != 'Depends':
-                        continue
-                    if dep.name == package:
-                        deps.add(pkg.name)
-    return list(deps)
-
-
 def get_linux_image_from_meta(apt_cache, pkg):
     depcache = apt_pkg.DepCache(apt_cache)
 
@@ -1232,9 +1211,10 @@ def get_linux_image_from_meta(apt_cache, pkg):
         return None
 
     try:
-        for dep_name, dep_ver, dep_op in candidate.depends_list_str.get('Depends')[0]:
-            if dep_name.startswith('linux-image-'):
-                return dep_name
+        for dep_list in candidate.depends_list_str.get('Depends'):
+            for dep_name, dep_ver, dep_op in dep_list:
+                if dep_name.startswith('linux-image-'):
+                    return dep_name
     except (KeyError, TypeError):
         logging.debug('Could not check dependencies for %s package' % (pkg))
     # if apt_cache[pkg].candidate:
