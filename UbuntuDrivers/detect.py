@@ -81,14 +81,12 @@ def _check_video_abi_compat(apt_cache, package):
             logging.debug('Cannot find %s package in the cache. Cannot check ABI' % (xorg_driver_name))
             return True
 
-    records = apt_pkg.PackageRecords(apt_cache)
     depcache = apt_pkg.DepCache(apt_cache)
     candidate = depcache.get_candidate_ver(package)
-    records.lookup(candidate.file_list[0])
-    deps = records['Depends'].split(', ')
+
     needs_video_abi = False
-    for dep in deps:
-        if dep.startswith('xorg-video-abi-'):
+    for dep_name, dep_ver, dep_op in candidate.depends_list_str.get('Depends'):
+        if dep_name.target_pkg.name.startswith('xorg-video-abi-'):
             needs_video_abi = True
             break
 
@@ -104,11 +102,10 @@ def _check_video_abi_compat(apt_cache, package):
         return True
 
     candidate = depcache.get_candidate_ver(xorg_core)
-    records.lookup(candidate.file_list[0])
 
-    provides = records.__getitem__('Provides').split(', ')
-    for provide in provides:
-        if provide.startswith('xorg-video-abi-'):
+
+    for provides_name, provides_ver, p_version in candidate.provides_list:
+        if provides_name.startswith('xorg-video-abi-'):
             xorg_video_abi = provide
 
     if xorg_video_abi:
@@ -1222,7 +1219,6 @@ def find_reverse_dependencies(apt_cache, package, prefix):
 
 def get_linux_image_from_meta(apt_cache, pkg):
     depcache = apt_pkg.DepCache(apt_cache)
-    records = apt_pkg.PackageRecords(apt_cache)
 
     try:
         candidate = depcache.get_candidate_ver(apt_cache[pkg])
@@ -1230,11 +1226,9 @@ def get_linux_image_from_meta(apt_cache, pkg):
         logging.debug('No candidate for %s found' % pkg)
         return None
 
-    records.lookup(candidate.file_list[0])
-
-    for dep in candidate.depends_list_str.get('Depends'):
-        if dep[0][0].startswith('linux-image-'):
-            return dep[0][0]
+    for dep_name, dep_ver, dep_op in candidate.depends_list_str.get('Depends'):
+        if dep_name.startswith('linux-image-'):
+            return dep_name
 
     # if apt_cache[pkg].candidate:
     #     record = apt_cache[pkg].candidate.record
