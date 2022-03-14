@@ -19,7 +19,7 @@ import logging
 
 # from gi.repository import GLib
 from gi.repository import UMockdev
-import apt
+import apt_pkg
 import aptdaemon.test
 
 import UbuntuDrivers.detect
@@ -71,8 +71,10 @@ def gen_fakearchive():
     '''Generate a fake archive for testing'''
 
     a = testarchive.Archive()
-    a.create_deb('vanilla', extra_tags={'Modaliases':
-                 'vanilla(pci:v00001234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)'})
+    a.create_deb('vanilla', component='main',
+                 extra_tags={'Modaliases':
+                             'vanilla(pci:v00001234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)',
+                             'Origin': '', 'Component': 'main'})
     a.create_deb('chocolate', dependencies={'Depends': 'xserver-xorg-core'},
                  extra_tags={'Modaliases':
                  'chocolate(usb:v9876dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'})
@@ -91,21 +93,24 @@ def gen_fakearchive():
     a.create_deb('stracciatella',
                  component='universe',
                  extra_tags={
-                     'Modaliases': 'stracciatella(pci:v98761234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)'})
+                     'Modaliases': 'stracciatella(pci:v98761234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)',
+                     'Component': 'universe'})
 
     # Non-free packages
     a.create_deb('neapolitan',
                  component='restricted',
-                 extra_tags={'Modaliases': 'neapolitan(pci:v67891234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)'})
+                 extra_tags={'Modaliases': 'neapolitan(pci:v67891234d*sv*sd*bc*sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i*)',
+                             'Component': 'restricted'})
 
     a.create_deb('tuttifrutti',
                  component='multiverse',
                  extra_tags={
-                     'Modaliases': 'tuttifrutti(usb:v1234dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)'})
+                     'Modaliases': 'tuttifrutti(usb:v1234dABCDsv*sd*bc00sc*i*, pci:v0000BEEFd*sv*sd*bc*sc*i00)',
+                     'Component': 'multiverse'})
 
     # packages not covered by modalises, for testing detection plugins
-    a.create_deb('special')
-    a.create_deb('picky')
+    a.create_deb('special', component='universe', extra_tags={'Component': 'universe'})
+    a.create_deb('picky', component='universe', extra_tags={'Component': 'universe'})
     a.create_deb('special-uninst', dependencies={'Depends': 'xorg-video-abi-3'})
 
     return a
@@ -219,15 +224,18 @@ class DetectTest(unittest.TestCase):
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             chroot.add_repository(archive.path, True, False)
 
-            # Overwrite sources list generate by aptdaemon testsuite to add
-            # options to apt and ignore unsigned repository
-            sources_list = os.path.join(chroot.path, 'etc/apt/sources.list')
-            with open(sources_list, 'w') as f:
-                f.write(archive.apt_source)
+            # # Overwrite sources list generate by aptdaemon testsuite to add
+            # # options to apt and ignore unsigned repository
+            # sources_list = os.path.join(chroot.path, 'etc/apt/sources.list')
+            # with open(sources_list, 'w') as f:
+            #     f.write(archive.apt_source)
 
-            cache = apt.Cache(rootdir=chroot.path)
-            cache.update()
-            cache.open()
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+
             res = UbuntuDrivers.detect.system_driver_packages(cache, sys_path=self.umockdev.get_sys_dir())
         finally:
             chroot.remove()
@@ -241,7 +249,7 @@ class DetectTest(unittest.TestCase):
 
         self.assertEqual(res['vanilla']['modalias'], 'pci:v00001234d00sv00000001sd00bc00sc00i00')
         self.assertTrue(res['vanilla']['syspath'].endswith('/devices/white'))
-        self.assertTrue(res['vanilla']['from_distro'])
+        self.assertFalse(res['vanilla']['from_distro'])
         self.assertTrue(res['vanilla']['free'])
         self.assertFalse('vendor' in res['vanilla'])
         self.assertFalse('model' in res['vanilla'])
@@ -537,7 +545,12 @@ class DetectTest(unittest.TestCase):
                                extra_tags={})
 
             chroot.add_repository(archive.path, True, False)
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
 
             # Install kernel packages
             for pkg in ('linux-image-5.4.0-25-generic',
@@ -555,7 +568,8 @@ class DetectTest(unittest.TestCase):
                         'linux-generic-hwe-18.04-edge',
                         'linux-generic-hwe-20.04',
                         'linux-image-generic'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             res = UbuntuDrivers.detect.system_driver_packages(cache,
                                                               sys_path=self.umockdev.get_sys_dir())
@@ -600,7 +614,11 @@ class DetectTest(unittest.TestCase):
                                extra_tags={})
 
             chroot.add_repository(archive.path, True, False)
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
             res = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path=self.umockdev.get_sys_dir())
         finally:
             chroot.remove()
@@ -711,7 +729,12 @@ class DetectTest(unittest.TestCase):
                                            'linux-meta-hwe-edge'})
 
             chroot.add_repository(archive.path, True, False)
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
 
             # Install kernel packages
             for pkg in ('linux-image-4.15.0-20-generic',
@@ -729,7 +752,8 @@ class DetectTest(unittest.TestCase):
                         'linux-generic-hwe-18.04',
                         'linux-generic',
                         'linux-generic-hwe-18.04-edge'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             res = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path=self.umockdev.get_sys_dir())
             linux_package = UbuntuDrivers.detect.get_linux(cache)
@@ -848,7 +872,12 @@ class DetectTest(unittest.TestCase):
                                            'linux-meta-hwe-edge'})
 
             chroot.add_repository(archive.path, True, False)
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
 
             # Install kernel packages
             for pkg in ('linux-image-4.15.0-20-generic',
@@ -860,7 +889,8 @@ class DetectTest(unittest.TestCase):
                         'linux-headers-generic-hwe-18.04-edge',
                         'linux-image-generic',
                         'linux-generic'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             res = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache,
                                                                     sys_path=self.umockdev.get_sys_dir())
@@ -1023,7 +1053,12 @@ class DetectTest(unittest.TestCase):
                                extra_tags={})
 
             chroot.add_repository(archive.path, True, False)
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
 
             # Install kernel packages
             for pkg in ('linux-image-5.4.0-25-generic',
@@ -1041,7 +1076,8 @@ class DetectTest(unittest.TestCase):
                         'linux-generic-hwe-18.04-edge',
                         'linux-generic-hwe-20.04',
                         'linux-image-generic'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             res = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache,
                                                                     sys_path=self.umockdev.get_sys_dir())
@@ -1170,7 +1206,12 @@ class DetectTest(unittest.TestCase):
                                extra_tags={})
 
             chroot.add_repository(archive.path, True, False)
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
 
             # Install kernel packages
             for pkg in ('linux-image-5.4.0-25-generic',
@@ -1188,7 +1229,8 @@ class DetectTest(unittest.TestCase):
                         'linux-generic-hwe-18.04-edge',
                         'linux-generic-hwe-20.04',
                         'linux-image-generic'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             res = UbuntuDrivers.detect.system_driver_packages(cache,
                                                               sys_path=self.umockdev.get_sys_dir())
@@ -1403,7 +1445,12 @@ class DetectTest(unittest.TestCase):
                                extra_tags={})
 
             chroot.add_repository(archive.path, True, False)
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
 
             # Install kernel packages
             for pkg in ('linux-image-5.4.0-25-generic',
@@ -1421,7 +1468,8 @@ class DetectTest(unittest.TestCase):
                         'linux-generic-hwe-18.04-edge',
                         'linux-generic-hwe-20.04',
                         'linux-image-generic'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             res = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache,
                                                                     sys_path=self.umockdev.get_sys_dir())
@@ -1455,7 +1503,10 @@ class DetectTest(unittest.TestCase):
                                extra_tags={'Modaliases':
                                            'meta(dmi:*pnXPS137390:*, pci:*sv00001028sd00000962*)'})
             chroot.add_repository(archive.path, True, False)
-            cache = apt.Cache(rootdir=chroot.path)
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
             res = UbuntuDrivers.detect.system_device_specific_metapackages(cache, sys_path=self.umockdev.get_sys_dir())
         finally:
             chroot.remove()
@@ -1482,7 +1533,10 @@ Filename: ./vanilla_1_all.deb
 Description: broken \xEB encoding
 ''')
             chroot.add_repository(archive.path, True, False)
-            cache = apt.Cache(rootdir=chroot.path)
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
             res = UbuntuDrivers.detect.system_driver_packages(cache, sys_path=self.umockdev.get_sys_dir())
         finally:
             chroot.remove()
@@ -1521,7 +1575,10 @@ Description: broken \xEB encoding
             archive.create_deb('nvidia-driver-450-server', dependencies={'Depends': 'xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)'})
             chroot.add_repository(archive.path, True, False)
-            cache = apt.Cache(rootdir=chroot.path)
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
             res = UbuntuDrivers.detect.system_device_drivers(cache, sys_path=self.umockdev.get_sys_dir())
         finally:
             chroot.remove()
@@ -1583,7 +1640,10 @@ Description: broken \xEB encoding
             chroot.add_test_repository()
             archive = gen_fakearchive()
             chroot.add_repository(archive.path, True, False)
-            cache = apt.Cache(rootdir=chroot.path)
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
 
             # add a wrapper modinfo binary
             with open(os.path.join(chroot.path, 'modinfo'), 'w') as f:
@@ -1681,15 +1741,16 @@ exec /sbin/modinfo "$@"
             archive = gen_fakearchive()
             chroot.add_repository(archive.path, True, False)
 
-            # Overwrite sources list generate by aptdaemon testsuite to add
-            # options to apt and ignore unsigned repository
-            sources_list = os.path.join(chroot.path, 'etc/apt/sources.list')
-            with open(sources_list, 'w') as f:
-                f.write(archive.apt_source)
+            # # Overwrite sources list generate by aptdaemon testsuite to add
+            # # options to apt and ignore unsigned repository
+            # sources_list = os.path.join(chroot.path, 'etc/apt/sources.list')
+            # with open(sources_list, 'w') as f:
+            #     f.write(archive.apt_source)
 
-            cache = apt.Cache(rootdir=chroot.path)
-            cache.update()
-            cache.open()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
 
             res = set(UbuntuDrivers.detect.system_driver_packages(
                 cache, sys_path=self.umockdev.get_sys_dir(), freeonly=True))
@@ -1707,15 +1768,16 @@ exec /sbin/modinfo "$@"
             archive = gen_fakearchive()
             chroot.add_repository(archive.path, True, False)
 
-            # Overwrite sources list generate by aptdaemon testsuite to add
-            # options to apt and ignore unsigned repository
-            sources_list = os.path.join(chroot.path, 'etc/apt/sources.list')
-            with open(sources_list, 'w') as f:
-                f.write(archive.apt_source)
+            # # Overwrite sources list generate by aptdaemon testsuite to add
+            # # options to apt and ignore unsigned repository
+            # sources_list = os.path.join(chroot.path, 'etc/apt/sources.list')
+            # with open(sources_list, 'w') as f:
+            #     f.write(archive.apt_source)
 
-            cache = apt.Cache(rootdir=chroot.path)
-            cache.update()
-            cache.open()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
 
             res = UbuntuDrivers.detect.system_device_drivers(cache, sys_path=self.umockdev.get_sys_dir(), freeonly=True)
         finally:
@@ -1735,7 +1797,10 @@ exec /sbin/modinfo "$@"
             archive = gen_fakearchive()
             chroot.add_repository(archive.path, True, False)
 
-            cache = apt.Cache(rootdir=chroot.path)
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
 
             self.assertEqual(UbuntuDrivers.detect.detect_plugin_packages(cache), {})
 
@@ -1839,7 +1904,12 @@ def detect(apt):
                                            'linux-meta-lts-quantal'})
 
             chroot.add_repository(archive.path, True, False)
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
             linux_headers = UbuntuDrivers.detect.get_linux_headers(cache)
             self.assertEqual(linux_headers, '')
 
@@ -1858,7 +1928,8 @@ def detect(apt):
                         'linux-headers-generic-lts-quantal',
                         'linux-generic',
                         'linux-generic-lts-quantal'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             linux_headers = UbuntuDrivers.detect.get_linux_headers(cache)
             self.assertEqual(linux_headers, 'linux-headers-generic-lts-quantal')
@@ -1925,7 +1996,12 @@ def detect(apt):
 
             chroot.add_repository(archive.path, True, False)
 
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
 
             linux = UbuntuDrivers.detect.get_linux(cache)
             self.assertEqual(linux, '')
@@ -1945,7 +2021,8 @@ def detect(apt):
                         'linux-headers-generic-lts-quantal',
                         'linux-generic',
                         'linux-generic-lts-quantal'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             linux = UbuntuDrivers.detect.get_linux(cache)
             self.assertEqual(linux, 'linux-generic-lts-quantal')
@@ -1955,6 +2032,7 @@ def detect(apt):
 
 class ToolTest(unittest.TestCase):
     '''Test ubuntu-drivers tool'''
+    maxDiff = None
 
     @classmethod
     def setUpClass(klass):
@@ -1983,6 +2061,7 @@ APT::Get::AllowUnauthenticated "true";
         # no custom detection plugins by default
         klass.plugin_dir = os.path.join(klass.chroot.path, 'detect')
         os.environ['UBUNTU_DRIVERS_DETECT_DIR'] = klass.plugin_dir
+        os.environ['PYTHONPATH'] = ROOT_DIR
 
         # avoid failures due to unexpected udevadm debug messages if kernel is
         # booted with "debug"
@@ -2278,7 +2357,12 @@ class KernelDectionTest(unittest.TestCase):
 
             chroot.add_repository(archive.path, True, False)
 
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_headers_metapackage()
@@ -2300,7 +2384,8 @@ class KernelDectionTest(unittest.TestCase):
                         'linux-generic-hwe-18.04',
                         'linux-generic',
                         'linux-generic-hwe-18.04-edge'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_headers_metapackage()
@@ -2390,7 +2475,12 @@ class KernelDectionTest(unittest.TestCase):
 
             chroot.add_repository(archive.path, True, False)
 
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux_headers = kernel_detection.get_linux_headers_metapackage()
@@ -2414,7 +2504,8 @@ class KernelDectionTest(unittest.TestCase):
                         'linux-headers-3.8.0-1-powerpc-smp',
                         'linux-headers-3.5.0-19-powerpc64-smp',
                         'linux-headers-3.8.0-2-powerpc64-smp'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux_headers = kernel_detection.get_linux_headers_metapackage()
@@ -2487,7 +2578,12 @@ class KernelDectionTest(unittest.TestCase):
 
             chroot.add_repository(archive.path, True, False)
 
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux_headers = kernel_detection.get_linux_headers_metapackage()
@@ -2509,7 +2605,8 @@ class KernelDectionTest(unittest.TestCase):
                         'linux-lowlatency',
                         'linux-generic',
                         'linux-generic-lts-quantal'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux_headers = kernel_detection.get_linux_headers_metapackage()
@@ -2583,7 +2680,12 @@ class KernelDectionTest(unittest.TestCase):
 
             chroot.add_repository(archive.path, True, False)
 
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_metapackage()
@@ -2600,7 +2702,8 @@ class KernelDectionTest(unittest.TestCase):
                         'linux-headers-generic-hwe-18.04-edge',
                         'linux-image-generic',
                         'linux-generic'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_metapackage()
@@ -2679,7 +2782,12 @@ class KernelDectionTest(unittest.TestCase):
 
             chroot.add_repository(archive.path, True, False)
 
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_metapackage()
@@ -2701,7 +2809,8 @@ class KernelDectionTest(unittest.TestCase):
                         'linux-generic-hwe-18.04',
                         'linux-generic',
                         'linux-generic-hwe-18.04-edge'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_metapackage()
@@ -2744,7 +2853,12 @@ class KernelDectionTest(unittest.TestCase):
 
             chroot.add_repository(archive.path, True, False)
 
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_metapackage()
@@ -2759,7 +2873,8 @@ class KernelDectionTest(unittest.TestCase):
                         'linux-image-3.5.0-19-powerpc64-smp',
                         'linux-image-3.8.0-2-powerpc64-smp',
                         'linux-image-3.0.27-1-ac100'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_metapackage()
@@ -2798,7 +2913,12 @@ class KernelDectionTest(unittest.TestCase):
                                            'linux-meta-lts-quantal'})
             chroot.add_repository(archive.path, True, False)
 
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_metapackage()
@@ -2813,7 +2933,8 @@ class KernelDectionTest(unittest.TestCase):
                         'linux-image-generic-lts-quantal',
                         'linux-image-lowlatency',
                         'linux-lowlatency'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_metapackage()
@@ -2864,7 +2985,12 @@ class KernelDectionTest(unittest.TestCase):
                                            'linux-meta-lts-quantal'})
             chroot.add_repository(archive.path, True, False)
 
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_metapackage()
@@ -2882,7 +3008,8 @@ class KernelDectionTest(unittest.TestCase):
                         'linux-generic-hwe-18.04-edge',
                         'linux-image-generic',
                         'linux-image-generic-lts-quantal'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_metapackage()
@@ -2954,7 +3081,12 @@ class KernelDectionTest(unittest.TestCase):
 
             chroot.add_repository(archive.path, True, False)
 
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_metapackage()
@@ -2976,7 +3108,8 @@ class KernelDectionTest(unittest.TestCase):
                         'linux-generic-hwe-18.04-edge',
                         'linux-generic-hwe-20.04',
                         'linux-image-generic'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_metapackage()
@@ -3067,7 +3200,12 @@ class KernelDectionTest(unittest.TestCase):
 
             chroot.add_repository(archive.path, True, False)
 
-            cache = apt.Cache(rootdir=chroot.path)
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(os.path.join(chroot.path, "var", "lib", "dpkg", "status"))
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_metapackage()
@@ -3094,7 +3232,8 @@ class KernelDectionTest(unittest.TestCase):
                         'linux-generic-hwe-20.04',
                         'linux-oem-20.04',
                         'linux-image-generic'):
-                cache[pkg].mark_install()
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
 
             kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
             linux = kernel_detection.get_linux_metapackage()
