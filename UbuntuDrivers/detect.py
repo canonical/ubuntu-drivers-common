@@ -929,6 +929,31 @@ def _cmp_gfx_alternatives(x, y):
     if not x.endswith('-server') and y.endswith('-server'):
         return 1
 
+    preferred_support = ['PB', 'LTSB']
+
+    x_score = 0
+    y_score = 0
+
+    x_support = _pkg_support_from_cache(x)
+    y_support = _pkg_support_from_cache(y)
+
+    if x_support in preferred_support:
+        x_score += 100
+
+    if y_support in preferred_support:
+        y_score += 100
+
+    if x > y:
+        x_score += 1
+    elif x < y:
+        y_score += 1
+
+    if ((x_score >= 100) or (y_score >= 100)):
+        if x_score > y_score:
+            return 1
+        elif x_score < y_score:
+            return -1
+
     if _pkg_support_from_cache(x) == 'PB' and _pkg_support_from_cache(y) != 'PB':
         return 1
     if _pkg_support_from_cache(x) != 'PB' and _pkg_support_from_cache(y) == 'PB':
