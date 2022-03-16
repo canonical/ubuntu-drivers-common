@@ -1,8 +1,15 @@
-ubuntu-drivers-common (1:0.9.0~0.20.04.7) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.0~0.20.04.7) focal; urgency=medium
 
-  * 
+  * UbuntuDrivers/detect.py:
+    - Handle Production branches (PB) (LP: #1964747).
+    - Always prefer PB and LTSB, and pick the highest of the two
+      whenever possible.
+  * tests/test_ubuntu_drivers.py:
+    - Add test_system_driver_packages_chroot_support_branch_pb and
+      test_system_driver_packages_chroot_support_branch_pb_1, to
+      keep track of our policy on PB and LTSB releases.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 16 Mar 2022 17:16:41 +0100
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 16 Mar 2022 17:36:45 +0100
 
 ubuntu-drivers-common (1:0.9.0~0.20.04.6) focal; urgency=medium
 
