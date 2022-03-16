@@ -589,7 +589,6 @@ class DetectTest(unittest.TestCase):
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)',
                                            'Support': 'LTSB'})
 
-
             archive.create_deb('nvidia-driver-470', dependencies={'Depends': 'xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)',
                                            'Support': 'LTSB'})
@@ -610,7 +609,6 @@ class DetectTest(unittest.TestCase):
             archive.create_deb('nvidia-headless-no-dkms-390',
                                dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
                                extra_tags={})
-
 
             archive.create_deb('nvidia-headless-no-dkms-470',
                                dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
@@ -673,7 +671,6 @@ class DetectTest(unittest.TestCase):
                                dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
                                extra_tags={})
 
-
             archive.create_deb('linux-modules-nvidia-510-generic',
                                dependencies={'Depends': 'linux-modules-nvidia-510-5.4.0-25-generic'},
                                extra_tags={})
@@ -681,7 +678,6 @@ class DetectTest(unittest.TestCase):
             archive.create_deb('linux-modules-nvidia-510-5.4.0-25-generic',
                                dependencies={'Depends': 'linux-image-5.4.0-25-generic'},
                                extra_tags={})
-
 
             # Linux nvidia modules hwe-20.04 flavours
             archive.create_deb('linux-modules-nvidia-450-server-generic-hwe-20.04',
@@ -820,7 +816,6 @@ class DetectTest(unittest.TestCase):
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)',
                                            'Support': 'LTSB'})
 
-
             archive.create_deb('nvidia-driver-470', dependencies={'Depends': 'xorg-video-abi-4'},
                                extra_tags={'Modaliases': 'nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)',
                                            'Support': 'LTSB'})
@@ -845,7 +840,6 @@ class DetectTest(unittest.TestCase):
             archive.create_deb('nvidia-headless-no-dkms-390',
                                dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
                                extra_tags={})
-
 
             archive.create_deb('nvidia-headless-no-dkms-470',
                                dependencies={'Depends': 'xorg-video-abi-3 | xorg-video-abi-4'},
