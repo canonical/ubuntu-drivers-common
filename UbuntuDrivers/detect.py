@@ -14,6 +14,7 @@ import fnmatch
 import subprocess
 import functools
 import re
+import yaml
 
 import apt_pkg
 
@@ -189,6 +190,26 @@ def _apt_cache_modalias_map(apt_cache):
 
     return result2
 
+def package_get_nv_allowing_min_driver(did):
+    '''Get nvidia allowing driver for specific devices.
+
+    did: 0x1234
+    Return the situable nvidia driver version for it.
+    '''
+    path = "/etc/force_install.yaml"
+    min_version = None
+    with open(path, "r") as stream:
+        try:
+            gpus = list(yaml.safe_load(stream)['chips'])
+            for gpu in gpus:
+                if gpu['devid'] == did:
+                    min_version = gpu['minimumbranch']
+                    print("Found a specific nv driver version %s for %s(%s)" %
+                            (min_version, gpu['name'], did))
+                    break
+        except yaml.YAMLError as exc:
+            print(exc)
+    return min_version
 
 def packages_for_modalias(apt_cache, modalias):
     '''Search packages which match the given modalias.
@@ -207,9 +228,23 @@ def packages_for_modalias(apt_cache, modalias):
     pat, bus_map = cache_map.get(modalias.split(':', 1)[0], (None, {}))
     if pat is None or not pat.match(modalias):
         return []
+    vid, did = _get_vendor_model_from_alias(modalias)
+    nvamd = None
+    if vid == "10DE":
+        nvamd = package_get_nv_allowing_min_driver("0x" + did)
+        nvamdn = "nvidia-driver-%s" % nvamd
+        nvamda = "pci:v000010DEd0000%s*" % did
+        bus_map[nvamda] = set([nvamdn])
+
     for alias in bus_map:
         if fnmatch.fnmatchcase(modalias.lower(), alias.lower()):
             for p in bus_map[alias]:
+                try:
+                    if fnmatch.fnmatchcase(nvamda.lower(), alias.lower()):
+                        apt_cache[p]
+                except:
+                    print("%s is not in the pool" % p)
+                    continue
                 pkgs.add(p)
 
     return [apt_cache[p] for p in pkgs]
