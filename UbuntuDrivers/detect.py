@@ -14,7 +14,7 @@ import fnmatch
 import subprocess
 import functools
 import re
-import yaml
+import json
 
 import apt_pkg
 
@@ -22,6 +22,7 @@ from UbuntuDrivers import kerneldetection
 
 system_architecture = ''
 lookup_cache = {}
+customized_supported_gpus_json = '/etc/customized_supported_gpus.json'
 
 
 def get_apt_arch():
@@ -196,19 +197,23 @@ def package_get_nv_allowing_driver(did):
     did: 0x1234
     Return the situable nvidia driver version for it.
     '''
-    path = "/etc/force_install.yaml"
+    path = customized_supported_gpus_json
     version = None
-    with open(path, "r") as stream:
-        try:
-            gpus = list(yaml.safe_load(stream)['chips'])
-            for gpu in gpus:
-                if gpu['devid'] == did:
-                    version = gpu['branch'].split('.')[0]
-                    print("Found a specific nv driver version %s for %s(%s)" %
-                            (version, gpu['name'], did))
-                    break
-        except yaml.YAMLError as exc:
-            print(exc)
+    try:
+        with open(path, "r") as stream:
+            try:
+                gpus = list(json.load(stream)['chips'])
+                for gpu in gpus:
+                    if gpu['devid'] == did:
+                        version = gpu['branch'].split('.')[0]
+                        logging.info("Found a specific nv driver version %s for %s(%s)" %
+                                (version, gpu['name'], did))
+                        break
+            except ValueError as e:
+                logging.debug(e)
+    except IOError as e:
+        logging.debug('package_get_nv_allowing_driver(): Cannot read %s, %s' %
+                  (path, e))
     return version
 
 def packages_for_modalias(apt_cache, modalias):
@@ -243,7 +248,7 @@ def packages_for_modalias(apt_cache, modalias):
                     if fnmatch.fnmatchcase(nvamda.lower(), alias.lower()):
                         apt_cache[p]
                 except:
-                    print("%s is not in the pool" % p)
+                    logging.debug("%s is unavailable." % p)
                     continue
                 pkgs.add(p)
 
@@ -345,20 +350,24 @@ def _is_nv_allowing_runtimepm_supported(alias, ver):
     if vid != "10DE":
         return False
     did = "0x%s" % did
-    path = "/etc/force_install.yaml"
-    with open(path, "r") as stream:
-        try:
-            gpus = list(yaml.safe_load(stream)['chips'])
-            for gpu in gpus:
-                if gpu['devid'] == did and 'runtimepm' in gpu['features']:
-                    if gpu['branch'].split('.')[0] != ver:
-                        print('Candidate version does not match %s != %s' %
-                                (gpu['branch'].split('.')[0], ver))
-                        return False
-                    print("Found runtimepm supports on %s." % did)
-                    return True
-        except yaml.YAMLError as exc:
-            print(exc)
+    path = customized_supported_gpus_json
+    try:
+        with open(path, "r") as stream:
+            try:
+                gpus = list(json.load(stream)['chips'])
+                for gpu in gpus:
+                    if gpu['devid'] == did and 'runtimepm' in gpu['features']:
+                        if gpu['branch'].split('.')[0] != ver:
+                            logging.debug('Candidate version does not match %s != %s' %
+                                    (gpu['branch'].split('.')[0], ver))
+                            return False
+                        logging.info("Found runtimepm supports on %s." % did)
+                        return True
+            except ValueError as e:
+                logging.debug(e)
+    except IOError as e:
+        logging.debug('_is_nv_allowing_runtimepm_supported(): Cannot read %s, %s' %
+                  (path, e))
     return False
 
 def _is_runtimepm_supported(apt_cache, pkg, alias):
