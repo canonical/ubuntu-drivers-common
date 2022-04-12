@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.9.6.1pr71) jammy; urgency=medium
+
+  * https://github.com/tseliot/ubuntu-drivers-common/pull/71
+
+ -- Jeremy Szu <jeremy.szu@canonical.com>  Tue, 12 Apr 2022 14:19:14 +0000
+
 ubuntu-drivers-common (1:0.9.6.1) jammy; urgency=medium
 
   * UbuntuDrivers/detect.py:

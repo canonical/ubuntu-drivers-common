@@ -191,6 +191,7 @@ def _apt_cache_modalias_map(apt_cache):
 
     return result2
 
+
 def package_get_nv_allowing_driver(did):
     '''Get nvidia allowing driver for specific devices.
 
@@ -207,14 +208,15 @@ def package_get_nv_allowing_driver(did):
                     if gpu['devid'] == did:
                         version = gpu['branch'].split('.')[0]
                         logging.info("Found a specific nv driver version %s for %s(%s)" %
-                                (version, gpu['name'], did))
+                                     (version, gpu['name'], did))
                         break
             except ValueError as e:
                 logging.debug(e)
     except IOError as e:
         logging.debug('package_get_nv_allowing_driver(): Cannot read %s, %s' %
-                  (path, e))
+                      (path, e))
     return version
+
 
 def packages_for_modalias(apt_cache, modalias):
     '''Search packages which match the given modalias.
@@ -247,7 +249,8 @@ def packages_for_modalias(apt_cache, modalias):
                 try:
                     if fnmatch.fnmatchcase(nvamda.lower(), alias.lower()):
                         apt_cache[p]
-                except:
+                except Exception as e:
+                    logging.debug(e)
                     logging.debug("%s is unavailable." % p)
                     continue
                 pkgs.add(p)
@@ -342,6 +345,7 @@ def _pkg_get_support(apt_cache, pkg):
 
     return support
 
+
 def _is_nv_allowing_runtimepm_supported(alias, ver):
     '''alias: e.g. pci:v000010DEd000024BAsv0000103Csd000089C6bc03sc00i00'''
     result = re.search('pci:v0000(.*)d0000(.*)sv(.*)', alias)
@@ -359,7 +363,7 @@ def _is_nv_allowing_runtimepm_supported(alias, ver):
                     if gpu['devid'] == did and 'runtimepm' in gpu['features']:
                         if gpu['branch'].split('.')[0] != ver:
                             logging.debug('Candidate version does not match %s != %s' %
-                                    (gpu['branch'].split('.')[0], ver))
+                                          (gpu['branch'].split('.')[0], ver))
                             return False
                         logging.info("Found runtimepm supports on %s." % did)
                         return True
@@ -367,8 +371,9 @@ def _is_nv_allowing_runtimepm_supported(alias, ver):
                 logging.debug(e)
     except IOError as e:
         logging.debug('_is_nv_allowing_runtimepm_supported(): Cannot read %s, %s' %
-                  (path, e))
+                      (path, e))
     return False
+
 
 def _is_runtimepm_supported(apt_cache, pkg, alias):
     '''Check if the package supports runtimepm for the given modalias'''
