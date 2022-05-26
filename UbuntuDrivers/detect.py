@@ -241,18 +241,13 @@ def packages_for_modalias(apt_cache, modalias):
         nvamd = package_get_nv_allowing_driver("0x" + did)
         nvamdn = "nvidia-driver-%s" % nvamd
         nvamda = "pci:v000010DEd0000%s*" % did
-        bus_map[nvamda] = set([nvamdn])
+        for p in apt_cache.packages:
+            if p.get_fullname().split(':')[0] == nvamdn:
+                bus_map[nvamda] = set([nvamdn])
 
     for alias in bus_map:
         if fnmatch.fnmatchcase(modalias.lower(), alias.lower()):
             for p in bus_map[alias]:
-                try:
-                    if fnmatch.fnmatchcase(nvamda.lower(), alias.lower()):
-                        apt_cache[p]
-                except Exception as e:
-                    logging.debug(e)
-                    logging.debug("%s is unavailable." % p)
-                    continue
                 pkgs.add(p)
 
     return [apt_cache[p] for p in pkgs]
