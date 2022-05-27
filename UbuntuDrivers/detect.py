@@ -210,11 +210,12 @@ def package_get_nv_allowing_driver(did):
                         logging.info("Found a specific nv driver version %s for %s(%s)" %
                                      (version, gpu['name'], did))
                         break
-            except ValueError as e:
-                logging.debug(e)
-    except IOError as e:
-        logging.debug('package_get_nv_allowing_driver(): Cannot read %s, %s' %
-                      (path, e))
+            except:
+                logging.debug('package_get_nv_allowing_driver(): unexpected json detected.')
+                pass
+    except:
+        logging.debug('package_get_nv_allowing_driver(): unable to read %s' % path)
+        pass
     return version
 
 
@@ -237,6 +238,7 @@ def packages_for_modalias(apt_cache, modalias):
         return []
     vid, did = _get_vendor_model_from_alias(modalias)
     nvamd = None
+    found = 0
     if vid == "10DE":
         nvamd = package_get_nv_allowing_driver("0x" + did)
         nvamdn = "nvidia-driver-%s" % nvamd
@@ -244,6 +246,9 @@ def packages_for_modalias(apt_cache, modalias):
         for p in apt_cache.packages:
             if p.get_fullname().split(':')[0] == nvamdn:
                 bus_map[nvamda] = set([nvamdn])
+                found = 1
+        if nvamd is not None and not found:
+            logging.debug('%s is not in the package pool.' % nvamdn)
 
     for alias in bus_map:
         if fnmatch.fnmatchcase(modalias.lower(), alias.lower()):
@@ -362,11 +367,12 @@ def _is_nv_allowing_runtimepm_supported(alias, ver):
                             return False
                         logging.info("Found runtimepm supports on %s." % did)
                         return True
-            except ValueError as e:
-                logging.debug(e)
-    except IOError as e:
-        logging.debug('_is_nv_allowing_runtimepm_supported(): Cannot read %s, %s' %
-                      (path, e))
+            except:
+                logging.debug('_is_nv_allowing_runtimepm_supported(): unexpected json detected')
+                pass
+    except:
+        logging.debug('_is_nv_allowing_runtimepm_supported(): unable to read %s' % path)
+        pass
     return False
 
 
