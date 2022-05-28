@@ -210,10 +210,10 @@ def package_get_nv_allowing_driver(did):
                         logging.info("Found a specific nv driver version %s for %s(%s)" %
                                      (version, gpu['name'], did))
                         break
-            except:
+            except Exception:
                 logging.debug('package_get_nv_allowing_driver(): unexpected json detected.')
                 pass
-    except:
+    except Exception:
         logging.debug('package_get_nv_allowing_driver(): unable to read %s' % path)
         pass
     return version
@@ -367,10 +367,10 @@ def _is_nv_allowing_runtimepm_supported(alias, ver):
                             return False
                         logging.info("Found runtimepm supports on %s." % did)
                         return True
-            except:
+            except Exception:
                 logging.debug('_is_nv_allowing_runtimepm_supported(): unexpected json detected')
                 pass
-    except:
+    except Exception:
         logging.debug('_is_nv_allowing_runtimepm_supported(): unable to read %s' % path)
         pass
     return False
