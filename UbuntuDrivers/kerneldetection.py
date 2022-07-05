@@ -83,7 +83,7 @@ class KernelDetection(object):
         version = ''
         prefix = 'linux-%s' % ('headers' if target == 'headers' else 'image')
 
-        pattern = re.compile('linux-image-(.+)-([0-9]+)-(.+)')
+        pattern = re.compile('linux-image-(?:unsigned-)?(.+)-([0-9]+)-(.+)')
 
         for package_name in map(self._filter_cache, self.apt_cache.packages):
             if package_name:
