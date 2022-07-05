@@ -2529,6 +2529,8 @@ int main(int argc, char *argv[]) {
     /* Device information (discrete) */
     struct device discrete_device = { 0 };
 
+    /* Get nvidia driver version */
+    int major, minor, extra;
 
     while (1) {
         static struct option long_options[] =
@@ -3047,6 +3049,13 @@ int main(int argc, char *argv[]) {
         for (i = 0; i < 500; i++, usleep(20000)) {
             if (is_file(UDEV_NVIDIA_COMPLETED))
                 break;
+            /* Get nvidia driver version inside loop because sometime nvidia
+             * driver take longer time to load.
+             */
+            if (get_nvidia_driver_version(&major, &minor, &extra) &&
+                major < 390) {
+                break;
+            }
         }
         fprintf(log_handle, "Takes %dms to wait for nvidia udev rules completed.\n", i * 20);
     }
