@@ -1096,10 +1096,17 @@ def _pkg_support_from_cache(x):
 def _cmp_gfx_alternatives(x, y):
     '''Compare two graphics driver names in terms of preference. (desktop)
 
+    -open always sorts after non-open.
     -server always sorts after non-server.
     LTSB (Long Term Support Branch) always sorts before NFB (New Feature Branch).
     Legacy always sorts before Beta.
     '''
+
+    if x.endswith('-open') and not y.endswith('-open'):
+        return -1
+    if not x.endswith('-open') and y.endswith('-open'):
+        return 1
+
     if x.endswith('-server') and not y.endswith('-server'):
         return -1
     if not x.endswith('-server') and y.endswith('-server'):
