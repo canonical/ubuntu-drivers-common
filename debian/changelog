@@ -1,3 +1,20 @@
+ubuntu-drivers-common (1:0.9.6.2) kinetic; urgency=medium
+
+  [ Jeremy Szu ]
+  * share/hybrid/gpu-manager.c:
+    - Don't wait for nvidia-drm when dealing with nvidia-340
+      (LP: #1973604).
+
+  [ Ēriks Remess ]
+  * UbuntuDrivers/kerneldetection.py:
+    - Detect unsigned kernel images correctly.
+
+  [ Alberto Milone ]
+  * UbuntuDrivers/detect.py:
+    - Make sure -open drivers have a lower priority.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 11 Aug 2022 15:09:46 +0000
+
 ubuntu-drivers-common (1:0.9.6.1) jammy; urgency=medium
 
   * UbuntuDrivers/detect.py:
