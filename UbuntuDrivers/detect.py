@@ -830,9 +830,11 @@ def nvidia_desktop_pre_installation_hook(to_install):
 
     # Enable KMS if nvidia >= 470
     for package_name in to_install:
-        if package_name.startswith('nvidia-driver-'):
+        pattern = re.compile('nvidia-driver-([0-9]+)(.*)')
+        match = pattern.match(package_name)
+        if match:
             try:
-                version = int(package_name.split('-')[-1])
+                version = int(match.group(1))
             except ValueError:
                 pass
             finally:
