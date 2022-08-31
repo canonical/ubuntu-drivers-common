@@ -192,13 +192,17 @@ def _apt_cache_modalias_map(apt_cache):
     return result2
 
 
+def path_get_customized_supported_gpus():
+    return customized_supported_gpus_json
+
+
 def package_get_nv_allowing_driver(did):
     '''Get nvidia allowing driver for specific devices.
 
     did: 0x1234
     Return the situable nvidia driver version for it.
     '''
-    path = customized_supported_gpus_json
+    path = path_get_customized_supported_gpus()
     version = None
     try:
         with open(path, "r") as stream:
@@ -354,7 +358,7 @@ def _is_nv_allowing_runtimepm_supported(alias, ver):
     if vid != "10DE":
         return False
     did = "0x%s" % did
-    path = customized_supported_gpus_json
+    path = path_get_customized_supported_gpus()
     try:
         with open(path, "r") as stream:
             try:
