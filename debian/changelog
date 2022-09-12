@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.9.0~0.20.04.8) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.0~0.20.04.8) focal; urgency=medium
 
-  * 
+  * UbuntuDrivers/detect.py:
+    - Make sure -open drivers have a lower priority (LP: #1988836).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 12 Sep 2022 12:12:05 +0000
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 12 Sep 2022 12:52:21 +0000
 
 ubuntu-drivers-common (1:0.9.0~0.20.04.7) focal; urgency=medium
 
