@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.9.6.2) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.6.2~0.22.04.1) jammy; urgency=medium
 
-  * 
+  * UbuntuDrivers/detect.py:
+    - Make sure -open drivers have a lower priority (LP: #1988836).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 12 Sep 2022 11:32:15 +0000
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 12 Sep 2022 11:39:41 +0000
 
 ubuntu-drivers-common (1:0.9.6.1) jammy; urgency=medium
 
