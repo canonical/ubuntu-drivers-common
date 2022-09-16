@@ -93,3 +93,15 @@ which can do any kind of detection and then return the resulting set of
 packages that apply to the current system. Please note that this cannot rely on
 having root privileges.
 
+## Autopkgtest
+
+For the autopkgtest of ubuntu-drivers, the following command can be used when
+developing test cases:
+
+```shell
+$ PYTHONPATH=. tests/run test_ubuntu_drivers
+```
+
+Testing in a clean environment is always recommended. Using a pbuilder chroot,
+an sbuild chroot, or a direct upload to a PPA, will reduce the chances of tests
+failing due to your specific system.
