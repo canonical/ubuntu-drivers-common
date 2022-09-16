@@ -95,13 +95,13 @@ having root privileges.
 
 ## Autopkgtest
 
-For the autopkgtest of ubuntu-drivers, a useful command can be used when
+For the autopkgtest of ubuntu-drivers, the following command can be used when
 developing test cases:
 
 ```shell
 $ PYTHONPATH=. tests/run test_ubuntu_drivers
 ```
 
-Once the new test case is completed but the others failed, suggest to use a
-clean environment to verify, such as: pbuilder, sbuild or dput it to PPA to
-build.
+Testing in a clean environment is always recommended. Using a pbuilder chroot,
+an sbuild chroot, or a direct upload to a PPA, will reduce the chances of tests
+failing due to your specific system.
