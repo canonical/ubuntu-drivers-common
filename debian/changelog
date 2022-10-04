@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.9.6.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.6.3) kinetic; urgency=medium
 
-  * 
+  * UbuntuDrivers/detect.py:
+    - Fix driver series detection in nvidia_desktop_pre_installation_hook.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 23 Aug 2022 14:42:30 +0000
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 24 Aug 2022 10:41:03 +0000
 
 ubuntu-drivers-common (1:0.9.6.2) kinetic; urgency=medium
 
