@@ -32,16 +32,20 @@ def detect(apt_cache):
         except KeyError:
             pass
         env['LC_ALL'] = 'C'
-        aplay = subprocess.Popen(
-            ['aplay', '-l'], env=env,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            universal_newlines=True)
-        (aplay_out, aplay_err) = aplay.communicate()
-
-        if aplay.returncode != 0:
-            logging.error('aplay -l failed with %i: %s' % (aplay.returncode,
-                          aplay_err))
+        try:
+            aplay = subprocess.Popen(
+                ['aplay', '-l'], env=env,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                universal_newlines=True)
+            (aplay_out, aplay_err) = aplay.communicate()
+            if aplay.returncode != 0:
+                logging.error('aplay -l failed with %i: %s' % (aplay.returncode,
+                              aplay_err))
+                return None
+        except FileNotFoundError:
+            logging.error('aplay command not found')
             return None
+
     except OSError:
         logging.debug('could not open aplay -l. Skipping sl-modem detection')
         return None
