@@ -835,10 +835,9 @@ def nvidia_desktop_pre_installation_hook(to_install):
         if match:
             try:
                 version = int(match.group(1))
+                with_nvidia_kms = version >= 470
             except ValueError:
                 pass
-            finally:
-                with_nvidia_kms = version >= 470
 
     if with_nvidia_kms:
         set_nvidia_kms(1)
