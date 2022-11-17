@@ -1,8 +1,34 @@
-ubuntu-drivers-common (1:0.9.6.4) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.6.4) lunar; urgency=medium
 
-  * 
+  [ Jeremy Szu ]
+  * README, README.md,
+    UbuntuDrivers/detect.py,
+    tests/test_ubuntu_drivers.py:
+    - Add support for force installing the NVIDIA driver on unsupported
+      devices.
+      The device and its target driver branch are both specified in the
+      /etc/custom_supported_gpus.json file.
+      Support for  runtimepm can also be set in the file.
+    - Support autokgstest for force install nvidia.
+    - Add autopkgtest in README section.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 05 Oct 2022 12:37:23 +0000
+  [ gongzhengyang ]
+  * UbuntuDrivers/detect.py:
+    - Fix local variable 'version' being referenced before assignment
+      when catching ValueError.
+
+  [ Alberto Milone ]
+  * tests/test_ubuntu_drivers.py:
+    - Add test_system_open_driver_packages_chroot1(). This makes sure
+    that we keep preferring non-open NVIDIA modules over the -open ones
+    (on the desktop), until the open module catches up on the desktop
+    features.
+
+  [ Jeff Lane ]
+  * detect-plugins/sl-modem.py:
+    - Add some error trapping when aplay is not installed (on servers).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 17 Nov 2022 11:12:05 +0000
 
 ubuntu-drivers-common (1:0.9.6.3) kinetic; urgency=medium
 
