@@ -911,7 +911,6 @@ def get_desktop_package_list(apt_cache, sys_path=None, free_only=False, include_
 
 def nvidia_desktop_pre_installation_hook(to_install):
     '''Applies changes that need to happen before installing the NVIDIA drivers'''
-    with_nvidia_kms = False
 
     # Enable KMS if nvidia >= 470
     for package_name in to_install:
@@ -920,12 +919,11 @@ def nvidia_desktop_pre_installation_hook(to_install):
         if match:
             try:
                 version = int(match.group(1))
-                with_nvidia_kms = version >= 470
             except ValueError:
-                pass
-
-    if with_nvidia_kms:
-        set_nvidia_kms(1)
+                continue
+            if version >= 470:
+                set_nvidia_kms(1)
+                return
 
 
 def nvidia_desktop_post_installation_hook():
