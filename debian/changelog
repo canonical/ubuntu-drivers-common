@@ -1,8 +1,8 @@
-ubuntu-drivers-common (1:0.9.6.4.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.6.4.3) lunar; urgency=medium
 
-  * 
+  * tests/quirkreader-test.py:55:15: E275 missing whitespace after keyword
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 12 Jan 2023 16:42:20 +0000
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 12 Jan 2023 16:43:24 +0000
 
 ubuntu-drivers-common (1:0.9.6.4.2) lunar; urgency=medium
 
