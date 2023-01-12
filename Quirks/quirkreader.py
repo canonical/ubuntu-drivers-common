@@ -46,7 +46,11 @@ class ReadQuirk:
         else:
             if not hasattr(file, 'write'):#it is a file
                 myfile = open(file, 'r', encoding='utf-8')
-                lines_list = myfile.readlines()
+                try:
+                    lines_list = myfile.readlines()
+                    myfile.close()
+                except UnicodeDecodeError:
+                    lines_list = []
                 myfile.close()
             else:#it is a file object
                 lines_list = file.readlines()
