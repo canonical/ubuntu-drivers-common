@@ -52,7 +52,8 @@ class ReadQuirk:
                 except UnicodeDecodeError:
                     lines_list = []
                 myfile.close()
-            else:#it is a file object
+            else:
+                #it is a file object
                 lines_list = file.readlines()
         
         inside_quirk = False
