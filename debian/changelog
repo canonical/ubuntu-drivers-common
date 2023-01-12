@@ -1,8 +1,16 @@
-ubuntu-drivers-common (1:0.9.6.4.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.6.4.1) lunar; urgency=medium
 
-  * 
+  [ Alex-S-H-P ]
+  * UbuntuDrivers/detect.py:
+    - Remove redundant variable.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 22 Nov 2022 14:21:20 +0000
+  [ Alberto Milone ]
+  * UbuntuDrivers/detect.py:
+    - Update regex in nvidia_desktop_pre_installation_hook.
+  * Quirks/quirkreader.py:
+    - Handle UnicodeDecodeError. Fixes FTBFS.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 12 Jan 2023 14:42:42 +0000
 
 ubuntu-drivers-common (1:0.9.6.4) lunar; urgency=medium
 
