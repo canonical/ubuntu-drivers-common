@@ -52,7 +52,7 @@ class QuirkReaderTestCase(unittest.TestCase):
         # self.parser.write(destinationFile, test=True)
         try:
             os.remove(tempFile)
-        except(OSError, IOError):
+        except (OSError, IOError):
             pass
 
     def test_read_quirk1(self):
