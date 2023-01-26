@@ -1,8 +1,13 @@
-ubuntu-drivers-common (1:0.9.6.5) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.6.5) lunar; urgency=medium
 
-  * 
+  * UbuntuDrivers/detect.py:
+    - Make sure -open drivers have a lower priority on gpgpu too.
+  * tests/test_ubuntu_drivers.py:
+    - Fix the description of test_system_open_driver_packages_chroot1.
+    - Add test to make sure that -open drivers have a lower priority on
+      gpgpu too.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Thu, 26 Jan 2023 10:29:23 +0000
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 26 Jan 2023 16:54:26 +0000
 
 ubuntu-drivers-common (1:0.9.6.4.3) lunar; urgency=medium
 
