@@ -2378,7 +2378,7 @@ class DetectTest(unittest.TestCase):
         self.assertEqual(modules_package, 'linux-modules-nvidia-418-server-generic-hwe-20.04')
 
     def test_system_open_driver_packages_chroot1(self):
-        '''system_open_driver_packages() prefer non-open for test package repository'''
+        '''system_driver_packages() prefer non-open for test package repository'''
 
         chroot = aptdaemon.test.Chroot()
         try:
