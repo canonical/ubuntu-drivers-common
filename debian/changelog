@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.9.6.6) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 20 Feb 2023 15:28:57 +0000
+
 ubuntu-drivers-common (1:0.9.6.5) lunar; urgency=medium
 
   * UbuntuDrivers/detect.py:
