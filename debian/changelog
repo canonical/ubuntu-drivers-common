@@ -1,8 +1,13 @@
-ubuntu-drivers-common (1:0.9.6.6) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.7) lunar; urgency=medium
 
-  * 
+  * UbuntuDrivers/detect.py:
+    - Introduce the NvidiaPkgNameInfo class to unify NVIDIA package
+      name parsing. This also fixes the potentially broken
+      _get_headless_no_dkms_metapackage() function, which could
+      return the wrong metapackage, now that the "-open" drivers
+      are in the archive.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 20 Feb 2023 15:28:57 +0000
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 21 Feb 2023 14:38:27 +0000
 
 ubuntu-drivers-common (1:0.9.6.5) lunar; urgency=medium
 
