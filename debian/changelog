@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.9.7.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.7.1) lunar; urgency=medium
 
-  * 
+  * debian/rules:
+    - Limit the test suite to the selected architectures.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 22 Feb 2023 10:02:47 +0000
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 22 Feb 2023 10:49:02 +0000
 
 ubuntu-drivers-common (1:0.9.7) lunar; urgency=medium
 
