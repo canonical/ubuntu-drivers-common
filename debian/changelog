@@ -1,8 +1,10 @@
-ubuntu-drivers-common (1:0.9.6.2~0.22.04.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.6.2~0.22.04.3) jammy; urgency=medium
 
-  * 
+  * UbuntuDrivers/detect.py:
+    - Fix "882:5 local variable 'with_nvidia_kms' is assigned to
+      but never used" FTBFS (triggered by tests/test_static.py).
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 08 Mar 2023 16:01:58 +0000
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 08 Mar 2023 16:03:28 +0000
 
 ubuntu-drivers-common (1:0.9.6.2~0.22.04.2) jammy; urgency=medium
 
