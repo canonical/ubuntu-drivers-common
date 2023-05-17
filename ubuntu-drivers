@@ -380,7 +380,7 @@ def greet(config, gpgpu, free_only, package_list, no_oem, **kwargs):
     if package_list:
         config.package_list = package_list
     if no_oem:
-        config.no_oem = install_oem_meta
+        config.install_oem_meta = False
 
 @greet.command()
 @click.argument('driver', nargs=-1)  # add the name argument
@@ -402,7 +402,7 @@ def install(config, **kwargs):
     if kwargs.get('package_list'):
         config.package_list = ''.join(kwargs.get('package_list'))
     if kwargs.get('no_oem'):
-        config.no_oem = kwargs.get('no_oem')
+        config.install_oem_meta = False
 
     if kwargs.get('driver'):
         config.driver_string = ''.join(kwargs.get('driver'))
