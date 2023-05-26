@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.9.7.2) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 26 May 2023 14:15:10 +0000
+
 ubuntu-drivers-common (1:0.9.7.1) lunar; urgency=medium
 
   * debian/rules:
