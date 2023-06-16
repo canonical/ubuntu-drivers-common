@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.9.7.1.1) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.7.1.1) lunar; urgency=medium
 
-  *
+  * ubuntu-drivers:
+    - Fix --no-oem option stored in wrong config variable (LP: #1966413)
 
- -- Olivier Gayot <olivier.gayot@canonical.com>  Fri, 16 Jun 2023 12:26:54 +0200
+ -- Olivier Gayot <olivier.gayot@canonical.com>  Fri, 16 Jun 2023 12:28:43 +0200
 
 ubuntu-drivers-common (1:0.9.7.1) lunar; urgency=medium
 
