@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.9.6.2~0.22.04.4) UNRELEASED; urgency=medium
+
+  *
+
+ -- Olivier Gayot <olivier.gayot@canonical.com>  Fri, 16 Jun 2023 11:48:15 +0200
+
 ubuntu-drivers-common (1:0.9.6.2~0.22.04.3) jammy; urgency=medium
 
   * UbuntuDrivers/detect.py:
