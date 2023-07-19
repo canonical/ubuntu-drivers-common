@@ -538,7 +538,7 @@ options nvidia-drm modeset=%d\n''' % (value)
     kms_fd.close()
 
 
-def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, include_oem=True):
+def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, include_oem=True, include_libfprint_tod=True):
     '''Get driver packages that are available for the system.
 
     This calls system_modaliases() to determine the system's hardware and then
@@ -590,6 +590,8 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
             if freeonly and not _is_package_free(apt_cache, p):
                 continue
             if not include_oem and fnmatch.fnmatch(p.name, 'oem-*-meta'):
+                continue
+            if not include_libfprint_tod and fnmatch.fnmatch(p.name, 'libfprint-2-tod1-*'):
                 continue
             packages[p.name] = {
                     'modalias': alias,
@@ -917,11 +919,13 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
     return result
 
 
-def get_desktop_package_list(apt_cache, sys_path=None, free_only=False, include_oem=True, driver_string=''):
+def get_desktop_package_list(apt_cache, sys_path=None, free_only=False,
+                             include_oem=True, include_libfprint_tod=True,
+                             driver_string=''):
     '''Return the list of packages that should be installed'''
     packages = system_driver_packages(
         apt_cache, sys_path, freeonly=free_only,
-        include_oem=include_oem)
+        include_oem=include_oem, include_libfprint_tod=include_libfprint_tod)
     packages = auto_install_filter(packages, driver_string)
     if not packages:
         logging.debug('No drivers found for installation.')
@@ -1137,7 +1141,7 @@ def auto_install_filter(packages, drivers_str=''):
     '''
     # any package which matches any of those globs will be accepted
     whitelist = ['bcmwl*', 'pvr-omap*', 'virtualbox-guest*', 'nvidia-*',
-                 'open-vm-tools*', 'oem-*-meta']
+                 'open-vm-tools*', 'oem-*-meta', 'libfprint-2-tod1-*']
 
     # If users specify a driver, use gpgpu_install_filter()
     if drivers_str:
