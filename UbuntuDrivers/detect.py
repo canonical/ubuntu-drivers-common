@@ -294,8 +294,6 @@ def packages_for_modalias(apt_cache, modalias):
         packages_for_modalias.cache_maps[apt_cache_hash] = cache_map
 
     pat, bus_map = cache_map.get(modalias.split(':', 1)[0], (None, {}))
-    if pat is None or not pat.match(modalias):
-        return []
     vid, did = _get_vendor_model_from_alias(modalias)
     nvamd = None
     found = 0
@@ -309,6 +307,10 @@ def packages_for_modalias(apt_cache, modalias):
                 found = 1
         if nvamd is not None and not found:
             logging.debug('%s is not in the package pool.' % nvamdn)
+
+    if not found:
+        if pat is None or not pat.match(modalias):
+            return []
 
     for alias in bus_map:
         if fnmatch.fnmatchcase(modalias.lower(), alias.lower()):
