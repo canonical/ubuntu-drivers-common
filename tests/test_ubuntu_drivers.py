@@ -41,6 +41,7 @@ dbus_address = None
 
 # modalias of an nvidia card covered by our nvidia-* packages
 modalias_nv = 'pci:v000010DEd000010C3sv00003842sd00002670bc03sc03i00'
+modalias_nv_2 = 'pci:v000010DEd00002777sv00003842sd00002670bc03sc03i00'
 
 
 def gen_fakehw():
@@ -53,6 +54,7 @@ def gen_fakehw():
     t.add_device('usb', 'black', None, ['modalias', 'usb:v9876dABCDsv01sd02bc00sc01i05'], [])
     # covered by nvidia-*.deb
     t.add_device('pci', 'graphics', None, ['modalias', modalias_nv], [])
+    t.add_device('pci', 'graphics_2', None, ['modalias', modalias_nv_2], [])
     # not covered by any driver package
     t.add_device('pci', 'grey', None, ['modalias', 'pci:vDEADBEEFd00'], [])
     t.add_device('ssb', 'yellow', None, [], ['MODALIAS', 'pci:vDEADBEEFd00'])
@@ -172,7 +174,8 @@ class DetectTest(unittest.TestCase):
             'pci:v98761234d00sv00000001sd00bc00sc00i00',
             'pci:v67891234d00sv00000001sd00bc00sc00i00',
             'dmi:aaapnXPS137390:a',
-            modalias_nv]))
+            modalias_nv,
+            modalias_nv_2]))
         self.assertTrue(res['pci:vDEADBEEFd00'].endswith('/sys/devices/grey'))
 
     def test_system_driver_packages_performance(self):
@@ -1448,6 +1451,23 @@ class DetectTest(unittest.TestCase):
 }''')
             res_470_no_490 = UbuntuDrivers.detect.system_driver_packages(cache,
                                                                          sys_path=self.umockdev.get_sys_dir())
+
+            # point to a specific version from ubuntu-archive (source list) which ID
+            # doesn't exist in any other old version
+            with open(csg_file, 'w') as csg:
+                csg.write('''{
+ "chips": [
+   {
+     "devid": "0x2777",
+     "name": "TEST 2777",
+     "branch": "520",
+     "features": [
+       "runtimepm"
+     ]
+   }
+ ]
+}''')
+            res_520_only = UbuntuDrivers.detect.system_driver_packages(cache, sys_path=self.umockdev.get_sys_dir())
         finally:
             chroot.remove()
 
@@ -1472,8 +1492,11 @@ class DetectTest(unittest.TestCase):
         self.assertTrue('nvidia-driver-470' in res_470_no_490)
         self.assertFalse('nvidia-driver-490' in res_470_no_490)
         packages = UbuntuDrivers.detect.gpgpu_install_filter(res_470_no_490, 'nvidia')
-        print(set(packages))
         self.assertEqual(set(packages), set(['nvidia-driver-470']))
+
+        self.assertTrue('nvidia-driver-520' in res_520_only)
+        packages = UbuntuDrivers.detect.gpgpu_install_filter(res_520_only, 'nvidia')
+        self.assertEqual(set(packages), set(['nvidia-driver-520']))
 
     def test_system_gpgpu_driver_packages_chroot1(self):
         '''system_gpgpu_driver_packages() for test package repository'''
