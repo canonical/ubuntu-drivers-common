@@ -645,6 +645,42 @@ def _get_vendor_model_from_alias(alias):
     return (None, None)
 
 
+def _get_userspace_lrm_meta(apt_cache, pkg):
+    assert pkg is not None
+    metapackage = None
+    '''Return nvidia-driver-lrm-$flavour metapackage from the main metapackage.
+
+    This is useful to see whether any such package is available.
+    '''
+    depcache = apt_pkg.DepCache(apt_cache)
+    name = pkg.name
+
+    nvidia_info = NvidiaPkgNameInfo(name)
+    if not nvidia_info.is_valid:
+        logging.debug('Unsupported driver detected: %s. Skipping' % name)
+        return metapackage
+
+    if nvidia_info.has_obsolete_name_scheme():
+        logging.debug('Legacy driver detected: %s. Skipping.' % name)
+        return metapackage
+
+    candidate_flavour = nvidia_info.get_flavour()
+    candidate = 'nvidia-driver-lrm-%s' % (candidate_flavour)
+
+    try:
+        package = apt_cache[candidate]
+        # skip foreign architectures, we usually only want native
+        # driver packages
+        package_candidate = depcache.get_candidate_ver(package)
+        if (candidate and
+                package_candidate.arch in ('all', get_apt_arch())):
+            metapackage = candidate
+    except KeyError:
+        pass
+
+    return metapackage
+
+
 def _get_headless_no_dkms_metapackage(pkg, apt_cache):
     assert pkg is not None
     metapackage = None
@@ -956,6 +992,12 @@ def get_desktop_package_list(apt_cache, sys_path=None, free_only=False, include_
                 modules_package = get_linux_modules_metapackage(apt_cache, p)
                 if modules_package and not apt_cache[modules_package].current_ver:
                     to_install.append(modules_package)
+
+                    lrm_meta = _get_userspace_lrm_meta(apt_cache, p)
+                    if lrm_meta and not apt_cache[lrm_meta].current_ver:
+                        # Add the lrm meta and drop the non lrm one
+                        to_install.append(lrm_meta)
+                        to_install.remove(p)
             except KeyError:
                 pass
 
