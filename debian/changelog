@@ -1,8 +1,16 @@
-ubuntu-drivers-common (1:0.9.7.3) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.7.3) mantic; urgency=medium
 
-  * 
+  [ Dirk Su ]
+  * Skip modalias checking if id in force install list.
+  * Add autokgstest for force install nvidia.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Wed, 16 Aug 2023 15:12:30 +0200
+  [ Alberto Milone ]
+  * UbuntuDrivers/detect.py,
+    tests/test_ubuntu_drivers.py:
+    - Add get_userspace_lrm_meta() to get the -lrm meta
+      when available.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 23 Aug 2023 16:30:09 +0200
 
 ubuntu-drivers-common (1:0.9.7.2) mantic; urgency=medium
 
