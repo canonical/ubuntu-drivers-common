@@ -1,8 +1,9 @@
-ubuntu-drivers-common (1:0.9.7.4) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.7.4) mantic; urgency=medium
 
-  * 
+  * UbuntuDrivers/detect.py:
+    - Make it clear that get_userspace_lrm_meta() accepts an actual name.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Mon, 28 Aug 2023 15:42:42 +0000
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 28 Aug 2023 15:48:47 +0000
 
 ubuntu-drivers-common (1:0.9.7.3) mantic; urgency=medium
 
