@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.9.7.4) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 28 Aug 2023 15:42:42 +0000
+
 ubuntu-drivers-common (1:0.9.7.3) mantic; urgency=medium
 
   [ Dirk Su ]
