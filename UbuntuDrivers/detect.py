@@ -647,23 +647,22 @@ def _get_vendor_model_from_alias(alias):
     return (None, None)
 
 
-def get_userspace_lrm_meta(apt_cache, pkg):
-    assert pkg is not None
+def get_userspace_lrm_meta(apt_cache, pkg_name):
+    assert pkg_name is not None
     metapackage = None
     '''Return nvidia-driver-lrm-$flavour metapackage from the main metapackage.
 
     This is useful to see whether any such package is available.
     '''
     depcache = apt_pkg.DepCache(apt_cache)
-    name = pkg.name
 
-    nvidia_info = NvidiaPkgNameInfo(name)
+    nvidia_info = NvidiaPkgNameInfo(pkg_name)
     if not nvidia_info.is_valid:
-        logging.debug('Unsupported driver detected: %s. Skipping' % name)
+        logging.debug('Unsupported driver detected: %s. Skipping' % pkg_name)
         return metapackage
 
     if nvidia_info.has_obsolete_name_scheme():
-        logging.debug('Legacy driver detected: %s. Skipping.' % name)
+        logging.debug('Legacy driver detected: %s. Skipping.' % pkg_name)
         return metapackage
 
     candidate_flavour = nvidia_info.get_flavour()
