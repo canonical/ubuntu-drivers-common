@@ -1761,7 +1761,7 @@ class DetectTest(unittest.TestCase):
         packages = UbuntuDrivers.detect.gpgpu_install_filter(res, 'nvidia')
         # LTSB always wins on the server
         self.assertEqual(set(packages), set([target_name]))
-        lrm_meta = UbuntuDrivers.detect.get_userspace_lrm_meta(cache, cache[target_name])
+        lrm_meta = UbuntuDrivers.detect.get_userspace_lrm_meta(cache, target_name)
         self.assertEqual(lrm_meta, 'nvidia-driver-lrm-535')
         self.assertEqual(linux_package, 'linux-generic-hwe-20.04')
         # Get the linux-modules-nvidia module for the kernel
