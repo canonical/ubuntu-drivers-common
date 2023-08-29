@@ -1,8 +1,10 @@
-ubuntu-drivers-common (1:0.9.7.5) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.7.5) mantic; urgency=medium
 
-  * 
+  * tests/test_ubuntu_drivers.py:
+    - Fix test_system_driver_packages_chroot_core_lrm_1() to match the
+      behaviour in get_userspace_lrm_meta().
 
- -- Alberto Milone <alberto.milone@canonical.com>  Tue, 29 Aug 2023 12:23:11 +0000
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 29 Aug 2023 12:25:56 +0000
 
 ubuntu-drivers-common (1:0.9.7.4) mantic; urgency=medium
 
