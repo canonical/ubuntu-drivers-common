@@ -280,6 +280,12 @@ def install_gpgpu(args):
         if modules_package and not cache[modules_package].current_ver:
             to_install.append(modules_package)
 
+            lrm_meta = UbuntuDrivers.detect.get_userspace_lrm_meta(apt_cache, p)
+            if lrm_meta and not apt_cache[lrm_meta].current_ver:
+                # Add the lrm meta and drop the non lrm one
+                to_install.append(lrm_meta)
+                to_install.remove(p)
+
     if not to_install:
         print('All the available drivers are already installed.')
         return 0
