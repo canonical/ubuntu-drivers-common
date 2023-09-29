@@ -1,8 +1,14 @@
-ubuntu-drivers-common (1:0.9.7.6) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.7.6) mantic; urgency=medium
 
-  * 
+  [ Dimitri John Ledkov ]
+  * Add broadcom-sta-dkms to allowlist. (LP: #2013236)
+    In Lunar it was identified that both bcmwl and broadcom-sta-dkms are
+    identical and maintained in the archive twice. They were merged,
+    taking the Debian name as the new default one. However, allowlist was
+    forgotten to be updated in ubuntu-drivers to actually offer default
+    install of broadcom-sta-dkms.
 
- -- Alberto Milone <alberto.milone@canonical.com>  Fri, 29 Sep 2023 15:18:22 +0000
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 29 Sep 2023 15:19:31 +0000
 
 ubuntu-drivers-common (1:0.9.7.5) mantic; urgency=medium
 
