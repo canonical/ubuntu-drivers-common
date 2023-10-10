@@ -3,8 +3,8 @@
 PROGRAM = gpu-manager
 PROGRAM_FILES = gpu-manager.c
 CC = gcc
-CFLAGS =-g -Wall $(shell pkg-config --cflags libpci libdrm libkmod) -Ijson-parser json-parser/json.c
-LDFLAGS =$(shell pkg-config --libs libpci libdrm libkmod) -lm
+CFLAGS =-g -Wall $(shell pkg-config --cflags libpci libdrm libkmod libudev) -Ijson-parser json-parser/json.c
+LDFLAGS =$(shell pkg-config --libs libpci libdrm libkmod libudev) -lm
 
 all: build
 
