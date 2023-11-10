@@ -24,6 +24,26 @@ system_architecture = ''
 lookup_cache = {}
 custom_supported_gpus_json = '/etc/custom_supported_gpus.json'
 
+class MIPICamPkgNameInfo(object):
+    '''Class to process MIPI camera package names'''
+    def __init__(self, pkg_name):
+        self._pkg_name = pkg_name
+        self.is_valid = False
+        self._process_name(self._pkg_name)
+
+    def _process_name(self, name):
+        matches = ['ipu6', 'ivsc', 'usbio']
+        if all(x not in name for x in matches):
+            logging.debug('MIPICamPkgNameInfo: %s is not an MIPI camera package. Skipping', name)
+            return
+
+        pattern = re.compile('linux-modules-([a-z0-9]+)(.*)')
+        match = pattern.match(name)
+        if match:
+            self._flavour = match.group(1)
+            self.is_valid = True
+    def get_flavour(self):
+        return self._flavour
 
 class NvidiaPkgNameInfo(object):
     '''Class to process NVIDIA package names'''
@@ -540,7 +560,7 @@ options nvidia-drm modeset=%d\n''' % (value)
     kms_fd.close()
 
 
-def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, include_oem=True):
+def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, include_oem=True, include_mipi_cam=True):
     '''Get driver packages that are available for the system.
 
     This calls system_modaliases() to determine the system's hardware and then
@@ -593,6 +613,10 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
                 continue
             if not include_oem and fnmatch.fnmatch(p.name, 'oem-*-meta'):
                 continue
+            if not include_mipi_cam and (fnmatch.fnmatch(p.name, 'linux-modules-ipu6*') or
+                                         fnmatch.fnmatch(p.name, 'linux-modules-ivsc*') or
+                                         fnmatch.fnmatch(p.name, 'linux-modules-usbio*')):
+                continue
             packages[p.name] = {
                     'modalias': alias,
                     'syspath': syspath,
@@ -619,6 +643,20 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
         recommended = nvidia_packages[-1]
         for p in nvidia_packages:
             packages[p]['recommended'] = (p == recommended)
+
+    # Add "recommended" flags for MIPI camera alternatives
+    for pattern in ['linux-modules-ipu6', 'linux-modules-ivsc', 'linux-modules-usbio']:
+        mipi_packages = [p for p in packages if p.startswith(pattern)]
+        if mipi_packages:
+            # Create a cache for looking up drivers to pick the best
+            # candidate
+            for key, value in packages.items():
+                if key.startswith(pattern):
+                    lookup_cache[key] = value
+            mipi_packages.sort(key=functools.cmp_to_key(_cmp_mipi_alternatives))
+            recommended = mipi_packages[-1]
+            for p in mipi_packages:
+                packages[p]['recommended'] = (p == recommended)
 
     # add available packages which need custom detection code
     for plugin, pkgs in detect_plugin_packages(apt_cache).items():
@@ -954,11 +992,13 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
     return result
 
 
-def get_desktop_package_list(apt_cache, sys_path=None, free_only=False, include_oem=True, driver_string=''):
+def get_desktop_package_list(apt_cache, sys_path=None, free_only=False,
+                             include_oem=True, include_mipi_cam=True,
+                             driver_string=''):
     '''Return the list of packages that should be installed'''
     packages = system_driver_packages(
         apt_cache, sys_path, freeonly=free_only,
-        include_oem=include_oem)
+        include_oem=include_oem, include_mipi_cam=include_mipi_cam)
     packages = auto_install_filter(packages, driver_string)
     if not packages:
         logging.debug('No drivers found for installation.')
@@ -1180,7 +1220,8 @@ def auto_install_filter(packages, drivers_str=''):
     '''
     # any package which matches any of those globs will be accepted
     whitelist = ['bcmwl*', 'pvr-omap*', 'virtualbox-guest*', 'nvidia-*',
-                 'open-vm-tools*', 'oem-*-meta', 'broadcom-sta-dkms']
+                 'open-vm-tools*', 'oem-*-meta', 'broadcom-sta-dkms',
+                 'linux-modules-ipu6*', 'linux-modules-ivsc*', 'linux-modules-usbio*']
 
     # If users specify a driver, use gpgpu_install_filter()
     if drivers_str:
@@ -1376,6 +1417,13 @@ def _cmp_gfx_alternatives_gpgpu(x, y):
     assert x == y
     return 0
 
+def _cmp_mipi_alternatives(x, y):
+    if x < y:
+        return -1
+    if x > y:
+        return 1
+    assert x == y
+    return 0
 
 def _add_builtins(drivers):
     '''Add builtin driver alternatives'''
@@ -1465,11 +1513,12 @@ def get_linux_modules_metapackage(apt_cache, candidate):
     depcache = apt_pkg.DepCache(apt_cache)
 
     nvidia_info = NvidiaPkgNameInfo(candidate)
-    if not nvidia_info.is_valid:
-        logging.debug('Non NVIDIA linux-modules packages are not supported at this time: %s. Skipping' % candidate)
+    mipicam_info = MIPICamPkgNameInfo(candidate)
+    if not nvidia_info.is_valid and not mipicam_info.is_valid:
+        logging.debug('Non NVIDIA and MIPI camera linux-modules packages are not supported at this time: %s. Skipping' % candidate)
         return metapackage
 
-    if nvidia_info.has_obsolete_name_scheme():
+    if nvidia_info.is_valid and nvidia_info.has_obsolete_name_scheme():
         logging.debug('Legacy driver detected: %s. Skipping.' % candidate)
         return metapackage
 
@@ -1483,8 +1532,12 @@ def get_linux_modules_metapackage(apt_cache, candidate):
         logging.debug('No linux-image can be found for %s. Skipping.' % candidate)
         return metapackage
 
-    candidate_flavour = nvidia_info.get_flavour()
-    linux_modules_candidate = 'linux-modules-nvidia-%s-%s' % (candidate_flavour, linux_flavour)
+    if nvidia_info.is_valid:
+        candidate_flavour = nvidia_info.get_flavour()
+        linux_modules_candidate = 'linux-modules-nvidia-%s-%s' % (candidate_flavour, linux_flavour)
+    if mipicam_info.is_valid:
+        candidate_flavour = mipicam_info.get_flavour()
+        linux_modules_candidate = 'linux-modules-%s-%s' % (candidate_flavour, linux_flavour)
 
     try:
         package = apt_cache[linux_modules_candidate]
@@ -1493,7 +1546,10 @@ def get_linux_modules_metapackage(apt_cache, candidate):
 
         if (package_candidate and package_candidate.arch in ('all', get_apt_arch())):
             linux_version = get_linux_version(apt_cache)
-            linux_modules_abi_candidate = 'linux-modules-nvidia-%s-%s' % (candidate_flavour, linux_version)
+            if nvidia_info.is_valid:
+                linux_modules_abi_candidate = 'linux-modules-nvidia-%s-%s' % (candidate_flavour, linux_version)
+            if mipicam_info.is_valid:
+                linux_modules_abi_candidate = 'linux-modules-%s-%s' % (candidate_flavour, linux_version)
             logging.debug('linux_modules_abi_candidate: %s' % (linux_modules_abi_candidate))
 
             # Let's check if there is a candidate that is specific to
@@ -1514,12 +1570,17 @@ def get_linux_modules_metapackage(apt_cache, candidate):
     if linux_modules_match:
         # Look for the metapackage in the reverse
         # dependencies
-        reverse_deps = [dep.parent_pkg.name for dep in apt_cache[linux_modules_match].rev_depends_list
-                        if dep.parent_pkg.name.startswith('linux-modules-nvidia-')]
-
+        if nvidia_info.is_valid:
+            reverse_deps = [dep.parent_pkg.name for dep in apt_cache[linux_modules_match].rev_depends_list
+                            if dep.parent_pkg.name.startswith('linux-modules-nvidia-')]
+            modules_candidate = 'linux-modules-nvidia-%s-%s' % (candidate_flavour,
+                                                                get_linux_image(apt_cache).replace('linux-image-', ''))
+        if mipicam_info.is_valid:
+            reverse_deps = [dep.parent_pkg.name for dep in apt_cache[linux_modules_match].rev_depends_list
+                            if dep.parent_pkg.name.startswith('linux-modules-%s' % candidate_flavour)]
+            modules_candidate = 'linux-modules-%s-%s' % (candidate_flavour,
+                                                                get_linux_image(apt_cache).replace('linux-image-', ''))
         pick = ''
-        modules_candidate = 'linux-modules-nvidia-%s-%s' % (candidate_flavour,
-                                                            get_linux_image(apt_cache).replace('linux-image-', ''))
         for dep in reverse_deps:
             if dep == modules_candidate:
                 pick = dep
@@ -1527,6 +1588,9 @@ def get_linux_modules_metapackage(apt_cache, candidate):
             metapackage = pick
             return metapackage
 
+    # There is not DKMS package for MIPI camera, skip it
+    if mipicam_info.is_valid:
+        return metapackage
     # If no linux-modules-nvidia package is available for the current kernel
     # we should install the relevant DKMS package
     dkms_package = 'nvidia-dkms-%s' % candidate_flavour
