@@ -125,7 +125,7 @@ Architecture: %s
                 f.write('%s: %s\n' % (k, v))
 
         for path, contents in files.items():
-            if type(contents) == bytes:
+            if isinstance(contents, bytes):
                 mode = 'wb'
             else:
                 mode = 'w'
