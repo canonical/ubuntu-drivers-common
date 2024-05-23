@@ -507,10 +507,10 @@ def _get_db_name(syspath, alias):
     Values are None if unknown.
     '''
     try:
-        out = subprocess.check_output(['udevadm', 'hwdb', '--test=' + alias],
+        out = subprocess.check_output(['systemd-hwdb', 'query', alias],
                                       universal_newlines=True)
     except (OSError, subprocess.CalledProcessError) as e:
-        logging.debug('_get_db_name(%s, %s): udevadm hwdb failed: %s', syspath, alias, str(e))
+        logging.debug('_get_db_name(%s, %s): systemd-hwdb failed: %s', syspath, alias, str(e))
         return (None, None)
 
     logging.debug('_get_db_name: output\n%s\n', out)
