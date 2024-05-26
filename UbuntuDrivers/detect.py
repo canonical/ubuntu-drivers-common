@@ -48,7 +48,7 @@ class NvidiaPkgNameInfo(object):
         # Obsolete naming such as nvidia-340
         if match:
             self._obsolete_name_scheme = True
-            self._major_ver = match.group(1)
+            self._major_ver = int(match.group(1))
             self._flavour = self._major_ver
             self.is_valid = True
             return
