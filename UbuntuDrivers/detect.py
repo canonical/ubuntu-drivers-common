@@ -1180,7 +1180,7 @@ def auto_install_filter(packages, drivers_str=''):
     '''
     # any package which matches any of those globs will be accepted
     whitelist = ['bcmwl*', 'pvr-omap*', 'virtualbox-guest*', 'nvidia-*',
-                 'open-vm-tools*', 'oem-*-meta', 'broadcom-sta-dkms']
+                 'open-vm-tools*', 'hwe-*-meta', 'oem-*-meta', 'broadcom-sta-dkms']
 
     # If users specify a driver, use gpgpu_install_filter()
     if drivers_str:
