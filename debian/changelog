@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.9.7.7) UNRELEASED; urgency=medium
+
+  * 
+
+ -- Kuba Pawlak <kuba.pawlak@canonical.com>  Fri, 05 Jul 2024 11:59:32 +0200
+
 ubuntu-drivers-common (1:0.9.7.6) mantic; urgency=medium
 
   [ Dimitri John Ledkov ]
