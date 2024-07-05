@@ -1,3 +1,3 @@
 Tests: system
-Depends: ubuntu-drivers-common, alsa-utils, apport, python3-gi, gir1.2-umockdev-1.0, umockdev, libgl1-mesa-glx, linux-headers-generic | linux-headers, liblocale-gettext-perl
+Depends: ubuntu-drivers-common, alsa-utils, apport, python3-gi, gir1.2-umockdev-1.0, umockdev, libglx-mesa0, linux-headers-generic | linux-headers, liblocale-gettext-perl
 Restrictions: needs-root
