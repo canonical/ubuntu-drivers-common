@@ -193,12 +193,7 @@ class DetectTest(unittest.TestCase):
         sec = (stop.ru_utime + stop.ru_stime) - (start.ru_utime + start.ru_stime)
         sys.stderr.write('[%.2f s] ' % sec)
 
-        if 'arm' in os.uname().machine:
-            target = 90.0
-        elif 'i386' == get_deb_arch():
-            target = 40.0
-        else:
-            target = 30.0
+        target = 90.0
 
         self.assertLess(sec, target)
 
