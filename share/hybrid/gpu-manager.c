@@ -63,7 +63,7 @@
 #include <libkmod.h>
 #include "xf86drm.h"
 #include "xf86drmMode.h"
-#include "json.h"
+#include "json-parser/json.h"
 
 static inline void freep(void *);
 static inline void fclosep(FILE **);
