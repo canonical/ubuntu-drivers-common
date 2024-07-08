@@ -1,19 +1,14 @@
 #!/usr/bin/make -f
 
-PROGRAM = gpu-manager
-PROGRAM_FILES = gpu-manager.c
-CC = gcc
-CFLAGS =-g -Wall $(shell pkg-config --cflags libpci libdrm libkmod) -Ijson-parser json-parser/json.c
-LDFLAGS =$(shell pkg-config --libs libpci libdrm libkmod) -lm
+PROG = gpu-manager
+OBJ = gpu-manager.o json-parser/json.o
 
-all: build
+override CFLAGS += -Wall $(shell pkg-config --cflags libpci libdrm libkmod)
+override LDLIBS += $(shell pkg-config --libs libpci libdrm libkmod) -lm
 
-gpu-manager: gpu-manager.o
-	$(CC) $(CFLAGS) gpu-manager.o $(LDFLAGS) -o gpu-manager
+all: $(PROG)
 
-gpu-manager.o:
-	$(CC) $(CFLAGS) -c gpu-manager.c
+$(PROG): $(OBJ)
 
-build: gpu-manager
 clean:
-	@rm -f $(PROGRAM) $(PROGRAM).o json.o
+	rm -f $(PROG) $(OBJ)
