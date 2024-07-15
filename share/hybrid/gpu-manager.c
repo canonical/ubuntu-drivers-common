@@ -2986,6 +2986,27 @@ int main(int argc, char *argv[]) {
         pci_cleanup(pacc);
         pacc = NULL;
     }
+
+    /* Probe graphic drivers earlier since some graphic related application
+     * (e.g. gdm, mutter) rely on udev rules to apply extra configurations.
+     */
+    if (has_nvidia && !nvidia_blacklisted && !is_module_loaded("nvidia"))
+        load_module("nvidia");
+
+    /* Make sure the udev rules are applied for graphic cards.
+     *
+     * Also make sure to do this before trying to open /dev/dri/card*
+     * because doing so too early may trigger a nvidia bug:
+     * https://forums.developer.nvidia.com/t/545-29-06-18-1-flip-event-timeout-error-on-startup-shutdown-and-sometimes-suspend-wayland-unusable/274788
+     */
+    if (has_nvidia && !nvidia_blacklisted) {
+        for (i = 0; i < 500; i++, usleep(20000)) {
+            if (is_file(UDEV_NVIDIA_COMPLETED))
+                break;
+        }
+        fprintf(log_handle, "Takes %dms to wait for nvidia udev rules completed.\n", i * 20);
+    }
+
     /* Add information about connected outputs */
     add_connected_outputs_info(current_devices, cards_n);
 
@@ -3026,12 +3047,6 @@ int main(int argc, char *argv[]) {
     fprintf(log_handle, "Has nvidia? %s\n", (has_nvidia ? "yes" : "no"));
     fprintf(log_handle, "How many cards? %d\n", cards_n);
 
-    /* Probe graphic drivers earlier since some graphic related application
-     * (e.g. gdm, mutter) rely on udev rules to apply extra configurations.
-     */
-    if (has_nvidia && !nvidia_blacklisted && !is_module_loaded("nvidia"))
-        load_module("nvidia");
-
     /* See if the system has changed */
     has_changed = has_system_changed(old_devices,
                                      current_devices,
@@ -3041,15 +3056,6 @@ int main(int argc, char *argv[]) {
 
     if (has_changed)
         fprintf(log_handle, "System configuration has changed\n");
-
-    /* Make sure the udev rules are applied for graphic cards. */
-    if (has_nvidia && !nvidia_blacklisted) {
-        for (i = 0; i < 500; i++, usleep(20000)) {
-            if (is_file(UDEV_NVIDIA_COMPLETED))
-                break;
-        }
-        fprintf(log_handle, "Takes %dms to wait for nvidia udev rules completed.\n", i * 20);
-    }
 
     if (cards_n == 1) {
         fprintf(log_handle, "Single card detected\n");
