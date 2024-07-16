@@ -1,5 +1,10 @@
 # Rule installed by ubuntu-drivers-common
 
+# Remove SimpleDRM device when nvidia-drm loads.
+# This normally happens automatically for DRM devices that also register
+# a framebuffer device, but that's not the case yet for the nvidia driver.
+ACTION=="add", SUBSYSTEM=="module", KERNEL=="nvidia_drm", TEST=="/sys/devices/platform/simple-framebuffer.0/drm/card0", RUN+="/bin/rm /dev/dri/card0"
+
 # Create a file with the card details for gpu-manager
 ACTION=="add", SUBSYSTEM=="drm", DEVPATH=="*/drm/card*", RUN+="/sbin/u-d-c-print-pci-ids"
 
