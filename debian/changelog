@@ -1,3 +1,16 @@
+ubuntu-drivers-common (1:0.9.7.7~22.04.1) UNRELEASED; urgency=medium
+
+  * SRU (LP: #2076245)
+  * share/hybrid/71-u-d-c-gpu-detection.rules
+    - Remove SimpleDRM device when nvidia-drm loads (LP: #2060268)
+  * share/hybrid/gpu-manager.c
+    - Wait for nvidia-drm to settle before opening /dev/dri/card*
+    (LP: #2060268)
+  * share/hybrid/gpu-manager.c
+    - Skip to wait nvidia-drm for nvidia-340 (LP: #1973604)
+
+ -- Kuba Pawlak <kuba.pawlak@canonical.com>  Wed, 07 Aug 2024 13:45:38 +0200
+
 ubuntu-drivers-common (1:0.9.6.2~0.22.04.4) jammy; urgency=medium
 
   * ubuntu-drivers:
