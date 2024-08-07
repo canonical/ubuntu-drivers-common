@@ -1,5 +1,6 @@
 ubuntu-drivers-common (1:0.9.7.7) UNRELEASED; urgency=medium
 
+  * SRU (LP: #2076245)
   * debian/tests/control
     - change test dependencies from libgl1-mesa-glx to libglx-mesa0
       (LP: #2071829)
@@ -15,9 +16,9 @@ ubuntu-drivers-common (1:0.9.7.7) UNRELEASED; urgency=medium
   * share/hybrid:
     - Change Makefile to respect CC and CFLAGS environment variables
   * share/hybrid/71-u-d-c-gpu-detection.rules
-    Remove SimpleDRM device when nvidia-drm loads
-  *  share/hybrid/gpu-manager.c  
-    Wait for nvidia-drm to settle before opening /dev/dri/card*
+    - Remove SimpleDRM device when nvidia-drm loads (LP: #2060268)
+  * share/hybrid/gpu-manager.c  
+    - Wait for nvidia-drm to settle before opening /dev/dri/card* (LP: #2060268)
 
  -- Kuba Pawlak <kuba.pawlak@canonical.com>  Wed, 24 Jul 2024 11:00:58 +0200
 
