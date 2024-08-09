@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.9.7.7) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.7.7) oracular; urgency=medium
 
   * SRU (LP: #2076245)
   * debian/tests/control
