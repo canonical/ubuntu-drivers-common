@@ -14,6 +14,7 @@ import fnmatch
 import subprocess
 import functools
 import re
+import json
 
 import apt_pkg
 
@@ -21,6 +22,7 @@ from UbuntuDrivers import kerneldetection
 
 system_architecture = ''
 lookup_cache = {}
+custom_supported_gpus_json = '/etc/custom_supported_gpus.json'
 
 
 class NvidiaPkgNameInfo(object):
@@ -246,6 +248,37 @@ def _apt_cache_modalias_map(apt_cache):
     return result2
 
 
+def path_get_custom_supported_gpus():
+    return custom_supported_gpus_json
+
+
+def package_get_nv_allowing_driver(did):
+    '''Get nvidia allowing driver for specific devices.
+
+    did: 0x1234
+    Return the situable nvidia driver version for it.
+    '''
+    path = path_get_custom_supported_gpus()
+    version = None
+    try:
+        with open(path, "r") as stream:
+            try:
+                gpus = list(json.load(stream)['chips'])
+                for gpu in gpus:
+                    if gpu['devid'] == did:
+                        version = gpu['branch'].split('.')[0]
+                        logging.info("Found a specific nv driver version %s for %s(%s)" %
+                                     (version, gpu['name'], did))
+                        break
+            except Exception:
+                logging.debug('package_get_nv_allowing_driver(): unexpected json detected.')
+                pass
+    except Exception:
+        logging.debug('package_get_nv_allowing_driver(): unable to read %s' % path)
+        pass
+    return version
+
+
 def packages_for_modalias(apt_cache, modalias):
     '''Search packages which match the given modalias.
 
@@ -261,8 +294,24 @@ def packages_for_modalias(apt_cache, modalias):
         packages_for_modalias.cache_maps[apt_cache_hash] = cache_map
 
     pat, bus_map = cache_map.get(modalias.split(':', 1)[0], (None, {}))
-    if pat is None or not pat.match(modalias):
-        return []
+    vid, did = _get_vendor_model_from_alias(modalias)
+    nvamd = None
+    found = 0
+    if vid == "10DE":
+        nvamd = package_get_nv_allowing_driver("0x" + did)
+        nvamdn = "nvidia-driver-%s" % nvamd
+        nvamda = "pci:v000010DEd0000%s*" % did
+        for p in apt_cache.packages:
+            if p.get_fullname().split(':')[0] == nvamdn:
+                bus_map[nvamda] = set([nvamdn])
+                found = 1
+        if nvamd is not None and not found:
+            logging.debug('%s is not in the package pool.' % nvamdn)
+
+    if not found:
+        if pat is None or not pat.match(modalias):
+            return []
+
     for alias in bus_map:
         if fnmatch.fnmatchcase(modalias.lower(), alias.lower()):
             for p in bus_map[alias]:
@@ -359,10 +408,46 @@ def _pkg_get_support(apt_cache, pkg):
     return support
 
 
-def _is_runtimepm_supported(pkg, alias):
+def _is_nv_allowing_runtimepm_supported(alias, ver):
+    '''alias: e.g. pci:v000010DEd000024BAsv0000103Csd000089C6bc03sc00i00'''
+    result = re.search('pci:v0000(.*)d0000(.*)sv(.*)', alias)
+    vid = result.group(1)
+    did = result.group(2)
+    if vid != "10DE":
+        return False
+    did = "0x%s" % did
+    path = path_get_custom_supported_gpus()
+    try:
+        with open(path, "r") as stream:
+            try:
+                gpus = list(json.load(stream)['chips'])
+                for gpu in gpus:
+                    if gpu['devid'] == did and 'runtimepm' in gpu['features']:
+                        if gpu['branch'].split('.')[0] != ver:
+                            logging.debug('Candidate version does not match %s != %s' %
+                                          (gpu['branch'].split('.')[0], ver))
+                            return False
+                        logging.info("Found runtimepm supports on %s." % did)
+                        return True
+            except Exception:
+                logging.debug('_is_nv_allowing_runtimepm_supported(): unexpected json detected')
+                pass
+    except Exception:
+        logging.debug('_is_nv_allowing_runtimepm_supported(): unable to read %s' % path)
+        pass
+    return False
+
+
+def _is_runtimepm_supported(apt_cache, pkg, alias):
     '''Check if the package supports runtimepm for the given modalias'''
     try:
-        m = pkg.candidate.record['PmAliases']
+        depcache = apt_pkg.DepCache(apt_cache)
+        candidate = depcache.get_candidate_ver(pkg)
+        records = apt_pkg.PackageRecords(apt_cache)
+        records.lookup(candidate.file_list[0])
+        section = apt_pkg.TagSection(records.record)
+        ver = candidate.ver_str.split('.')[0]
+        m = section['PmAliases']
     except (KeyError, AttributeError, UnicodeDecodeError):
         return False
     else:
@@ -371,6 +456,8 @@ def _is_runtimepm_supported(pkg, alias):
 
         n = m[m.find('(')+1: m.find(')')]
         modaliases = n.split(', ')
+        if _is_nv_allowing_runtimepm_supported(alias, ver):
+            return True
         return any(fnmatch.fnmatch(alias.lower(), regex.lower()) for regex in modaliases)
 
 
@@ -512,7 +599,7 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
                     'free': _is_package_free(apt_cache, p),
                     'from_distro': _is_package_from_distro(apt_cache, p),
                     'support': _pkg_get_support(apt_cache, p),
-                    'runtimepm': _is_runtimepm_supported(p, alias)
+                    'runtimepm': _is_runtimepm_supported(apt_cache, p, alias)
                 }
             (vendor, model) = _get_db_name(syspath, alias)
             if vendor is not None:
