@@ -50,10 +50,6 @@ Depends: ${python3:Depends},
  usbutils,
  kmod | module-init-tools,
 Suggests: python3-aptdaemon.pkcompat
-Replaces: nvidia-common (<< 1:0.2.46), jockey-common, jockey-gtk, jockey-kde
-Conflicts: nvidia-common (<< 1:0.2.46), jockey-common, jockey-gtk, jockey-kde
-Breaks: nvidia-prime (<< 0.6)
-Provides: nvidia-common, jockey-common, jockey-gtk, jockey-kde
 Description: Detect and install additional Ubuntu driver packages
  This package aggregates and abstracts Ubuntu specific logic and knowledge
  about third-party driver packages. It provides:
