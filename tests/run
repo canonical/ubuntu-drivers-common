@@ -21,7 +21,6 @@
 
 import unittest, os.path, sys, logging, os, atexit
 import getopt
-import resource
 
 def usage():
     instructionsList = ['The only accepted (optional) parameters are:'
@@ -37,10 +36,6 @@ def usage():
     print(''.join(instructionsList))
 
 def main():
-    # Set a high limit of open fds
-    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
-    if soft < 8180:
-        resource.setrlimit(resource.RLIMIT_NOFILE, (8180, hard))
     cwd = os.getcwd()
     inputFile = os.path.join(cwd, 'xorg.conf')
     outputDir = cwd
