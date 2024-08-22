@@ -1,3 +1,24 @@
+ubuntu-drivers-common (1:0.9.7.6ubuntu3) noble; urgency=medium
+
+  * Change directly the source, the package doesn't use quilt...
+
+ -- Sebastien Bacher <seb128@ubuntu.com>  Wed, 03 Apr 2024 11:11:21 +0200
+
+ubuntu-drivers-common (1:0.9.7.6ubuntu2) noble; urgency=medium
+
+  * debian/patches/workaround_builders_slowness.patch:
+    - increase the timeout for test_system_driver_packages_performance
+      since for some reason it seems really slow but only on the builders
+
+ -- Sebastien Bacher <seb128@ubuntu.com>  Wed, 03 Apr 2024 10:26:31 +0200
+
+ubuntu-drivers-common (1:0.9.7.6ubuntu1) noble; urgency=medium
+
+  * tests/testarchive.py:
+    -  Fix a pycodestyle E721 error with the newer python
+
+ -- Sebastien Bacher <seb128@ubuntu.com>  Thu, 28 Mar 2024 11:18:31 +0100
+
 ubuntu-drivers-common (1:0.9.7.6) mantic; urgency=medium
 
   [ Dimitri John Ledkov ]
