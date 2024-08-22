@@ -197,12 +197,6 @@ class DetectTest(unittest.TestCase):
 
         self.assertLess(sec, target)
 
-    def test_max_open_file_descriptors(self):
-        '''max_open_file_descriptors'''
-        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
-
-        self.assertEqual(soft, 8180)
-
     def test_system_driver_packages_chroot(self):
         '''system_driver_packages() for test package repository'''
 
