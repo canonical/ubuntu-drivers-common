@@ -83,21 +83,3 @@ Description: debhelper extension for scanning kernel module aliases
  This enables software which is looking for missing driver packages (such as
  Jockey or the operating system installer) to identify which package(s) will
  provide a driver for a piece of hardware, identified by its modalias.
- 
-Package: nvidia-common
-Section: oldlibs
-Priority: extra
-Architecture: i386 amd64 armel armhf
-Depends: ubuntu-drivers-common, ${misc:Depends}
-Description: transitional package for ubuntu-drivers-common
- This is a transitional package for ubuntu-drivers-common. You can remove it
- after upgrading.
-
-Package: fglrx-pxpress
-Section: oldlibs
-Priority: extra
-Architecture: i386 amd64
-Depends: ubuntu-drivers-common, ${misc:Depends}
-Description: transitional package for ubuntu-drivers-common
- This is a transitional package for ubuntu-drivers-common. You can remove it
- after upgrading.
