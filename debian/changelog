@@ -1,3 +1,21 @@
+ubuntu-drivers-common (1:0.9.7.6ubuntu3.1) noble; urgency=medium
+
+  [ Mate Kukri ]
+  * debian/control: Make Vcs-Git and Vcs-Browser fields point to current location
+
+  [ Alessandro Astone ]
+  * Wait for nvidia-drm to settle before opening /dev/dri/card*
+    (LP: #2060268)
+
+  [ Daniel van Vugt ]
+  * Remove SimpleDRM device when nvidia-drm loads
+    (LP: #2060268)
+
+  [ Kuba Pawlak ]
+  * Revert "Change maximum open files limit for the shell" (LP: #2077646)
+
+ -- Timo Aaltonen <tjaalton@debian.org>  Thu, 22 Aug 2024 15:26:53 +0300
+
 ubuntu-drivers-common (1:0.9.7.6ubuntu3) noble; urgency=medium
 
   * Change directly the source, the package doesn't use quilt...
