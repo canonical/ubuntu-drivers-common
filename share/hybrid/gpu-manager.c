@@ -157,8 +157,6 @@ struct pme_dev {
 
 
 static bool is_file(char *file);
-static bool is_dir(char *directory);
-static bool is_dir_empty(char *directory);
 static bool is_link(char *file);
 static bool is_module_loaded(const char *module);
 static bool get_nvidia_driver_version(int *major, int *minor, int *extra);
@@ -351,23 +349,6 @@ static bool pci_device_is_boot_vga(struct pci_dev *info) {
         return false;
     }
     return (strcmp(boot_vga_str, "1\n") == 0);
-}
-
-
-/* Trim string in place */
-static void trim(char *str) {
-    char *pointer = str;
-    int len = strlen(pointer);
-
-    while(isspace(pointer[len - 1]))
-        pointer[--len] = 0;
-
-    while(* pointer && isspace(* pointer)) {
-        ++pointer;
-        --len;
-    }
-
-    memmove(str, pointer, len + 1);
 }
 
 
@@ -649,20 +630,6 @@ static bool find_string_in_file(const char *path, const char *pattern) {
 }
 
 
-static bool is_file_empty(const char *file) {
-    struct stat stbuf;
-
-    if (stat(file, &stbuf) == -1) {
-        fprintf(log_handle, "can't access %s\n", file);
-        return false;
-    }
-    if ((stbuf.st_mode & S_IFMT) && ! stbuf.st_size)
-        return true;
-
-    return false;
-}
-
-
 static bool has_cmdline_option(const char *option)
 {
     return (find_string_in_file("/proc/cmdline", option));
@@ -693,43 +660,6 @@ static prime_intel_drv get_prime_intel_driver() {
     }
 
     return driver;
-}
-
-
-static bool copy_file(const char *src_path, const char *dst_path)
-{
-    _cleanup_fclose_ FILE *src = NULL;
-    _cleanup_fclose_ FILE *dst = NULL;
-    int src_fd, dst_fd;
-    int n = 0;
-    char buf[BUFSIZ];
-
-    src = fopen(src_path, "r");
-    if (src == NULL) {
-        fprintf(log_handle, "error: can't open %s for reading\n", src_path);
-        return false;
-    }
-
-    dst = fopen(dst_path, "w");
-    if (dst == NULL) {
-        fprintf(log_handle, "error: can't open %s for writing.\n",
-                dst_path);
-        return false;
-    }
-
-    src_fd = fileno(src);
-    dst_fd = fileno(dst);
-
-    fprintf(log_handle, "copying %s to %s...\n", src_path, dst_path);
-
-    while ((n = read(src_fd, buf, BUFSIZ)) > 0)
-        if (write(dst_fd, buf, n) != n) {
-            fprintf(log_handle, "write error on file %s\n", dst_path);
-            return false;
-        }
-
-    fprintf(log_handle, "%s was copied successfully to %s\n", src_path, dst_path);
-    return true;
 }
 
 
@@ -1172,37 +1102,6 @@ static bool is_file(char *file) {
         return true;
 
     return false;
-}
-
-
-static bool is_dir(char *directory) {
-    struct stat stbuf;
-
-    if (stat(directory, &stbuf) == -1) {
-        fprintf(log_handle, "Error: can't access %s\n", directory);
-        return false;
-    }
-    if ((stbuf.st_mode & S_IFMT) == S_IFDIR)
-        return true;
-    return false;
-}
-
-
-static bool is_dir_empty(char *directory) {
-    int n = 0;
-    struct dirent *d;
-    DIR *dir = opendir(directory);
-    if (dir == NULL)
-        return true;
-    while ((d = readdir(dir)) != NULL) {
-        if(++n > 2)
-        break;
-    }
-    closedir(dir);
-    if (n <= 2)
-        return true;
-    else
-        return false;
 }
 
 
