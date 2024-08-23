@@ -42,5 +42,5 @@ override_dh_clean:
 	rm -rf *.egg-info
 	rm -f debian/ubuntu-drivers-common.maintscript
 	find $(CURDIR) -name "__pycache__" -exec rm -rf "{}" \;
-	make -C share/hybrid clean
+	rm -f share/hybrid/gpu-manager.o share/hybrid/json-parser/json.o
 	dh_clean
