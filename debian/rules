@@ -2,30 +2,21 @@
 DEB_VERSION=$(shell dpkg-parsechangelog | grep ^Version | cut -f2 -d\ |cut -f1 -d-)
 DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
 TEST_ARCHES=amd64 arm64
-py3sdo=set -e; $(foreach py, $(shell py3versions -r), $(py) $(1);)
+PYBUILD_NAME=ubuntu-drivers-common
 
 %:
-	dh "$@" --with python3,apport
-
-override_dh_auto_build:
-	$(call py3sdo, setup.py build)
-
-override_dh_auto_install:
-	$(call py3sdo, setup.py install --root=$(CURDIR)/debian/tmp --install-layout=deb)
+	dh "$@" --with python3,apport --buildsystem=pybuild
 
 override_dh_auto_test:
 ifeq (, $(findstring nocheck, $(DEB_BUILD_OPTIONS)))
   ifeq ($(DEB_HOST_ARCH),$(filter $(DEB_HOST_ARCH), $(TEST_ARCHES)))
-	$(call py3sdo, setup.py egg_info)
-	set -e; $(foreach py, $(shell py3versions -r), PATH=$$PATH:/sbin:/usr/sbin PYTHONPATH=. $(py) -B tests/run;)
+	./setup.py egg_info
+	PYTHONPATH=. tests/run
   endif
 endif
 
-override_dh_auto_clean:
-	$(call py3sdo, setup.py clean)
-
 override_dh_install:
-	dh_install --fail-missing -Xlib/systemd -Xsbin -Xlib/udev
+	dh_install -Xlib/systemd -Xsbin -Xlib/udev
 
 	# on architectures where we build gpu-manager, install the systemd unit,
 	# the udev rule, and the script for gpu detection
