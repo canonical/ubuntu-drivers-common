@@ -1,3 +1,10 @@
+ubuntu-drivers-common (1:0.9.7.8) oracular; urgency=medium
+
+  [ Kuba Pawlak ]
+  * Revert "Change maximum open files limit for the shell" (LP: #2077646)
+
+ -- Timo Aaltonen <tjaalton@debian.org>  Wed, 28 Aug 2024 21:42:02 +0300
+
 ubuntu-drivers-common (1:0.9.7.7) oracular; urgency=medium
 
   * SRU (LP: #2076245)
