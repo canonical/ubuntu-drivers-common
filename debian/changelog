@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.9.6.2~0.22.04.7) UNRELEASED; urgency=medium
+ubuntu-drivers-common (1:0.9.6.2~0.22.04.7) jammy; urgency=medium
 
   * share/hybrid/71-u-d-c-gpu-detection.rules
     - Remove SimpleDRM device when nvidia-drm loads (LP: #2060268)
