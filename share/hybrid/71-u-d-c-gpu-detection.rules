@@ -3,7 +3,9 @@
 # Remove SimpleDRM device when nvidia-drm loads.
 # This normally happens automatically for DRM devices that also register
 # a framebuffer device, but that's not the case yet for the nvidia driver.
-ACTION=="add", SUBSYSTEM=="module", KERNEL=="nvidia_drm", TEST=="/sys/devices/platform/simple-framebuffer.0/drm/card0", RUN+="/bin/rm /dev/dri/card0"
+ACTION=="add", KERNEL=="card0", SUBSYSTEM=="drm", DRIVERS=="simple-framebuffer", ENV{U_D_C_IS_SIMPLEDRM}="1", RUN+="/bin/touch /run/u-d-c-card0-is-simpledrm"
+ACTION=="remove", KERNEL=="card0", SUBSYSTEM=="drm", ENV{U_D_C_IS_SIMPLEDRM}=="1", RUN+="/bin/rm -f /run/u-d-c-card0-is-simpledrm"
+ACTION=="add", KERNEL=="card[0-9]*", SUBSYSTEM=="drm", DRIVERS=="nvidia", TEST=="/run/u-d-c-card0-is-simpledrm", RUN+="/bin/rm /dev/dri/card0"
 
 # Create a file with the card details for gpu-manager
 ACTION=="add", SUBSYSTEM=="drm", DEVPATH=="*/drm/card*", RUN+="/sbin/u-d-c-print-pci-ids"
