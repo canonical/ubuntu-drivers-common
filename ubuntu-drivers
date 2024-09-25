@@ -18,6 +18,7 @@ import os
 import logging
 import apt_pkg
 
+from functools import cmp_to_key
 import UbuntuDrivers.detect
 
 sys_path = os.environ.get('UBUNTU_DRIVERS_SYS_DIR')
@@ -456,9 +457,11 @@ def list(config, **kwargs):
 
     if kwargs.get('gpgpu'):
         packages = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path)
+        sort_func = UbuntuDrivers.detect._cmp_gfx_alternatives_gpgpu
     else:
         packages = UbuntuDrivers.detect.system_driver_packages(apt_cache=cache,
             sys_path=sys_path, freeonly=config.free_only, include_oem=config.install_oem_meta)
+        sort_func = UbuntuDrivers.detect._cmp_gfx_alternatives
 
     if kwargs.get('recommended'):
         if kwargs.get('gpgpu'):
@@ -466,7 +469,7 @@ def list(config, **kwargs):
         else:
             packages = UbuntuDrivers.detect.auto_install_filter(packages, '')
 
-    for package in packages:
+    for package, info in sorted(packages.items(), key=cmp_to_key(lambda left, right: sort_func(left[0], right[0])), reverse=True):
         try:
             linux_modules = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, package)
             if (not linux_modules and package.find('dkms') != -1):
