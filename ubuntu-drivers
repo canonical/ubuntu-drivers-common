@@ -481,7 +481,10 @@ def list(config, **kwargs):
                     # Such as "nvidia-headless-no-dkms-470-server linux-modules-nvidia-470-server-generic"
                     print('%s %s' % (package, linux_modules))
                 else:
-                    print('%s, (kernel modules provided by %s)' % (package, linux_modules))
+                    if info.get('recommended'):
+                        print('%s, (kernel modules provided by %s) - RECOMMENDED' % (package, linux_modules))
+                    else:
+                        print('%s, (kernel modules provided by %s)' % (package, linux_modules))
             else:
                 print(package)
         except KeyError:
