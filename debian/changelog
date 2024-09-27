@@ -1,3 +1,14 @@
+ubuntu-drivers-common (1:0.9.7.9) oracular; urgency=medium
+
+  [ Kuba Pawlak ]
+  * Sort the output list of matching nvidia drivers (LP: #2081970)
+  * NVIDIA 560 release should suggest -open variant first (LP: #2081967)
+
+  [ Alessandro Astone ]
+  * Improve SimpleDRM+NVIDIA fix across kernel versions (LP: #2060268)
+
+ -- Kuba Pawlak <kuba.pawlak@canonical.com>  Thu, 26 Sep 2024 10:27:26 +0200
+
 ubuntu-drivers-common (1:0.9.7.8) oracular; urgency=medium
 
   [ Kuba Pawlak ]
