@@ -65,6 +65,19 @@ class NvidiaPkgNameInfo(object):
                                         '-open' if self._open else '')
             self.is_valid = True
 
+        # Recent naming such as nvidia-headless[-no-dkms]-525 for gpgpu
+        pattern = re.compile('nvidia-headless(.*)-([0-9]+)(.*)')
+        match = pattern.match(name)
+
+        if match:
+            self._server = match.group(0).find('-server') != -1
+            self._open = match.group(0).find('-open') != -1
+            self._flavour = '%s%s%s' % (match.group(2),
+                                        '-server' if self._server else '',
+                                        '-open' if self._open else '')
+            self._major_ver = match.group(2)
+            self.is_valid = True
+
     def has_obsolete_name_scheme(self):
         return self._obsolete_name_scheme
 
