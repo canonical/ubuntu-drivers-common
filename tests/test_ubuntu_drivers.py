@@ -1926,7 +1926,7 @@ class DetectTest(unittest.TestCase):
 
             res = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path=self.umockdev.get_sys_dir())
             linux_package = UbuntuDrivers.detect.get_linux(cache)
-            modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, 'nvidia-driver-410')
+            modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, 'nvidia-headless-no-dkms-410')
         finally:
             chroot.remove()
 
@@ -2065,7 +2065,7 @@ class DetectTest(unittest.TestCase):
                                                                     sys_path=self.umockdev.get_sys_dir())
             linux_package = UbuntuDrivers.detect.get_linux(cache)
             modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache,
-                                                                                 'nvidia-driver-410')
+                                                                                 'nvidia-headless-no-dkms-410')
         finally:
             chroot.remove()
 
@@ -2252,7 +2252,7 @@ class DetectTest(unittest.TestCase):
                                                                     sys_path=self.umockdev.get_sys_dir())
             linux_package = UbuntuDrivers.detect.get_linux(cache)
             modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache,
-                                                                                 'nvidia-driver-440')
+                                                                                 'nvidia-headless-no-dkms-440')
         finally:
             chroot.remove()
 
