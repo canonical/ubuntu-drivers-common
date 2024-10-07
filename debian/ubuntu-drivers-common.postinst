@@ -1,0 +1,29 @@
+#!/bin/sh
+
+case "$1" in
+    (configure)
+        # Check if /etc/default/grub.d/oem-flavour.cfg is a symlink
+        [ ! -L /etc/default/grub.d/oem-flavour.cfg ] && exit 0
+        # Get the real path of the symlink
+        real_oem_flavour_path=$(readlink -f /etc/default/grub.d/oem-flavour.cfg)
+        # Check if the file exists
+        [ ! -f "$real_oem_flavour_path" ] && exit 0
+        # Check which Debian binary package contains the real oem-flavour.cfg file
+        package=$(dpkg -S "$real_oem_flavour_path" 2>/dev/null | cut -d: -f1)
+        # If the package doesn't exist, exit
+        [ -z "$package" ] && exit 0
+        # Check if $package starts with oem-somerville, oem-stella, or oem-sutton, and ends with -meta
+        case "$package" in
+            oem-somerville*-meta|oem-stella*-meta|oem-sutton*-meta)
+                # Check if the file contains $package and GRUB_FLAVOUR_ORDER=oem
+                if grep -q "$package" "$real_oem_flavour_path" && grep -q "^GRUB_FLAVOUR_ORDER=oem" "$real_oem_flavour_path"; then
+                    # Both conditions are met, proceed with removal
+                    echo "/etc/default/grub.d/oem-flavour.cfg contains $package and GRUB_FLAVOUR_ORDER=oem. Removing oem-flavour.cfg..."
+                    rm -f /etc/default/grub.d/oem-flavour.cfg
+                fi
+                ;;
+        esac
+    ;;
+esac
+
+#DEBHELPER#
