@@ -385,7 +385,7 @@ def command_debug(args):
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
-@click.option('--gpgpu', is_flag=True, help='gpgpu drivers')
+@click.option('--gpgpu', is_flag=True, help='Install drivers for use in a headless (aka General Purpose GPU) environment. This results in a smaller installation footprint by not installing packages that are only useful in graphical environments.')
 @click.option('--free-only', is_flag=True, help='Only consider free packages')
 @click.option('--package-list', nargs=1, metavar='PATH', help='Create file with list of installed packages (in install mode)')
 @click.option('--no-oem', is_flag=True, default=False, show_default=True, metavar='install_oem_meta', help='Do not include OEM enablement packages (these enable an external archive)')
@@ -403,7 +403,7 @@ def greet(config, gpgpu, free_only, package_list, no_oem, **kwargs):
 
 @greet.command()
 @click.argument('driver', nargs=-1)  # add the name argument
-@click.option('--gpgpu', is_flag=True, help='gpgpu drivers')
+@click.option('--gpgpu', is_flag=True, help='Install drivers for use in a headless (aka General Purpose GPU) environment. This results in a smaller installation footprint by not installing packages that are only useful in graphical environments.')
 @click.option('--recommended', is_flag=True, help='Only show the recommended driver packages')
 @click.option('--free-only', is_flag=True, help='Only consider free packages')
 @click.option('--package-list', nargs=1, metavar='PATH', help='Create file with list of installed packages (in install mode)')
@@ -455,7 +455,7 @@ def autoinstall(config, **kwargs):
 
 @greet.command()
 @click.argument('list', nargs=-1)
-@click.option('--gpgpu', is_flag=True, help='gpgpu drivers')
+@click.option('--gpgpu', is_flag=True, help='Install drivers for use in a headless (aka General Purpose GPU) environment. This results in a smaller installation footprint by not installing packages that are only useful in graphical environments.')
 @click.option('--recommended', is_flag=True, help='Only show the recommended driver packages')
 @click.option('--free-only', is_flag=True, help='Only consider free packages')
 @click.option('--include-dkms', is_flag=True, help='Also consider DKMS packages')
