@@ -15,7 +15,7 @@ ubuntu-drivers-common (1:0.9.6.2~0.22.04.7) jammy; urgency=medium
     - Wait for nvidia-drm to settle before opening /dev/dri/card*
     (LP: #2060268)
   * tests/test_ubuntu_drivers.py
-   - Race condition on builders result in 100% fail rate
+   - Split a test to fix a race condition
     (LP: #2077654)
    - revert RLIMIT_NOFILE set and test (LP: #2077646)
 
