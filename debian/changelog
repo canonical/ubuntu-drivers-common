@@ -1,3 +1,11 @@
+ubuntu-drivers-common (1:0.9.6.2~0.22.04.9) jammy; urgency=medium
+
+  [Shih-Yuan Lee]
+  * debian/ubuntu-drivers-common.postinst: Refine the script and trigger
+    update-grub when it needs. (LP: #2083657)
+
+ -- Kuba Pawlak <kuba.pawlak@canonical.com>  Fri, 11 Oct 2024 16:00:22 +0200
+
 ubuntu-drivers-common (1:0.9.6.2~0.22.04.8) jammy; urgency=medium
 
   [Shih-Yuan Lee]
