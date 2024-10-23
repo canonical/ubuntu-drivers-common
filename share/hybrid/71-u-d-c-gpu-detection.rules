@@ -5,7 +5,10 @@
 # a framebuffer device, but that's not the case yet for the nvidia driver.
 ACTION=="add", KERNEL=="card0", SUBSYSTEM=="drm", DRIVERS=="simple-framebuffer", ENV{U_D_C_IS_SIMPLEDRM}="1", RUN+="/bin/touch /run/u-d-c-card0-is-simpledrm"
 ACTION=="remove", KERNEL=="card0", SUBSYSTEM=="drm", ENV{U_D_C_IS_SIMPLEDRM}=="1", RUN+="/bin/rm -f /run/u-d-c-card0-is-simpledrm"
-ACTION=="add", KERNEL=="card[0-9]*", SUBSYSTEM=="drm", DRIVERS=="nvidia", TEST=="/run/u-d-c-card0-is-simpledrm", RUN+="/bin/rm /dev/dri/card0"
+ACTION=="add", KERNEL=="card[0-9]*", SUBSYSTEM=="drm", DRIVERS=="nvidia", \
+    IMPORT{program}="/bin/sh -c 'echo U_D_C_MODESET=`cat /sys/module/nvidia_drm/parameters/modeset`'"
+ACTION=="add", KERNEL=="card[0-9]*", SUBSYSTEM=="drm", DRIVERS=="nvidia", \
+    ENV{U_D_C_MODESET}=="Y", TEST=="/run/u-d-c-card0-is-simpledrm", RUN+="/bin/rm /dev/dri/card0"
 
 # Create a file with the card details for gpu-manager
 ACTION=="add", SUBSYSTEM=="drm", DEVPATH=="*/drm/card*", RUN+="/sbin/u-d-c-print-pci-ids"
