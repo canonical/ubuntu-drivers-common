@@ -1651,8 +1651,11 @@ def get_linux_modules_metapackage(apt_cache, candidate):
                         if dep.parent_pkg.name.startswith('linux-modules-nvidia-')]
 
         pick = ''
-        modules_candidate = 'linux-modules-nvidia-%s-%s' % (candidate_flavour,
-                                                            get_linux_image(apt_cache).replace('linux-image-', ''))
+        candidate_suffix = get_linux_image(apt_cache).replace('linux-image-', '')
+        if candidate_suffix == "virtual":
+            candidate_suffix = "generic"
+        modules_candidate = 'linux-modules-nvidia-%s-%s' % (candidate_flavour, candidate_suffix)
+
         for dep in reverse_deps:
             if dep == modules_candidate:
                 pick = dep
