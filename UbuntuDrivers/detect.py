@@ -19,6 +19,7 @@ import json
 import apt_pkg
 
 from UbuntuDrivers import kerneldetection
+from functools import cmp_to_key
 
 system_architecture = ''
 lookup_cache = {}
@@ -1009,12 +1010,14 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
     return result
 
 
-def get_desktop_package_list(apt_cache, sys_path=None, free_only=False, include_oem=True, driver_string=''):
+def get_desktop_package_list(
+        apt_cache, sys_path=None, free_only=False, include_oem=True,
+        driver_string='', include_dkms=False):
     '''Return the list of packages that should be installed'''
     packages = system_driver_packages(
         apt_cache, sys_path, freeonly=free_only,
         include_oem=include_oem)
-    packages = auto_install_filter(packages, driver_string)
+    packages = auto_install_filter(packages, driver_string, get_recommended=False)
     if not packages:
         logging.debug('No drivers found for installation.')
         return packages
@@ -1024,13 +1027,15 @@ def get_desktop_package_list(apt_cache, sys_path=None, free_only=False, include_
 
     # ignore packages which are already installed
     to_install = []
-    for p in packages:
+    for p, _ in sorted(packages.items(),
+                       key=cmp_to_key(lambda left, right: _cmp_gfx_alternatives(left[0], right[0])),
+                       reverse=True):
         package_obj = apt_cache[p]
         if not package_obj.current_ver:
-            to_install.append(p)
 
             candidate = depcache.get_candidate_ver(package_obj)
             records.lookup(candidate.file_list[0])
+            to_install.append(p)
 
             # See if runtimepm is supported
             if records['runtimepm']:
@@ -1047,6 +1052,10 @@ def get_desktop_package_list(apt_cache, sys_path=None, free_only=False, include_
             try:
                 modules_package = get_linux_modules_metapackage(apt_cache, p)
                 if modules_package and not apt_cache[modules_package].current_ver:
+                    if not include_dkms and "dkms" in modules_package:
+                        to_install.remove(p)
+                        continue
+                    to_install.remove(p)
                     to_install.append(modules_package)
 
                     lrm_meta = get_userspace_lrm_meta(apt_cache, p)
@@ -1054,6 +1063,7 @@ def get_desktop_package_list(apt_cache, sys_path=None, free_only=False, include_
                         # Add the lrm meta and drop the non lrm one
                         to_install.append(lrm_meta)
                         to_install.remove(p)
+                    break
             except KeyError:
                 pass
 
@@ -1124,7 +1134,7 @@ def _process_driver_string(string):
     return driver
 
 
-def gpgpu_install_filter(packages, drivers_str):
+def gpgpu_install_filter(packages, drivers_str, get_recommended=True):
     drivers = []
     allow = []
     result = {}
@@ -1217,14 +1227,17 @@ def gpgpu_install_filter(packages, drivers_str):
                     result[p] = packages[p]
                 else:
                     # print('before recommended: %s' % packages[p])
-                    if packages[p].get('recommended'):
+                    if get_recommended:
+                        if packages[p].get('recommended'):
+                            result[p] = packages[p]
+                    else:
                         result[p] = packages[p]
                         # print('Found "recommended" flavour in %s' % (packages[p]))
                 break
     return result
 
 
-def auto_install_filter(packages, drivers_str=''):
+def auto_install_filter(packages, drivers_str='', get_recommended=True):
     '''Get packages which are appropriate for automatic installation.
 
     Return the subset of the given list of packages which are appropriate for
@@ -1248,7 +1261,10 @@ def auto_install_filter(packages, drivers_str=''):
 
     result = {}
     for p in allow:
-        if 'recommended' not in packages[p] or packages[p]['recommended']:
+        if get_recommended:
+            if 'recommended' not in packages[p] or packages[p]['recommended']:
+                result[p] = packages[p]
+        else:
             result[p] = packages[p]
     return result
 

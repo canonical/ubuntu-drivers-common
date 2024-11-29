@@ -40,6 +40,8 @@ class Config(object):
         self.package_list = ''
         self.install_oem_meta = True
         self.driver_string = ''
+        self.include_dkms = False
+        self.recommended = False
 
 pass_config = click.make_pass_decorator(Config, ensure=True)
 
@@ -173,7 +175,7 @@ def command_install(args):
 
     to_install = UbuntuDrivers.detect.get_desktop_package_list(cache, sys_path,
         free_only=args.free_only, include_oem=args.install_oem_meta,
-        driver_string=args.driver_string)
+        driver_string=args.driver_string, include_dkms=args.include_dkms)
 
     if not to_install:
         print('All the available drivers are already installed.')
@@ -258,31 +260,41 @@ def install_gpgpu(args):
         return 1
 
     packages = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path)
-    packages = UbuntuDrivers.detect.gpgpu_install_filter(packages, args.driver_string)
+    packages = UbuntuDrivers.detect.gpgpu_install_filter(packages, args.driver_string, get_recommended=False)
     if not packages:
         print('No drivers found for installation.')
         return not_found_exit_status
 
     # ignore packages which are already installed
     to_install = []
-    for p in packages:
+    for p, _ in sorted(packages.items(),
+                       key=cmp_to_key(lambda left, right:
+                                      UbuntuDrivers.detect._cmp_gfx_alternatives_gpgpu(left[0], right[0])),
+                       reverse=True):
         candidate = packages[p].get('metapackage')
-        print(candidate)
         if candidate and not cache[candidate].current_ver:
+            to_install.append(p)
             to_install.append(candidate)
+        print(candidate)
 
-    if candidate:
-        # Add the matching linux modules package
-        modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, candidate)
-        print(modules_package)
-        if modules_package and not cache[modules_package].current_ver:
-            to_install.append(modules_package)
-
-            lrm_meta = UbuntuDrivers.detect.get_userspace_lrm_meta(cache, p)
-            if lrm_meta and not apt_cache[lrm_meta].current_ver:
-                # Add the lrm meta and drop the non lrm one
-                to_install.append(lrm_meta)
+        if candidate:
+            # Add the matching linux modules package
+            modules_package = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, p)
+            print(modules_package)
+            if modules_package and not cache[modules_package].current_ver:
+                if not args.include_dkms and "dkms" in modules_package:
+                    to_install.remove(p)
+                    to_install.remove(candidate)
+                    continue
                 to_install.remove(p)
+                to_install.append(modules_package)
+
+                lrm_meta = UbuntuDrivers.detect.get_userspace_lrm_meta(cache, p)
+                if lrm_meta and not cache[lrm_meta].current_ver:
+                    # Add the lrm meta and drop the non lrm one
+                    to_install.append(lrm_meta)
+                    to_install.remove(p)
+                break
 
     if not to_install:
         print('All the available drivers are already installed.')
@@ -396,6 +408,7 @@ def greet(config, gpgpu, free_only, package_list, no_oem, **kwargs):
 @click.option('--free-only', is_flag=True, help='Only consider free packages')
 @click.option('--package-list', nargs=1, metavar='PATH', help='Create file with list of installed packages (in install mode)')
 @click.option('--no-oem', is_flag=True, metavar='install_oem_meta', help='Do not include OEM enablement packages (these enable an external archive)')
+@click.option('--include-dkms', is_flag=True, help='Also consider DKMS packages')
 @pass_config
 def install(config, **kwargs):
     '''Install a driver [driver[:version][,driver[:version]]]'''
@@ -403,6 +416,8 @@ def install(config, **kwargs):
         config.gpgpu = True
     if kwargs.get('free_only'):
         config.free_only = True
+    if kwargs.get("include_dkms"):
+        config.include_dkms = True
 
     # if kwargs.get('package_list'):
     #     config.package_list = kwargs.get('package_list')
@@ -443,11 +458,13 @@ def autoinstall(config, **kwargs):
 @click.option('--gpgpu', is_flag=True, help='gpgpu drivers')
 @click.option('--recommended', is_flag=True, help='Only show the recommended driver packages')
 @click.option('--free-only', is_flag=True, help='Only consider free packages')
+@click.option('--include-dkms', is_flag=True, help='Also consider DKMS packages')
 @pass_config
 def list(config, **kwargs):
     '''Show all driver packages which apply to the current system.'''
     apt_pkg.init_config()
     apt_pkg.init_system()
+    include_dkms = kwargs.get("include_dkms")
 
     try:
         cache = apt_pkg.Cache(None)
@@ -463,23 +480,20 @@ def list(config, **kwargs):
             sys_path=sys_path, freeonly=config.free_only, include_oem=config.install_oem_meta)
         sort_func = UbuntuDrivers.detect._cmp_gfx_alternatives
 
-    if kwargs.get('recommended'):
-        if kwargs.get('gpgpu'):
-            packages = UbuntuDrivers.detect.gpgpu_install_filter(packages, '')
-        else:
-            packages = UbuntuDrivers.detect.auto_install_filter(packages, '')
-
     for package, info in sorted(packages.items(), key=cmp_to_key(lambda left, right: sort_func(left[0], right[0])), reverse=True):
         try:
             linux_modules = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, package)
-            if (not linux_modules and package.find('dkms') != -1):
+            if (not linux_modules and "dkms" in package and include_dkms):
                 linux_modules = package
 
             if linux_modules:
+                if not include_dkms and "dkms" in linux_modules:
+                    continue
                 if kwargs.get('recommended'):
                     # This is just a space separated two item line
                     # Such as "nvidia-headless-no-dkms-470-server linux-modules-nvidia-470-server-generic"
                     print('%s %s' % (package, linux_modules))
+                    break
                 else:
                     print('%s, (kernel modules provided by %s)' % (package, linux_modules))
             else:
