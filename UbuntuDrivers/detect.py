@@ -49,7 +49,7 @@ class NvidiaPkgNameInfo(object):
         # Obsolete naming such as nvidia-340
         if match:
             self._obsolete_name_scheme = True
-            self._major_ver = match.group(1)
+            self._major_ver = int(match.group(1))
             self._flavour = self._major_ver
             self.is_valid = True
             return
@@ -64,6 +64,7 @@ class NvidiaPkgNameInfo(object):
             self._flavour = '%s%s%s' % (match.group(1),
                                         '-server' if self._server else '',
                                         '-open' if self._open else '')
+            self._major_ver = int(match.group(1))
             self.is_valid = True
 
         # Recent naming such as nvidia-headless[-no-dkms]-525 for gpgpu
@@ -378,6 +379,27 @@ def _is_package_from_distro(apt_cache, pkg):
         return False
 
 
+def _pkg_get_open_preference(apt_cache, pkg):
+    '''Determine if -open package is prefered from apt Package object'''
+    depcache = apt_pkg.DepCache(apt_cache)
+    candidate = depcache.get_candidate_ver(pkg)
+    records = apt_pkg.PackageRecords(apt_cache)
+    records.lookup(candidate.file_list[0])
+
+    try:
+        preference = records['Prefer-Variant']
+    except (KeyError, AttributeError):
+        logging.debug('_pkg_get_open_preference %s: package has Prefer-Open header, cannot determine', pkg.name)
+        return False
+
+    if preference not in ('Open', 'Closed'):
+        logging.debug('_pkg_get_open_preference %s: package has invalid Prefer-Open %s'
+                      'header, cannot determine preference', pkg.name, preference)
+        return None
+
+    return preference
+
+
 def _pkg_get_module(apt_cache, pkg):
     '''Determine module name from apt Package object'''
     depcache = apt_pkg.DepCache(apt_cache)
@@ -543,6 +565,24 @@ def _get_db_name(syspath, alias):
     return (vendor, model)
 
 
+def _is_open_prefered(apt_cache, pkg):
+    if not pkg.name.startswith('nvidia-'):
+        return False
+
+    preference = _pkg_get_open_preference(apt_cache, pkg)
+    if preference is None:
+        nvidia_info = NvidiaPkgNameInfo(pkg.name)
+        if nvidia_info.get_major_version() >= 560:
+            logging.debug('_is_open_prefered(%s): True', pkg.name)
+            return True
+    elif preference == 'Open':
+        logging.debug('_is_open_prefered(%s): True', pkg.name)
+        return True
+
+    logging.debug('_is_open_prefered(%s): False', pkg.name)
+    return False
+
+
 def set_nvidia_kms(value):
     '''Set KMS on or off for NVIDIA'''
     nvidia_kms_file = '/lib/modprobe.d/nvidia-kms.conf'
@@ -613,7 +653,8 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
                     'free': _is_package_free(apt_cache, p),
                     'from_distro': _is_package_from_distro(apt_cache, p),
                     'support': _pkg_get_support(apt_cache, p),
-                    'runtimepm': _is_runtimepm_supported(apt_cache, p, alias)
+                    'runtimepm': _is_runtimepm_supported(apt_cache, p, alias),
+                    'open_preferred': _is_open_prefered(apt_cache, p)
                 }
             (vendor, model) = _get_db_name(syspath, alias)
             if vendor is not None:
@@ -754,6 +795,7 @@ def system_device_specific_metapackages(apt_cache=None, sys_path=None, include_o
                     'from_distro': _is_package_from_distro(apt_cache, p),
                     'recommended': True,
                     'support': _pkg_get_support(apt_cache, p),
+                    'open_preferred': _is_open_prefered(apt_cache, p),
                 }
 
     return packages
@@ -815,6 +857,7 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
                         'free': _is_package_free(apt_cache, p),
                         'from_distro': _is_package_from_distro(apt_cache, p),
                         'support': _pkg_get_support(apt_cache, p),
+                        'open_preferred': _is_open_prefered(apt_cache, p),
                     }
                 if vendor is not None:
                     packages[p.name]['vendor'] = vendor
@@ -1253,66 +1296,140 @@ def _pkg_support_from_cache(x):
     return None
 
 
+def _pkg_open_preferred_from_cache(x):
+    '''Look up driver and return if open package is preferred'''
+    if lookup_cache.get(x):
+        return lookup_cache.get(x).get('open_preferred')
+    return False
+
+
+def _get_fit_level(x):
+    '''decide how well the package fits desktop environment'''
+
+    # for desktop non-server packages are prefered to -server ones
+    # if a package preferes open variants, these come on top
+
+    if _pkg_open_preferred_from_cache(x):
+        if re.search(r'(\d{3})-open$', x):
+            return 3
+
+        if re.search(r'(\d{3})$', x):
+            return 2
+
+        if re.search(r'(\d{3})-server-open$', x):
+            return 1
+
+        if re.search(r'(\d{3})-server$', x):
+            return 0
+    else:
+        if re.search(r'(\d{3})$', x):
+            return 3
+
+        if re.search(r'(\d{3})-server$', x):
+            return 2
+
+        if re.search(r'(\d{3})-open$', x):
+            return 1
+
+        if re.search(r'(\d{3})-server-open$', x):
+            return 0
+    return 0
+
+
+def _get_fit_level_gpgpu(x):
+    '''decide how well the package fits server environment'''
+
+    # for server environment -server packages are prefered to non-server ones
+    # if a package preferes open variants, these come on top
+
+    if _pkg_open_preferred_from_cache(x):
+        if re.search(r'(\d{3})-server-open$', x):
+            return 3
+
+        if re.search(r'(\d{3})-server$', x):
+            return 2
+
+        if re.search(r'(\d{3})-open$', x):
+            return 1
+
+        if re.search(r'(\d{3})$', x):
+            return 0
+    else:
+        if re.search(r'(\d{3})-server$', x):
+            return 3
+
+        if re.search(r'(\d{3})$', x):
+            return 2
+
+        if re.search(r'(\d{3})-server-open$', x):
+            return 1
+
+        if re.search(r'(\d{3})-open$', x):
+            return 0
+    return 0
+
+
 def _cmp_gfx_alternatives(x, y):
     '''Compare two graphics driver names in terms of preference. (desktop)
 
-    -open always sorts after non-open.
+    -open by default sorts after non-open, unless a driver preferes open variant
     -server always sorts after non-server.
     LTSB (Long Term Support Branch) always sorts before NFB (New Feature Branch).
     Legacy always sorts before Beta.
     '''
 
-    if x.endswith('-open') and not y.endswith('-open'):
-        return -1
-    if not x.endswith('-open') and y.endswith('-open'):
-        return 1
-
-    if x.endswith('-server') and not y.endswith('-server'):
-        return -1
-    if not x.endswith('-server') and y.endswith('-server'):
-        return 1
-
-    preferred_support = ['PB', 'LTSB']
-
-    x_score = 0
-    y_score = 0
-
-    x_support = _pkg_support_from_cache(x)
-    y_support = _pkg_support_from_cache(y)
-
-    if x_support in preferred_support:
-        x_score += 100
-
-    if y_support in preferred_support:
-        y_score += 100
-
-    if x > y:
-        x_score += 1
-    elif x < y:
-        y_score += 1
-
-    if ((x_score >= 100) or (y_score >= 100)):
-        if x_score > y_score:
+    if x.startswith('nvidia-') and y.startswith('nvidia-'):
+        if _get_fit_level(x) > _get_fit_level(y):
             return 1
-        elif x_score < y_score:
+        if _get_fit_level(x) < _get_fit_level(y):
             return -1
 
-    if _pkg_support_from_cache(x) == 'PB' and _pkg_support_from_cache(y) != 'PB':
-        return 1
-    if _pkg_support_from_cache(x) != 'PB' and _pkg_support_from_cache(y) == 'PB':
-        return -1
-    if _pkg_support_from_cache(x) == 'LTSB' and _pkg_support_from_cache(y) != 'LTSB':
-        return 1
-    if _pkg_support_from_cache(x) != 'LTSB' and _pkg_support_from_cache(y) == 'LTSB':
-        return -1
-    if _pkg_support_from_cache(x) == 'Legacy' and _pkg_support_from_cache(y) != 'Legacy':
-        return -1
-    if _pkg_support_from_cache(x) != 'Legacy' and _pkg_support_from_cache(y) == 'Legacy':
-        return 1
-    if _pkg_support_from_cache(x) == 'Beta' and _pkg_support_from_cache(y) != 'Beta':
-        return -1
-    if _pkg_support_from_cache(x) != 'Beta' and _pkg_support_from_cache(y) == 'Beta':
-        return 1
+        preferred_support = ['PB', 'LTSB']
+
+        x_score = 0
+        y_score = 0
+
+        x_support = _pkg_support_from_cache(x)
+        y_support = _pkg_support_from_cache(y)
+
+        if x_support in preferred_support:
+            x_score += 100
+
+        if y_support in preferred_support:
+            y_score += 100
+
+        if x > y:
+            x_score += 1
+        elif x < y:
+            y_score += 1
+
+        if ((x_score >= 100) or (y_score >= 100)):
+            if x_score > y_score:
+                return 1
+            elif x_score < y_score:
+                return -1
+
+        if _pkg_support_from_cache(x) == 'PB' and _pkg_support_from_cache(y) != 'PB':
+            return 1
+        if _pkg_support_from_cache(x) != 'PB' and _pkg_support_from_cache(y) == 'PB':
+            return -1
+        if _pkg_support_from_cache(x) == 'LTSB' and _pkg_support_from_cache(y) != 'LTSB':
+            return 1
+        if _pkg_support_from_cache(x) != 'LTSB' and _pkg_support_from_cache(y) == 'LTSB':
+            return -1
+        if _pkg_support_from_cache(x) == 'NFB' and _pkg_support_from_cache(y) != 'NFB':
+            return -1
+        if _pkg_support_from_cache(x) != 'NFB' and _pkg_support_from_cache(y) == 'NFB':
+            return 1
+        if _pkg_support_from_cache(x) == 'Legacy' and _pkg_support_from_cache(y) != 'Legacy':
+            return -1
+        if _pkg_support_from_cache(x) != 'Legacy' and _pkg_support_from_cache(y) == 'Legacy':
+            return 1
+        if _pkg_support_from_cache(x) == 'Beta' and _pkg_support_from_cache(y) != 'Beta':
+            return -1
+        if _pkg_support_from_cache(x) != 'Beta' and _pkg_support_from_cache(y) == 'Beta':
+            return 1
+
     if x < y:
         return -1
     if x > y:
@@ -1324,37 +1441,40 @@ def _cmp_gfx_alternatives(x, y):
 def _cmp_gfx_alternatives_gpgpu(x, y):
     '''Compare two graphics driver names in terms of preference. (server)
 
-    -open always sorts after non-open.
+    -open by default sorts after non-open, unless a driver preferes open variant
     -server always sorts before non-server.
+    non server package always sorts after server package
     LTSB (Long Term Support Branch) always sorts before NFB (New Feature Branch).
     Legacy always sorts before Beta.
     '''
-    if x.endswith('-open') and not y.endswith('-open'):
-        return -1
-    if not x.endswith('-open') and y.endswith('-open'):
-        return 1
 
-    if x.endswith('-server') and not y.endswith('-server'):
-        return 1
-    if not x.endswith('-server') and y.endswith('-server'):
-        return -1
+    if x.startswith('nvidia-') and y.startswith('nvidia-'):
+        if _get_fit_level_gpgpu(x) > _get_fit_level_gpgpu(y):
+            return 1
+        if _get_fit_level_gpgpu(x) < _get_fit_level_gpgpu(y):
+            return -1
 
-    if _pkg_support_from_cache(x) == 'PB' and _pkg_support_from_cache(y) != 'PB':
-        return 1
-    if _pkg_support_from_cache(x) != 'PB' and _pkg_support_from_cache(y) == 'PB':
-        return -1
-    if _pkg_support_from_cache(x) == 'LTSB' and _pkg_support_from_cache(y) != 'LTSB':
-        return 1
-    if _pkg_support_from_cache(x) != 'LTSB' and _pkg_support_from_cache(y) == 'LTSB':
-        return -1
-    if _pkg_support_from_cache(x) == 'Legacy' and _pkg_support_from_cache(y) != 'Legacy':
-        return -1
-    if _pkg_support_from_cache(x) != 'Legacy' and _pkg_support_from_cache(y) == 'Legacy':
-        return 1
-    if _pkg_support_from_cache(x) == 'Beta' and _pkg_support_from_cache(y) != 'Beta':
-        return -1
-    if _pkg_support_from_cache(x) != 'Beta' and _pkg_support_from_cache(y) == 'Beta':
-        return 1
+        if _pkg_support_from_cache(x) == 'PB' and _pkg_support_from_cache(y) != 'PB':
+            return 1
+        if _pkg_support_from_cache(x) != 'PB' and _pkg_support_from_cache(y) == 'PB':
+            return -1
+        if _pkg_support_from_cache(x) == 'LTSB' and _pkg_support_from_cache(y) != 'LTSB':
+            return 1
+        if _pkg_support_from_cache(x) != 'LTSB' and _pkg_support_from_cache(y) == 'LTSB':
+            return -1
+        if _pkg_support_from_cache(x) == 'Legacy' and _pkg_support_from_cache(y) != 'Legacy':
+            return -1
+        if _pkg_support_from_cache(x) != 'Legacy' and _pkg_support_from_cache(y) == 'Legacy':
+            return 1
+        if _pkg_support_from_cache(x) == 'NFB' and _pkg_support_from_cache(y) != 'NFB':
+            return -1
+        if _pkg_support_from_cache(x) != 'NFB' and _pkg_support_from_cache(y) == 'NFB':
+            return 1
+        if _pkg_support_from_cache(x) == 'Beta' and _pkg_support_from_cache(y) != 'Beta':
+            return -1
+        if _pkg_support_from_cache(x) != 'Beta' and _pkg_support_from_cache(y) == 'Beta':
+            return 1
+
     if x < y:
         return -1
     if x > y:
