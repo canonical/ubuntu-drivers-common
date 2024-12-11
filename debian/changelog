@@ -1,3 +1,20 @@
+ubuntu-drivers-common (1:0.9.7.6ubuntu3.2) noble; urgency=medium
+
+  [Alessandro Astone]
+  * Improve SimpleDRM+NVIDIA fix across kernel versions (LP: #2083329)
+
+  [ Kuba Pawlak ]
+  * fix searching for lrm drivers matching linux-image-virtual (LP: #2085962)
+  * fix install --gpgpu handling (LP: #2083709)
+  * Add --include-dkms option to listing drivers (LP: #2090924)
+  * Sort the output list of matching nvidia drivers (LP: #2081970)
+  * NVIDIA 560 release should suggest -open variant first (LP: #2081967)
+
+  [ Dann Frazier]
+  * Add more useful help text for --gpgpu See LP: #2081881
+
+ -- Kuba Pawlak <kuba.pawlak@canonical.com>  Wed, 11 Dec 2024 13:40:29 +0100
+
 ubuntu-drivers-common (1:0.9.7.6ubuntu3.1) noble; urgency=medium
 
   [ Mate Kukri ]
