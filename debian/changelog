@@ -1,3 +1,33 @@
+ubuntu-drivers-common (1:0.10) plucky; urgency=medium
+
+  [ Kuba Pawlak]
+  * Add --include-dkms option to listing drivers (LP: #2090924)
+  * fix searching for lrm drivers matching linux-image-virtual (LP: #2085962)
+  * Don't remove SimpleDRM if nvidia has fbdev
+  * Don't remove SimpleDRM if nvidia does not have modesetting
+  * fix install --gpgpu handling (LP: #2083709)
+  * Sort the output list of matching nvidia drivers (LP: #2081970)
+  * NVIDIA 560 release should suggest -open variant first (LP: #2081967)
+  * Skip a test that fails after update of aptdaemon
+
+  [ Dann Frazier ]
+  * Add more useful help text for --gpgpu (LP: #2081881)
+
+  [ Alessandro Astone ]
+  * Improve SimpleDRM+NVIDIA fix across kernel versions (LP: #2060268)
+
+  [ Timo Aaltonen ]
+  * gpu-manager: Drop unused functions
+  * copyright: Fix a lintian warning.
+  * Drop obsolete constraints.
+  * rules: Remove built objects directly instead of running make clean.
+  * control, rules: Migrate to debhelper-compat 13 and pybuild.
+  * control: Migrate to pkgconf.
+  * control: Drop obsolete Breaks/Conflicts/Provides/Replaces.
+  * control: Drop ancient transitional packages fglrx-pxpress and nvidia-common.
+
+ -- Kuba Pawlak <kuba.pawlak@canonical.com>  Fri, 06 Dec 2024 16:51:26 +0100
+
 ubuntu-drivers-common (1:0.9.7.8) oracular; urgency=medium
 
   [ Kuba Pawlak ]
