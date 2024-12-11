@@ -1,3 +1,15 @@
+ubuntu-drivers-common (1:0.9.7.10) oracular; urgency=medium
+
+  [ Kuba Pawlak ]
+  * fix searching for lrm drivers matching linux-image-virtual (LP: #2085962)`
+  * fix install --gpgpu handling (LP: #2083709)
+  * Add --include-dkms option to listing drivers (LP: #2090924)
+
+  [ Dann Frazier]
+  * Add more useful help text for --gpgpu See LP: #2081881
+
+ -- Kuba Pawlak <kuba.pawlak@canonical.com>  Wed, 11 Dec 2024 14:47:07 +0100
+
 ubuntu-drivers-common (1:0.9.7.9) oracular; urgency=medium
 
   [ Kuba Pawlak ]
