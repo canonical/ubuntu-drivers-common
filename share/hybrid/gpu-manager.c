@@ -2930,14 +2930,10 @@ int main(int argc, char *argv[]) {
 
                         if (!current_devices[cards_n]->boot_vga) {
                             /* Do not enable RTD3 unless it's a laptop */
-                            if (is_laptop()) {
-                                nvidia_runtimepm_supported = is_nv_runtimepm_supported(dev->device_id);
-
-                                if (!nvidia_runtimepm_supported) {
-                                    /* This is a fairly expensive call, so check the database first */
-                                    get_d3_substates(pm_dev, &d3cold, &d3hot);
-                                    nvidia_runtimepm_supported = d3hot;
-                                }
+                            if (!nvidia_runtimepm_supported) {
+                                /* This is a fairly expensive call, so check the database first */
+                                get_d3_substates(pm_dev, &d3cold, &d3hot);
+                                nvidia_runtimepm_supported = d3hot;
                             }
                             else {
                                 nvidia_runtimepm_supported = false;
