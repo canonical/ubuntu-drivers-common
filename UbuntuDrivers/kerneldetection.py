@@ -25,6 +25,8 @@ import logging
 import re
 
 from subprocess import Popen
+import os
+from apt_pkg import version_compare
 
 
 class KernelDetection(object):
@@ -156,6 +158,7 @@ class KernelDetection(object):
         '''Get the linux metapackage for the newest_kernel installed'''
         return self._get_linux_metapackage('meta')
 
+
     def get_linux_version(self):
         linux_image_meta = self.get_linux_image_metapackage()
         linux_version = ''
@@ -182,3 +185,99 @@ class KernelDetection(object):
         #         linux_version = dependencies.strip().replace('linux-image-', '')
 
         return linux_version
+
+    def is_running_kernel_outdated(self):
+        '''Check if running kernel is outdated.
+
+        Returns a tuple (is_outdated, running_version, latest_version, requires_dkms):
+            is_outdated: True if the kernel is outdated
+            running_version: version string of the running kernel
+            latest_version: version string of the latest available kernel
+            requires_dkms: True if DKMS modules are required
+        '''
+        logging.debug('Checking if running kernel is outdated')
+        
+        # Get running kernel version
+        running_version = os.uname().release
+        logging.debug('Running kernel version: %s', running_version)
+        
+        # Check if running kernel matches expected format (if not, DKMS required)
+        # We make an assumption that a system on a non-ubuntu kernel version format
+        # is not on an Ubuntu prebuilt kernel upgrade path, and thus cannot benefit from prebuilt modules.
+        if not re.match(r'\d+\.\d+\.\d+-\d+', running_version):
+            logging.debug('Running kernel version does not match expected format - DKMS required')
+            return False, running_version, None, True
+        
+        # Get list of installed kernel metapackages. If any are upgradable, we should warn the
+        # user to upgrade before proceeding.
+        # We make an assumption that any of the installed kernels could be the next default boot
+        # option (not necessarily just the currently running one) - and thus we should advise that
+        # any update candidates are applied before proceeding.
+        meta_pkgs = []
+        for pkg in self.apt_cache.packages:
+            if not pkg.current_ver:
+                continue
+            if not pkg.name.startswith('linux-image-'):
+                continue
+            # Skip actual kernel image packages
+            if re.match(r'linux-image-(\d+\.\d+\.\d+-\d+|\w*unsigned-\d+\.\d+\.\d+-\d+)', pkg.name):
+                continue
+            meta_pkgs.append(pkg)
+            logging.debug('Found installed kernel metapackage: %s', pkg.name)
+
+        # Theoretically this shouldn't happen on an Ubuntu system, but it could if
+        # a user is running their own kernel with the same version code pattern as Ubuntu
+        # kernels
+        if not meta_pkgs:
+            logging.debug('No kernel metapackages found')
+            return False, None, None, True
+
+        for meta_pkg in meta_pkgs:
+            logging.debug('Checking metapackage %s for updates', meta_pkg.name)
+            
+            # Check if this metapackage has an update available
+            candidate = self.apt_depcache.get_candidate_ver(meta_pkg)
+            if not candidate:
+                logging.debug('No candidate version for %s', meta_pkg.name)
+                continue
+                
+            if not self.apt_depcache.is_upgradable(meta_pkg):
+                logging.debug('No update available for %s', meta_pkg.name)
+                continue
+
+            # Check candidate dependencies for new kernel version
+            for dep in candidate.depends_list.get('Depends', []):
+                for dep_or in dep:
+                    if not dep_or.target_pkg.name.startswith('linux-image-'):
+                        continue
+                    if not re.match(r'linux-image-\d+\.\d+\.\d+-\d+', dep_or.target_pkg.name):
+                        continue
+                    
+                    latest_version = dep_or.target_pkg.name.split('linux-image-')[1]
+                    logging.debug('Found new kernel version %s from %s', latest_version, meta_pkg.name)
+                    
+                    return True, running_version, latest_version, False
+
+        logging.debug('No kernel updates found')
+        return False, running_version, None, False
+
+    def get_kernel_update_warning(self, include_dkms=False):
+        '''Get a warning message if the kernel needs updating.
+        
+        Returns:
+            should_exit: True if we should exit (e.g., when DKMS is required but not enabled)
+        '''
+        is_outdated, running, latest, requires_dkms = self.is_running_kernel_outdated()
+        
+        if requires_dkms and not include_dkms:
+            print("Your running kernel (%s) requires DKMS modules, which will NOT work with secure boot. "
+                   "Please use --include-dkms if you do not have secure boot enabled and want to proceed." % running)
+            return True
+        
+        if is_outdated and latest:
+            print(f"Warning: Your running kernel ({running}) is outdated. "
+                    f"A newer kernel ({latest}) is available in the Ubuntu archives. "
+                    f"Please run 'sudo apt update && sudo apt upgrade' to update your system.")
+            return False
+                    
+        return False
