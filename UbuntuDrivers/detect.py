@@ -1055,7 +1055,6 @@ def get_desktop_package_list(
                     if not include_dkms and "dkms" in modules_package:
                         to_install.remove(p)
                         continue
-                    to_install.remove(p)
                     to_install.append(modules_package)
 
                     lrm_meta = get_userspace_lrm_meta(apt_cache, p)
