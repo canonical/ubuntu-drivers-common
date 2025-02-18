@@ -1,3 +1,10 @@
+ubuntu-drivers-common (1:0.10.1) plucky; urgency=medium
+
+  [ Kuba Pawlak ]
+  * fix DKMS install of gaming drivers (LP: #2098674)
+
+ -- Kuba Pawlak <kuba.pawlak@canonical.com>  Tue, 18 Feb 2025 11:52:55 +0100
+
 ubuntu-drivers-common (1:0.10) plucky; urgency=medium
 
   [ Kuba Pawlak]
