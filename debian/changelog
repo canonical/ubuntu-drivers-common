@@ -1,3 +1,10 @@
+ubuntu-drivers-common (1:0.9.7.11) oracular; urgency=medium
+
+  [ Kuba Pawlak ]
+  * fix DKMS install of gaming drivers (LP: #2098674)
+
+ -- Kuba Pawlak <kuba.pawlak@canonical.com>  Tue, 18 Feb 2025 11:48:19 +0100
+
 ubuntu-drivers-common (1:0.9.7.10) oracular; urgency=medium
 
   [ Kuba Pawlak ]
