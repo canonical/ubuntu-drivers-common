@@ -207,7 +207,7 @@ def _check_video_abi_compat(apt_cache, package):
     return True
 
 
-def _apt_cache_modalias_map(apt_cache):
+def apt_cache_modalias_map(apt_cache):
     '''Build a modalias map from an apt_pkg.Cache object.
 
     This filters out uninstallable video drivers (i. e. which depend on a video
@@ -294,21 +294,17 @@ def package_get_nv_allowing_driver(did):
     return version
 
 
-def packages_for_modalias(apt_cache, modalias):
+def packages_for_modalias(apt_cache, modalias, modalias_map=None):
     '''Search packages which match the given modalias.
 
     Return a list of apt.Package objects.
     '''
     pkgs = set()
 
-    apt_cache_hash = hash(package.get_fullname() for package in apt_cache.packages)
-    try:
-        cache_map = packages_for_modalias.cache_maps[apt_cache_hash]
-    except KeyError:
-        cache_map = _apt_cache_modalias_map(apt_cache)
-        packages_for_modalias.cache_maps[apt_cache_hash] = cache_map
+    if modalias_map is None:
+        modalias_map = apt_cache_modalias_map(apt_cache)
 
-    pat, bus_map = cache_map.get(modalias.split(':', 1)[0], (None, {}))
+    pat, bus_map = modalias_map.get(modalias.split(':', 1)[0], (None, {}))
     vid, did = _get_vendor_model_from_alias(modalias)
     nvamd = None
     found = 0
@@ -333,9 +329,6 @@ def packages_for_modalias(apt_cache, modalias):
                 pkgs.add(p)
 
     return [apt_cache[p] for p in pkgs]
-
-
-packages_for_modalias.cache_maps = {}
 
 
 def _is_package_free(apt_cache, pkg):
@@ -640,8 +633,9 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
             return {}
 
     packages = {}
+    modalias_map = apt_cache_modalias_map(apt_cache)
     for alias, syspath in modaliases.items():
-        for p in packages_for_modalias(apt_cache, alias):
+        for p in packages_for_modalias(apt_cache, alias, modalias_map=modalias_map):
             if freeonly and not _is_package_free(apt_cache, p):
                 continue
             if not include_oem and fnmatch.fnmatch(p.name, 'oem-*-meta'):
@@ -818,8 +812,9 @@ def system_device_specific_metapackages(apt_cache=None, sys_path=None, include_o
             return {}
 
     packages = {}
+    modalias_map = apt_cache_modalias_map(apt_cache)
     for alias, syspath in modaliases.items():
-        for p in packages_for_modalias(apt_cache, alias):
+        for p in packages_for_modalias(apt_cache, alias, modalias_map=modalias_map):
             if not fnmatch.fnmatch(p.name, 'oem-*-meta'):
                 continue
             packages[p.name] = {
@@ -880,8 +875,9 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
             return {}
 
     packages = {}
+    modalias_map = apt_cache_modalias_map(apt_cache)
     for alias, syspath in modaliases.items():
-        for p in packages_for_modalias(apt_cache, alias):
+        for p in packages_for_modalias(apt_cache, alias, modalias_map=modalias_map):
             (vendor, model) = _get_db_name(syspath, alias)
             vendor_id, model_id = _get_vendor_model_from_alias(alias)
             if (vendor_id is not None) and (vendor_id.lower() in vendors_whitelist):
