@@ -1,3 +1,10 @@
+ubuntu-drivers-common (1:0.10.2) plucky; urgency=medium
+
+  [ Simon Chopin ]
+  * Replace buggy modalias map caching with simple arg passing (LP: #2092601)
+
+ -- Kuba Pawlak <kuba.pawlak@canonical.com>  Thu, 03 Apr 2025 10:30:34 +0200
+
 ubuntu-drivers-common (1:0.10.1) plucky; urgency=medium
 
   [ Kuba Pawlak ]
