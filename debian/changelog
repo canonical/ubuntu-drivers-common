@@ -1,3 +1,10 @@
+ubuntu-drivers-common (1:0.9.7.12) oracular; urgency=medium
+
+  *  [ Simon Chopin ]
+  * Replace buggy modalias map caching with simple arg passing (LP: #2092601)
+
+ -- Kuba Pawlak <kuba.pawlak@canonical.com>  Wed, 16 Apr 2025 20:36:27 +0200
+
 ubuntu-drivers-common (1:0.9.7.11) oracular; urgency=medium
 
   [ Kuba Pawlak ]
