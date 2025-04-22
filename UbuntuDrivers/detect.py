@@ -915,7 +915,7 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
     return packages
 
 
-def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
+def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False, mock=False):
     '''Get by-device driver packages that are available for the system.
 
     This calls system_modaliases() to determine the system's hardware and then
@@ -929,6 +929,9 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
 
     If freeonly is set to True, only free packages (from main and universe) are
     considered
+
+    If mock is set to True, return a sample dictionary output. Intended for
+    developers of consumer applications for debugging.
 
     Return a dictionary which maps devices to available drivers:
 
@@ -969,6 +972,15 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
                      recommended == True, and all others False.
     '''
     result = {}
+
+    if mock:
+        from time import sleep
+        sleep(2)
+        return {
+            '1': {'drivers': {'base-files': {'free': True}}, 'vendor': 'Phony LTDA'},
+            '2': {'drivers': {'bash': {'free': False}}, 'vendor': "Forged GmbH", 'model': "Bourne to be alive"}
+        }
+
     if not apt_cache:
         try:
             apt_cache = apt_pkg.Cache(None)
