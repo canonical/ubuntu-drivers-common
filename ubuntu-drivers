@@ -459,6 +459,13 @@ def greet(config, gpgpu, free_only, package_list, no_oem, **kwargs):
 @pass_config
 def install(config, **kwargs):
     '''Install a driver [driver[:version][,driver[:version]]]'''
+
+    # Require root
+    if os.geteuid() != 0:
+        print("Error: 'ubuntu-drivers install' must be run as root. Try using 'sudo'.", file=sys.stderr)
+        sys.exit(1)
+
+
     if kwargs.get('gpgpu'):
         config.gpgpu = True
     if kwargs.get('free_only'):
