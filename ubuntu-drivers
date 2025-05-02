@@ -488,6 +488,11 @@ def autoinstall(config, **kwargs):
     '''Deprecated, please use "install" instead'''
     #print('install, {0}'.format(kwargs['driver']))
 
+    # Require root
+    if os.geteuid() != 0:
+        print("Error: 'ubuntu-drivers autoinstall' must be run as root. Try using 'sudo'.", file=sys.stderr)
+        sys.exit(1)
+
     if kwargs.get('free_only'):
         config.free_only = True
     # if kwargs.get('package_list'):
