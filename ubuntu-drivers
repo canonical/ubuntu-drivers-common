@@ -272,9 +272,13 @@ def install_gpgpu(args):
                                       UbuntuDrivers.detect._cmp_gfx_alternatives_gpgpu(left[0], right[0])),
                        reverse=True):
         candidate = packages[p].get('metapackage')
-        if candidate and not cache[candidate].current_ver:
-            to_install.append(p)
-            to_install.append(candidate)
+        if candidate:
+            if cache[candidate].current_ver:
+                to_install = []
+                break
+            else:
+                to_install.append(p)
+                to_install.append(candidate)
         print(candidate)
 
         if candidate:
