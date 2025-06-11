@@ -385,21 +385,9 @@ def command_debug(args):
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
-@click.option('--gpgpu', is_flag=True, help='Install “general-purpose computing” drivers for use in a headless server environment. This installs a server (ERD) flavor of the driver (which is required for compatibility with some server applications, such as nvidia-fabricmanager), and also results in a smaller installation footprint by not installing packages that are only useful in graphical environments.')
-@click.option('--free-only', is_flag=True, help='Only consider free packages')
-@click.option('--package-list', nargs=1, metavar='PATH', help='Create file with list of installed packages (in install mode)')
-@click.option('--no-oem', is_flag=True, default=False, show_default=True, metavar='install_oem_meta', help='Do not include OEM enablement packages (these enable an external archive)')
 @pass_config
-def greet(config, gpgpu, free_only, package_list, no_oem, **kwargs):
-    if gpgpu:
-        click.echo('This is gpgpu mode')
-        config.gpu = True
-    if free_only:
-        config.free_only = True
-    if package_list:
-        config.package_list = package_list
-    if no_oem:
-        config.install_oem_meta = False
+def greet(config, **kwargs):
+    pass
 
 @greet.command()
 @click.argument('driver', nargs=-1)  # add the name argument
