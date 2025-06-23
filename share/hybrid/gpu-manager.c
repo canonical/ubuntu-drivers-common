@@ -327,6 +327,43 @@ scan_device(struct pci_dev *p) {
 }
 /* End parts from lspci.{c|h} */
 
+static bool pci_device_is_edp_connected(struct pci_dev *info) {
+    struct dirent *entry;
+    char card[256];
+    char name[1024];
+    DIR *dir;
+    _cleanup_fclose_ FILE *file = NULL;
+    _cleanup_free_ char *connector_status = NULL;
+    size_t len = 0;
+
+    snprintf(name, 1023, "/sys/bus/pci/devices/%04x:%02x:%02x.%1u/drm",
+             info->domain, info->bus, info->dev, info->func);
+    dir = opendir(name);
+    if (!dir)
+        return false;
+    while ((entry = readdir(dir))) {
+        if (strstr(entry->d_name, "card")) {
+            snprintf(card, sizeof(card), "%s", entry->d_name);
+            break;
+        }
+    }
+    closedir(dir);
+
+    snprintf(name, 1023,
+             "/sys/bus/pci/devices/%04x:%02x:%02x.%1u/drm/%s/%s-eDP-1/status",
+             info->domain, info->bus, info->dev, info->func, card, card);
+    file = fopen(name, "r");
+    if (file == NULL) {
+        fprintf(log_handle, "can't open %s\n", name);
+        return false;
+    }
+    if (getline(&connector_status, &len, file) == -1) {
+        fprintf(log_handle, "can't get line from %s\n", name);
+        return false;
+    }
+    return (strcmp(connector_status, "connected\n") == 0);
+}
+
 
 static bool pci_device_is_boot_vga(struct pci_dev *info) {
     size_t len = 0;
@@ -342,6 +379,8 @@ static bool pci_device_is_boot_vga(struct pci_dev *info) {
     file = fopen(sysfs_path, "r");
     if (file == NULL) {
         fprintf(log_handle, "can't open %s\n", sysfs_path);
+        if (pci_device_is_edp_connected(info))
+            return true;
         return false;
     }
     if (getline(&boot_vga_str, &len, file) == -1) {
