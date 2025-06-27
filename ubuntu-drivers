@@ -403,7 +403,7 @@ def greet(config, gpgpu, free_only, package_list, no_oem, **kwargs):
 
 @greet.command()
 @click.argument('driver', nargs=-1)  # add the name argument
-@click.option('--gpgpu', is_flag=True, help='Install drivers for use in a headless (aka General Purpose GPU) environment. This results in a smaller installation footprint by not installing packages that are only useful in graphical environments.')
+@click.option('--gpgpu', is_flag=True, help='Install “general-purpose computing” drivers for use in a headless server environment. This installs a server (ERD) flavor of the driver (which is required for compatibility with some server applications, such as nvidia-fabricmanager), and also results in a smaller installation footprint by not installing packages that are only useful in graphical environments.')
 @click.option('--recommended', is_flag=True, help='Only show the recommended driver packages')
 @click.option('--free-only', is_flag=True, help='Only consider free packages')
 @click.option('--package-list', nargs=1, metavar='PATH', help='Create file with list of installed packages (in install mode)')
@@ -455,7 +455,7 @@ def autoinstall(config, **kwargs):
 
 @greet.command()
 @click.argument('list', nargs=-1)
-@click.option('--gpgpu', is_flag=True, help='Install drivers for use in a headless (aka General Purpose GPU) environment. This results in a smaller installation footprint by not installing packages that are only useful in graphical environments.')
+@click.option('--gpgpu', is_flag=True, help='Install “general-purpose computing” drivers for use in a headless server environment. This installs a server (ERD) flavor of the driver (which is required for compatibility with some server applications, such as nvidia-fabricmanager), and also results in a smaller installation footprint by not installing packages that are only useful in graphical environments.')
 @click.option('--recommended', is_flag=True, help='Only show the recommended driver packages')
 @click.option('--free-only', is_flag=True, help='Only consider free packages')
 @click.option('--include-dkms', is_flag=True, help='Also consider DKMS packages')
