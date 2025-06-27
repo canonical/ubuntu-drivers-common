@@ -76,7 +76,7 @@ def main():
     else:
         suite = unittest.TestLoader().loadTestsFromNames(
             [t[:-3] for t in os.listdir(os.path.dirname(__file__))
-            if t.endswith('.py') and t not in ['settings.py', '__init__.py'] and not
+            if t.endswith('.py') and t not in ['settings.py', '__init__.py', 'patchos.py'] and not
             (t == 'gpu-manager.py' and '86' not in os.uname()[4])])
     res = unittest.TextTestRunner(verbosity=2).run(suite)
     return len(res.errors) + len(res.failures)
