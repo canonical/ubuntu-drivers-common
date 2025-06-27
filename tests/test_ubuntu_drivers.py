@@ -4902,7 +4902,7 @@ APT::Get::AllowUnauthenticated "true";
         '''ubuntu-drivers install for fake sysfs and chroot'''
 
         ud = subprocess.Popen(
-            [self.tool_path, 'install'],
+            ['python3', '-m', 'tests.patchos', self.tool_path, 'install'],
             universal_newlines=True, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, env=os.environ)
         out, err = ud.communicate()
@@ -4914,13 +4914,27 @@ APT::Get::AllowUnauthenticated "true";
 
         # now all packages should be installed, so it should not do anything
         ud = subprocess.Popen(
-            [self.tool_path, 'install'],
+            ['python3', '-m', 'tests.patchos', self.tool_path, 'install'],
             universal_newlines=True, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, env=os.environ)
         out, err = ud.communicate()
         # self.assertEqual(err, '')
         self.assertFalse('bcmwl-kernel-source' in out, out)
         self.assertEqual(ud.returncode, 0)
+
+    def test_auto_install_chroot_no_root_access(self):
+        '''ubuntu-drivers install for fake sysfs and chroot, but no root privileges'''
+
+        ud = subprocess.Popen(
+            [self.tool_path, 'install'],
+            universal_newlines=True, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, env=os.environ)
+        out, err = ud.communicate()
+        # self.assertEqual(err, '')
+        self.assertFalse('bcmwl-kernel-source' in out, out)
+        self.assertEqual(ud.returncode, 1)
+
+        # now all packages should be installed, so it should not do anything
 
     def test_auto_install_packagelist(self):
         '''ubuntu-drivers install package list creation'''
@@ -4929,7 +4943,7 @@ APT::Get::AllowUnauthenticated "true";
         self.addCleanup(os.unlink, listfile)
 
         ud = subprocess.Popen(
-            [self.tool_path, 'install', '--package-list', listfile],
+            ['python3', '-m', 'tests.patchos', self.tool_path, 'install', '--package-list', listfile],
             universal_newlines=True, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
         out, err = ud.communicate()
