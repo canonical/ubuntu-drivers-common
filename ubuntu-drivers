@@ -231,10 +231,6 @@ def command_install(args):
 
     return ret
 
-def command_autoinstall(args):
-    '''Install drivers that are appropriate for automatic installation. [DEPRECATED]'''
-    return command_install(args)
-
 def install_gpgpu(args):
     '''Install GPGPU drivers that are appropriate for your hardware.'''
     candidate = ''
@@ -445,29 +441,6 @@ def install(config, **kwargs):
     else:
         command_install(config)
 
-@greet.command()
-@click.argument('driver', nargs=-1)  # add the name argument
-@pass_config
-def autoinstall(config, **kwargs):
-    '''Deprecated, please use "install" instead'''
-    #print('install, {0}'.format(kwargs['driver']))
-
-    # Require root
-    if os.geteuid() != 0:
-        print("Error: 'ubuntu-drivers autoinstall' must be run as root. Try using 'sudo'.", file=sys.stderr)
-        sys.exit(1)
-
-    if kwargs.get('free_only'):
-        config.free_only = True
-    # if kwargs.get('package_list'):
-    #     config.package_list = kwargs.get('package_list')
-    if kwargs.get('package_list'):
-        config.package_list = ''.join(kwargs.get('package_list'))
-
-    if kwargs.get('driver'):
-        config.driver_string = ''.join(kwargs.get('driver'))
-
-    command_install(config)
 
 @greet.command()
 @click.argument('list', nargs=-1)
