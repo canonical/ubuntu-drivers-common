@@ -27,7 +27,7 @@ setup(
     url="http://www.albertomilone.com",
     license="gpl",
     description="Detect and install additional Ubuntu driver packages",
-    packages=["NvidiaDetector", "Quirks", "UbuntuDrivers"],
+    packages=["Quirks", "UbuntuDrivers"],
     data_files=[("/usr/share/ubuntu-drivers-common/", ["share/obsolete", "share/fake-devices-wrapper"]),
                 ("/var/lib/ubuntu-drivers-common/", []),
                 ("/usr/share/ubuntu-drivers-common/quirks", glob.glob("quirks/*")),
@@ -36,5 +36,5 @@ setup(
                 ("/usr/lib/nvidia/", glob.glob("nvidia-installer-hooks/*")),
                 ("/usr/lib/ubiquity/target-config", glob.glob("ubiquity/target-config/*")),
                ] + extra_data,
-    scripts=["nvidia-detector", "quirks-handler", "ubuntu-drivers"],
+    scripts=["quirks-handler", "ubuntu-drivers"],
 )
