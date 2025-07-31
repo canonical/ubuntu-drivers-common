@@ -1,13 +1,29 @@
 ubuntu-drivers-common (1:0.10.3) questing; urgency=medium
 
+  [ Mitchell Augustin ]
+  * replace nvidia-current with generic nvidia-driver-xxx branch in tests
+  * Remove nvidia-detector
+  [ Kai-Chuan Hsieh ]
+  *  Fix AMD + NVIDIA platform boot_vga not set
   [ Conrad Fernandez ]
   * Require root for install and autoinstall (LP: #1920225)
   [ Kuba Pawlak ]
   * Repeated 'install' invocations cycle between drivers (LP: #2115507)
-  [ Mitchell Augustin ]
-  * Add more accurate help text for gpgpu flag (LP: #2115537)
 
  -- Kuba Pawlak <kuba.pawlak@canonical.com>  Mon, 30 Jun 2025 09:54:58 +0200
+
+ubuntu-drivers-common (1:0.10.2ubuntu2) questing; urgency=medium
+
+  * d/s/options: ignore .git
+    - Remove .git artifacts included in the previous upload
+
+ -- Nick Rosbrook <enr0n@ubuntu.com>  Thu, 31 Jul 2025 08:43:25 -0400
+
+ubuntu-drivers-common (1:0.10.2ubuntu1) questing; urgency=medium
+
+  * Clarify gpgpu flag help text (LP: #2115537)
+
+ -- Mitchell Augustin <mitchell.augustin@canonical.com> Tue, 01 Jul 2025 16:46:31 -0500
 
 ubuntu-drivers-common (1:0.10.2) plucky; urgency=medium
 
