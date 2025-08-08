@@ -1,3 +1,10 @@
+ubuntu-drivers-common (1:0.10.2ubuntu0.1) plucky; urgency=medium
+
+  * Clarify gpgpu flag help text (LP: #2115537)
+
+ -- Mitchell Augustin <mitchell.augustin@canonical.com>  Tue, 01 Jul 2025 16:47:38 -0500
+
+
 ubuntu-drivers-common (1:0.10.2) plucky; urgency=medium
 
   [ Simon Chopin ]
