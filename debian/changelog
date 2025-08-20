@@ -1,3 +1,10 @@
+ubuntu-drivers-common (1:0.10.3ubuntu1) plucky; urgency=medium
+
+  * Check kernel version / Secure Boot status and warn user if needed
+    (LP: #2109526)
+
+ -- Mitchell Augustin <mitchell.augustin@canonical.com>  Thu, 10 Jul 2025 07:47:10 -0500
+
 ubuntu-drivers-common (1:0.10.3) questing; urgency=medium
 
   [ Mitchell Augustin ]
