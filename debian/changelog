@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.10.2ubuntu0.1) plucky; urgency=medium
+ubuntu-drivers-common (1:0.10.2.1) plucky; urgency=medium
 
   * Clarify gpgpu flag help text (LP: #2115537)
 
