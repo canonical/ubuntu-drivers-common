@@ -1036,6 +1036,12 @@ def get_desktop_package_list(
 
             candidate = depcache.get_candidate_ver(package_obj)
             records.lookup(candidate.file_list[0])
+
+            # Do not add more than one nvidia-driver-* (or associated packages) to to_install
+            if p.startswith("nvidia-driver-"):
+                if any(pkg.startswith("nvidia-driver-") for pkg in to_install):
+                    continue
+
             to_install.append(p)
 
             # See if runtimepm is supported

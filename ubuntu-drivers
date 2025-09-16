@@ -271,6 +271,11 @@ def install_gpgpu(args):
                        key=cmp_to_key(lambda left, right:
                                       UbuntuDrivers.detect._cmp_gfx_alternatives_gpgpu(left[0], right[0])),
                        reverse=True):
+        # Do not add more than one nvidia-driver-* (or associated packages) to to_install
+        if p.startswith("nvidia-driver-"):
+            if any(pkg.startswith("nvidia-driver-") for pkg in to_install):
+                continue
+
         candidate = packages[p].get('metapackage')
         if candidate and not cache[candidate].current_ver:
             to_install.append(p)
