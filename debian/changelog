@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.9.6.2~0.22.04.10) jammy; urgency=medium
+
+  * Prevent coinstallation of conflicting Nvidia Drivers (LP: #2125156)
+
+ -- Mitchell Augustin <mitchell.augustin@canonical.com>  Fri, 03 Oct 2025 16:26:02 -0500
+
 ubuntu-drivers-common (1:0.9.6.2~0.22.04.9) jammy; urgency=medium
 
   [ Alessandro Astone ]
