@@ -113,7 +113,7 @@ def system_modaliases(sys_path=None):
     Return a modalias → sysfs path map.
     '''
     aliases = {}
-    devices = sys_path and '%s/devices' % (sys_path) or '/sys/devices'
+    devices = f"{sys_path}/devices" if sys_path else "/sys/devices"
     for path, dirs, files in os.walk(devices):
         modalias = None
 
