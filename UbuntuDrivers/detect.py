@@ -319,9 +319,12 @@ def packages_for_modalias(apt_cache, modalias, modalias_map=None):
         if nvamd is not None and not found:
             logging.debug('%s is not in the package pool.' % nvamdn)
 
-    if not found:
-        if pat is None or not pat.match(modalias):
-            return []
+    if found:
+        logging.info('Found custom %s in the package pool.' % nvamdn)
+        return [apt_cache[nvamdn]]
+
+    if pat is None or not pat.match(modalias):
+        return []
 
     for alias in bus_map:
         if fnmatch.fnmatchcase(modalias.lower(), alias.lower()):
@@ -452,12 +455,10 @@ def _is_nv_allowing_runtimepm_supported(alias, ver):
                 gpus = list(json.load(stream)['chips'])
                 for gpu in gpus:
                     if gpu['devid'] == did and 'runtimepm' in gpu['features']:
-                        if gpu['branch'].split('.')[0] != ver:
-                            logging.debug('Candidate version does not match %s != %s' %
-                                          (gpu['branch'].split('.')[0], ver))
-                            return False
-                        logging.info("Found runtimepm supports on %s." % did)
-                        return True
+                        if ver in gpu['branch'].split('.')[0]:
+                            logging.info("Found runtimepm supports on %s." % did)
+                            return True
+                logging.debug('%s has no matched driver to support runtimepm' % did)
             except Exception:
                 logging.debug('_is_nv_allowing_runtimepm_supported(): unexpected json detected')
                 pass
