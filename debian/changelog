@@ -1,6 +1,10 @@
 ubuntu-drivers-common (1:0.9.7.6ubuntu3.5) noble; urgency=medium
 
+  [ Mitchell Augustin ]
   * Prevent coinstallation of conflicting Nvidia Drivers (LP: #2125156)
+
+  [ Nick Rosbrook ]
+  * debian/source/options: ignore .git to prevent git artifacts in upload
 
  -- Mitchell Augustin <mitchell.augustin@canonical.com>  Fri, 03 Oct 2025 16:26:02 -0500
 
