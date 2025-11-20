@@ -114,7 +114,7 @@ def system_modaliases(sys_path=None):
     Return a modalias → sysfs path map.
     '''
     aliases = {}
-    devices = sys_path and '%s/devices' % (sys_path) or '/sys/devices'
+    devices = f"{sys_path}/devices" if sys_path else "/sys/devices"
     for path, dirs, files in os.walk(devices):
         modalias = None
 
@@ -1053,6 +1053,12 @@ def get_desktop_package_list(
 
             candidate = depcache.get_candidate_ver(package_obj)
             records.lookup(candidate.file_list[0])
+
+            # Do not add more than one nvidia-driver-* (or associated packages) to to_install
+            if p.startswith("nvidia-driver-"):
+                if any(pkg.startswith("nvidia-driver-") for pkg in to_install):
+                    continue
+
             to_install.append(p)
 
             # See if runtimepm is supported
