@@ -245,6 +245,8 @@ def apt_cache_modalias_map(apt_cache):
                 if not part:
                     continue
                 module, lst = part.split('(')
+                if lst.startswith("of:"):
+                    lst = lst.replace(",", "\\,")
                 for alias in re.split(r'(?<!\\),', lst):
                     alias = alias.strip()
                     bus = alias.split(':', 1)[0]
