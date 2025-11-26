@@ -253,7 +253,7 @@ class KernelDetection(object):
         return False, running_version, None, False
 
     def get_kernel_update_warning(self, include_dkms=False):
-        '''Get a warning message if the kernel needs updating.
+        '''Print a warning message if the kernel needs updating.
 
         Returns:
             should_exit: True if the caller should exit (e.g. DKMS required but not included)
