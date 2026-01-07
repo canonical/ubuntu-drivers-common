@@ -1,3 +1,4 @@
 extend-diff-ignore = "*__pycache__*"
 tar-ignore = "*__pycache__*"
-
+extend-diff-ignore = ".git"
+tar-ignore = ".git"
