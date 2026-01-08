@@ -1117,6 +1117,15 @@ def _process_driver_string(string):
     '''Returns a _GpgpuDriver object'''
     driver = _GpgpuDriver()
 
+    # Check for metapackage-style names like nvidia-driver-535, nvidia-driver-535-server, etc.
+    metapackage_pattern = re.compile('nvidia-driver-([0-9]+)(.*)')
+    metapackage_match = metapackage_pattern.match(string)
+
+    if metapackage_match:
+        driver.vendor = 'nvidia'
+        driver.flavour = '%s%s' % (metapackage_match.group(1), metapackage_match.group(2))
+        return driver
+
     full_pattern = re.compile('(.+):([0-9]+)(.*)')
     vendor_only_pattern = re.compile('([a-z]+)')
     series_only_pattern = re.compile('([0-9]+)(.*)')
@@ -1166,6 +1175,7 @@ def gpgpu_install_filter(packages, drivers_str, get_recommended=True):
         # Just one driver
         # e.g. --gpgpu 390
         #      --gpgpu nvidia:390
+        #      --gpgpu nvidia-driver-535-server
         #
         # Or Multiple drivers
         # e.g. --gpgpu nvidia:390,amdgpu
