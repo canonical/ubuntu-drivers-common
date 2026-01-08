@@ -1132,6 +1132,10 @@ def already_installed_filter(cache, packages, include_dkms, comparator):
                     pass
 
         candidate = packages[p].get('metapackage')
+        # Do not add more than one nvidia-driver-* (or associated packages) to to_install
+        if p.startswith("nvidia-driver-"):
+            if any(pkg.startswith("nvidia-driver-") for pkg in to_install):
+                continue
 
         if candidate:
             if cache[candidate].current_ver:
