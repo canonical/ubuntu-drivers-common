@@ -20,6 +20,7 @@ import apt_pkg
 
 from functools import cmp_to_key
 import UbuntuDrivers.detect
+from UbuntuDrivers import kerneldetection
 
 sys_path = os.environ.get('UBUNTU_DRIVERS_SYS_DIR')
 
@@ -57,6 +58,15 @@ def command_list(args):
         print(ex)
         return 1
 
+
+    # First check if kernel needs updating
+    kernel_detector = kerneldetection.KernelDetection(cache)
+
+    should_exit = kernel_detector.get_kernel_update_warning(args.include_dkms)
+
+    if should_exit:
+        return 1
+
     packages = UbuntuDrivers.detect.system_driver_packages(apt_cache=cache,
         sys_path=sys_path, freeonly=args.free_only, include_oem=args.install_oem_meta)
 
@@ -89,6 +99,15 @@ def command_list_oem(args):
     except Exception as ex:
         print(ex)
         return 1
+    
+
+    # First check if kernel needs updating
+    kernel_detector = kerneldetection.KernelDetection(cache)
+
+    should_exit = kernel_detector.get_kernel_update_warning(args.include_dkms)
+
+    if should_exit:
+        return 1
 
     packages = UbuntuDrivers.detect.system_device_specific_metapackages(
         apt_cache=cache, sys_path=sys_path, include_oem=args.install_oem_meta)
@@ -113,6 +132,15 @@ def list_gpgpu(args):
         cache = apt_pkg.Cache(None)
     except Exception as ex:
         print(ex)
+        return 1
+
+
+    # First check if kernel needs updating
+    kernel_detector = kerneldetection.KernelDetection(cache)
+
+    should_exit = kernel_detector.get_kernel_update_warning(args.include_dkms)
+
+    if should_exit:
         return 1
 
     packages = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path)
@@ -173,6 +201,16 @@ def command_install(args):
 
     with_nvidia_kms = False
     is_nvidia = False
+
+
+    # First check if kernel needs updating
+    kernel_detector = kerneldetection.KernelDetection(cache)
+
+    should_exit = kernel_detector.get_kernel_update_warning(args.include_dkms)
+
+    if should_exit:
+        return 1
+
 
     to_install = UbuntuDrivers.detect.get_desktop_package_list(cache, sys_path,
         free_only=args.free_only, include_oem=args.install_oem_meta,
@@ -254,6 +292,15 @@ def install_gpgpu(args):
         cache = apt_pkg.Cache(None)
     except Exception as ex:
         print(ex)
+        return 1
+
+
+    # First check if kernel needs updating
+    kernel_detector = kerneldetection.KernelDetection(cache)
+
+    should_exit = kernel_detector.get_kernel_update_warning(args.include_dkms)
+
+    if should_exit:
         return 1
 
     packages = UbuntuDrivers.detect.system_gpgpu_driver_packages(cache, sys_path)
@@ -413,6 +460,15 @@ def list(config, **kwargs):
         cache = apt_pkg.Cache(None)
     except Exception as ex:
         print(ex)
+        return 1
+
+
+    # First check if kernel needs updating
+    kernel_detector = kerneldetection.KernelDetection(cache)
+
+    should_exit = kernel_detector.get_kernel_update_warning(include_dkms)
+
+    if should_exit:
         return 1
 
     if kwargs.get('gpgpu'):
