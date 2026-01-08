@@ -24,7 +24,8 @@ import apt_pkg
 import logging
 import re
 
-from subprocess import Popen
+from subprocess import Popen, PIPE
+import os
 
 
 class KernelDetection(object):
@@ -182,3 +183,140 @@ class KernelDetection(object):
         #         linux_version = dependencies.strip().replace('linux-image-', '')
 
         return linux_version
+
+    def is_running_kernel_outdated(self):
+        '''Check if running kernel is outdated.
+
+        Returns a tuple (is_outdated, running_version, latest_version, requires_dkms):
+            is_outdated: True if the kernel is outdated
+            running_version: version string of the running kernel
+            latest_version: version string of the latest available kernel
+            requires_dkms: True if DKMS modules are required
+        '''
+        logging.debug('Checking if running kernel is outdated')
+
+        # Get running kernel version
+        running_version = os.uname().release
+        logging.debug('Running kernel version: %s', running_version)
+
+        # Check if running kernel matches expected format (if not, DKMS required)
+        # We make an assumption that a system on a non-ubuntu kernel version format
+        # is not on an Ubuntu prebuilt kernel upgrade path, and thus cannot benefit from prebuilt modules.
+        if not re.match(r'\d+\.\d+\.\d+-\d+', running_version):
+            logging.debug('Running kernel version does not match expected format - DKMS required')
+            return False, running_version, None, True
+
+        # Get list of installed kernel metapackages. If any are upgradable, we should warn the
+        # user to upgrade before proceeding.
+        # We make an assumption that any of the installed kernels could be the next default boot
+        # option (not necessarily just the currently running one) - and thus we should advise that
+        # any update candidates are applied before proceeding.
+        meta_pkgs = []
+        for pkg in self.apt_cache.packages:
+            if not pkg.current_ver:
+                continue
+            if not pkg.name.startswith('linux-image-'):
+                continue
+            # Skip actual kernel image packages
+            if re.match(r'linux-image-(\d+\.\d+\.\d+-\d+|\w*unsigned-\d+\.\d+\.\d+-\d+)', pkg.name):
+                continue
+            meta_pkgs.append(pkg)
+            logging.debug('Found installed kernel metapackage: %s', pkg.name)
+
+        for meta_pkg in meta_pkgs:
+            logging.debug('Checking metapackage %s for updates', meta_pkg.name)
+
+            # Check if this metapackage has an update available
+            candidate = self.apt_depcache.get_candidate_ver(meta_pkg)
+            if not candidate:
+                logging.debug('No candidate version for %s', meta_pkg.name)
+                continue
+
+            if not self.apt_depcache.is_upgradable(meta_pkg):
+                logging.debug('No update available for %s', meta_pkg.name)
+                continue
+
+            # Check candidate dependencies for new kernel version
+            for dep in candidate.depends_list.get('Depends', []):
+                for dep_or in dep:
+                    if not dep_or.target_pkg.name.startswith('linux-image-'):
+                        continue
+                    if not re.match(r'linux-image-\d+\.\d+\.\d+-\d+', dep_or.target_pkg.name):
+                        continue
+
+                    latest_version = dep_or.target_pkg.name.split('linux-image-')[1]
+                    logging.debug('Found new kernel version %s from %s', latest_version, meta_pkg.name)
+
+                    return True, running_version, latest_version, False
+
+        logging.debug('No kernel updates found')
+        return False, running_version, None, False
+
+    def get_kernel_update_warning(self, include_dkms=False):
+        '''Print a warning message if the kernel needs updating.
+
+        Returns:
+            should_exit: True if the caller should exit (e.g. DKMS required but not included)
+        '''
+        is_outdated, running, latest, requires_dkms = self.is_running_kernel_outdated()
+
+        if requires_dkms:
+            if not include_dkms:
+                # Check Secure Boot state using mokutil
+                try:
+                    process = Popen(['mokutil', '--sb-state'], stdout=PIPE, stderr=PIPE)
+                    output, err = process.communicate()
+                    output = output.decode('utf-8').lower()
+                    err = err.decode('utf-8').lower()
+                    if 'secureboot enabled' in output or 'secure boot enabled' in output:
+                        print(
+                            "Your running kernel (%s) requires DKMS modules, and you have Secure Boot enabled. "
+                            "To proceed, ensure you have access to your machine’s UEFI menu and have the rights "
+                            "to enroll a Machine Owner Key (MOK), "
+                            "then re-run ubuntu-drivers with --include-dkms. This will install the DKMS modules, "
+                            "then prompt you to enroll the new MOK and reboot."
+                            % running
+                        )
+                        return True
+                    elif 'secureboot disabled' in output or 'secure boot disabled' in output:
+                        print(
+                            "Your running kernel (%s) requires DKMS modules. You have Secure Boot disabled, but if "
+                            "you enable it in the future, you will need to sign or reinstall these DKMS modules for "
+                            "them to work. "
+                            "If you would like to continue, please re-run ubuntu-drivers with --include-dkms."
+                            % running
+                        )
+                        return True
+                    elif 'this system doesn\'t support secure boot' in err:
+                        print(
+                            "Your running kernel (%s) requires DKMS modules. Please use --include-dkms if you want"
+                            " to proceed."
+                            % running
+                        )
+                        return True
+                    # else: fall through to generic response
+                except Exception as e:
+                    logging.warning('Could not determine Secure Boot state: %s', str(e))
+                    # fall through to generic response
+
+                # fallback generic response - n
+                print(
+                    "Your running kernel (%s) requires DKMS modules, and ubuntu-drivers was unable to determine if"
+                    " Secure Boot is enabled. If you have SB enabled, you will need to enroll a MOK to proceed, "
+                    "which will require access to your UEFI menu and administrative privileges. Please use "
+                    "--include-dkms if you want to proceed."
+                    % running
+                )
+                return True
+            else:
+                # DKMS is allowed via --include-dkms, so no exit needed
+                return False
+
+        if is_outdated and latest:
+            print(
+                f"Warning: Your running kernel ({running}) is outdated. "
+                f"A newer kernel ({latest}) is available in the Ubuntu archives. "
+                f"Please run 'sudo apt update && sudo apt upgrade' to update your system."
+            )
+        # Outdated kernel is only a warning, not a blocker
+        return False
