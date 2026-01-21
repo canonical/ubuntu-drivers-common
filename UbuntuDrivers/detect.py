@@ -1722,10 +1722,10 @@ def get_linux_modules_metapackage(apt_cache, candidate):
 
 def _load_grub_cfg(grub_cfg_path='/boot/grub/grub.cfg'):
     '''Load grub configuration file content.
-    
+
     Args:
         grub_cfg_path: Path to grub.cfg file (default: /boot/grub/grub.cfg)
-    
+
     Returns:
         String content of grub.cfg, or None if file doesn't exist or can't be read
     '''
@@ -1743,17 +1743,17 @@ def _load_grub_cfg(grub_cfg_path='/boot/grub/grub.cfg'):
 
 def _parse_grub_cfg_for_kernel(grub_content, entry_num):
     '''Parse grub configuration content to find kernel version for given entry.
-    
+
     Args:
         grub_content: Content of grub.cfg file as string
         entry_num: Entry identifier - either numeric index (as string) or entry ID
-    
+
     Returns:
         Kernel version string, or None if not found
     '''
     if not grub_content:
         return None
-        
+
     vmlinuz_entry_regex = r'linux\s+.*vmlinuz-([^\s]+)'
     try:
         lines = grub_content.split('\n')
@@ -1827,10 +1827,10 @@ def _parse_grub_cfg_for_kernel(grub_content, entry_num):
 
 def _get_kernel_from_grub_entry(entry_num):
     '''Convert grub entry number to kernel version by parsing grub.cfg.
-    
+
     Args:
         entry_num: Entry identifier - either numeric index (as string) or entry ID
-    
+
     Returns:
         Kernel version string, or None if not found
     '''
@@ -1910,12 +1910,12 @@ def _resolve_nvidia_module_path_for_kernel(kernel_version):
             universal_newlines=True,
             stderr=subprocess.DEVNULL
         )
-        
+
         # Get the first match if any
         matches = result.strip().split('\n')
         if matches and matches[0]:
             return matches[0]
-            
+
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         logging.debug(f"find command failed in _resolve_nvidia_module_path_for_kernel(): {e}")
 
@@ -2023,11 +2023,13 @@ def gather_welcome_page_data():
         return data
 
     # Get installed NVIDIA drivers
-    data['nvidia_drivers'] = get_installed_packages_by_glob(cache, "nvidia-driver-*") or \
-            get_installed_packages_by_glob(cache, "linux-modules-nvidia-*")
+    data['nvidia_drivers'] = get_installed_packages_by_glob(
+        cache, "nvidia-driver-*") or \
+        get_installed_packages_by_glob(cache, "linux-modules-nvidia-*")
 
     # Get installed OEM meta packages
-    data['oem_packages'] = get_installed_packages_by_glob(cache, "oem-*-meta")
+    data['oem_packages'] = get_installed_packages_by_glob(
+        cache, "oem-*-meta")
 
     # Check NVIDIA module status if NVIDIA drivers are installed
     if data['nvidia_drivers']:

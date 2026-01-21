@@ -40,9 +40,9 @@ class TestWelcomePageFormatting(unittest.TestCase):
             'nvidia_status': None,
             'nvidia_status_error': None
         }
-        
+
         output = format_welcome_page(data)
-        
+
         self.assertIn("Welcome to ubuntu-drivers", output)
         self.assertIn("No OEM or NVIDIA drivers are currently installed", output)
         self.assertIn("ubuntu-drivers --help", output)
@@ -56,9 +56,9 @@ class TestWelcomePageFormatting(unittest.TestCase):
             'nvidia_status': None,
             'nvidia_status_error': None
         }
-        
+
         output = format_welcome_page(data)
-        
+
         self.assertIn("Welcome to ubuntu-drivers", output)
         self.assertIn("Warning: Could not access package cache", output)
         self.assertIn("Could not open cache", output)
@@ -72,9 +72,9 @@ class TestWelcomePageFormatting(unittest.TestCase):
             'nvidia_status': None,
             'nvidia_status_error': None
         }
-        
+
         output = format_welcome_page(data)
-        
+
         self.assertIn("NVIDIA Drivers:", output)
         self.assertIn("nvidia-driver-535", output)
         self.assertIn("linux-modules-nvidia-535-generic", output)
@@ -89,9 +89,9 @@ class TestWelcomePageFormatting(unittest.TestCase):
             'nvidia_status': None,
             'nvidia_status_error': None
         }
-        
+
         output = format_welcome_page(data)
-        
+
         self.assertIn("OEM Enablement Packages:", output)
         self.assertIn("oem-somerville-meta", output)
         self.assertIn("oem-stella-meta", output)
@@ -106,9 +106,9 @@ class TestWelcomePageFormatting(unittest.TestCase):
             'nvidia_status': None,
             'nvidia_status_error': None
         }
-        
+
         output = format_welcome_page(data)
-        
+
         self.assertIn("NVIDIA Drivers:", output)
         self.assertIn("nvidia-driver-535", output)
         self.assertIn("OEM Enablement Packages:", output)
@@ -130,9 +130,9 @@ class TestWelcomePageFormatting(unittest.TestCase):
             },
             'nvidia_status_error': None
         }
-        
+
         output = format_welcome_page(data)
-        
+
         self.assertIn("NVIDIA Module Status", output)
         self.assertIn("✓ NVIDIA module is currently loaded", output)
         self.assertIn("Module path for current kernel:", output)
@@ -154,9 +154,9 @@ class TestWelcomePageFormatting(unittest.TestCase):
             },
             'nvidia_status_error': None
         }
-        
+
         output = format_welcome_page(data)
-        
+
         self.assertIn("NVIDIA Module Status", output)
         self.assertIn("ℹ️  NVIDIA module is not currently loaded", output)
         self.assertIn("📍 The NVIDIA module should load on next boot", output)
@@ -177,9 +177,9 @@ class TestWelcomePageFormatting(unittest.TestCase):
             },
             'nvidia_status_error': None
         }
-        
+
         output = format_welcome_page(data)
-        
+
         self.assertIn("❌  ERROR: NVIDIA module is missing for the next boot kernel!", output)
         self.assertIn("Next boot kernel: 5.15.0-97-generic", output)
         self.assertIn("Please re-run ubuntu-drivers", output)
@@ -202,9 +202,9 @@ class TestWelcomePageFormatting(unittest.TestCase):
             },
             'nvidia_status_error': None
         }
-        
+
         output = format_welcome_page(data)
-        
+
         self.assertIn("⚠️  Kernel version difference detected", output)
         self.assertIn("reboot to use the latest kernel", output)
         self.assertIn("Next boot kernel: 5.15.0-97-generic", output)
@@ -225,9 +225,9 @@ class TestWelcomePageFormatting(unittest.TestCase):
             },
             'nvidia_status_error': None
         }
-        
+
         output = format_welcome_page(data)
-        
+
         self.assertIn("📍 Module paths differ", output)
         self.assertIn("you should reboot", output)
         self.assertIn("Current:", output)
@@ -242,9 +242,9 @@ class TestWelcomePageFormatting(unittest.TestCase):
             'nvidia_status': None,
             'nvidia_status_error': 'Permission denied'
         }
-        
+
         output = format_welcome_page(data)
-        
+
         self.assertIn("NVIDIA Module Status", output)
         self.assertIn("⚠️  Could not check NVIDIA module status", output)
         self.assertIn("Permission denied", output)
@@ -265,9 +265,9 @@ class TestWelcomePageFormatting(unittest.TestCase):
             },
             'nvidia_status_error': None
         }
-        
+
         output = format_welcome_page(data)
-        
+
         self.assertIn("⚠️  Could not determine next boot kernel", output)
         self.assertIn("try again with `sudo ubuntu-drivers`", output)
 
@@ -280,9 +280,9 @@ class TestWelcomePageFormatting(unittest.TestCase):
             'nvidia_status': None,
             'nvidia_status_error': None
         }
-        
+
         output = format_welcome_page(data)
-        
+
         self.assertIsInstance(output, str)
 
     def test_format_welcome_page_no_empty_lines_at_start(self):
@@ -294,9 +294,9 @@ class TestWelcomePageFormatting(unittest.TestCase):
             'nvidia_status': None,
             'nvidia_status_error': None
         }
-        
+
         output = format_welcome_page(data)
-        
+
         # Should start with one newline, then content
         self.assertTrue(output.startswith('\n==='))
 
@@ -309,10 +309,10 @@ class TestWelcomePageFormatting(unittest.TestCase):
             'nvidia_status': None,
             'nvidia_status_error': None
         }
-        
+
         output = format_welcome_page(data)
         lines = output.split('\n')
-        
+
         # Should have multiple lines
         self.assertGreater(len(lines), 5)
         # Should contain section headers
