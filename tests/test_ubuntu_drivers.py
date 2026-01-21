@@ -4984,9 +4984,9 @@ APT::Get::AllowUnauthenticated "true";
             stderr=subprocess.PIPE)
         out, err = ud.communicate()
         self.assertEqual(err, '')
-        self.assertFalse('=== Welcome to ubuntu-drivers ===' in out, out)
-        self.assertFalse('This tool helps you install and manage hardware drivers' in out, out)
-        self.assertFalse('--- Installed OEM / NVIDIA Drivers ---' in out, out)
+        self.assertNotIn('=== Welcome to ubuntu-drivers ===', out)
+        self.assertNotIn('This tool helps you install and manage hardware drivers', out)
+        self.assertNotIn('--- Installed OEM / NVIDIA Drivers ---', out)
         self.assertEqual(ud.returncode, 0)
 
 
