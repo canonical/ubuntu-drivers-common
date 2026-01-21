@@ -2015,3 +2015,49 @@ def check_nvidia_module_status():
         }
 
     return result
+
+
+def gather_welcome_page_data():
+    '''Gather data for the welcome page.
+
+    Returns:
+        dict: A dictionary containing:
+            - cache_error: Error message if cache couldn't be loaded, or None
+            - nvidia_drivers: List of installed NVIDIA driver packages
+            - oem_packages: List of installed OEM packages
+            - nvidia_status: NVIDIA module status dict, or None if not applicable
+            - nvidia_status_error: Error message if status check failed, or None
+    '''
+    data = {
+        'cache_error': None,
+        'nvidia_drivers': [],
+        'oem_packages': [],
+        'nvidia_status': None,
+        'nvidia_status_error': None
+    }
+
+    # Initialize apt cache
+    apt_pkg.init_config()
+    apt_pkg.init_system()
+
+    try:
+        cache = apt_pkg.Cache(None)
+    except Exception as ex:
+        data['cache_error'] = str(ex)
+        return data
+
+    # Get installed NVIDIA drivers
+    data['nvidia_drivers'] = get_installed_packages_by_glob(cache, "nvidia-driver-*") or \
+            get_installed_packages_by_glob(cache, "linux-modules-nvidia-*")
+
+    # Get installed OEM meta packages
+    data['oem_packages'] = get_installed_packages_by_glob(cache, "oem-*-meta")
+
+    # Check NVIDIA module status if NVIDIA drivers are installed
+    if data['nvidia_drivers']:
+        try:
+            data['nvidia_status'] = check_nvidia_module_status()
+        except Exception as e:
+            data['nvidia_status_error'] = str(e)
+
+    return data
