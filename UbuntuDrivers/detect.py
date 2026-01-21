@@ -1721,20 +1721,42 @@ def get_linux_modules_metapackage(apt_cache, candidate):
     return metapackage
 
 
-def _get_kernel_from_grub_entry(entry_num):
-    '''Convert grub entry number to kernel version by parsing grub.cfg'''
-    vmlinuz_entry_regex = r'linux\s+.*vmlinuz-([^\s]+)'
+def _load_grub_cfg(grub_cfg_path='/boot/grub/grub.cfg'):
+    '''Load grub configuration file content.
+    
+    Args:
+        grub_cfg_path: Path to grub.cfg file (default: /boot/grub/grub.cfg)
+    
+    Returns:
+        String content of grub.cfg, or None if file doesn't exist or can't be read
+    '''
     try:
-        grub_cfg = '/boot/grub/grub.cfg'
-        if not os.path.exists(grub_cfg):
-            logging.debug('Could not read /boot/grub/grub.cfg in _get_kernel_from_grub_entry()')
+        if not os.path.exists(grub_cfg_path):
+            logging.debug('Could not read %s in _load_grub_cfg()', grub_cfg_path)
             return None
 
-        with open(grub_cfg, 'r') as f:
-            grub_content = f.read()
+        with open(grub_cfg_path, 'r') as f:
+            return f.read()
+    except (OSError, IOError) as e:
+        logging.debug(f"Error loading grub.cfg: ${e}")
+        return None
 
-        # Find all menuentry lines and their corresponding linux lines
-        menu_entries = []
+
+def _parse_grub_cfg_for_kernel(grub_content, entry_num):
+    '''Parse grub configuration content to find kernel version for given entry.
+    
+    Args:
+        grub_content: Content of grub.cfg file as string
+        entry_num: Entry identifier - either numeric index (as string) or entry ID
+    
+    Returns:
+        Kernel version string, or None if not found
+    '''
+    if not grub_content:
+        return None
+        
+    vmlinuz_entry_regex = r'linux\s+.*vmlinuz-([^\s]+)'
+    try:
         lines = grub_content.split('\n')
         current_entry = None
 
@@ -1781,6 +1803,7 @@ def _get_kernel_from_grub_entry(entry_num):
         # manual modifications to their kernel image names, and that
         # they haven't modified their grub menu in ways that aren't visible to
         # /boot/grub/grub.cfg.
+        menu_entries = []
         for line in lines:
             if line.strip().startswith('menuentry'):
                 current_entry = line.strip()
@@ -1796,11 +1819,26 @@ def _get_kernel_from_grub_entry(entry_num):
         if 0 <= entry_idx < len(menu_entries):
             return menu_entries[entry_idx]
 
-        logging.debug('Could not determine kernel in _get_kernel_from_grub_entry()')
+        logging.debug('Could not determine kernel in _parse_grub_cfg_for_kernel()')
         return None
-    except (OSError, IOError, ValueError, IndexError) as e:
-        logging.debug(f"Error in _get_kernel_from_grub_entry() ${e}")
+    except (ValueError, IndexError) as e:
+        logging.debug(f"Error in _parse_grub_cfg_for_kernel() ${e}")
         return None
+
+
+def _get_kernel_from_grub_entry(entry_num):
+    '''Convert grub entry number to kernel version by parsing grub.cfg.
+    
+    Args:
+        entry_num: Entry identifier - either numeric index (as string) or entry ID
+    
+    Returns:
+        Kernel version string, or None if not found
+    '''
+    grub_content = _load_grub_cfg()
+    if grub_content is None:
+        return None
+    return _parse_grub_cfg_for_kernel(grub_content, entry_num)
 
 
 def _get_actual_grub_default():
