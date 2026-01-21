@@ -15,7 +15,6 @@ import subprocess
 import functools
 import re
 import json
-import glob
 
 import apt_pkg
 
