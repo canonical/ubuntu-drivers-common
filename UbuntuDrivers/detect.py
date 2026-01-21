@@ -1892,56 +1892,33 @@ def _get_actual_grub_default():
 def _resolve_nvidia_module_path_for_kernel(kernel_version):
     """Return the path to the NVIDIA kernel module for a given kernel version, if present.
 
-    Tries standard, DKMS, and other possible locations and compressed variants.
+    Uses find to search for nvidia.ko* files in the kernel modules directory.
     """
 
     if not kernel_version:
         logging.debug("Kernel not known, giving up on _resolve_nvidia_module_path_for_kernel()")
         return None
 
-    glob_pattern = f'/lib/modules/{kernel_version}/kernel/nvidia*'
-    for nvidia_dir in glob.glob(glob_pattern):
-        if os.path.isdir(nvidia_dir):
-            for module_file in ['nvidia.ko', 'nvidia.ko.gz', 'nvidia.ko.zst']:
-                path = os.path.join(nvidia_dir, module_file)
-                if os.path.exists(path):
-                    return path
+    modules_dir = f'/lib/modules/{kernel_version}'
+    if not os.path.exists(modules_dir):
+        logging.debug(f"Module directory {modules_dir} does not exist")
+        return None
 
-    possible_paths = [
-        # Standard kernel module path
-        f'/lib/modules/{kernel_version}/kernel/drivers/video/nvidia.ko',
-        # Compressed standard module
-        f'/lib/modules/{kernel_version}/kernel/drivers/video/nvidia.ko.gz',
-        # DKMS module paths (common for NVIDIA drivers)
-        f'/lib/modules/{kernel_version}/updates/dkms/nvidia.ko',
-        f'/lib/modules/{kernel_version}/updates/dkms/nvidia.ko.gz',
-        f'/lib/modules/{kernel_version}/updates/dkms/nvidia.ko.zst',
-        # Alternative DKMS paths
-        f'/lib/modules/{kernel_version}/updates/nvidia.ko',
-        f'/lib/modules/{kernel_version}/updates/nvidia.ko.gz',
-        f'/lib/modules/{kernel_version}/updates/nvidia.ko.zst',
-        # Additional distribution-specific paths
-        f'/lib/modules/{kernel_version}/extra/nvidia.ko',
-        f'/lib/modules/{kernel_version}/extra/nvidia.ko.gz',
-        f'/lib/modules/{kernel_version}/extra/nvidia.ko.zst',
-        # Directory scans
-        f'/lib/modules/{kernel_version}/updates/dkms/',
-        f'/lib/modules/{kernel_version}/updates/',
-        f'/lib/modules/{kernel_version}/extra/',
-        f'/lib/modules/{kernel_version}/kernel/',
-    ]
-
-    for path in possible_paths:
-        if os.path.exists(path):
-            if path.endswith('/'):
-                try:
-                    for filename in os.listdir(path):
-                        if filename.startswith('nvidia.ko'):
-                            return os.path.join(path, filename)
-                except (OSError, IOError):
-                    continue
-            else:
-                return path
+    try:
+        # Use find to locate nvidia.ko* files (including compressed variants)
+        result = subprocess.check_output(
+            ['find', modules_dir, '-name', 'nvidia.ko*', '-type', 'f'],
+            universal_newlines=True,
+            stderr=subprocess.DEVNULL
+        )
+        
+        # Get the first match if any
+        matches = result.strip().split('\n')
+        if matches and matches[0]:
+            return matches[0]
+            
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        logging.debug(f"find command failed in _resolve_nvidia_module_path_for_kernel(): {e}")
 
     logging.debug("_resolve_nvidia_module_path_for_kernel() returned None")
     return None
