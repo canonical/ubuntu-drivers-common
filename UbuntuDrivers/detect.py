@@ -1947,8 +1947,17 @@ def check_nvidia_module_status():
 
     # Check if nvidia module is loaded
     try:
-        lsmod_output = subprocess.check_output(['lsmod'], universal_newlines=True)
-        result['loaded'] = 'nvidia' in lsmod_output
+        lsmod_output = subprocess.check_output(
+            ['lsmod'], universal_newlines=True)
+        # Check for exact module name match (first column in lsmod output)
+        result['loaded'] = False
+        for line in lsmod_output.splitlines():
+            # lsmod format: module_name size used_by
+            # Split and check first field for exact match
+            parts = line.split()
+            if parts and parts[0] == 'nvidia':
+                result['loaded'] = True
+                break
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         logging.debug(f"Exception in loaded module check: ${e}")
         pass
