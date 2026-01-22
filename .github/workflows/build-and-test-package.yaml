@@ -28,7 +28,7 @@ jobs:
           sudo apt-get install -y build-essential debhelper fakeroot apt
 
       - name: Install Build Dependencies for ubuntu-drivers-common
-        run: sudo apt build-dep -y ubuntu-drivers-common
+        run: sudo apt build-dep -y ubuntu-drivers-common && sudo apt install -y mypy python3-mypy
 
       - name: Run dpkg-buildpackage
         # This step will fail the job if the build or test stages fail.
