@@ -23,6 +23,7 @@
 import apt_pkg
 import logging
 import re
+from typing import Optional, Tuple, List
 
 from subprocess import Popen, PIPE
 import os
@@ -30,7 +31,7 @@ import os
 
 class KernelDetection(object):
 
-    def __init__(self, cache=None):
+    def __init__(self, cache: Optional[apt_pkg.Cache] = None) -> None:
         if cache:
             self.apt_cache = cache
             self.apt_depcache = apt_pkg.DepCache(cache)
@@ -38,15 +39,15 @@ class KernelDetection(object):
             apt_pkg.init_config()
             apt_pkg.init_system()
             self.apt_cache = apt_pkg.Cache(None)
-            self.apt_depcache = apt_pkg.DepCache(cache)
+            self.apt_depcache = apt_pkg.DepCache(self.apt_cache)
 
-    def _is_greater_than(self, term1, term2):
+    def _is_greater_than(self, term1: str, term2: str) -> bool:
         # We don't want to take into account
         # the flavour
         pattern = re.compile('(.+)-([0-9]+)-(.+)')
         match1 = pattern.match(term1)
         match2 = pattern.match(term2)
-        if match1:
+        if match1 and match2:
             term1 = '%s-%s' % (match1.group(1),
                                match1.group(2))
             term2 = '%s-%s' % (match2.group(1),
@@ -59,7 +60,7 @@ class KernelDetection(object):
         process.communicate()
         return not process.returncode
 
-    def _get_linux_flavour(self, candidates, image):
+    def _get_linux_flavour(self, candidates: List[str], image: str) -> str:
         pattern = re.compile(r'linux-image-([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)-(.+)')
         match = pattern.match(image)
         flavour = ''
@@ -68,7 +69,7 @@ class KernelDetection(object):
 
         return flavour
 
-    def _filter_cache(self, pkg):
+    def _filter_cache(self, pkg: apt_pkg.Package) -> Optional[str]:
         package_name = pkg.name
         if (package_name.startswith('linux-image') and
             'extra' not in package_name and (pkg.current_ver or
@@ -77,7 +78,7 @@ class KernelDetection(object):
         else:
             return None
 
-    def _get_linux_metapackage(self, target):
+    def _get_linux_metapackage(self, target: str) -> str:
         '''Get the linux headers, linux-image or linux metapackage'''
         metapackage = ''
         image_package = ''
@@ -109,7 +110,7 @@ class KernelDetection(object):
                 target_package = image_package
 
             reverse_dependencies = [dep.parent_pkg.name for dep in self.apt_cache[target_package]
-                                    .rev_depends_list if dep.parent_pkg.name.startswith(prefix)]
+                                    .rev_depends_list if dep.parent_pkg.name.startswith(prefix)]  # type: ignore[attr-defined]
 
             if reverse_dependencies:
                 # This should be something like linux-image-$flavour
@@ -128,7 +129,7 @@ class KernelDetection(object):
                 if target == 'meta':
                     # Let's get the metapackage
                     reverse_dependencies = [dep.parent_pkg.name for dep in self.apt_cache[metapackage]
-                                            .rev_depends_list if dep.parent_pkg.name.startswith('linux-')]
+                                            .rev_depends_list if dep.parent_pkg.name.startswith('linux-')]  # type: ignore[attr-defined]
                     if reverse_dependencies:
                         flavour = self._get_linux_flavour(reverse_dependencies, target_package)
                         linux_meta = ''
@@ -145,30 +146,31 @@ class KernelDetection(object):
                             metapackage = linux_meta
         return metapackage
 
-    def get_linux_headers_metapackage(self):
+    def get_linux_headers_metapackage(self) -> str:
         '''Get the linux headers for the newest_kernel installed'''
         return self._get_linux_metapackage('headers')
 
-    def get_linux_image_metapackage(self):
+    def get_linux_image_metapackage(self) -> str:
         '''Get the linux headers for the newest_kernel installed'''
         return self._get_linux_metapackage('image')
 
-    def get_linux_metapackage(self):
+    def get_linux_metapackage(self) -> str:
         '''Get the linux metapackage for the newest_kernel installed'''
         return self._get_linux_metapackage('meta')
 
-    def get_linux_version(self):
+    def get_linux_version(self) -> Optional[str]:
         linux_image_meta = self.get_linux_image_metapackage()
-        linux_version = ''
+        linux_version = None
         try:
             # dependencies = self.apt_cache[linux_image_meta].candidate.\
             #                  record['Depends']
             candidate = self.apt_depcache.get_candidate_ver(self.apt_cache[linux_image_meta])
-            for dep_list in candidate.depends_list_str.get('Depends'):
-                for dep_name, dep_ver, dep_op in dep_list:
-                    if dep_name.startswith('linux-image'):
-                        linux_version = dep_name.strip().replace('linux-image-', '')
-                        break
+            if candidate:
+                for dep_list in candidate.depends_list_str.get('Depends'):  # type: ignore[attr-defined]
+                    for dep_name, dep_ver, dep_op in dep_list:
+                        if dep_name.startswith('linux-image'):
+                            linux_version = dep_name.strip().replace('linux-image-', '')
+                            break
         except KeyError:
             logging.error('No dependencies can be found for %s' % (linux_image_meta))
             return None
@@ -184,7 +186,7 @@ class KernelDetection(object):
 
         return linux_version
 
-    def is_running_kernel_outdated(self):
+    def is_running_kernel_outdated(self) -> Tuple[bool, str, Optional[str], bool]:
         '''Check if running kernel is outdated.
 
         Returns a tuple (is_outdated, running_version, latest_version, requires_dkms):
@@ -252,7 +254,7 @@ class KernelDetection(object):
         logging.debug('No kernel updates found')
         return False, running_version, None, False
 
-    def get_kernel_update_warning(self, include_dkms=False):
+    def get_kernel_update_warning(self, include_dkms: bool = False) -> bool:
         '''Print a warning message if the kernel needs updating.
 
         Returns:
@@ -265,9 +267,9 @@ class KernelDetection(object):
                 # Check Secure Boot state using mokutil
                 try:
                     process = Popen(['mokutil', '--sb-state'], stdout=PIPE, stderr=PIPE)
-                    output, err = process.communicate()
-                    output = output.decode('utf-8').lower()
-                    err = err.decode('utf-8').lower()
+                    output_bytes, err_bytes = process.communicate()
+                    output: str = output_bytes.decode('utf-8').lower()
+                    err: str = err_bytes.decode('utf-8').lower()
                     if 'secureboot enabled' in output or 'secure boot enabled' in output:
                         print(
                             "Your running kernel (%s) requires DKMS modules, and you have Secure Boot enabled. "

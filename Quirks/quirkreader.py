@@ -21,46 +21,53 @@
 import xkit.xutils
 import xkit.xorgparser
 import Quirks.quirkinfo
+from typing import Optional, Dict, List, Any
 
 import tempfile
 import os
 
 class Quirk:
 
-    def __init__(self, id=None, handler=[], x_snippet="", match_tags={}):
+    def __init__(self, id: Optional[str] = None,
+                 handler: List[str] = [],
+                 x_snippet: str = "",
+                 match_tags: Dict[str, List[str]] = {}) -> None:
         self.id = id
         self.handler = handler
         self.x_snippet = x_snippet
-        self.match_tags = {}.fromkeys(Quirks.quirkinfo.dmi_keys, '')
+        self.match_tags: Dict[str, List[str]] = {k: [] for k in Quirks.quirkinfo.dmi_keys}
 
 class ReadQuirk:
 
-    def __init__(self, source=None):
+    def __init__(self, source: Optional[str] = None) -> None:
         self.source = source
         
         #See if the source is a file or a file object
         #and act accordingly
         file = self.source
+        lines_list: List[str] = []
         if file == None:
             lines_list = []
         else:
             if not hasattr(file, 'write'):#it is a file
-                myfile = open(file, 'r', encoding='utf-8')
-                try:
-                    lines_list = myfile.readlines()
+                if isinstance(file, str):
+                    myfile = open(file, 'r', encoding='utf-8')
+                    try:
+                        lines_list = myfile.readlines()
+                        myfile.close()
+                    except UnicodeDecodeError:
+                        lines_list = []
                     myfile.close()
-                except UnicodeDecodeError:
-                    lines_list = []
-                myfile.close()
             else:
                 #it is a file object
-                lines_list = file.readlines()
+                if hasattr(file, 'readlines'):
+                    lines_list = file.readlines()  # type: ignore[union-attr]
         
         inside_quirk = False
         has_id = False
         has_handler = False
         inside_x_snippet = False
-        self._quirks = []
+        self._quirks: List[Quirk] = []
 
         it = 0
         for line in lines_list:
@@ -97,7 +104,7 @@ class ReadQuirk:
                                     len(temp_str):].strip().split('"')
                         tag_match = ''
                         tag_value = ''
-                        tag_values = []
+                        tag_values: List[str] = []
                         for elem in temp_bits:
                             if elem.strip():
                                 if not tag_match:
@@ -133,7 +140,7 @@ class ReadQuirk:
                     del temp_quirk
                     continue
 
-    def get_quirks(self):
+    def get_quirks(self) -> List[Quirk]:
         return self._quirks
 
 

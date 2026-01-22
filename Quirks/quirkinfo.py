@@ -21,6 +21,7 @@
 
 
 import os
+from typing import Dict
 
 dmi_keys = ('product_name', 'product_version',
              'sys_vendor', 'bios_version',
@@ -28,11 +29,11 @@ dmi_keys = ('product_name', 'product_version',
              'board_name', 'board_vendor')
 
 class QuirkInfo:
-    def __init__(self):
+    def __init__(self) -> None:
         self.sys_dir = '/sys'
-        self._quirk_info = {}.fromkeys(dmi_keys, '')
+        self._quirk_info: Dict[str, str] = {}.fromkeys(dmi_keys, '')
 
-    def get_dmi_info(self):
+    def get_dmi_info(self) -> Dict[str, str]:
         '''Return all the dmi info of the system hardware.
 
         Some or the whole Dmi info may not be available on
@@ -51,7 +52,7 @@ class QuirkInfo:
         return self._quirk_info
 
 
-def main():
+def main() -> int:
     a = QuirkInfo()
     print(a.get_dmi_info())
     
