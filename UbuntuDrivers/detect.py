@@ -1903,21 +1903,17 @@ def _resolve_nvidia_module_path_for_kernel(kernel_version):
         logging.debug(f"Module directory {modules_dir} does not exist")
         return None
 
-    try:
-        # Use find to locate nvidia.ko* files (including compressed variants)
-        result = subprocess.check_output(
-            ['find', modules_dir, '-name', 'nvidia.ko*', '-type', 'f'],
-            universal_newlines=True,
-            stderr=subprocess.DEVNULL
-        )
+    # Use find to locate nvidia.ko* files (including compressed variants)
+    result = subprocess.check_output(
+        ['find', modules_dir, '-name', 'nvidia.ko*', '-type', 'f'],
+        universal_newlines=True,
+        stderr=subprocess.DEVNULL
+    )
 
-        # Get the first match if any
-        matches = result.strip().split('\n')
-        if matches and matches[0]:
-            return matches[0]
-
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        logging.debug(f"find command failed in _resolve_nvidia_module_path_for_kernel(): {e}")
+    # Get the first match if any
+    matches = result.strip().split('\n')
+    if matches and matches[0]:
+        return matches[0]
 
     logging.debug("_resolve_nvidia_module_path_for_kernel() returned None")
     return None
@@ -1974,8 +1970,7 @@ def check_nvidia_module_status():
             logging.debug(f"Exception in module path check: ${e}")
             pass
 
-    if not result['next_boot_kernel']:
-        result['next_boot_kernel'] = _get_actual_grub_default()
+    result['next_boot_kernel'] = _get_actual_grub_default()
 
     # If we cannot determine the next boot kernel definitively,
     # don't make any assumptions about module / system state.
