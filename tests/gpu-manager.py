@@ -471,8 +471,8 @@ class GpuManagerTest(unittest.TestCase):
         # We deliberately leave the amdgpu-pro settings
         # out of this for now.
         if (not gpu_test.has_selected_driver and not
-            (gpu_test.amdgpu_pro_powersaving or
-                amdgpu_pro_performance or amdgpu_pro_reset)):
+            (gpu_test.amdgpu_pro_powersaving
+                or amdgpu_pro_performance or amdgpu_pro_reset)):
             gpu_test.has_not_acted = True
 
         # Copy the logs
@@ -521,12 +521,12 @@ class GpuManagerTest(unittest.TestCase):
             card_line = '%04x:%04x;0000:%02d:%02d:0;%d\n' % (
                 self.vendors.get(card),
                 ((it == 0) and
-                 (bump_boot_vga_device_id and
-                    boot_vga_device_id + 1 or
-                    boot_vga_device_id) or
-                 (bump_discrete_device_id and
-                    discrete_device_id + 1 or
-                    discrete_device_id)),
+                 (bump_boot_vga_device_id
+                    and boot_vga_device_id + 1
+                    or boot_vga_device_id)
+                 or (bump_discrete_device_id
+                     and discrete_device_id + 1
+                     or discrete_device_id)),
                 (it == 0) and 0 or it,
                 (it == 0) and 1 or 0,
                 (it == 0) and 1 or 0)
@@ -4650,8 +4650,8 @@ if __name__ == '__main__':
     new_argv = []
     for elem in sys.argv:
         if (
-                (elem != '--save-logs-to' and elem != args.save_logs_to) and
-                (elem != '--with-valgrind' and elem != args.with_valgrind) and
-                (elem != '--with-gdb' and elem != args.with_gdb)):
+                (elem != '--save-logs-to' and elem != args.save_logs_to)
+                and (elem != '--with-valgrind' and elem != args.with_valgrind)
+                and (elem != '--with-gdb' and elem != args.with_gdb)):
             new_argv.append(elem)
     unittest.main(argv=new_argv)

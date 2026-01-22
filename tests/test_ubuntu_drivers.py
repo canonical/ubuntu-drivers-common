@@ -1005,22 +1005,22 @@ class DetectTest(unittest.TestCase):
                                extra_tags={})
 
             archive.create_deb(
-                                'linux-generic-hwe-18.04',
-                                dependencies={'Depends': 'linux-generic'},
-                                extra_tags={'Source':
-                                            'linux-meta'})
+                'linux-generic-hwe-18.04',
+                dependencies={'Depends': 'linux-generic'},
+                extra_tags={'Source':
+                            'linux-meta'})
             archive.create_deb(
-                                'linux-generic-hwe-18.04-edge',
-                                dependencies={'Depends': 'linux-generic'},
-                                extra_tags={'Source': 'linux-meta'})
+                'linux-generic-hwe-18.04-edge',
+                dependencies={'Depends': 'linux-generic'},
+                extra_tags={'Source': 'linux-meta'})
             archive.create_deb(
-                                'linux-headers-generic-hwe-18.04',
-                                dependencies={'Depends': 'linux-headers-generic'},
-                                extra_tags={})
+                'linux-headers-generic-hwe-18.04',
+                dependencies={'Depends': 'linux-headers-generic'},
+                extra_tags={})
             archive.create_deb(
-                                'linux-headers-generic-hwe-18.04-edge',
-                                dependencies={'Depends': 'linux-headers-generic'},
-                                extra_tags={})
+                'linux-headers-generic-hwe-18.04-edge',
+                dependencies={'Depends': 'linux-headers-generic'},
+                extra_tags={})
 
             chroot.add_repository(archive.path, True, False)
             apt_pkg.init_config()

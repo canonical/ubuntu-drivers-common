@@ -71,9 +71,9 @@ class KernelDetection(object):
 
     def _filter_cache(self, pkg: apt_pkg.Package) -> Optional[str]:
         package_name = pkg.name
-        if (package_name.startswith('linux-image') and
-            'extra' not in package_name and (pkg.current_ver or
-                                             self.apt_depcache.marked_install(pkg))):
+        if (package_name.startswith('linux-image')
+            and 'extra' not in package_name and (pkg.current_ver
+                                                 or self.apt_depcache.marked_install(pkg))):
             return package_name
         else:
             return None
@@ -109,8 +109,10 @@ class KernelDetection(object):
             else:
                 target_package = image_package
 
-            reverse_dependencies = [dep.parent_pkg.name for dep in self.apt_cache[target_package]
-                                    .rev_depends_list if dep.parent_pkg.name.startswith(prefix)]  # type: ignore[attr-defined]
+            reverse_dependencies = [
+                dep.parent_pkg.name for dep in self.apt_cache[target_package].rev_depends_list
+                if dep.parent_pkg.name.startswith(prefix)
+            ]  # type: ignore[attr-defined]
 
             if reverse_dependencies:
                 # This should be something like linux-image-$flavour
@@ -119,17 +121,19 @@ class KernelDetection(object):
                 for candidate in reverse_dependencies:
                     try:
                         candidate_pkg = self.apt_cache[candidate]
-                        if (candidate.startswith(prefix) and (candidate_pkg and
-                           (candidate_pkg.current_ver or self.apt_depcache.marked_install(candidate_pkg))) and
-                           candidate.replace(prefix, '') > metapackage.replace(prefix, '')):
+                        if (candidate.startswith(prefix) and (candidate_pkg
+                           and (candidate_pkg.current_ver or self.apt_depcache.marked_install(candidate_pkg)))
+                                and candidate.replace(prefix, '') > metapackage.replace(prefix, '')):
                             metapackage = candidate
                     except KeyError:
                         continue
                 # if we are looking for headers, then we are good
                 if target == 'meta':
                     # Let's get the metapackage
-                    reverse_dependencies = [dep.parent_pkg.name for dep in self.apt_cache[metapackage]
-                                            .rev_depends_list if dep.parent_pkg.name.startswith('linux-')]  # type: ignore[attr-defined]
+                    reverse_dependencies = [
+                        dep.parent_pkg.name for dep in self.apt_cache[metapackage].rev_depends_list
+                        if dep.parent_pkg.name.startswith('linux-')
+                    ]  # type: ignore[attr-defined]
                     if reverse_dependencies:
                         flavour = self._get_linux_flavour(reverse_dependencies, target_package)
                         linux_meta = ''

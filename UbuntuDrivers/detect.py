@@ -16,8 +16,11 @@ import functools
 import re
 import json
 from typing import Optional, Dict, List, Set, Tuple, Any, TypedDict
+from functools import cmp_to_key
 
 import apt_pkg
+
+from UbuntuDrivers import kerneldetection
 
 
 class DriverInfo(TypedDict, total=False):
@@ -51,8 +54,6 @@ class PackageInfo(TypedDict, total=False):
     open_preferred: bool
     metapackage: str
 
-from UbuntuDrivers import kerneldetection
-from functools import cmp_to_key
 
 system_architecture = ''
 lookup_cache = {}
@@ -235,7 +236,8 @@ def _check_video_abi_compat(apt_cache: apt_pkg.Cache,
 
         logging.debug('Driver package %s is incompatible with current X.org server ABI %s',
                       package.name, xorg_video_abi)
-        logging.debug('%s is not in %s' % (package, [x.parent_pkg for x in abi_pkg.rev_depends_list]))  # type: ignore[attr-defined]
+        logging.debug('%s is not in %s' % (
+            package, [x.parent_pkg for x in abi_pkg.rev_depends_list]))  # type: ignore[attr-defined]
         return False
 
     return True
@@ -328,9 +330,11 @@ def package_get_nv_allowing_driver(did: str) -> Optional[str]:
     return version
 
 
-def packages_for_modalias(apt_cache: apt_pkg.Cache,
-                         modalias: str,
-                         modalias_map: Optional[Dict[str, Tuple[Any, Dict[str, Set[str]]]]] = None) -> List['apt_pkg.Package']:
+def packages_for_modalias(
+        apt_cache: apt_pkg.Cache,
+        modalias: str,
+        modalias_map: Optional[Dict[str, Tuple[Any, Dict[str, Set[str]]]]] = None
+) -> List['apt_pkg.Package']:
     '''Search packages which match the given modalias.
 
     Return a list of apt.Package objects.
@@ -522,7 +526,7 @@ def _is_runtimepm_supported(apt_cache: apt_pkg.Cache, pkg: 'apt_pkg.Package', al
         if m.find('nvidia(') != 0:
             return False
 
-        n = m[m.find('(')+1: m.find(')')]
+        n = m[m.find('(') + 1: m.find(')')]
         modaliases = n.split(', ')
         if _is_nv_allowing_runtimepm_supported(alias, ver):
             return True
@@ -628,9 +632,9 @@ options nvidia-drm modeset=%d\n''' % (value)
 
 
 def system_driver_packages(apt_cache: Optional[apt_pkg.Cache] = None,
-                          sys_path: Optional[str] = None,
-                          freeonly: bool = False,
-                          include_oem: bool = True) -> Dict[str, PackageInfo]:
+                           sys_path: Optional[str] = None,
+                           freeonly: bool = False,
+                           include_oem: bool = True) -> Dict[str, PackageInfo]:
     '''Get driver packages that are available for the system.
 
     This calls system_modaliases() to determine the system's hardware and then
@@ -685,14 +689,14 @@ def system_driver_packages(apt_cache: Optional[apt_pkg.Cache] = None,
             if not include_oem and fnmatch.fnmatch(p.name, 'oem-*-meta'):
                 continue
             packages[p.name] = {
-                    'modalias': alias,
-                    'syspath': syspath,
-                    'free': _is_package_free(apt_cache, p),
-                    'from_distro': _is_package_from_distro(apt_cache, p),
-                    'support': _pkg_get_support(apt_cache, p),
-                    'runtimepm': _is_runtimepm_supported(apt_cache, p, alias),
-                    'open_preferred': _is_open_prefered(apt_cache, p)
-                }
+                'modalias': alias,
+                'syspath': syspath,
+                'free': _is_package_free(apt_cache, p),
+                'from_distro': _is_package_from_distro(apt_cache, p),
+                'support': _pkg_get_support(apt_cache, p),
+                'runtimepm': _is_runtimepm_supported(apt_cache, p, alias),
+                'open_preferred': _is_open_prefered(apt_cache, p)
+            }
             (vendor, model) = _get_db_name(syspath, alias)
             if vendor is not None:
                 packages[p.name]['vendor'] = vendor
@@ -718,10 +722,10 @@ def system_driver_packages(apt_cache: Optional[apt_pkg.Cache] = None,
             try:
                 apt_p = apt_cache[p]
                 packages[p] = {
-                        'free': _is_package_free(apt_cache, apt_p),
-                        'from_distro': _is_package_from_distro(apt_cache, apt_p),
-                        'plugin': plugin,
-                    }
+                    'free': _is_package_free(apt_cache, apt_p),
+                    'from_distro': _is_package_from_distro(apt_cache, apt_p),
+                    'plugin': plugin,
+                }
             except KeyError:
                 logging.debug('Package %s plugin not available. Skipping.' % p)
 
@@ -765,8 +769,8 @@ def get_userspace_lrm_meta(apt_cache: apt_pkg.Cache, pkg_name: str) -> Optional[
         # skip foreign architectures, we usually only want native
         # driver packages
         package_candidate = depcache.get_candidate_ver(package)
-        if (candidate and
-                package_candidate.arch in ('all', get_apt_arch())):
+        if (candidate
+                and package_candidate.arch in ('all', get_apt_arch())):
             metapackage = candidate
     except KeyError:
         pass
@@ -802,8 +806,8 @@ def _get_headless_no_dkms_metapackage(pkg: 'apt_pkg.Package', apt_cache: apt_pkg
         # skip foreign architectures, we usually only want native
         # driver packages
         package_candidate = depcache.get_candidate_ver(package)
-        if (candidate and
-                package_candidate.arch in ('all', get_apt_arch())):
+        if (candidate
+                and package_candidate.arch in ('all', get_apt_arch())):
             metapackage = candidate
     except KeyError:
         pass
@@ -864,19 +868,21 @@ def system_device_specific_metapackages(apt_cache: Optional[apt_pkg.Cache] = Non
             if not fnmatch.fnmatch(p.name, 'oem-*-meta'):
                 continue
             packages[p.name] = {
-                    'modalias': alias,
-                    'syspath': syspath,
-                    'free': _is_package_free(apt_cache, p),
-                    'from_distro': _is_package_from_distro(apt_cache, p),
-                    'recommended': True,
-                    'support': _pkg_get_support(apt_cache, p),
-                    'open_preferred': _is_open_prefered(apt_cache, p),
-                }
+                'modalias': alias,
+                'syspath': syspath,
+                'free': _is_package_free(apt_cache, p),
+                'from_distro': _is_package_from_distro(apt_cache, p),
+                'recommended': True,
+                'support': _pkg_get_support(apt_cache, p),
+                'open_preferred': _is_open_prefered(apt_cache, p),
+            }
 
     return packages
 
 
-def system_gpgpu_driver_packages(apt_cache=None, sys_path=None) -> Dict[str, PackageInfo]:  # type: ignore[no-untyped-def]
+def system_gpgpu_driver_packages(
+        apt_cache=None, sys_path=None
+) -> Dict[str, PackageInfo]:  # type: ignore[no-untyped-def]
     '''Get driver packages, for gpgpu purposes, that are available for the system.
 
     This calls system_modaliases() to determine the system's hardware and then
@@ -928,13 +934,13 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None) -> Dict[str, Pac
             vendor_id, model_id = _get_vendor_model_from_alias(alias)
             if (vendor_id is not None) and (vendor_id.lower() in vendors_whitelist):
                 packages[p.name] = {
-                        'modalias': alias,
-                        'syspath': syspath,
-                        'free': _is_package_free(apt_cache, p),
-                        'from_distro': _is_package_from_distro(apt_cache, p),
-                        'support': _pkg_get_support(apt_cache, p),
-                        'open_preferred': _is_open_prefered(apt_cache, p),
-                    }
+                    'modalias': alias,
+                    'syspath': syspath,
+                    'free': _is_package_free(apt_cache, p),
+                    'from_distro': _is_package_from_distro(apt_cache, p),
+                    'support': _pkg_get_support(apt_cache, p),
+                    'open_preferred': _is_open_prefered(apt_cache, p),
+                }
                 if vendor is not None:
                     packages[p.name]['vendor'] = vendor
                 if model is not None:
@@ -961,8 +967,8 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None) -> Dict[str, Pac
 
 
 def system_device_drivers(apt_cache: Optional[apt_pkg.Cache] = None,
-                         sys_path: Optional[str] = None,
-                         freeonly: bool = False) -> Dict[str, DeviceInfo]:
+                          sys_path: Optional[str] = None,
+                          freeonly: bool = False) -> Dict[str, DeviceInfo]:
     '''Get by-device driver packages that are available for the system.
 
     This calls system_modaliases() to determine the system's hardware and then
@@ -1879,8 +1885,8 @@ def get_linux_modules_metapackage(apt_cache, candidate: str) -> Optional[str]:  
             abi_specific = apt_cache[linux_modules_abi_candidate]
             # skip foreign architectures, we usually only want native
             abi_specific_candidate = depcache.get_candidate_ver(abi_specific)
-            if (abi_specific_candidate and
-                    abi_specific_candidate.arch in ('all', get_apt_arch())):
+            if (abi_specific_candidate
+                    and abi_specific_candidate.arch in ('all', get_apt_arch())):
                 logging.debug('Found ABI compatible %s' % (linux_modules_abi_candidate))
                 linux_modules_match = linux_modules_candidate
     except KeyError:
@@ -1918,8 +1924,8 @@ def get_linux_modules_metapackage(apt_cache, candidate: str) -> Optional[str]:  
         package_candidate = depcache.get_candidate_ver(package)
 
         # skip foreign architectures, we usually only want native
-        if (package_candidate and
-                package_candidate.arch in ('all', get_apt_arch())):
+        if (package_candidate
+                and package_candidate.arch in ('all', get_apt_arch())):
             metapackage = dkms_package
     except KeyError:
         logging.error('No "%s" can be found.', dkms_package)

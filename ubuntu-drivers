@@ -36,6 +36,7 @@ logger.setLevel(level=LOGLEVEL)
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
+
 class Config(object):
     def __init__(self) -> None:
         self.gpgpu: bool = False
@@ -46,7 +47,9 @@ class Config(object):
         self.include_dkms: bool = False
         self.recommended: bool = False
 
+
 pass_config = click.make_pass_decorator(Config, ensure=True)
+
 
 def command_list(args: Config) -> int:
     '''Show all driver packages which apply to the current system.'''
@@ -59,7 +62,6 @@ def command_list(args: Config) -> int:
         print(ex)
         return 1
 
-
     # First check if kernel needs updating
     kernel_detector = kerneldetection.KernelDetection(cache)
 
@@ -69,7 +71,7 @@ def command_list(args: Config) -> int:
         return 1
 
     packages = UbuntuDrivers.detect.system_driver_packages(apt_cache=cache,
-        sys_path=sys_path, freeonly=args.free_only, include_oem=args.install_oem_meta)
+                                                           sys_path=sys_path, freeonly=args.free_only, include_oem=args.install_oem_meta)
 
     for package in packages:
         try:
@@ -86,6 +88,7 @@ def command_list(args: Config) -> int:
 
     return 0
 
+
 def command_list_oem(args: Config) -> int:
     '''Show all OEM enablement packages which apply to this system'''
 
@@ -100,7 +103,6 @@ def command_list_oem(args: Config) -> int:
     except Exception as ex:
         print(ex)
         return 1
-    
 
     # First check if kernel needs updating
     kernel_detector = kerneldetection.KernelDetection(cache)
@@ -123,6 +125,7 @@ def command_list_oem(args: Config) -> int:
 
     return 0
 
+
 def list_gpgpu(args: Config) -> int:
     '''Show all GPGPU driver packages which apply to the current system.'''
     found = False
@@ -134,7 +137,6 @@ def list_gpgpu(args: Config) -> int:
     except Exception as ex:
         print(ex)
         return 1
-
 
     # First check if kernel needs updating
     kernel_detector = kerneldetection.KernelDetection(cache)
@@ -151,6 +153,7 @@ def list_gpgpu(args: Config) -> int:
             print('%s, (kernel modules provided by %s)' % (candidate, UbuntuDrivers.detect.get_linux_modules_metapackage(cache, candidate)))
 
     return 0
+
 
 def command_devices(args: Config) -> Optional[int]:
     '''Show all devices which need drivers, and which packages apply to them.'''
@@ -191,6 +194,7 @@ def command_devices(args: Config) -> Optional[int]:
 
     return None
 
+
 def command_install(args: Config) -> Optional[int]:
     '''Install drivers that are appropriate for your hardware.'''
     apt_pkg.init_config()
@@ -205,7 +209,6 @@ def command_install(args: Config) -> Optional[int]:
     with_nvidia_kms = False
     is_nvidia = False
 
-
     # First check if kernel needs updating
     kernel_detector = kerneldetection.KernelDetection(cache)
 
@@ -214,10 +217,9 @@ def command_install(args: Config) -> Optional[int]:
     if should_exit:
         return 1
 
-
     to_install = UbuntuDrivers.detect.get_desktop_package_list(cache, sys_path,
-        free_only=args.free_only, include_oem=args.install_oem_meta,
-        driver_string=args.driver_string, include_dkms=args.include_dkms)
+                                                               free_only=args.free_only, include_oem=args.install_oem_meta,
+                                                               driver_string=args.driver_string, include_dkms=args.include_dkms)
 
     if not to_install:
         print('All the available drivers are already installed.')
@@ -232,7 +234,7 @@ def command_install(args: Config) -> Optional[int]:
         UbuntuDrivers.detect.nvidia_desktop_pre_installation_hook(to_install)
 
     ret = subprocess.call(['apt-get', 'install', '-o',
-        'DPkg::options::=--force-confnew', '-y'] + to_install)
+                           'DPkg::options::=--force-confnew', '-y'] + to_install)
 
     oem_meta_to_install = fnmatch.filter(to_install, 'oem-*-meta')
 
@@ -273,6 +275,7 @@ def command_install(args: Config) -> Optional[int]:
 
     return ret
 
+
 def install_gpgpu(args: Config) -> int:
     '''Install GPGPU drivers that are appropriate for your hardware.'''
     candidate: str = ''
@@ -297,7 +300,6 @@ def install_gpgpu(args: Config) -> int:
         print(ex)
         return 1
 
-
     # First check if kernel needs updating
     kernel_detector = kerneldetection.KernelDetection(cache)
 
@@ -317,8 +319,8 @@ def install_gpgpu(args: Config) -> int:
         return 0
 
     ret = subprocess.call(['apt-get', 'install', '-o',
-        'DPkg::options::=--force-confnew',
-        '--no-install-recommends', '-y'] + to_install)
+                           'DPkg::options::=--force-confnew',
+                           '--no-install-recommends', '-y'] + to_install)
 
     # create package list
     if ret == 0 and args.package_list:
@@ -327,6 +329,7 @@ def install_gpgpu(args: Config) -> int:
             f.write('\n')
 
     return ret
+
 
 def command_debug(args: Config) -> Optional[int]:
     '''Print all available information and debug data about drivers.'''
@@ -393,7 +396,7 @@ def command_debug(args: Config) -> Optional[int]:
         if support:
             info_str += '  support level: ' + support
 
-        print('%s: installed: %s   available: %s%s%s ' % (package, inst, cand, auto,  info_str))
+        print('%s: installed: %s   available: %s%s%s ' % (package, inst, cand, auto, info_str))
 
 def format_welcome_page(data):
     '''Format the welcome page output from gathered data.
@@ -502,6 +505,7 @@ def greet(config, **kwargs):
     if not click.get_current_context().invoked_subcommand:
         show_welcome_page()
 
+
 @greet.command()
 @click.argument('driver', nargs=-1)  # add the name argument
 @click.option('--gpgpu', is_flag=True, help='Install “general-purpose computing” drivers for use in a headless server environment. This installs a server (ERD) flavor of the driver (which is required for compatibility with some server applications, such as nvidia-fabricmanager), and also results in a smaller installation footprint by not installing packages that are only useful in graphical environments.')
@@ -518,7 +522,6 @@ def install(config: Config, **kwargs: Any) -> None:
     if os.geteuid() != 0:
         print("Error: 'ubuntu-drivers install' must be run as root. Try using 'sudo'.", file=sys.stderr)
         sys.exit(1)
-
 
     if kwargs.get('gpgpu'):
         config.gpgpu = True
@@ -562,7 +565,6 @@ def list(config: Config, **kwargs: Any) -> Optional[int]:
         print(ex)
         return 1
 
-
     # First check if kernel needs updating
     kernel_detector = kerneldetection.KernelDetection(cache)
 
@@ -576,7 +578,7 @@ def list(config: Config, **kwargs: Any) -> Optional[int]:
         sort_func = UbuntuDrivers.detect._cmp_gfx_alternatives_gpgpu
     else:
         packages = UbuntuDrivers.detect.system_driver_packages(apt_cache=cache,
-            sys_path=sys_path, freeonly=config.free_only, include_oem=config.install_oem_meta)
+                                                               sys_path=sys_path, freeonly=config.free_only, include_oem=config.install_oem_meta)
         sort_func = UbuntuDrivers.detect._cmp_gfx_alternatives
 
     for package, info in sorted(packages.items(), key=cmp_to_key(lambda left, right: sort_func(left[0], right[0])), reverse=True):  # type: ignore[index]
@@ -602,6 +604,7 @@ def list(config: Config, **kwargs: Any) -> Optional[int]:
 
     return 0
 
+
 @greet.command()
 @click.argument('list-oem', nargs=-1)
 @click.option('--package-list', nargs=1, metavar='PATH', help='Create file with a list of the available packages')
@@ -613,12 +616,14 @@ def list_oem(config: Config, **kwargs: Any) -> None:
 
     command_list_oem(config)
 
+
 @greet.command()
 @click.argument('debug', nargs=-1)  # add the name argument
 @pass_config
 def debug(config: Config, **kwargs: Any) -> None:
     '''Print all available information and debug data about drivers.'''
     command_debug(config)
+
 
 @greet.command()
 @click.argument('devices', nargs=-1)  # add the name argument
