@@ -1007,6 +1007,26 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
     return result
 
 
+def get_installed_packages_by_glob(apt_cache, glob_pattern):
+    '''Query apt-cache for installed packages matching a specific glob pattern.
+
+    Args:
+        apt_cache: The apt cache object
+        glob_pattern: Glob pattern to match package names (e.g., "nvidia-driver-*")
+
+    Returns:
+        List of strings containing the names of all installed packages that match the pattern
+    '''
+    installed_packages = []
+
+    for package in apt_cache.packages:
+        package_name = package.name
+        if package.current_ver and fnmatch.fnmatch(package_name, glob_pattern):
+            installed_packages.append(package_name)
+
+    return sorted(installed_packages)
+
+
 def get_desktop_package_list(
         apt_cache, sys_path=None, free_only=False, include_oem=True,
         driver_string='', include_dkms=False):
@@ -1698,3 +1718,328 @@ def get_linux_modules_metapackage(apt_cache, candidate):
         pass
 
     return metapackage
+
+
+def _load_grub_cfg(grub_cfg_path='/boot/grub/grub.cfg'):
+    '''Load grub configuration file content.
+
+    Args:
+        grub_cfg_path: Path to grub.cfg file (default: /boot/grub/grub.cfg)
+
+    Returns:
+        String content of grub.cfg, or None if file doesn't exist or can't be read
+    '''
+    try:
+        if not os.path.exists(grub_cfg_path):
+            logging.debug('Could not read %s in _load_grub_cfg()', grub_cfg_path)
+            return None
+
+        with open(grub_cfg_path, 'r') as f:
+            return f.read()
+    except (OSError, IOError) as e:
+        logging.debug(f"Error loading grub.cfg: ${e}")
+        return None
+
+
+def _parse_grub_cfg_for_kernel(grub_content, entry_num):
+    '''Parse grub configuration content to find kernel version for given entry.
+
+    Args:
+        grub_content: Content of grub.cfg file as string
+        entry_num: Entry identifier - either numeric index (as string) or entry ID
+
+    Returns:
+        Kernel version string, or None if not found
+    '''
+    if not grub_content:
+        return None
+
+    vmlinuz_entry_regex = r'linux\s+.*vmlinuz-([^\s]+)'
+    try:
+        lines = grub_content.split('\n')
+        current_entry = None
+
+        # According to
+        # https://www.gnu.org/software/grub/manual/grub/html_node/Simple-configuration.html,
+        # grub.cfg may also query off the "id" parameter (a string key).
+        # Based off this doc (not using quotes, just space-delimited)
+        # and Ubuntu's default (using variable expansion for "--id" and single-quotes),
+        # we will parse for space, ', or " as delimiters.
+        if not entry_num.isdigit():
+            matches = []
+            for line in lines:
+                if line.strip().startswith('menuentry') and \
+                    ((" " + entry_num + " ") in line.strip() or
+                     ("'" + entry_num + "'") in line.strip() or
+                     ("\"" + entry_num + "\"") in line.strip()):
+                    current_entry = line.strip()
+                elif line.strip().startswith('linux') and current_entry:
+                    # Extract kernel version from linux line
+                    match = re.search(vmlinuz_entry_regex, line)
+                    if match:
+                        matches.append(match.group(1))
+                    current_entry = None
+            # If there are != 1 matches, we should stop attempting to parse.
+            # (unlikely w/ standard Ubuntu configs, since typical menuentry IDs
+            # have distinct UUIDs, but theoretically possible if user tinkered
+            # enough, which is really out of u-d-c's scope.)
+            if len(matches) == 1:
+                return matches[0]
+            elif len(matches) > 1:
+                print("Could not determine which of the following kernels will boot next: " + str(matches))
+                return None
+            else:
+                print("Could not determine which kernel will boot next from /boot/grub/grub.cfg")
+                return None
+
+        # Walk through each line of grub.cfg and set current_entry when
+        # we reach a line starting with "menuentry" to indicate that we are
+        # in a menuentry stanza. Once a "linux" line is reached in the stanza,
+        # strip the kernel version, append to menu_entries, then reset
+        # current_entry to None to denote that we've parsed all relevant data
+        # for this menuentry.
+        # We make assumptions here that the user hasn't made any esoteric
+        # manual modifications to their kernel image names, and that
+        # they haven't modified their grub menu in ways that aren't visible to
+        # /boot/grub/grub.cfg.
+        menu_entries = []
+        for line in lines:
+            if line.strip().startswith('menuentry'):
+                current_entry = line.strip()
+            elif line.strip().startswith('linux') and current_entry:
+                # Extract kernel version from linux line
+                match = re.search(vmlinuz_entry_regex, line)
+                if match:
+                    menu_entries.append(match.group(1))
+                current_entry = None
+
+        # Return the kernel version for the requested entry
+        entry_idx = int(entry_num)
+        if 0 <= entry_idx < len(menu_entries):
+            return menu_entries[entry_idx]
+
+        logging.debug('Could not determine kernel in _parse_grub_cfg_for_kernel()')
+        return None
+    except (ValueError, IndexError) as e:
+        logging.debug(f"Error in _parse_grub_cfg_for_kernel() ${e}")
+        return None
+
+
+def _get_kernel_from_grub_entry(entry_num):
+    '''Convert grub entry number to kernel version by parsing grub.cfg.
+
+    Args:
+        entry_num: Entry identifier - either numeric index (as string) or entry ID
+
+    Returns:
+        Kernel version string, or None if not found
+    '''
+    grub_content = _load_grub_cfg()
+    if grub_content is None:
+        return None
+    return _parse_grub_cfg_for_kernel(grub_content, entry_num)
+
+
+def _get_actual_grub_default():
+    '''Get the actual grub default entry by checking grub configuration'''
+    try:
+        # Check if GRUB_DEFAULT is set to a specific value
+        grub_default_path = '/etc/default/grub'
+        if not os.path.exists(grub_default_path):
+            logging.debug('Could not read /etc/default/grub in _get_actual_grub_default()')
+            return None
+
+        with open(grub_default_path, 'r') as f:
+            for line in f:
+                if line.startswith('GRUB_DEFAULT='):
+                    default_val = line.split('=', 1)[1].strip().strip('"\'')
+
+                    if default_val.isdigit():
+                        # Numeric entry
+                        return _get_kernel_from_grub_entry(default_val)
+                    elif default_val == 'saved':
+                        # Check grubenv for saved entry
+                        grubenv_path = '/boot/grub/grubenv'
+                        if os.path.exists(grubenv_path):
+                            with open(grubenv_path, 'r') as f2:
+                                for env_line in f2:
+                                    if env_line.startswith('saved_entry='):
+                                        entry_num = env_line.split('=', 1)[1].strip()
+                                        # Handle expandable menus, such as "Advanced options"
+                                        # which have the form [menu_id]>[submenu_item_id]
+                                        if '>' in entry_num:
+                                            entry_num = env_line.split('>', 1)[1].strip()
+                                        return _get_kernel_from_grub_entry(entry_num)
+                    elif 'vmlinuz-' in default_val:
+                        # Direct kernel path
+                        match = re.search(r'vmlinuz-([^\s]+)', default_val)
+                        if match:
+                            return match.group(1)
+                    else:
+                        # String entry
+                        return _get_kernel_from_grub_entry(default_val)
+                    break
+
+        logging.debug('Could not read /etc/default/grub in _get_actual_grub_default()')
+        return None
+
+    except (OSError, IOError) as e:
+        logging.debug(f"Error in _get_actual_grub_default() ${e}")
+        return None
+
+
+def _resolve_nvidia_module_path_for_kernel(kernel_version):
+    """Return the path to the NVIDIA kernel module for a given kernel version, if present.
+
+    Uses find to search for nvidia.ko* files in the kernel modules directory.
+    """
+
+    if not kernel_version:
+        logging.debug("Kernel not known, giving up on _resolve_nvidia_module_path_for_kernel()")
+        return None
+
+    modules_dir = f'/lib/modules/{kernel_version}'
+    if not os.path.exists(modules_dir):
+        logging.debug(f"Module directory {modules_dir} does not exist")
+        return None
+
+    # Use find to locate nvidia.ko* files (including compressed variants)
+    result = subprocess.check_output(
+        ['find', modules_dir, '-name', 'nvidia.ko*', '-type', 'f'],
+        universal_newlines=True,
+        stderr=subprocess.DEVNULL
+    )
+
+    # Get the first match if any
+    matches = result.strip().split('\n')
+    if matches and matches[0]:
+        return matches[0]
+
+    logging.debug("_resolve_nvidia_module_path_for_kernel() returned None")
+    return None
+
+
+def check_nvidia_module_status():
+    '''Check NVIDIA module status and kernel compatibility.
+
+    Returns:
+        dict: Contains information about NVIDIA module status:
+            - 'loaded': bool - Whether nvidia module is currently loaded
+            - 'current_module_path': str or None - Path to current nvidia module
+            - 'next_boot_kernel': str or None - Next boot kernel version
+            - 'next_boot_module_path': str or None - Path to nvidia module for next boot kernel
+            - 'needs_reboot': bool - Whether a reboot is needed
+            - 'module_missing': bool - Whether nvidia module is missing for next boot kernel
+    '''
+
+    result = {
+        'loaded': False,
+        'current_module_path': None,
+        'next_boot_kernel': None,
+        'next_boot_module_path': None,
+        'needs_reboot': False,
+        'module_missing': False
+    }
+
+    # Check if nvidia module is loaded
+    try:
+        lsmod_output = subprocess.check_output(
+            ['lsmod'], universal_newlines=True)
+        # Check for exact module name match (first column in lsmod output)
+        result['loaded'] = False
+        for line in lsmod_output.splitlines():
+            # lsmod format: module_name size used_by
+            # Split and check first field for exact match
+            parts = line.split()
+            if parts and parts[0] == 'nvidia':
+                result['loaded'] = True
+                break
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        logging.debug(f"Exception in loaded module check: ${e}")
+        pass
+
+    # Get current nvidia module info if loaded
+    if result['loaded']:
+        try:
+            modinfo_output = subprocess.check_output(['modinfo', 'nvidia'], universal_newlines=True)
+            for line in modinfo_output.splitlines():
+                if line.startswith('filename:'):
+                    result['current_module_path'] = line.split(':', 1)[1].strip()
+                    break
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            logging.debug(f"Exception in module path check: ${e}")
+            pass
+
+    result['next_boot_kernel'] = _get_actual_grub_default()
+
+    # If we cannot determine the next boot kernel definitively,
+    # don't make any assumptions about module / system state.
+    if not result['next_boot_kernel']:
+        result['needs_reboot'] = False
+        result['module_missing'] = False
+        result['next_boot_module_path'] = None
+        return result
+
+    current_kernel = os.uname().release
+    result['needs_reboot'] = bool(result['next_boot_kernel'] and result['next_boot_kernel'] != current_kernel)
+
+    # Always try to resolve the next boot module path (even if kernels match)
+    next_path = _resolve_nvidia_module_path_for_kernel(result['next_boot_kernel'])
+    if next_path:
+        result['next_boot_module_path'] = next_path
+    else:
+        result['module_missing'] = True
+        # Optional: provide debug context
+        result['debug_info'] = {
+            'checked_kernel': result['next_boot_kernel']
+        }
+
+    return result
+
+
+def gather_welcome_page_data():
+    '''Gather data for the welcome page.
+
+    Returns:
+        dict: A dictionary containing:
+            - cache_error: Error message if cache couldn't be loaded, or None
+            - nvidia_drivers: List of installed NVIDIA driver packages
+            - oem_packages: List of installed OEM packages
+            - nvidia_status: NVIDIA module status dict, or None if not applicable
+            - nvidia_status_error: Error message if status check failed, or None
+    '''
+    data = {
+        'cache_error': None,
+        'nvidia_drivers': [],
+        'oem_packages': [],
+        'nvidia_status': None,
+        'nvidia_status_error': None
+    }
+
+    # Initialize apt cache
+    apt_pkg.init_config()
+    apt_pkg.init_system()
+
+    try:
+        cache = apt_pkg.Cache(None)
+    except Exception as ex:
+        data['cache_error'] = str(ex)
+        return data
+
+    # Get installed NVIDIA drivers
+    data['nvidia_drivers'] = get_installed_packages_by_glob(
+        cache, "nvidia-driver-*") or \
+        get_installed_packages_by_glob(cache, "linux-modules-nvidia-*")
+
+    # Get installed OEM meta packages
+    data['oem_packages'] = get_installed_packages_by_glob(
+        cache, "oem-*-meta")
+
+    # Check NVIDIA module status if NVIDIA drivers are installed
+    if data['nvidia_drivers']:
+        try:
+            data['nvidia_status'] = check_nvidia_module_status()
+        except Exception as e:
+            data['nvidia_status_error'] = str(e)
+
+    return data

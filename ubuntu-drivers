@@ -432,15 +432,112 @@ def command_debug(args):
 
         print('%s: installed: %s   available: %s%s%s ' % (package, inst, cand, auto,  info_str))
 
+def format_welcome_page(data):
+    '''Format the welcome page output from gathered data.
+    
+    Args:
+        data: Dictionary containing welcome page data (from gather_welcome_page_data)
+    
+    Returns:
+        str: Formatted welcome page text
+    '''
+    lines = []
+    lines.append("\n=== Welcome to ubuntu-drivers ===")
+    lines.append("This tool helps you install and manage hardware drivers for your Ubuntu system.")
+    
+    # Handle cache error
+    if data['cache_error']:
+        lines.append(f"Warning: Could not access package cache: {data['cache_error']}")
+        return '\n'.join(lines)
+    
+    # Display installed drivers
+    lines.append("\n--- Installed OEM / NVIDIA Drivers ---")
+    if data['nvidia_drivers'] or data['oem_packages']:
+        if data['nvidia_drivers']:
+            lines.append("NVIDIA Drivers:")
+            for driver in data['nvidia_drivers']:
+                lines.append(f"  • {driver}")
+        if data['oem_packages']:
+            lines.append("OEM Enablement Packages:")
+            for package in data['oem_packages']:
+                lines.append(f"  • {package}")
+    else:
+        lines.append("No OEM or NVIDIA drivers are currently installed.")
+    
+    lines.append("\nFor more information, use 'ubuntu-drivers --help' or 'ubuntu-drivers list'")
+    lines.append("To install drivers, use 'sudo ubuntu-drivers install'")
+    
+    # Check NVIDIA module status and kernel compatibility if NVIDIA drivers were detected
+    if not data['nvidia_drivers']:
+        return '\n'.join(lines)
+        
+    if data['nvidia_status_error']:
+        lines.append('\n--- NVIDIA Module Status ---')
+        lines.append(f'⚠️  Could not check NVIDIA module status: {data["nvidia_status_error"]}')
+        return '\n'.join(lines)
+    
+    if not data['nvidia_status']:
+        return '\n'.join(lines)
+        
+    nvidia_status = data['nvidia_status']
+    
+    lines.append('\n--- NVIDIA Module Status ---')
+    if nvidia_status['loaded']:
+        lines.append('✓ NVIDIA module is currently loaded')
+    else:
+        # This case can happen after a new driver install, but before load, for example
+        lines.append('ℹ️  NVIDIA module is not currently loaded')
+        
+        # Show next boot module path even when not loaded
+        if nvidia_status['next_boot_module_path']:
+            lines.append(f'   📍 The NVIDIA module should load on next boot')
+            lines.append(f'   📍 Next boot module path: {nvidia_status["next_boot_module_path"]}')
+        
+    if nvidia_status['current_module_path']:
+        lines.append(f'  Module path for current kernel: {nvidia_status["current_module_path"]}')
+    
+    if nvidia_status['module_missing']:
+        lines.append('\n❌  ERROR: NVIDIA module is missing for the next boot kernel!')
+        lines.append(f'   Next boot kernel: {nvidia_status["next_boot_kernel"]}')
+        lines.append('   Please re-run ubuntu-drivers to install the missing module.')
+        return '\n'.join(lines)  # We don't want to instruct the user to reboot if they're missing the new kernel's NV driver
+    elif nvidia_status['next_boot_module_path']:
+        lines.append(f'   ✓ Next boot module path: {nvidia_status["next_boot_module_path"]}')
+        # Show both paths when they differ
+        if (nvidia_status['current_module_path'] and 
+            nvidia_status['current_module_path'] != nvidia_status['next_boot_module_path']):
+            lines.append(f'   📍 Module paths differ - you should reboot to use the latest kernel & driver:')
+            lines.append(f'      Current:  {nvidia_status["current_module_path"]}')
+            lines.append(f'      Next boot: {nvidia_status["next_boot_module_path"]}')
+
+    if nvidia_status['needs_reboot']:
+        lines.append(f'\n⚠️  Kernel version difference detected - reboot to use the latest kernel:')
+        lines.append(f'   Current kernel: {os.uname().release}')
+        lines.append(f'   Next boot kernel: {nvidia_status["next_boot_kernel"]}')
+    elif not nvidia_status['next_boot_kernel']:
+        lines.append('   ⚠️  Could not determine next boot kernel (try again with `sudo ubuntu-drivers`)')
+    else:
+        lines.append('   ✓ Current and next boot kernel versions match')
+    
+    return '\n'.join(lines)
+
+def show_welcome_page():
+    '''Display a welcome page showing installed OEM and NVIDIA drivers.'''
+    data = UbuntuDrivers.detect.gather_welcome_page_data()
+    output = format_welcome_page(data)
+    print(output)
+
 #
 # main
 #
 
 
-@click.group(context_settings=CONTEXT_SETTINGS)
+@click.group(context_settings=CONTEXT_SETTINGS, invoke_without_command=True)
 @pass_config
 def greet(config, **kwargs):
-    pass
+    # Show welcome page if no subcommand is provided
+    if not click.get_current_context().invoked_subcommand:
+        show_welcome_page()
 
 @greet.command()
 @click.argument('driver', nargs=-1)  # add the name argument

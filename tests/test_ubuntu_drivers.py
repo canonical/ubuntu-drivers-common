@@ -4974,6 +4974,21 @@ APT::Get::AllowUnauthenticated "true";
         # driver packages
         self.assertTrue('available: 1 (auto-install)  [third party]  free  modalias:' in out, out)
 
+    def test_welcome_page_with_subcommand(self):
+        '''ubuntu-drivers does not show welcome page when subcommand is provided'''
+
+        # Test that running ubuntu-drivers with a subcommand does not show welcome page
+        ud = subprocess.Popen(
+            [self.tool_path, 'list'],
+            universal_newlines=True, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        out, err = ud.communicate()
+        self.assertEqual(err, '')
+        self.assertNotIn('=== Welcome to ubuntu-drivers ===', out)
+        self.assertNotIn('This tool helps you install and manage hardware drivers', out)
+        self.assertNotIn('--- Installed OEM / NVIDIA Drivers ---', out)
+        self.assertEqual(ud.returncode, 0)
+
 
 class PluginsTest(unittest.TestCase):
     '''Test detect-plugins/*'''
