@@ -110,9 +110,10 @@ class KernelDetection(object):
                 target_package = image_package
 
             reverse_dependencies = [
-                dep.parent_pkg.name for dep in self.apt_cache[target_package].rev_depends_list
+                dep.parent_pkg.name
+                for dep in self.apt_cache[target_package].rev_depends_list  # type: ignore[attr-defined]
                 if dep.parent_pkg.name.startswith(prefix)
-            ]  # type: ignore[attr-defined]
+            ]
 
             if reverse_dependencies:
                 # This should be something like linux-image-$flavour
@@ -131,9 +132,10 @@ class KernelDetection(object):
                 if target == 'meta':
                     # Let's get the metapackage
                     reverse_dependencies = [
-                        dep.parent_pkg.name for dep in self.apt_cache[metapackage].rev_depends_list
+                        dep.parent_pkg.name
+                        for dep in self.apt_cache[metapackage].rev_depends_list  # type: ignore[attr-defined]
                         if dep.parent_pkg.name.startswith('linux-')
-                    ]  # type: ignore[attr-defined]
+                    ]
                     if reverse_dependencies:
                         flavour = self._get_linux_flavour(reverse_dependencies, target_package)
                         linux_meta = ''

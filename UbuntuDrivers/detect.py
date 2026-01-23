@@ -15,7 +15,7 @@ import subprocess
 import functools
 import re
 import json
-from typing import Optional, Dict, List, Set, Tuple, Any, TypedDict
+from typing import Optional, Dict, List, Set, Tuple, Any, TypedDict, Callable
 from functools import cmp_to_key
 
 import apt_pkg
@@ -881,8 +881,9 @@ def system_device_specific_metapackages(apt_cache: Optional[apt_pkg.Cache] = Non
 
 
 def system_gpgpu_driver_packages(
-        apt_cache=None, sys_path=None
-) -> Dict[str, PackageInfo]:  # type: ignore[no-untyped-def]
+        apt_cache: Optional[apt_pkg.Cache] = None,
+        sys_path: Optional[str] = None
+) -> Dict[str, PackageInfo]:
     '''Get driver packages, for gpgpu purposes, that are available for the system.
 
     This calls system_modaliases() to determine the system's hardware and then
