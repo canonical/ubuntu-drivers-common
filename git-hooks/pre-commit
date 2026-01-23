@@ -1,0 +1,14 @@
+#!/bin/bash
+# Pre-commit hook that runs static analysis and type checking
+
+set -e
+
+echo "Running static tests (pycodestyle and pyflakes)..."
+python3 -m unittest tests.test_static.TestStatic -v
+
+echo ""
+echo "Running mypy type checking..."
+mypy UbuntuDrivers/ Quirks/ ubuntu-drivers
+
+echo ""
+echo "✓ All checks passed!"

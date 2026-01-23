@@ -7,6 +7,16 @@ the most appropriate driver version (as we usually ship several), as well as
 setting up the alternatives symlinks that the proprietary NVidia and FGLRX
 packages use.
 
+## Development Setup
+
+After cloning the repository, configure git to use the project's git hooks:
+
+```bash
+git config core.hooksPath git-hooks
+```
+
+This enables pre-commit hooks that run static analysis (pycodestyle, pyflakes) and mypy type checking.
+
 ## Command line interface
 
 The simplest frontend is the `ubuntu-drivers` command line tool. You can use
