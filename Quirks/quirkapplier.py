@@ -28,6 +28,7 @@ import xkit.xutils
 import xkit.xorgparser
 
 import Quirks.quirkreader
+from Quirks.quirkreader import Quirk
 import Quirks.quirkinfo
 
 class QuirkChecker:
@@ -35,12 +36,12 @@ class QuirkChecker:
                  path: str = '/usr/share/jockey/quirks') -> None:
         self._handler = handler
         self.quirks_path = path
-        self._quirks: List['Quirks.quirkreader.Quirk'] = []
+        self._quirks: List[Quirk] = []
         self.get_quirks_from_path()
         self._system_info = self.get_system_info()
         self._xorg_conf_d_path = '/usr/share/X11/xorg.conf.d'
 
-    def get_quirks_from_path(self) -> List['Quirks.quirkreader.Quirk']:
+    def get_quirks_from_path(self) -> List[Quirk]:
         '''check all the files in a directory looking for quirks'''
         self._quirks = []
         if os.path.isdir(self.quirks_path):
@@ -54,7 +55,7 @@ class QuirkChecker:
         return self._quirks
         
 
-    def get_quirks_from_file(self, quirk_file: str) -> List['Quirks.quirkreader.Quirk']:
+    def get_quirks_from_file(self, quirk_file: str) -> List[Quirk]:
         '''check all the files in a directory looking for quirks'''
         # read other blacklist files (which we will not touch, but evaluate)
         quirk_file = Quirks.quirkreader.ReadQuirk(quirk_file)
@@ -65,7 +66,7 @@ class QuirkChecker:
         quirk_info = Quirks.quirkinfo.QuirkInfo()
         return quirk_info.get_dmi_info()
 
-    def matches_tags(self, quirk: 'Quirks.quirkreader.Quirk') -> bool:
+    def matches_tags(self, quirk: Quirk) -> bool:
         '''See if tags match system info'''
         result = True
         for tag in quirk.match_tags.keys():
