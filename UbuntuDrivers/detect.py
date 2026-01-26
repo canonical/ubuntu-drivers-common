@@ -186,7 +186,7 @@ def system_modaliases(sys_path: Optional[str] = None) -> Dict[str, str]:
 
 
 def _check_video_abi_compat(apt_cache: apt_pkg.Cache,
-                            package: 'apt_pkg.Package') -> bool:
+                            package: apt_pkg.Package) -> bool:
     xorg_video_abi = None
 
     if package.name.startswith('nvidia-driver-'):
@@ -289,7 +289,7 @@ def apt_cache_modalias_map(apt_cache: apt_pkg.Cache) -> Dict[str, Tuple[Any, Dic
             logging.error('Package %s has invalid modalias header: %s' % (
                 package.name, m))
 
-    result2 = {}
+    result2: Dict[str, Tuple[Any, Dict[str, Set[str]]]] = {}
     for bus, alias_map in result.items():
         pat = re.compile(
             '|'.join([fnmatch.translate(pat) for pat in alias_map.keys()]),
@@ -372,7 +372,7 @@ def packages_for_modalias(
     return [apt_cache[p] for p in pkgs]
 
 
-def _is_package_free(apt_cache: apt_pkg.Cache, pkg: 'apt_pkg.Package') -> bool:
+def _is_package_free(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> bool:
     depcache = apt_pkg.DepCache(apt_cache)
     candidate = depcache.get_candidate_ver(pkg)
     assert candidate is not None
@@ -401,7 +401,7 @@ def _is_package_free(apt_cache: apt_pkg.Cache, pkg: 'apt_pkg.Package') -> bool:
     return True
 
 
-def _is_package_from_distro(apt_cache: apt_pkg.Cache, pkg: 'apt_pkg.Package') -> bool:
+def _is_package_from_distro(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> bool:
     depcache = apt_pkg.DepCache(apt_cache)
     candidate = depcache.get_candidate_ver(pkg)
     if candidate is None:
@@ -413,7 +413,7 @@ def _is_package_from_distro(apt_cache: apt_pkg.Cache, pkg: 'apt_pkg.Package') ->
         return False
 
 
-def _pkg_get_open_preference(apt_cache: apt_pkg.Cache, pkg: 'apt_pkg.Package') -> Optional[Any]:
+def _pkg_get_open_preference(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> Optional[Any]:
     '''Determine if -open package is prefered from apt Package object'''
     depcache = apt_pkg.DepCache(apt_cache)
     candidate = depcache.get_candidate_ver(pkg)
@@ -434,7 +434,7 @@ def _pkg_get_open_preference(apt_cache: apt_pkg.Cache, pkg: 'apt_pkg.Package') -
     return preference
 
 
-def _pkg_get_module(apt_cache: apt_pkg.Cache, pkg: 'apt_pkg.Package') -> Optional[str]:
+def _pkg_get_module(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> Optional[str]:
     '''Determine module name from apt Package object'''
     depcache = apt_pkg.DepCache(apt_cache)
     candidate = depcache.get_candidate_ver(pkg)
@@ -456,7 +456,7 @@ def _pkg_get_module(apt_cache: apt_pkg.Cache, pkg: 'apt_pkg.Package') -> Optiona
     return module
 
 
-def _pkg_get_support(apt_cache: apt_pkg.Cache, pkg: 'apt_pkg.Package') -> Optional[str]:
+def _pkg_get_support(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> Optional[str]:
     '''Determine support level from apt Package object'''
 
     depcache = apt_pkg.DepCache(apt_cache)
@@ -510,7 +510,7 @@ def _is_nv_allowing_runtimepm_supported(alias: str, ver: str) -> bool:
     return False
 
 
-def _is_runtimepm_supported(apt_cache: apt_pkg.Cache, pkg: 'apt_pkg.Package', alias: str) -> bool:
+def _is_runtimepm_supported(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package, alias: str) -> bool:
     '''Check if the package supports runtimepm for the given modalias'''
     try:
         depcache = apt_pkg.DepCache(apt_cache)
@@ -538,7 +538,7 @@ def is_wayland_session() -> bool:
     return os.environ.get('XDG_SESSION_TYPE', '') == 'wayland' or os.environ.get('WAYLAND_DISPLAY') is not None
 
 
-def _is_manual_install(apt_cache: apt_pkg.Cache, pkg: 'apt_pkg.Package') -> bool:
+def _is_manual_install(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> bool:
     '''Determine if the kernel module from an apt.Package is manually installed.'''
 
     if pkg.current_ver:
@@ -602,7 +602,7 @@ def _get_db_name(syspath: str, alias: str) -> Tuple[Optional[str], Optional[str]
     return (vendor, model)
 
 
-def _is_open_prefered(apt_cache: apt_pkg.Cache, pkg: 'apt_pkg.Package') -> bool:
+def _is_open_prefered(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> bool:
     if not pkg.name.startswith('nvidia-'):
         return False
 
@@ -778,7 +778,7 @@ def get_userspace_lrm_meta(apt_cache: apt_pkg.Cache, pkg_name: str) -> Optional[
     return metapackage
 
 
-def _get_headless_no_dkms_metapackage(pkg: 'apt_pkg.Package', apt_cache: apt_pkg.Cache) -> Optional[str]:
+def _get_headless_no_dkms_metapackage(pkg: apt_pkg.Package, apt_cache: apt_pkg.Cache) -> Optional[str]:
     assert pkg is not None
     metapackage: Optional[str] = None
     '''Return headless-no-dkms metapackage from the main metapackage.

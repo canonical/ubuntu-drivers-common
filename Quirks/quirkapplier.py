@@ -108,7 +108,7 @@ class QuirkChecker:
         return '%s/10-%s-%s.conf' % (self._xorg_conf_d_path,
                 self._handler, quirk.id.lower().replace(' ', '-'))
 
-    def _apply_quirk(self, quirk: Any) -> bool:
+    def _apply_quirk(self, quirk: Quirk) -> bool:
         '''Get the xorg snippet and apply it'''
         # Get the relevant x_snippet
         # Write conf file to /usr/share/X11/xorg.conf.d/file.conf
@@ -128,7 +128,7 @@ class QuirkChecker:
             return False
         return True
 
-    def _unapply_quirk(self, quirk: Any) -> bool:
+    def _unapply_quirk(self, quirk: Quirk) -> bool:
         '''Remove the file with the xorg snippet'''
         # Get the relevant x_snippet
         # Write conf file to /usr/share/X11/xorg.conf.d/file.conf
