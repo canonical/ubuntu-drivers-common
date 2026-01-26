@@ -1,3 +1,11 @@
+ubuntu-drivers-common (1:0.9.7.6ubuntu3.6) noble; urgency=medium
+
+  * [ Conrad Fernandez ]
+    Require root for install and autoinstall (LP: #1920225)
+    with tests added
+
+ -- Kuba Pawlak <kuba.pawlak@canonical.com>  Mon, 26 Jan 2026 16:42:46 +0100
+
 ubuntu-drivers-common (1:0.9.7.6ubuntu3.5) noble; urgency=medium
 
   [ Mitchell Augustin ]
@@ -19,7 +27,6 @@ ubuntu-drivers-common (1:0.9.7.6ubuntu3.3) noble; urgency=medium
   * Clarify gpgpu flag help text (LP: #2115537)
 
  -- Mitchell Augustin <mitchell.augustin@canonical.com>  Tue, 01 Jul 2025 16:49:10 -0500
-
 
 ubuntu-drivers-common (1:0.9.7.6ubuntu3.2) noble; urgency=medium
 
