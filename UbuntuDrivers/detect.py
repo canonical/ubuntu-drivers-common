@@ -1090,18 +1090,27 @@ def _process_driver_string(string):
 
 def already_installed_filter(cache, packages, include_dkms, comparator):
     '''
+    Filter out already installed packages from a list of package candidates.
+
+    Args:
+        cache: The apt cache object used to check installed packages.
+        packages: Dict of package candidates to consider for installation.
+        include_dkms: Boolean indicating whether to include DKMS packages.
+        comparator: Sorting function to identify most appropriate package for requested driver type.
+            See _cmp_gfx_alternatives or _cmp_gfx_alternatives_gpgpu for details.
+
     Takes a list of packages of this format:
     {'modalias': 'pci:v000010DEd000010C3sv00003842sd00002670bc03sc03i00',
-    'syspath': '/tmp/umockdev.8CRPA3/sys/devices/graphics', 'free': False,
+     'syspath': '/tmp/umockdev.8CRPA3/sys/devices/graphics', 'free': False,
      'from_distro': False, 'support': None, 'open_preferred': False,
      'vendor': 'NVIDIA Corporation', 'model': 'GT218 [GeForce 8400 GS Rev. 3]',
      'metapackage': 'nvidia-headless-no-dkms-410', 'recommended': True}
-    checks to see if the requested packages are alreay installed, then filters
+    checks to see if the requested packages are already installed, then filters
     them out if so.
 
-    It returns a simplified list of just the package names for apt to install,
-    of the form:
-    ['nvidia-driver-410', 'nvidia-headless-no-dkms-410']
+    Returns:
+        A simplified list of just the package names for apt to install, of the form:
+        ['nvidia-driver-410', 'nvidia-headless-no-dkms-410']
     '''
 
     # If there's no apt cache, there's no way to check what
@@ -1188,10 +1197,21 @@ def gpgpu_install_filter(cache, include_dkms, packages, drivers_str, get_recomme
     drivers = []
     allow = []
     result = {}
-    '''Filter the Ubuntu packages according to the parameters the users passed.
+    '''
+    Filter the Ubuntu packages according to the parameters the users passed.
 
-    Returns a list of drivers to be installed, of the form
-    ['nvidia-driver-410', 'nvidia-headless-no-dkms-410']
+    Args:
+        cache: The apt cache object used to check installed packages.
+        include_dkms: Boolean indicating whether to include DKMS packages.
+        packages: Dict of package candidates to consider for installation.
+        drivers_str: String specifying driver(s) and version(s) to filter for.
+        get_recommended: Boolean, if True only recommended packages are considered.
+        comparator: Sorting function to identify most appropriate package for requested driver type.
+            See _cmp_gfx_alternatives or _cmp_gfx_alternatives_gpgpu for details.
+
+    Returns:
+        A list of drivers to be installed, of the form
+        ['nvidia-driver-410', 'nvidia-headless-no-dkms-410']
 
     Ubuntu-drivers syntax
 
@@ -1201,14 +1221,14 @@ def gpgpu_install_filter(cache, include_dkms, packages, drivers_str, get_recomme
     If no version is specified, gives the “current” supported version for the GPU in question.
 
     Examples:
-    ubuntu-drivers autoinstall --gpgpu
-    ubuntu-drivers autoinstall --gpgpu 390
-    ubuntu-drivers autoinstall --gpgpu nvidia:390
+        ubuntu-drivers autoinstall --gpgpu
+        ubuntu-drivers autoinstall --gpgpu 390
+        ubuntu-drivers autoinstall --gpgpu nvidia:390
 
     Today this is only nvidia.  In the future there may be amdgpu-pro.
     Possible syntax, to be confirmed only once there are driver packages that could use it:
-    ubuntu-drivers autoinstall --gpgpu nvidia:390,amdgpu
-    ubuntu-drivers autoinstall --gpgpu amdgpu:version
+        ubuntu-drivers autoinstall --gpgpu nvidia:390,amdgpu
+        ubuntu-drivers autoinstall --gpgpu amdgpu:version
     '''
     if not packages:
         return list(result.keys())
@@ -1294,13 +1314,24 @@ def gpgpu_install_filter(cache, include_dkms, packages, drivers_str, get_recomme
 
 
 def auto_install_filter(cache, include_dkms, packages, drivers_str='', get_recommended=True, comparator=None):
-    '''Get packages which are appropriate for automatic installation.
+    '''
+    Get packages which are appropriate for automatic installation.
 
-    Return the subset of the given list of packages which are appropriate for
-    automatic installation by the installer as a list. This applies to e. g. the Broadcom
-    Wifi driver (as there is no alternative), but not to the FGLRX proprietary
-    graphics driver (as the free driver works well and FGLRX does not provide
-    KMS).
+    Args:
+        cache: The apt cache object used to check installed packages.
+        include_dkms: Boolean indicating whether to include DKMS packages.
+        packages: Dict of package candidates to consider for installation.
+        drivers_str: String specifying driver(s) and version(s) to filter for (optional).
+        get_recommended: Boolean, if True only recommended packages are considered.
+        comparator: Sorting function to identify most appropriate package for requested driver type.
+            See _cmp_gfx_alternatives or _cmp_gfx_alternatives_gpgpu for details.
+
+    Returns:
+        The subset of the given list of packages which are appropriate for
+        automatic installation by the installer as a list. This applies to e.g. the Broadcom
+        Wifi driver (as there is no alternative), but not to the FGLRX proprietary
+        graphics driver (as the free driver works well and FGLRX does not provide
+        KMS).
     '''
     # any package which matches any of those globs will be accepted
     whitelist = ['bcmwl*', 'pvr-omap*', 'virtualbox-guest*', 'nvidia-*',
