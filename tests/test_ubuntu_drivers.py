@@ -1381,7 +1381,7 @@ class DetectTest(unittest.TestCase):
    }
  ]
 }''')
-            res_470_no_390 = UbuntuDrivers.detect.system_driver_packages(cache,
+            res_390_no_470 = UbuntuDrivers.detect.system_driver_packages(cache,
                                                                          sys_path=self.umockdev.get_sys_dir())
 
             # point to the same version as candidate.
@@ -1462,10 +1462,10 @@ class DetectTest(unittest.TestCase):
         packages = UbuntuDrivers.detect.gpgpu_install_filter(res_wrong_json, 'nvidia')
         self.assertEqual(set(packages), set(['nvidia-driver-470']))
 
-        self.assertTrue('nvidia-driver-470' in res_470_no_390)
-        self.assertTrue('nvidia-driver-390' in res_470_no_390)
-        packages = UbuntuDrivers.detect.gpgpu_install_filter(res_470_no_390, 'nvidia')
-        self.assertEqual(set(packages), set(['nvidia-driver-470']))
+        self.assertFalse('nvidia-driver-470' in res_390_no_470)
+        self.assertTrue('nvidia-driver-390' in res_390_no_470)
+        packages = UbuntuDrivers.detect.gpgpu_install_filter(res_390_no_470, 'nvidia')
+        self.assertEqual(set(packages), set(['nvidia-driver-390']))
 
         self.assertTrue('nvidia-driver-470' in res_same_470)
         packages = UbuntuDrivers.detect.gpgpu_install_filter(res_same_470, 'nvidia')
