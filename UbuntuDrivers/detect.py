@@ -1088,43 +1088,40 @@ def _process_driver_string(string):
     return driver
 
 
-def already_installed_filter(cache, packages, include_dkms, gpgpu=False):
+def _sort_packages_by_preference(packages, gpgpu=False):
     '''
-    Sort driver branch to install according to preference, then select
-    most appropriate modules package and filter out already installed packages.
+    Sort packages by preference based on desktop or GPGPU mode.
+
+    Args:
+        packages: Dict of package candidates to sort.
+        gpgpu: Boolean flag indicating whether to use GPGPU (server) sorting preferences.
+
+    Returns:
+        List of (package_name, package_info) tuples sorted by preference (most preferred first).
+    '''
+    comparator = _cmp_gfx_alternatives_gpgpu if gpgpu else _cmp_gfx_alternatives
+    return sorted(packages.items(),
+                  key=cmp_to_key(lambda left, right: comparator(left[0], right[0])),
+                  reverse=True)
+
+
+def _build_installation_list(cache, sorted_packages, include_dkms, gpgpu=False):
+    '''
+    Build the list of packages to install including metapackages and modules.
 
     Args:
         cache: The apt cache object used to check installed packages.
-        packages: Dict of package candidates to consider for installation.
+        sorted_packages: List of (package_name, package_info) tuples sorted by preference.
         include_dkms: Boolean indicating whether to include DKMS packages.
-        gpgpu: Boolean flag indicating whether to use GPGPU (server) sorting preferences.
-
-    Takes a list of packages of this format:
-    {'modalias': 'pci:v000010DEd000010C3sv00003842sd00002670bc03sc03i00',
-     'syspath': '/tmp/umockdev.8CRPA3/sys/devices/graphics', 'free': False,
-     'from_distro': False, 'support': None, 'open_preferred': False,
-     'vendor': 'NVIDIA Corporation', 'model': 'GT218 [GeForce 8400 GS Rev. 3]',
-     'metapackage': 'nvidia-headless-no-dkms-410', 'recommended': True}
-    checks to see if the requested packages are already installed, then filters
-    them out if so.
+        gpgpu: Boolean flag indicating whether to use GPGPU (server) mode.
 
     Returns:
-        A simplified list of just the package names for apt to install, of the form:
-        ['nvidia-driver-410', 'nvidia-headless-no-dkms-410']
+        List of package names to install including metapackages and module packages.
     '''
-
-    # If there's no apt cache, there's no way to check what
-    # is already installed - so don't filter anything down.
-    if not cache:
-        return list(packages.keys())
-
-    comparator = _cmp_gfx_alternatives_gpgpu if gpgpu else _cmp_gfx_alternatives
     depcache = apt_pkg.DepCache(cache)
     to_install = []
-    for p, _ in sorted(packages.items(),
-                       key=cmp_to_key(lambda left, right:
-                                      comparator(left[0], right[0])),
-                       reverse=True):
+
+    for p, pkg_info in sorted_packages:
         if not gpgpu:
             candidate_ver = depcache.get_candidate_ver(cache[p])
             records = apt_pkg.PackageRecords(cache)
@@ -1141,7 +1138,7 @@ def already_installed_filter(cache, packages, include_dkms, gpgpu=False):
                     # installation will fail
                     pass
 
-        candidate = packages[p].get('metapackage')
+        candidate = pkg_info.get('metapackage')
         # Do not add more than one nvidia-driver-* (or associated packages) to to_install
         if p.startswith("nvidia-driver-"):
             if any(pkg.startswith("nvidia-driver-") for pkg in to_install):
@@ -1184,11 +1181,67 @@ def already_installed_filter(cache, packages, include_dkms, gpgpu=False):
                     to_install.remove(p)
             break
 
-    # Final filter
-    for p in sorted(to_install, reverse=True):
+    return to_install
+
+
+def _remove_already_installed(cache, packages):
+    '''
+    Filter out packages that are already installed.
+
+    Args:
+        cache: The apt cache object used to check installed packages.
+        packages: List of package names to filter.
+
+    Returns:
+        List of package names that are not yet installed.
+    '''
+    filtered = []
+    for p in sorted(packages, reverse=True):
         if cache and cache[p].current_ver:
             logging.debug("Removing already-installed package from to_install: " + p)
-            to_install.remove(p)
+        else:
+            filtered.append(p)
+    return filtered
+
+
+def already_installed_filter(cache, packages, include_dkms, gpgpu=False):
+    '''
+    Sort driver branch to install according to preference, then select
+    most appropriate modules package and filter out already installed packages.
+
+    Args:
+        cache: The apt cache object used to check installed packages.
+        packages: Dict of package candidates to consider for installation.
+        include_dkms: Boolean indicating whether to include DKMS packages.
+        gpgpu: Boolean flag indicating whether to use GPGPU (server) sorting preferences.
+
+    Takes a list of packages of this format:
+    {'modalias': 'pci:v000010DEd000010C3sv00003842sd00002670bc03sc03i00',
+     'syspath': '/tmp/umockdev.8CRPA3/sys/devices/graphics', 'free': False,
+     'from_distro': False, 'support': None, 'open_preferred': False,
+     'vendor': 'NVIDIA Corporation', 'model': 'GT218 [GeForce 8400 GS Rev. 3]',
+     'metapackage': 'nvidia-headless-no-dkms-410', 'recommended': True}
+    checks to see if the requested packages are already installed, then filters
+    them out if so.
+
+    Returns:
+        A simplified list of just the package names for apt to install, of the form:
+        ['nvidia-driver-410', 'nvidia-headless-no-dkms-410']
+    '''
+
+    # If there's no apt cache, there's no way to check what
+    # is already installed - so don't filter anything down.
+    if not cache:
+        return list(packages.keys())
+
+    # Step 1: Sort packages by preference
+    sorted_packages = _sort_packages_by_preference(packages, gpgpu)
+
+    # Step 2: Build the installation list with metapackages and modules
+    to_install = _build_installation_list(cache, sorted_packages, include_dkms, gpgpu)
+
+    # Step 3: Filter out already installed packages
+    to_install = _remove_already_installed(cache, to_install)
 
     logging.debug("to_install_final:  " + str(to_install))
     return to_install
