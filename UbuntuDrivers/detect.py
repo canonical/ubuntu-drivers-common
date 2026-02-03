@@ -1251,7 +1251,7 @@ def gpgpu_install_filter(cache, include_dkms, packages, drivers_str, get_recomme
         drivers.append(driver)
 
     if len(drivers) < 1:
-        return already_installed_filter(cache, result, include_dkms, gpgpu)
+        return []
 
     # If the vendor is not specified, we assume it's nvidia
     it = 0
@@ -1268,7 +1268,7 @@ def gpgpu_install_filter(cache, include_dkms, packages, drivers_str, get_recomme
         if vendors_temp.__contains__(vendor):
             # TODO: raise error here
             logging.debug('Multiple nvidia versions passed at the same time')
-            return already_installed_filter(cache, result, include_dkms, gpgpu)
+            return []
         vendors_temp.append(vendor)
         it += 1
 
