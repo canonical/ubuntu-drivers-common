@@ -1090,7 +1090,8 @@ def _process_driver_string(string):
 
 def already_installed_filter(cache, packages, include_dkms, gpgpu=False):
     '''
-    Filter out already installed packages from a list of package candidates.
+    Sort driver branch to install according to preference, then select
+    most appropriate modules package and filter out already installed packages.
 
     Args:
         cache: The apt cache object used to check installed packages.
@@ -1198,7 +1199,8 @@ def gpgpu_install_filter(cache, include_dkms, packages, drivers_str, get_recomme
     allow = []
     result = {}
     '''
-    Filter the Ubuntu packages according to the parameters the users passed.
+    Sort driver branch to install according to preference, then select
+    most appropriate modules package and filter out already installed packages.
 
     Args:
         cache: The apt cache object used to check installed packages.
