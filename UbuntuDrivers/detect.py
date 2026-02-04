@@ -1015,7 +1015,6 @@ def get_desktop_package_list(
         apt_cache, sys_path, freeonly=free_only,
         include_oem=include_oem)
 
-    to_install = []
     to_install = auto_install_filter(apt_cache, include_dkms, packages, driver_string, get_recommended=False)
     if not to_install:
         logging.debug('No drivers found for installation.')
@@ -1094,6 +1093,8 @@ def _sort_packages_by_preference(packages, gpgpu=False):
 
     Args:
         packages: Dict of package candidates to sort.
+            Typically originates from system_driver_packages() or system_gpgpu_driver_packages(),
+            and is filtered depending on the mode (desktop vs gpgpu) and user preferences.
         gpgpu: Boolean flag indicating whether to use GPGPU (server) sorting preferences.
 
     Returns:
@@ -1212,6 +1213,8 @@ def already_installed_filter(cache, packages, include_dkms, gpgpu=False):
     Args:
         cache: The apt cache object used to check installed packages.
         packages: Dict of package candidates to consider for installation.
+            Typically originates from system_driver_packages() or system_gpgpu_driver_packages(),
+            and is filtered depending on the mode (desktop vs gpgpu) and user preferences.
         include_dkms: Boolean indicating whether to include DKMS packages.
         gpgpu: Boolean flag indicating whether to use GPGPU (server) sorting preferences.
 
@@ -1231,8 +1234,17 @@ def already_installed_filter(cache, packages, include_dkms, gpgpu=False):
 
     # If there's no apt cache, there's no way to check what
     # is already installed - so don't filter anything down.
+    # (aside from non-coinstallable nvidia-driver-* packages)
     if not cache:
-        return list(packages.keys())
+        to_install = []
+        sorted_packages = _sort_packages_by_preference(packages, gpgpu)
+        for p, _ in sorted_packages:
+            # Do not add more than one nvidia-driver-* (or associated packages) to to_install
+            if p.startswith("nvidia-driver-"):
+                if any(pkg.startswith("nvidia-driver-") for pkg in to_install):
+                    continue
+            to_install.append(p)
+        return to_install
 
     # Step 1: Sort packages by preference
     sorted_packages = _sort_packages_by_preference(packages, gpgpu)
@@ -1259,6 +1271,8 @@ def gpgpu_install_filter(cache, include_dkms, packages, drivers_str, get_recomme
         cache: The apt cache object used to check installed packages.
         include_dkms: Boolean indicating whether to include DKMS packages.
         packages: Dict of package candidates to consider for installation.
+            Typically originates from system_driver_packages() or system_gpgpu_driver_packages(),
+            and is filtered depending on the mode (desktop vs gpgpu) and user preferences.
         drivers_str: String specifying driver(s) and version(s) to filter for.
         get_recommended: Boolean, if True only recommended packages are considered.
         gpgpu: Boolean flag indicating whether to use GPGPU (server) sorting preferences.
@@ -1372,6 +1386,8 @@ def auto_install_filter(cache, include_dkms, packages, drivers_str='', get_recom
         cache: The apt cache object used to check installed packages.
         include_dkms: Boolean indicating whether to include DKMS packages.
         packages: Dict of package candidates to consider for installation.
+            Typically originates from system_driver_packages() or system_gpgpu_driver_packages(),
+            and is filtered depending on the mode (desktop vs gpgpu) and user preferences.
         drivers_str: String specifying driver(s) and version(s) to filter for (optional).
         get_recommended: Boolean, if True only recommended packages are considered.
         gpgpu: Boolean flag indicating whether to use GPGPU (server) sorting preferences.
