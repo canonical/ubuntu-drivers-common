@@ -19,6 +19,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 from Quirks import quirkreader, quirkapplier
+
 # from xkit import xorgparser
 # from xkit.xorgparser import *
 import sys
@@ -30,12 +31,12 @@ import settings
 
 source = settings.inputFile
 destination = settings.inputDir
-destinationFile = os.path.join(settings.outputDir, 'quirksreader_test.txt')
-tempFile = os.path.join(destination, 'tmp')
+destinationFile = os.path.join(settings.outputDir, "quirksreader_test.txt")
+tempFile = os.path.join(destination, "tmp")
 
 
 def get_quirks_from_file(quirk_file):
-    '''check all the files in a directory looking for quirks'''
+    """check all the files in a directory looking for quirks"""
     # read other blacklist files (which we will not touch, but evaluate)
     quirk_file = quirkreader.ReadQuirk(quirk_file)
     return quirk_file.get_quirks()
@@ -56,11 +57,12 @@ class QuirkReaderTestCase(unittest.TestCase):
             pass
 
     def test_read_quirk1(self):
-        '''1 Matching config file'''
+        """1 Matching config file"""
         self.this_function_name = sys._getframe().f_code.co_name
 
-        with open(tempFile, 'w') as confFile:
-            confFile.write('''
+        with open(tempFile, "w") as confFile:
+            confFile.write(
+                """
 Section "Quirk"
     Identifier "Test Latitude E6530"
     Handler "nvidia-current|nvidia-current-updates"
@@ -79,24 +81,27 @@ Section "Quirk"
         EndSection
     EndXorgSnippet
 EndSection
-''')
+"""
+            )
         # os.system('cat %s' % tempFile)
         # loglevel = logging.DEBUG
-    # else:
+        # else:
         # loglevel = logging.INFO
 
         # logging.basicConfig(format='%(levelname)s:%(message)s', level=loglevel)
-        a = quirkapplier.QuirkChecker('nvidia-current', path=destination)
+        a = quirkapplier.QuirkChecker("nvidia-current", path=destination)
 
         # Override DMI
-        a._system_info = {'sys_vendor': 'Dell Inc.',
-                          'bios_vendor': 'American Megatrends Inc.',
-                          'product_version': 'System Version',
-                          'board_name': 'P6T SE',
-                          'bios_date': '01/19/2009',
-                          'bios_version': '0106',
-                          'product_name': 'Latitude E6530',
-                          'board_vendor': 'ASUSTeK Computer INC.'}
+        a._system_info = {
+            "sys_vendor": "Dell Inc.",
+            "bios_vendor": "American Megatrends Inc.",
+            "product_version": "System Version",
+            "board_name": "P6T SE",
+            "bios_date": "01/19/2009",
+            "bios_version": "0106",
+            "product_name": "Latitude E6530",
+            "board_vendor": "ASUSTeK Computer INC.",
+        }
         quirk_found = False
         quirk_matches = False
 
@@ -104,24 +109,25 @@ EndSection
             if a._handler.lower() in [x.lower().strip() for x in quirk.handler]:
                 quirk_found = True
 
-                logging.debug('Processing quirk %s' % quirk.id)
+                logging.debug("Processing quirk %s" % quirk.id)
                 # self.assertTrue(a.matches_tags(quirk))
                 if a.matches_tags(quirk):
                     # Do something here
-                    logging.debug('Quirk matches')
+                    logging.debug("Quirk matches")
                     quirk_matches = True
                 else:
-                    logging.debug('Quirk doesn\'t match')
+                    logging.debug("Quirk doesn't match")
 
         self.assertTrue(quirk_found)
         self.assertTrue(quirk_matches)
 
     def test_read_quirk2(self):
-        '''2 Not matching config file'''
+        """2 Not matching config file"""
         self.this_function_name = sys._getframe().f_code.co_name
 
-        with open(tempFile, 'w') as confFile:
-            confFile.write('''
+        with open(tempFile, "w") as confFile:
+            confFile.write(
+                """
 Section "Quirk"
     Identifier "Test Latitude E6530"
     Handler "nvidia-current|nvidia-current-updates"
@@ -142,24 +148,27 @@ Section "Quirk"
 EndSection
 
 
-''')
+"""
+            )
         # os.system('cat %s' % tempFile)
         # loglevel = logging.DEBUG
-    # else:
+        # else:
         # loglevel = logging.INFO
 
         # logging.basicConfig(format='%(levelname)s:%(message)s', level=loglevel)
-        a = quirkapplier.QuirkChecker('nvidia-current', path=destination)
+        a = quirkapplier.QuirkChecker("nvidia-current", path=destination)
 
         # Override DMI
-        a._system_info = {'sys_vendor': 'Fake',
-                          'bios_vendor': 'American Megatrends Inc.',
-                          'product_version': 'System Version',
-                          'board_name': 'P6T SE',
-                          'bios_date': '01/19/2009',
-                          'bios_version': '0106',
-                          'product_name': 'Fake product',
-                          'board_vendor': 'ASUSTeK Computer INC.'}
+        a._system_info = {
+            "sys_vendor": "Fake",
+            "bios_vendor": "American Megatrends Inc.",
+            "product_version": "System Version",
+            "board_name": "P6T SE",
+            "bios_date": "01/19/2009",
+            "bios_version": "0106",
+            "product_name": "Fake product",
+            "board_vendor": "ASUSTeK Computer INC.",
+        }
         quirk_found = False
         quirk_matches = True
 
@@ -167,25 +176,26 @@ EndSection
             if a._handler.lower() in [x.lower().strip() for x in quirk.handler]:
                 quirk_found = True
 
-                logging.debug('Processing quirk %s' % quirk.id)
+                logging.debug("Processing quirk %s" % quirk.id)
                 # It doesn't have to match
                 self.assertTrue(not a.matches_tags(quirk))
                 if a.matches_tags(quirk):
                     # Do something here
-                    logging.debug('Quirk matches')
+                    logging.debug("Quirk matches")
                 else:
-                    logging.debug('Quirk doesn\'t match')
+                    logging.debug("Quirk doesn't match")
                     quirk_matches = False
 
         self.assertTrue(quirk_found)
         self.assertFalse(quirk_matches)
 
     def test_read_quirk3(self):
-        '''3 Matching quirk aimed at multiple products'''
+        """3 Matching quirk aimed at multiple products"""
         self.this_function_name = sys._getframe().f_code.co_name
 
-        with open(tempFile, 'w') as confFile:
-            confFile.write('''
+        with open(tempFile, "w") as confFile:
+            confFile.write(
+                """
 Section "Quirk"
     Identifier "Test Latitude E6530"
     Handler "nvidia-current|nvidia-current-updates"
@@ -206,24 +216,27 @@ Section "Quirk"
 EndSection
 
 
-''')
+"""
+            )
         # os.system('cat %s' % tempFile)
         # loglevel = logging.DEBUG
-    # else:
+        # else:
         # loglevel = logging.INFO
 
         # logging.basicConfig(format='%(levelname)s:%(message)s', level=loglevel)
-        a = quirkapplier.QuirkChecker('nvidia-current', path=destination)
+        a = quirkapplier.QuirkChecker("nvidia-current", path=destination)
 
         # Override DMI
-        a._system_info = {'sys_vendor': 'Dell Inc.',
-                          'bios_vendor': 'American Megatrends Inc.',
-                          'product_version': 'System Version',
-                          'board_name': 'P6T SE',
-                          'bios_date': '01/19/2009',
-                          'bios_version': '0106',
-                          'product_name': 'Latitude E6535',
-                          'board_vendor': 'ASUSTeK Computer INC.'}
+        a._system_info = {
+            "sys_vendor": "Dell Inc.",
+            "bios_vendor": "American Megatrends Inc.",
+            "product_version": "System Version",
+            "board_name": "P6T SE",
+            "bios_date": "01/19/2009",
+            "bios_version": "0106",
+            "product_name": "Latitude E6535",
+            "board_vendor": "ASUSTeK Computer INC.",
+        }
         quirk_found = False
         quirk_matches = False
 
@@ -231,26 +244,27 @@ EndSection
             if a._handler.lower() in [x.lower().strip() for x in quirk.handler]:
                 quirk_found = True
 
-                logging.debug('Processing quirk %s' % quirk.id)
+                logging.debug("Processing quirk %s" % quirk.id)
                 # Let's test only the quirk that matters
                 if quirk.id == "Test Latitude E6530":
                     self.assertTrue(a.matches_tags(quirk))
                     if a.matches_tags(quirk):
                         # Do something here
-                        logging.debug('Quirk matches')
+                        logging.debug("Quirk matches")
                         quirk_matches = True
                     else:
-                        logging.debug('Quirk doesn\'t match')
+                        logging.debug("Quirk doesn't match")
 
         self.assertTrue(quirk_found)
         self.assertTrue(quirk_matches)
 
     def test_read_quirk4(self):
-        '''3 Matching quirk aimed at multiple products only one should match'''
+        """3 Matching quirk aimed at multiple products only one should match"""
         self.this_function_name = sys._getframe().f_code.co_name
 
-        with open(tempFile, 'w') as confFile:
-            confFile.write('''
+        with open(tempFile, "w") as confFile:
+            confFile.write(
+                """
 Section "Quirk"
     Identifier "Test Latitude E6530"
     Handler "nvidia-current|nvidia-current-updates"
@@ -271,24 +285,27 @@ Section "Quirk"
 EndSection
 
 
-''')
+"""
+            )
         # os.system('cat %s' % tempFile)
         # loglevel = logging.DEBUG
-    # else:
+        # else:
         # loglevel = logging.INFO
 
         # logging.basicConfig(format='%(levelname)s:%(message)s', level=loglevel)
-        a = quirkapplier.QuirkChecker('nvidia-current', path=destination)
+        a = quirkapplier.QuirkChecker("nvidia-current", path=destination)
 
         # Override DMI
-        a._system_info = {'sys_vendor': 'Dell Inc.',
-                          'bios_vendor': 'American Megatrends Inc.',
-                          'product_version': 'System Version',
-                          'board_name': 'P6T SE',
-                          'bios_date': '01/19/2009',
-                          'bios_version': '0106',
-                          'product_name': 'Latitude E6535',
-                          'board_vendor': 'ASUSTeK Computer INC.'}
+        a._system_info = {
+            "sys_vendor": "Dell Inc.",
+            "bios_vendor": "American Megatrends Inc.",
+            "product_version": "System Version",
+            "board_name": "P6T SE",
+            "bios_date": "01/19/2009",
+            "bios_version": "0106",
+            "product_name": "Latitude E6535",
+            "board_vendor": "ASUSTeK Computer INC.",
+        }
         quirk_found = False
         quirk_matches = False
         matches_number = 0
@@ -297,17 +314,17 @@ EndSection
             if a._handler.lower() in [x.lower().strip() for x in quirk.handler]:
                 quirk_found = True
 
-                logging.debug('Processing quirk %s' % quirk.id)
+                logging.debug("Processing quirk %s" % quirk.id)
                 # Let's test only the quirk that matters
                 if quirk.id == "Test Latitude E6530":
                     self.assertTrue(a.matches_tags(quirk))
                     if a.matches_tags(quirk):
                         # Do something here
-                        logging.debug('Quirk matches')
+                        logging.debug("Quirk matches")
                         quirk_matches = True
                         matches_number += 1
                     else:
-                        logging.debug('Quirk doesn\'t match')
+                        logging.debug("Quirk doesn't match")
 
         self.assertTrue(quirk_found)
         self.assertTrue(quirk_matches)
@@ -318,5 +335,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -8,46 +8,50 @@ import re
 import logging
 import subprocess
 
-modem_re = re.compile(r'^\s*\d+\s*\[Modem\s*\]')
-modem_as_subdevice_re = re.compile(r'^card [0-9].*[mM]odem')
+modem_re = re.compile(r"^\s*\d+\s*\[Modem\s*\]")
+modem_as_subdevice_re = re.compile(r"^card [0-9].*[mM]odem")
 
-pkg = 'sl-modem-daemon'
+pkg = "sl-modem-daemon"
 
 
 def detect(apt_cache):
     # Check in /proc/asound/cards
     try:
-        with open('/proc/asound/cards') as fd:
+        with open("/proc/asound/cards") as fd:
             for line in fd:
                 if modem_re.match(line):
                     return [pkg]
     except IOError as e:
-        logging.debug('could not open /proc/asound/cards: %s', e)
+        logging.debug("could not open /proc/asound/cards: %s", e)
 
     # Check aplay -l
     try:
         env = os.environ.copy()
         try:
-            del env['LANGUAGE']
+            del env["LANGUAGE"]
         except KeyError:
             pass
-        env['LC_ALL'] = 'C'
+        env["LC_ALL"] = "C"
         try:
             aplay = subprocess.Popen(
-                ['aplay', '-l'], env=env,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                universal_newlines=True)
+                ["aplay", "-l"],
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+            )
             (aplay_out, aplay_err) = aplay.communicate()
             if aplay.returncode != 0:
-                logging.error('aplay -l failed with %i: %s' % (aplay.returncode,
-                              aplay_err))
+                logging.error(
+                    "aplay -l failed with %i: %s" % (aplay.returncode, aplay_err)
+                )
                 return None
         except FileNotFoundError:
-            logging.error('aplay command not found')
+            logging.error("aplay command not found")
             return None
 
     except OSError:
-        logging.debug('could not open aplay -l. Skipping sl-modem detection')
+        logging.debug("could not open aplay -l. Skipping sl-modem detection")
         return None
 
     for row in aplay_out.splitlines():

@@ -26,7 +26,7 @@ import subprocess
 import sys
 import unittest
 
-pycodestyle_cmd = 'pycodestyle'
+pycodestyle_cmd = "pycodestyle"
 if sys.version < "3":
     pyflakes_cmd = "pyflakes"
 else:
@@ -37,9 +37,9 @@ PEP8_MAX_LINE_LENGTH = 120
 
 def find_on_path(command):
     """Is command on the executable search path?"""
-    if 'PATH' not in os.environ:
+    if "PATH" not in os.environ:
         return False
-    path = os.environ['PATH']
+    path = os.environ["PATH"]
     for element in path.split(os.pathsep):
         if not element:
             continue
@@ -51,52 +51,62 @@ def find_on_path(command):
 
 class TestStatic(unittest.TestCase):
     def all_paths(self):
-        '''Returns a list of python files of the project'''
+        """Returns a list of python files of the project"""
 
         ignore_dirs = [
-            ".bzr", ".git", "__pycache__", "debian",
+            ".bzr",
+            ".git",
+            "__pycache__",
+            "debian",
             # Project dirs ignored for the moment
             "Quirks",
         ]
         # List of files to ignore with ../ stripped from the beginning of the path
         ignore_files = [
-            'settings.py',
-            'setup.py',
+            "settings.py",
+            "setup.py",
             # Project files ignores for the moment
-            'tests/gpu-manager.py',
+            "tests/gpu-manager.py",
         ]
 
         paths = []
-        basedir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
+        basedir = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
         for dirpath, dirnames, filenames in os.walk(basedir):
-            dirpath = dirpath.replace(basedir, '')
+            dirpath = dirpath.replace(basedir, "")
             for ignore in ignore_dirs:
                 if ignore in dirnames:
                     dirnames.remove(ignore)
             filenames = [
-                n for n in filenames
-                if not n.startswith(".") and not n.endswith("~")]
+                n for n in filenames if not n.startswith(".") and not n.endswith("~")
+            ]
             for filename in filenames:
-                filepath = os.path.join(dirpath, filename).lstrip('/')
+                filepath = os.path.join(dirpath, filename).lstrip("/")
                 if filepath.endswith(".py") and filepath not in ignore_files:
                     paths.append(filepath)
         return paths
 
-    @unittest.skipUnless(find_on_path(pycodestyle_cmd), '%s not found on this system' % pycodestyle_cmd)
+    @unittest.skipUnless(
+        find_on_path(pycodestyle_cmd), "%s not found on this system" % pycodestyle_cmd
+    )
     def test_pycodestyle_clean(self):
-        '''pycodestyle - Python style guide checker'''
+        """pycodestyle - Python style guide checker"""
 
         subp = subprocess.Popen(
-            [pycodestyle_cmd, '--max-line-length=%d' % PEP8_MAX_LINE_LENGTH] + self.all_paths(),
-            stdout=subprocess.PIPE, universal_newlines=True)
+            [pycodestyle_cmd, "--max-line-length=%d" % PEP8_MAX_LINE_LENGTH]
+            + self.all_paths(),
+            stdout=subprocess.PIPE,
+            universal_newlines=True,
+        )
         output = subp.communicate()[0].splitlines()
         for line in output:
             print(line)
         self.assertEqual(0, len(output))
 
-    @unittest.skipUnless(find_on_path(pyflakes_cmd), '%s not found on this system' % pyflakes_cmd)
+    @unittest.skipUnless(
+        find_on_path(pyflakes_cmd), "%s not found on this system" % pyflakes_cmd
+    )
     def test_pyflakes_clean(self):
-        '''pyflakes passive checker'''
+        """pyflakes passive checker"""
         # Exclude handling based on run-pyflakes.py from reviewboard,
         # licensed under the MIT License.
         cur_dir = os.path.dirname(__file__)
@@ -111,7 +121,9 @@ class TestStatic(unittest.TestCase):
         error = False
         subp = subprocess.Popen(
             [pyflakes_cmd] + self.all_paths(),
-            stdout=subprocess.PIPE, universal_newlines=True)
+            stdout=subprocess.PIPE,
+            universal_newlines=True,
+        )
         output = subp.communicate()[0].splitlines()
         for line in output:
             if line.startswith("#"):

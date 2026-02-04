@@ -18,46 +18,54 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 
-
-
 import os
 from typing import Dict
 
-dmi_keys = ('product_name', 'product_version',
-             'sys_vendor', 'bios_version',
-             'bios_vendor', 'bios_date',
-             'board_name', 'board_vendor')
+dmi_keys = (
+    "product_name",
+    "product_version",
+    "sys_vendor",
+    "bios_version",
+    "bios_vendor",
+    "bios_date",
+    "board_name",
+    "board_vendor",
+)
+
 
 class QuirkInfo:
     def __init__(self) -> None:
-        self.sys_dir = '/sys'
-        self._quirk_info: Dict[str, str] = {}.fromkeys(dmi_keys, '')
+        self.sys_dir = "/sys"
+        self._quirk_info: Dict[str, str] = {}.fromkeys(dmi_keys, "")
 
     def get_dmi_info(self) -> Dict[str, str]:
-        '''Return all the dmi info of the system hardware.
+        """Return all the dmi info of the system hardware.
 
         Some or the whole Dmi info may not be available on
         some systems.
 
         The default implementation queries sysfs.
-        '''
+        """
         for item in self._quirk_info.keys():
             try:
-                value = open(os.path.join(self.sys_dir,
-                    'class', 'dmi', 'id', item)).read().strip()
+                value = (
+                    open(os.path.join(self.sys_dir, "class", "dmi", "id", item))
+                    .read()
+                    .strip()
+                )
             except (OSError, IOError, UnicodeDecodeError):
-                value = ''
+                value = ""
             self._quirk_info[item] = value
-        
+
         return self._quirk_info
 
 
 def main() -> int:
     a = QuirkInfo()
     print(a.get_dmi_info())
-    
+
     return 0
 
-#if __name__ == '__main__':
-    #main()
 
+# if __name__ == '__main__':
+# main()

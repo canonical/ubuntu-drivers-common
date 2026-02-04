@@ -26,32 +26,39 @@ from typing import Optional, Dict, List, Any
 import tempfile
 import os
 
+
 class Quirk:
 
-    def __init__(self, id: Optional[str] = None,
-                 handler: List[str] = [],
-                 x_snippet: str = "",
-                 match_tags: Dict[str, List[str]] = {}) -> None:
+    def __init__(
+        self,
+        id: Optional[str] = None,
+        handler: List[str] = [],
+        x_snippet: str = "",
+        match_tags: Dict[str, List[str]] = {},
+    ) -> None:
         self.id = id
         self.handler = handler
         self.x_snippet = x_snippet
-        self.match_tags: Dict[str, List[str]] = {k: [] for k in Quirks.quirkinfo.dmi_keys}
+        self.match_tags: Dict[str, List[str]] = {
+            k: [] for k in Quirks.quirkinfo.dmi_keys
+        }
+
 
 class ReadQuirk:
 
     def __init__(self, source: Optional[str] = None) -> None:
         self.source = source
-        
-        #See if the source is a file or a file object
-        #and act accordingly
+
+        # See if the source is a file or a file object
+        # and act accordingly
         file = self.source
         lines_list: List[str] = []
         if file == None:
             lines_list = []
         else:
-            if not hasattr(file, 'write'):#it is a file
+            if not hasattr(file, "write"):  # it is a file
                 if isinstance(file, str):
-                    myfile = open(file, 'r', encoding='utf-8')
+                    myfile = open(file, "r", encoding="utf-8")
                     try:
                         lines_list = myfile.readlines()
                         myfile.close()
@@ -59,10 +66,10 @@ class ReadQuirk:
                         lines_list = []
                     myfile.close()
             else:
-                #it is a file object
-                if hasattr(file, 'readlines'):
+                # it is a file object
+                if hasattr(file, "readlines"):
                     lines_list = file.readlines()  # type: ignore[union-attr]
-        
+
         inside_quirk = False
         has_id = False
         has_handler = False
@@ -71,69 +78,80 @@ class ReadQuirk:
 
         it = 0
         for line in lines_list:
-            if line.strip().startswith('#'):
+            if line.strip().startswith("#"):
                 continue
             if inside_quirk:
                 if inside_x_snippet:
 
-                    if line.lower().strip().startswith('endxorgsnippet'):
+                    if line.lower().strip().startswith("endxorgsnippet"):
                         inside_x_snippet = False
                         continue
                     else:
                         self._quirks[it].x_snippet += line
                 else:
-                    #not in x_snippet
-                    if not has_id and line.lower().strip().startswith('identifier'):
+                    # not in x_snippet
+                    if not has_id and line.lower().strip().startswith("identifier"):
                         has_id = True
                         temp_str = "identifier"
-                        id = line[line.lower().rfind(temp_str) + len(
-                             temp_str):].strip().replace('"', '')
+                        id = (
+                            line[line.lower().rfind(temp_str) + len(temp_str) :]
+                            .strip()
+                            .replace('"', "")
+                        )
                         self._quirks[it].id = id
                         del temp_str
-                    elif not has_handler and line.lower().strip().startswith('handler'):
+                    elif not has_handler and line.lower().strip().startswith("handler"):
                         has_handler = True
                         temp_str = "handler"
-                        handler = line[line.lower().rfind(temp_str) + len(
-                             temp_str):].strip().replace('"', '')
-                        handlers_list = handler.split('|')
+                        handler = (
+                            line[line.lower().rfind(temp_str) + len(temp_str) :]
+                            .strip()
+                            .replace('"', "")
+                        )
+                        handlers_list = handler.split("|")
                         self._quirks[it].handler = handlers_list
                         del temp_str
-                    elif line.lower().strip().startswith('match'):
+                    elif line.lower().strip().startswith("match"):
                         temp_str = "match"
-                        temp_bits = line[line.lower().rfind(temp_str) +
-                                    len(temp_str):].strip().split('"')
-                        tag_match = ''
-                        tag_value = ''
+                        temp_bits = (
+                            line[line.lower().rfind(temp_str) + len(temp_str) :]
+                            .strip()
+                            .split('"')
+                        )
+                        tag_match = ""
+                        tag_value = ""
                         tag_values: List[str] = []
                         for elem in temp_bits:
                             if elem.strip():
                                 if not tag_match:
                                     tag_match = elem.strip()
-                                    #tag_values = []
+                                    # tag_values = []
                                 else:
                                     tag_value = elem.strip()
-                                    tag_values = tag_value.split('|')
+                                    tag_values = tag_value.split("|")
                                     self._quirks[it].match_tags[tag_match] = tag_values
                                     break
                         del temp_bits
                         del temp_str
                         del tag_values
-                    elif line.lower().strip().startswith('xorgsnippet'):
+                    elif line.lower().strip().startswith("xorgsnippet"):
                         inside_x_snippet = True
                         self._quirks[it].x_snippet = ""
                         continue
-        
-                    elif line.lower().strip().startswith('endsection'):
-                        #End Quirk
+
+                    elif line.lower().strip().startswith("endsection"):
+                        # End Quirk
                         inside_quirk = False
                         if not self._quirks[it].id:
                             self._quirks.pop(it)
                         else:
                             it += 1
             else:
-                if line.lower().strip().startswith('section') \
-                and "quirk" in line.lower():
-                    #Begin Quirk
+                if (
+                    line.lower().strip().startswith("section")
+                    and "quirk" in line.lower()
+                ):
+                    # Begin Quirk
                     inside_quirk = True
                     temp_quirk = Quirk()
                     self._quirks.append(temp_quirk)
@@ -144,19 +162,19 @@ class ReadQuirk:
         return self._quirks
 
 
-#if __name__ == "__main__":
-    #quirk_file = ReadQuirk("quirk_snippet.txt")
-    #quirks = quirk_file.get_quirks()
-    #for quirk in quirks:
-        #print 'Quirk id: "%s"' % quirk.id
-        #for tag in quirk.match_tags.keys():
-            #print 'Matching "%s" with value "%s"' % (tag, quirk.match_tags[tag])
-        #print quirk.x_snippet
+# if __name__ == "__main__":
+# quirk_file = ReadQuirk("quirk_snippet.txt")
+# quirks = quirk_file.get_quirks()
+# for quirk in quirks:
+# print 'Quirk id: "%s"' % quirk.id
+# for tag in quirk.match_tags.keys():
+# print 'Matching "%s" with value "%s"' % (tag, quirk.match_tags[tag])
+# print quirk.x_snippet
 
-    #tmp_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
-    #tmp_file.write(quirk.x_snippet)
-    #tmp_file.close()
+# tmp_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
+# tmp_file.write(quirk.x_snippet)
+# tmp_file.close()
 
-    #tmp_xkit = xkit.xorgparser.Parser(tmp_file.name)
-    #print tmp_xkit.globaldict
-    #os.unlink(tmp_file.name)
+# tmp_xkit = xkit.xorgparser.Parser(tmp_file.name)
+# print tmp_xkit.globaldict
+# os.unlink(tmp_file.name)
