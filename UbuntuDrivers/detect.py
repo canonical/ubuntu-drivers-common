@@ -15,11 +15,45 @@ import subprocess
 import functools
 import re
 import json
+from typing import Optional, Dict, List, Set, Tuple, Any, TypedDict
+from functools import cmp_to_key
 
 import apt_pkg
 
 from UbuntuDrivers import kerneldetection
-from functools import cmp_to_key
+
+
+class DriverInfo(TypedDict, total=False):
+    """Type definition for individual driver information."""
+    free: bool
+    builtin: bool
+    from_distro: bool
+    recommended: bool
+
+
+class DeviceInfo(TypedDict, total=False):
+    """Type definition for device information with associated drivers."""
+    modalias: str
+    vendor: str
+    model: str
+    drivers: Dict[str, DriverInfo]
+    manual_install: bool
+
+
+class PackageInfo(TypedDict, total=False):
+    """Type definition for driver package information dictionaries."""
+    modalias: str
+    syspath: str
+    plugin: str
+    free: bool
+    from_distro: bool
+    vendor: str
+    model: str
+    recommended: bool
+    support: Optional[str]
+    open_preferred: bool
+    metapackage: str
+
 
 system_architecture = ''
 lookup_cache = {}
@@ -28,7 +62,7 @@ custom_supported_gpus_json = '/etc/custom_supported_gpus.json'
 
 class NvidiaPkgNameInfo(object):
     '''Class to process NVIDIA package names'''
-    def __init__(self, pkg_name):
+    def __init__(self, pkg_name: str) -> None:
         self._pkg_name = pkg_name
         self._obsolete_name_scheme = False
         self._server = False
@@ -38,7 +72,7 @@ class NvidiaPkgNameInfo(object):
         self.is_valid = False
         self._process_name(self._pkg_name)
 
-    def _process_name(self, name):
+    def _process_name(self, name: str) -> None:
         if 'nvidia' not in name:
             logging.debug('NvidiaPkgNameInfo: %s is not an NVIDIA package. Skipping', name)
             return
@@ -50,7 +84,7 @@ class NvidiaPkgNameInfo(object):
         if match:
             self._obsolete_name_scheme = True
             self._major_ver = int(match.group(1))
-            self._flavour = self._major_ver
+            self._flavour = str(self._major_ver)
             self.is_valid = True
             return
 
@@ -77,26 +111,26 @@ class NvidiaPkgNameInfo(object):
             self._flavour = '%s%s%s' % (match.group(2),
                                         '-server' if self._server else '',
                                         '-open' if self._open else '')
-            self._major_ver = match.group(2)
+            self._major_ver = int(match.group(2))
             self.is_valid = True
 
-    def has_obsolete_name_scheme(self):
+    def has_obsolete_name_scheme(self) -> bool:
         return self._obsolete_name_scheme
 
-    def is_server(self):
+    def is_server(self) -> bool:
         return self._server
 
-    def is_open(self):
+    def is_open(self) -> bool:
         return self._open
 
-    def get_major_version(self):
+    def get_major_version(self) -> int:
         return self._major_ver
 
-    def get_flavour(self):
+    def get_flavour(self) -> str:
         return self._flavour
 
 
-def get_apt_arch():
+def get_apt_arch() -> str:
     '''Cache system architecture'''
     global system_architecture
     if not system_architecture:
@@ -104,7 +138,7 @@ def get_apt_arch():
     return system_architecture
 
 
-def system_modaliases(sys_path=None):
+def system_modaliases(sys_path: Optional[str] = None) -> Dict[str, str]:
     '''Get modaliases present in the system.
 
     This ignores devices whose drivers are statically built into the kernel, as
@@ -151,7 +185,8 @@ def system_modaliases(sys_path=None):
     return aliases
 
 
-def _check_video_abi_compat(apt_cache, package):
+def _check_video_abi_compat(apt_cache: apt_pkg.Cache,
+                            package: apt_pkg.Package) -> bool:
     xorg_video_abi = None
 
     if package.name.startswith('nvidia-driver-'):
@@ -195,19 +230,20 @@ def _check_video_abi_compat(apt_cache, package):
 
     if xorg_video_abi:
         abi_pkg = apt_cache[xorg_video_abi]
-        for dep in abi_pkg.rev_depends_list:
+        for dep in abi_pkg.rev_depends_list:  # type: ignore[attr-defined]
             if dep.parent_pkg.name == package.name:
                 return True
 
         logging.debug('Driver package %s is incompatible with current X.org server ABI %s',
                       package.name, xorg_video_abi)
-        logging.debug('%s is not in %s' % (package, [x.parent_pkg for x in abi_pkg.rev_depends_list]))
+        logging.debug('%s is not in %s' % (
+            package, [x.parent_pkg for x in abi_pkg.rev_depends_list]))  # type: ignore[attr-defined]
         return False
 
     return True
 
 
-def apt_cache_modalias_map(apt_cache):
+def apt_cache_modalias_map(apt_cache: apt_pkg.Cache) -> Dict[str, Tuple[Any, Dict[str, Set[str]]]]:
     '''Build a modalias map from an apt_pkg.Cache object.
 
     This filters out uninstallable video drivers (i. e. which depend on a video
@@ -219,7 +255,7 @@ def apt_cache_modalias_map(apt_cache):
     depcache = apt_pkg.DepCache(apt_cache)
     records = apt_pkg.PackageRecords(apt_cache)
 
-    result = {}
+    result: Dict[str, Dict[str, Set[str]]] = {}
     for package in apt_cache.packages:
         # skip packages without a modalias field
         try:
@@ -253,7 +289,7 @@ def apt_cache_modalias_map(apt_cache):
             logging.error('Package %s has invalid modalias header: %s' % (
                 package.name, m))
 
-    result2 = {}
+    result2: Dict[str, Tuple[Any, Dict[str, Set[str]]]] = {}
     for bus, alias_map in result.items():
         pat = re.compile(
             '|'.join([fnmatch.translate(pat) for pat in alias_map.keys()]),
@@ -263,11 +299,11 @@ def apt_cache_modalias_map(apt_cache):
     return result2
 
 
-def path_get_custom_supported_gpus():
+def path_get_custom_supported_gpus() -> str:
     return custom_supported_gpus_json
 
 
-def package_get_nv_allowing_driver(did):
+def package_get_nv_allowing_driver(did: str) -> Optional[str]:
     '''Get nvidia allowing driver for specific devices.
 
     did: 0x1234
@@ -294,7 +330,11 @@ def package_get_nv_allowing_driver(did):
     return version
 
 
-def packages_for_modalias(apt_cache, modalias, modalias_map=None):
+def packages_for_modalias(
+        apt_cache: apt_pkg.Cache,
+        modalias: str,
+        modalias_map: Optional[Dict[str, Tuple[Any, Dict[str, Set[str]]]]] = None
+) -> List['apt_pkg.Package']:
     '''Search packages which match the given modalias.
 
     Return a list of apt.Package objects.
@@ -310,12 +350,13 @@ def packages_for_modalias(apt_cache, modalias, modalias_map=None):
     found = 0
     if vid == "10DE":
         nvamd = package_get_nv_allowing_driver("0x" + did)
-        nvamdn = "nvidia-driver-%s" % nvamd
-        nvamda = "pci:v000010DEd0000%s*" % did
-        for p in apt_cache.packages:
-            if p.get_fullname().split(':')[0] == nvamdn:
-                bus_map[nvamda] = set([nvamdn])
-                found = 1
+        if nvamd is not None:
+            nvamdn = "nvidia-driver-%s" % nvamd
+            nvamda = "pci:v000010DEd0000%s*" % did
+            for p in apt_cache.packages:
+                if p.get_fullname().split(':')[0] == nvamdn:
+                    bus_map[nvamda] = set([nvamdn])
+                    found = 1
         if nvamd is not None and not found:
             logging.debug('%s is not in the package pool.' % nvamdn)
 
@@ -331,7 +372,7 @@ def packages_for_modalias(apt_cache, modalias, modalias_map=None):
     return [apt_cache[p] for p in pkgs]
 
 
-def _is_package_free(apt_cache, pkg):
+def _is_package_free(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> bool:
     depcache = apt_pkg.DepCache(apt_cache)
     candidate = depcache.get_candidate_ver(pkg)
     assert candidate is not None
@@ -360,7 +401,7 @@ def _is_package_free(apt_cache, pkg):
     return True
 
 
-def _is_package_from_distro(apt_cache, pkg):
+def _is_package_from_distro(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> bool:
     depcache = apt_pkg.DepCache(apt_cache)
     candidate = depcache.get_candidate_ver(pkg)
     if candidate is None:
@@ -372,7 +413,7 @@ def _is_package_from_distro(apt_cache, pkg):
         return False
 
 
-def _pkg_get_open_preference(apt_cache, pkg):
+def _pkg_get_open_preference(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> Optional[Any]:
     '''Determine if -open package is prefered from apt Package object'''
     depcache = apt_pkg.DepCache(apt_cache)
     candidate = depcache.get_candidate_ver(pkg)
@@ -393,7 +434,7 @@ def _pkg_get_open_preference(apt_cache, pkg):
     return preference
 
 
-def _pkg_get_module(apt_cache, pkg):
+def _pkg_get_module(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> Optional[str]:
     '''Determine module name from apt Package object'''
     depcache = apt_pkg.DepCache(apt_cache)
     candidate = depcache.get_candidate_ver(pkg)
@@ -415,7 +456,7 @@ def _pkg_get_module(apt_cache, pkg):
     return module
 
 
-def _pkg_get_support(apt_cache, pkg):
+def _pkg_get_support(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> Optional[str]:
     '''Determine support level from apt Package object'''
 
     depcache = apt_pkg.DepCache(apt_cache)
@@ -437,9 +478,11 @@ def _pkg_get_support(apt_cache, pkg):
     return support
 
 
-def _is_nv_allowing_runtimepm_supported(alias, ver):
+def _is_nv_allowing_runtimepm_supported(alias: str, ver: str) -> bool:
     '''alias: e.g. pci:v000010DEd000024BAsv0000103Csd000089C6bc03sc00i00'''
     result = re.search('pci:v0000(.*)d0000(.*)sv(.*)', alias)
+    if not result:
+        return False
     vid = result.group(1)
     did = result.group(2)
     if vid != "10DE":
@@ -467,7 +510,7 @@ def _is_nv_allowing_runtimepm_supported(alias, ver):
     return False
 
 
-def _is_runtimepm_supported(apt_cache, pkg, alias):
+def _is_runtimepm_supported(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package, alias: str) -> bool:
     '''Check if the package supports runtimepm for the given modalias'''
     try:
         depcache = apt_pkg.DepCache(apt_cache)
@@ -483,25 +526,26 @@ def _is_runtimepm_supported(apt_cache, pkg, alias):
         if m.find('nvidia(') != 0:
             return False
 
-        n = m[m.find('(')+1: m.find(')')]
+        n = m[m.find('(') + 1: m.find(')')]
         modaliases = n.split(', ')
         if _is_nv_allowing_runtimepm_supported(alias, ver):
             return True
         return any(fnmatch.fnmatch(alias.lower(), regex.lower()) for regex in modaliases)
 
 
-def is_wayland_session():
+def is_wayland_session() -> bool:
     '''Check if the current session in on Wayland'''
-    return os.environ.get('WAYLAND_DISPLAY') is not None
+    return os.environ.get('XDG_SESSION_TYPE', '') == 'wayland' or os.environ.get('WAYLAND_DISPLAY') is not None
 
 
-def _is_manual_install(apt_cache, pkg):
+def _is_manual_install(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> bool:
     '''Determine if the kernel module from an apt.Package is manually installed.'''
 
     if pkg.current_ver:
         return False
 
     # special case, as our packages suffix the kmod with _version
+    module: Optional[str]
     if pkg.name.startswith('nvidia'):
         module = 'nvidia'
     elif pkg.name.startswith('fglrx'):
@@ -530,7 +574,7 @@ def _is_manual_install(apt_cache, pkg):
     return False
 
 
-def _get_db_name(syspath, alias):
+def _get_db_name(syspath: str, alias: str) -> Tuple[Optional[str], Optional[str]]:
     '''Return (vendor, model) names for given device.
 
     Values are None if unknown.
@@ -558,7 +602,7 @@ def _get_db_name(syspath, alias):
     return (vendor, model)
 
 
-def _is_open_prefered(apt_cache, pkg):
+def _is_open_prefered(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> bool:
     if not pkg.name.startswith('nvidia-'):
         return False
 
@@ -576,7 +620,7 @@ def _is_open_prefered(apt_cache, pkg):
     return False
 
 
-def set_nvidia_kms(value):
+def set_nvidia_kms(value: bool) -> None:
     '''Set KMS on or off for NVIDIA'''
     nvidia_kms_file = '/lib/modprobe.d/nvidia-kms.conf'
     kms_text = '''# This file was generated by ubuntu-drivers
@@ -587,7 +631,10 @@ options nvidia-drm modeset=%d\n''' % (value)
     kms_fd.close()
 
 
-def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, include_oem=True):
+def system_driver_packages(apt_cache: Optional[apt_pkg.Cache] = None,
+                           sys_path: Optional[str] = None,
+                           freeonly: bool = False,
+                           include_oem: bool = True) -> Dict[str, PackageInfo]:
     '''Get driver packages that are available for the system.
 
     This calls system_modaliases() to determine the system's hardware and then
@@ -642,14 +689,14 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
             if not include_oem and fnmatch.fnmatch(p.name, 'oem-*-meta'):
                 continue
             packages[p.name] = {
-                    'modalias': alias,
-                    'syspath': syspath,
-                    'free': _is_package_free(apt_cache, p),
-                    'from_distro': _is_package_from_distro(apt_cache, p),
-                    'support': _pkg_get_support(apt_cache, p),
-                    'runtimepm': _is_runtimepm_supported(apt_cache, p, alias),
-                    'open_preferred': _is_open_prefered(apt_cache, p)
-                }
+                'modalias': alias,
+                'syspath': syspath,
+                'free': _is_package_free(apt_cache, p),
+                'from_distro': _is_package_from_distro(apt_cache, p),
+                'support': _pkg_get_support(apt_cache, p),
+                'runtimepm': _is_runtimepm_supported(apt_cache, p, alias),
+                'open_preferred': _is_open_prefered(apt_cache, p)
+            }
             (vendor, model) = _get_db_name(syspath, alias)
             if vendor is not None:
                 packages[p.name]['vendor'] = vendor
@@ -675,17 +722,17 @@ def system_driver_packages(apt_cache=None, sys_path=None, freeonly=False, includ
             try:
                 apt_p = apt_cache[p]
                 packages[p] = {
-                        'free': _is_package_free(apt_cache, apt_p),
-                        'from_distro': _is_package_from_distro(apt_cache, apt_p),
-                        'plugin': plugin,
-                    }
+                    'free': _is_package_free(apt_cache, apt_p),
+                    'from_distro': _is_package_from_distro(apt_cache, apt_p),
+                    'plugin': plugin,
+                }
             except KeyError:
                 logging.debug('Package %s plugin not available. Skipping.' % p)
 
     return packages
 
 
-def _get_vendor_model_from_alias(alias):
+def _get_vendor_model_from_alias(alias: str) -> Tuple[Optional[str], Optional[str]]:
     modalias_pattern = re.compile('(.+):v(.+)d(.+)sv(.+)sd(.+)bc(.+)i.*')
 
     details = modalias_pattern.match(alias)
@@ -696,9 +743,9 @@ def _get_vendor_model_from_alias(alias):
     return (None, None)
 
 
-def get_userspace_lrm_meta(apt_cache, pkg_name):
+def get_userspace_lrm_meta(apt_cache: apt_pkg.Cache, pkg_name: str) -> Optional[str]:
     assert pkg_name is not None
-    metapackage = None
+    metapackage: Optional[str] = None
     '''Return nvidia-driver-lrm-$flavour metapackage from the main metapackage.
 
     This is useful to see whether any such package is available.
@@ -722,8 +769,8 @@ def get_userspace_lrm_meta(apt_cache, pkg_name):
         # skip foreign architectures, we usually only want native
         # driver packages
         package_candidate = depcache.get_candidate_ver(package)
-        if (candidate and
-                package_candidate.arch in ('all', get_apt_arch())):
+        if (candidate
+                and package_candidate.arch in ('all', get_apt_arch())):
             metapackage = candidate
     except KeyError:
         pass
@@ -731,9 +778,9 @@ def get_userspace_lrm_meta(apt_cache, pkg_name):
     return metapackage
 
 
-def _get_headless_no_dkms_metapackage(pkg, apt_cache):
+def _get_headless_no_dkms_metapackage(pkg: apt_pkg.Package, apt_cache: apt_pkg.Cache) -> Optional[str]:
     assert pkg is not None
-    metapackage = None
+    metapackage: Optional[str] = None
     '''Return headless-no-dkms metapackage from the main metapackage.
 
     This is useful when dealing with packages such as nvidia-driver-$flavour
@@ -759,8 +806,8 @@ def _get_headless_no_dkms_metapackage(pkg, apt_cache):
         # skip foreign architectures, we usually only want native
         # driver packages
         package_candidate = depcache.get_candidate_ver(package)
-        if (candidate and
-                package_candidate.arch in ('all', get_apt_arch())):
+        if (candidate
+                and package_candidate.arch in ('all', get_apt_arch())):
             metapackage = candidate
     except KeyError:
         pass
@@ -768,7 +815,9 @@ def _get_headless_no_dkms_metapackage(pkg, apt_cache):
     return metapackage
 
 
-def system_device_specific_metapackages(apt_cache=None, sys_path=None, include_oem=True):
+def system_device_specific_metapackages(apt_cache: Optional[apt_pkg.Cache] = None,
+                                        sys_path: Optional[str] = None,
+                                        include_oem: bool = True) -> Dict[str, PackageInfo]:
     '''Get device specific metapackages for this system
 
     This calls system_modaliases() to determine the system's hardware and then
@@ -819,19 +868,22 @@ def system_device_specific_metapackages(apt_cache=None, sys_path=None, include_o
             if not fnmatch.fnmatch(p.name, 'oem-*-meta'):
                 continue
             packages[p.name] = {
-                    'modalias': alias,
-                    'syspath': syspath,
-                    'free': _is_package_free(apt_cache, p),
-                    'from_distro': _is_package_from_distro(apt_cache, p),
-                    'recommended': True,
-                    'support': _pkg_get_support(apt_cache, p),
-                    'open_preferred': _is_open_prefered(apt_cache, p),
-                }
+                'modalias': alias,
+                'syspath': syspath,
+                'free': _is_package_free(apt_cache, p),
+                'from_distro': _is_package_from_distro(apt_cache, p),
+                'recommended': True,
+                'support': _pkg_get_support(apt_cache, p),
+                'open_preferred': _is_open_prefered(apt_cache, p),
+            }
 
     return packages
 
 
-def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
+def system_gpgpu_driver_packages(
+        apt_cache: Optional[apt_pkg.Cache] = None,
+        sys_path: Optional[str] = None
+) -> Dict[str, PackageInfo]:
     '''Get driver packages, for gpgpu purposes, that are available for the system.
 
     This calls system_modaliases() to determine the system's hardware and then
@@ -883,13 +935,13 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
             vendor_id, model_id = _get_vendor_model_from_alias(alias)
             if (vendor_id is not None) and (vendor_id.lower() in vendors_whitelist):
                 packages[p.name] = {
-                        'modalias': alias,
-                        'syspath': syspath,
-                        'free': _is_package_free(apt_cache, p),
-                        'from_distro': _is_package_from_distro(apt_cache, p),
-                        'support': _pkg_get_support(apt_cache, p),
-                        'open_preferred': _is_open_prefered(apt_cache, p),
-                    }
+                    'modalias': alias,
+                    'syspath': syspath,
+                    'free': _is_package_free(apt_cache, p),
+                    'from_distro': _is_package_from_distro(apt_cache, p),
+                    'support': _pkg_get_support(apt_cache, p),
+                    'open_preferred': _is_open_prefered(apt_cache, p),
+                }
                 if vendor is not None:
                     packages[p.name]['vendor'] = vendor
                 if model is not None:
@@ -915,7 +967,9 @@ def system_gpgpu_driver_packages(apt_cache=None, sys_path=None):
     return packages
 
 
-def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
+def system_device_drivers(apt_cache: Optional[apt_pkg.Cache] = None,
+                          sys_path: Optional[str] = None,
+                          freeonly: bool = False) -> Dict[str, DeviceInfo]:
     '''Get by-device driver packages that are available for the system.
 
     This calls system_modaliases() to determine the system's hardware and then
@@ -968,7 +1022,7 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
                      versions; these have this flag, where exactly one has
                      recommended == True, and all others False.
     '''
-    result = {}
+    result: Dict[str, DeviceInfo] = {}
     if not apt_cache:
         try:
             apt_cache = apt_pkg.Cache(None)
@@ -986,7 +1040,7 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
         result.setdefault(device_name, {})
         for opt_key in ('modalias', 'vendor', 'model'):
             if opt_key in pkginfo:
-                result[device_name][opt_key] = pkginfo[opt_key]
+                result[device_name][opt_key] = pkginfo[opt_key]  # type: ignore[index, literal-required]
         drivers = result[device_name].setdefault('drivers', {})
         drivers[pkg] = {'free': pkginfo['free'], 'from_distro': pkginfo['from_distro']}
         if 'recommended' in pkginfo:
@@ -1007,7 +1061,10 @@ def system_device_drivers(apt_cache=None, sys_path=None, freeonly=False):
     return result
 
 
-def get_installed_packages_by_glob(apt_cache, glob_pattern):
+def get_installed_packages_by_glob(
+        apt_cache: apt_pkg.Cache,
+        glob_pattern: str
+) -> List[str]:
     '''Query apt-cache for installed packages matching a specific glob pattern.
 
     Args:
@@ -1028,8 +1085,13 @@ def get_installed_packages_by_glob(apt_cache, glob_pattern):
 
 
 def get_desktop_package_list(
-        apt_cache, sys_path=None, free_only=False, include_oem=True,
-        driver_string='', include_dkms=False):
+        apt_cache: apt_pkg.Cache,
+        sys_path: Optional[str] = None,
+        free_only: bool = False,
+        include_oem: bool = True,
+        driver_string: str = '',
+        include_dkms: bool = False
+) -> List[str]:
     '''Return the list of packages that should be installed'''
     packages = system_driver_packages(
         apt_cache, sys_path, freeonly=free_only,
@@ -1043,18 +1105,18 @@ def get_desktop_package_list(
     return to_install
 
 
-def nvidia_desktop_pre_installation_hook(to_install):
+def nvidia_desktop_pre_installation_hook(to_install: List[str]) -> None:
     '''Applies changes that need to happen before installing the NVIDIA drivers'''
 
     # Enable KMS if nvidia >= 470
     for package_name in to_install:
         nvidia_info = NvidiaPkgNameInfo(package_name)
         if nvidia_info.get_major_version() >= 470:
-            set_nvidia_kms(1)
+            set_nvidia_kms(True)
             return
 
 
-def nvidia_desktop_post_installation_hook():
+def nvidia_desktop_post_installation_hook() -> None:
     # If we are dealing with NVIDIA PRIME, and runtimepm
     # is supported, enable it
     if os.path.isfile('/run/nvidia_runtimepm_supported'):
@@ -1071,12 +1133,12 @@ def nvidia_desktop_post_installation_hook():
 
 class _GpgpuDriver(object):
 
-    def __init__(self, vendor=None, flavour=None):
+    def __init__(self, vendor: Optional[str] = None, flavour: Optional[str] = None) -> None:
         self._vendors_whitelist = ('nvidia',)
         self.vendor = vendor
         self.flavour = flavour
 
-    def is_valid(self):
+    def is_valid(self) -> bool:
         if self.vendor:
             # Filter the allowed vendors
             if not fnmatch.filter(self._vendors_whitelist, self.vendor):
@@ -1084,7 +1146,7 @@ class _GpgpuDriver(object):
         return not (not self.vendor and not self.flavour)
 
 
-def _process_driver_string(string):
+def _process_driver_string(string: str) -> _GpgpuDriver:
     '''Returns a _GpgpuDriver object'''
     driver = _GpgpuDriver()
 
@@ -1116,7 +1178,10 @@ def _process_driver_string(string):
     return driver
 
 
-def _sort_packages_by_preference(packages, gpgpu=False):
+def _sort_packages_by_preference(
+        packages: Dict[str, PackageInfo],
+        gpgpu: bool = False
+) -> List[Tuple[str, PackageInfo]]:
     '''
     Sort packages by preference based on desktop or GPGPU mode.
 
@@ -1135,7 +1200,12 @@ def _sort_packages_by_preference(packages, gpgpu=False):
                   reverse=True)
 
 
-def _build_installation_list(cache, sorted_packages, include_dkms, gpgpu=False):
+def _build_installation_list(
+        cache: apt_pkg.Cache,
+        sorted_packages: List[Tuple[str, PackageInfo]],
+        include_dkms: bool,
+        gpgpu: bool = False
+) -> List[str]:
     '''
     Build the list of packages to install including metapackages and modules.
 
@@ -1149,7 +1219,7 @@ def _build_installation_list(cache, sorted_packages, include_dkms, gpgpu=False):
         List of package names to install including metapackages and module packages.
     '''
     depcache = apt_pkg.DepCache(cache)
-    to_install = []
+    to_install: List[str] = []
 
     for p, pkg_info in sorted_packages:
         if not gpgpu:
@@ -1214,7 +1284,10 @@ def _build_installation_list(cache, sorted_packages, include_dkms, gpgpu=False):
     return to_install
 
 
-def _remove_already_installed(cache, packages):
+def _remove_already_installed(
+        cache: Optional[apt_pkg.Cache],
+        packages: List[str]
+) -> List[str]:
     '''
     Filter out packages that are already installed.
 
@@ -1234,7 +1307,12 @@ def _remove_already_installed(cache, packages):
     return filtered
 
 
-def already_installed_filter(cache, packages, include_dkms, gpgpu=False):
+def already_installed_filter(
+        cache: Optional[apt_pkg.Cache],
+        packages: Dict[str, PackageInfo],
+        include_dkms: bool,
+        gpgpu: bool = False
+) -> List[str]:
     '''
     Sort driver branch to install according to preference, then select
     most appropriate modules package and filter out already installed packages.
@@ -1265,7 +1343,7 @@ def already_installed_filter(cache, packages, include_dkms, gpgpu=False):
     # is already installed - so don't filter anything down.
     # (aside from non-coinstallable nvidia-driver-* packages)
     if not cache:
-        to_install = []
+        to_install: List[str] = []
         sorted_packages = _sort_packages_by_preference(packages, gpgpu)
         for p, _ in sorted_packages:
             # Do not add more than one nvidia-driver-* (or associated packages) to to_install
@@ -1288,10 +1366,17 @@ def already_installed_filter(cache, packages, include_dkms, gpgpu=False):
     return to_install
 
 
-def gpgpu_install_filter(cache, include_dkms, packages, drivers_str, get_recommended=True, gpgpu=True):
-    drivers = []
-    allow = []
-    result = {}
+def gpgpu_install_filter(
+        cache: Optional[apt_pkg.Cache],
+        include_dkms: bool,
+        packages: Dict[str, PackageInfo],
+        drivers_str: str,
+        get_recommended: bool = True,
+        gpgpu: bool = True
+) -> List[str]:
+    drivers: List[_GpgpuDriver] = []
+    allow: List[str] = []
+    result: Dict[str, PackageInfo] = {}
     '''
     Sort driver branch to install according to preference, then select
     most appropriate modules package and filter out already installed packages.
@@ -1359,14 +1444,15 @@ def gpgpu_install_filter(cache, include_dkms, packages, drivers_str, get_recomme
 
     # Do not allow installing multiple versions of the nvidia driver
     it = 0
-    vendors_temp = []
+    vendors_temp: List[str] = []
     for driver in drivers:
         vendor = driver.vendor
         if vendor in vendors_temp:
             # TODO: raise error here
             logging.debug('Multiple nvidia versions passed at the same time')
             return []
-        vendors_temp.append(vendor)
+        if vendor is not None:
+            vendors_temp.append(vendor)
         it += 1
 
     # If the flavour is not specified, we assume it's nvidia,
@@ -1408,7 +1494,14 @@ def gpgpu_install_filter(cache, include_dkms, packages, drivers_str, get_recomme
     return already_installed_filter(cache, result, include_dkms, gpgpu)
 
 
-def auto_install_filter(cache, include_dkms, packages, drivers_str='', get_recommended=True, gpgpu=False):
+def auto_install_filter(
+        cache: Optional[apt_pkg.Cache],
+        include_dkms: bool,
+        packages: Dict[str, PackageInfo],
+        drivers_str: str = '',
+        get_recommended: bool = True,
+        gpgpu: bool = False
+) -> List[str]:
     '''
     Get packages which are appropriate for automatic installation.
 
@@ -1452,7 +1545,7 @@ def auto_install_filter(cache, include_dkms, packages, drivers_str='', get_recom
     return already_installed_filter(cache, result, include_dkms, gpgpu)
 
 
-def detect_plugin_packages(apt_cache=None):
+def detect_plugin_packages(apt_cache: Optional[apt_pkg.Cache] = None) -> Dict[str, List[str]]:
     '''Get driver packages from custom detection plugins.
 
     Some driver packages cannot be identified by modaliases, but need some
@@ -1467,7 +1560,7 @@ def detect_plugin_packages(apt_cache=None):
 
     Return pluginname -> [package, ...] map.
     '''
-    packages = {}
+    packages: Dict[str, List[str]] = {}
     plugindir = os.environ.get('UBUNTU_DRIVERS_DETECT_DIR',
                                '/usr/share/ubuntu-drivers-common/detect/')
     if not os.path.isdir(plugindir):
@@ -1487,7 +1580,7 @@ def detect_plugin_packages(apt_cache=None):
         plugin = os.path.join(plugindir, fname)
         logging.debug('Loading custom detection plugin %s', plugin)
 
-        symb = {}
+        symb: Dict[str, Any] = {}
         with open(plugin) as f:
             try:
                 exec(compile(f.read(), plugin, 'exec'), symb)
@@ -1514,21 +1607,21 @@ def detect_plugin_packages(apt_cache=None):
     return packages
 
 
-def _pkg_support_from_cache(x):
+def _pkg_support_from_cache(x: str) -> Optional[str]:
     '''Look up driver package and return their support level'''
     if lookup_cache.get(x):
         return lookup_cache.get(x).get('support')
     return None
 
 
-def _pkg_open_preferred_from_cache(x):
+def _pkg_open_preferred_from_cache(x: str) -> bool:
     '''Look up driver and return if open package is preferred'''
     if lookup_cache.get(x):
         return lookup_cache.get(x).get('open_preferred')
     return False
 
 
-def _get_fit_level(x):
+def _get_fit_level(x: str) -> int:
     '''decide how well the package fits desktop environment'''
 
     # for desktop non-server packages are prefered to -server ones
@@ -1561,7 +1654,7 @@ def _get_fit_level(x):
     return 0
 
 
-def _get_fit_level_gpgpu(x):
+def _get_fit_level_gpgpu(x: str) -> int:
     '''decide how well the package fits server environment'''
 
     # for server environment -server packages are prefered to non-server ones
@@ -1594,7 +1687,7 @@ def _get_fit_level_gpgpu(x):
     return 0
 
 
-def _cmp_gfx_alternatives(x, y):
+def _cmp_gfx_alternatives(x: str, y: str) -> int:
     '''Compare two graphics driver names in terms of preference. (desktop)
 
     -open by default sorts after non-open, unless a driver preferes open variant
@@ -1663,7 +1756,7 @@ def _cmp_gfx_alternatives(x, y):
     return 0
 
 
-def _cmp_gfx_alternatives_gpgpu(x, y):
+def _cmp_gfx_alternatives_gpgpu(x: str, y: str) -> int:
     '''Compare two graphics driver names in terms of preference. (server)
 
     -open by default sorts after non-open, unless a driver preferes open variant
@@ -1708,7 +1801,7 @@ def _cmp_gfx_alternatives_gpgpu(x, y):
     return 0
 
 
-def _add_builtins(drivers):
+def _add_builtins(drivers: Dict[str, DeviceInfo]) -> None:
     '''Add builtin driver alternatives'''
 
     for device, info in drivers.items():
@@ -1730,31 +1823,31 @@ def _add_builtins(drivers):
                 break
 
 
-def get_linux_headers(apt_cache):
+def get_linux_headers(apt_cache: apt_pkg.Cache) -> str:
     '''Return the linux headers for the system's kernel'''
     kernel_detection = kerneldetection.KernelDetection(apt_cache)
     return kernel_detection.get_linux_headers_metapackage()
 
 
-def get_linux_image(apt_cache):
+def get_linux_image(apt_cache: apt_pkg.Cache) -> str:
     '''Return the linux image for the system's kernel'''
     kernel_detection = kerneldetection.KernelDetection(apt_cache)
     return kernel_detection.get_linux_image_metapackage()
 
 
-def get_linux_version(apt_cache):
+def get_linux_version(apt_cache: apt_pkg.Cache) -> Optional[str]:
     '''Return the linux image for the system's kernel'''
     kernel_detection = kerneldetection.KernelDetection(apt_cache)
     return kernel_detection.get_linux_version()
 
 
-def get_linux(apt_cache):
+def get_linux(apt_cache: apt_pkg.Cache) -> str:
     '''Return the linux metapackage for the system's kernel'''
     kernel_detection = kerneldetection.KernelDetection(apt_cache)
     return kernel_detection.get_linux_metapackage()
 
 
-def get_linux_image_from_meta(apt_cache, pkg):
+def get_linux_image_from_meta(apt_cache, pkg: str) -> Optional[str]:  # type: ignore[no-untyped-def]
     depcache = apt_pkg.DepCache(apt_cache)
 
     try:
@@ -1786,7 +1879,7 @@ def get_linux_image_from_meta(apt_cache, pkg):
     return None
 
 
-def get_linux_modules_metapackage(apt_cache, candidate):
+def get_linux_modules_metapackage(apt_cache, candidate: str) -> Optional[str]:  # type: ignore[no-untyped-def]
     '''Return the linux-modules-$driver metapackage for the system's kernel'''
     assert candidate is not None
     metapackage = None
@@ -1832,8 +1925,8 @@ def get_linux_modules_metapackage(apt_cache, candidate):
             abi_specific = apt_cache[linux_modules_abi_candidate]
             # skip foreign architectures, we usually only want native
             abi_specific_candidate = depcache.get_candidate_ver(abi_specific)
-            if (abi_specific_candidate and
-                    abi_specific_candidate.arch in ('all', get_apt_arch())):
+            if (abi_specific_candidate
+                    and abi_specific_candidate.arch in ('all', get_apt_arch())):
                 logging.debug('Found ABI compatible %s' % (linux_modules_abi_candidate))
                 linux_modules_match = linux_modules_candidate
     except KeyError:
@@ -1871,8 +1964,8 @@ def get_linux_modules_metapackage(apt_cache, candidate):
         package_candidate = depcache.get_candidate_ver(package)
 
         # skip foreign architectures, we usually only want native
-        if (package_candidate and
-                package_candidate.arch in ('all', get_apt_arch())):
+        if (package_candidate
+                and package_candidate.arch in ('all', get_apt_arch())):
             metapackage = dkms_package
     except KeyError:
         logging.error('No "%s" can be found.', dkms_package)
@@ -1881,7 +1974,7 @@ def get_linux_modules_metapackage(apt_cache, candidate):
     return metapackage
 
 
-def _load_grub_cfg(grub_cfg_path='/boot/grub/grub.cfg'):
+def _load_grub_cfg(grub_cfg_path: str = '/boot/grub/grub.cfg') -> Optional[str]:
     '''Load grub configuration file content.
 
     Args:
@@ -1902,7 +1995,10 @@ def _load_grub_cfg(grub_cfg_path='/boot/grub/grub.cfg'):
         return None
 
 
-def _parse_grub_cfg_for_kernel(grub_content, entry_num):
+def _parse_grub_cfg_for_kernel(
+        grub_content: Optional[str],
+        entry_num: str
+) -> Optional[str]:
     '''Parse grub configuration content to find kernel version for given entry.
 
     Args:
@@ -1986,7 +2082,7 @@ def _parse_grub_cfg_for_kernel(grub_content, entry_num):
         return None
 
 
-def _get_kernel_from_grub_entry(entry_num):
+def _get_kernel_from_grub_entry(entry_num: str) -> Optional[str]:
     '''Convert grub entry number to kernel version by parsing grub.cfg.
 
     Args:
@@ -2001,7 +2097,7 @@ def _get_kernel_from_grub_entry(entry_num):
     return _parse_grub_cfg_for_kernel(grub_content, entry_num)
 
 
-def _get_actual_grub_default():
+def _get_actual_grub_default() -> Optional[str]:
     '''Get the actual grub default entry by checking grub configuration'''
     try:
         # Check if GRUB_DEFAULT is set to a specific value
@@ -2049,7 +2145,7 @@ def _get_actual_grub_default():
         return None
 
 
-def _resolve_nvidia_module_path_for_kernel(kernel_version):
+def _resolve_nvidia_module_path_for_kernel(kernel_version: Optional[str]) -> Optional[str]:
     """Return the path to the NVIDIA kernel module for a given kernel version, if present.
 
     Uses find to search for nvidia.ko* files in the kernel modules directory.
@@ -2080,7 +2176,7 @@ def _resolve_nvidia_module_path_for_kernel(kernel_version):
     return None
 
 
-def check_nvidia_module_status():
+def check_nvidia_module_status() -> Dict[str, Any]:
     '''Check NVIDIA module status and kernel compatibility.
 
     Returns:
@@ -2145,7 +2241,7 @@ def check_nvidia_module_status():
     result['needs_reboot'] = bool(result['next_boot_kernel'] and result['next_boot_kernel'] != current_kernel)
 
     # Always try to resolve the next boot module path (even if kernels match)
-    next_path = _resolve_nvidia_module_path_for_kernel(result['next_boot_kernel'])
+    next_path = _resolve_nvidia_module_path_for_kernel(result['next_boot_kernel'])  # type: ignore[arg-type]
     if next_path:
         result['next_boot_module_path'] = next_path
     else:
@@ -2158,7 +2254,7 @@ def check_nvidia_module_status():
     return result
 
 
-def gather_welcome_page_data():
+def gather_welcome_page_data() -> Dict[str, Any]:
     '''Gather data for the welcome page.
 
     Returns:
@@ -2169,7 +2265,7 @@ def gather_welcome_page_data():
             - nvidia_status: NVIDIA module status dict, or None if not applicable
             - nvidia_status_error: Error message if status check failed, or None
     '''
-    data = {
+    data: Dict[str, Any] = {
         'cache_error': None,
         'nvidia_drivers': [],
         'oem_packages': [],

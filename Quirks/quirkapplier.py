@@ -22,23 +22,26 @@ import os
 import sys
 import tempfile
 import logging
+from typing import List, Dict, Any
 
 import xkit.xutils
 import xkit.xorgparser
 
 import Quirks.quirkreader
+from Quirks.quirkreader import Quirk
 import Quirks.quirkinfo
 
 class QuirkChecker:
-    def __init__(self, handler, path='/usr/share/jockey/quirks'):
+    def __init__(self, handler: str,
+                 path: str = '/usr/share/jockey/quirks') -> None:
         self._handler = handler
         self.quirks_path = path
-        self._quirks = []
+        self._quirks: List[Quirk] = []
         self.get_quirks_from_path()
         self._system_info = self.get_system_info()
         self._xorg_conf_d_path = '/usr/share/X11/xorg.conf.d'
 
-    def get_quirks_from_path(self):
+    def get_quirks_from_path(self) -> List[Quirk]:
         '''check all the files in a directory looking for quirks'''
         self._quirks = []
         if os.path.isdir(self.quirks_path):
@@ -52,18 +55,18 @@ class QuirkChecker:
         return self._quirks
         
 
-    def get_quirks_from_file(self, quirk_file):
+    def get_quirks_from_file(self, quirk_file: str) -> List[Quirk]:
         '''check all the files in a directory looking for quirks'''
         # read other blacklist files (which we will not touch, but evaluate)
         quirk_file = Quirks.quirkreader.ReadQuirk(quirk_file)
         return quirk_file.get_quirks()
 
-    def get_system_info(self):
+    def get_system_info(self) -> Dict[str, str]:
         '''Get system info for the quirk'''
         quirk_info = Quirks.quirkinfo.QuirkInfo()
         return quirk_info.get_dmi_info()
 
-    def matches_tags(self, quirk):
+    def matches_tags(self, quirk: Quirk) -> bool:
         '''See if tags match system info'''
         result = True
         for tag in quirk.match_tags.keys():
@@ -76,7 +79,7 @@ class QuirkChecker:
         logging.debug('Success')
         return result
 
-    def _check_quirks(self, enable=True):
+    def _check_quirks(self, enable: bool = True) -> None:
         '''Process quirks and do something with them'''
         for quirk in self._quirks:
             if self._handler.lower() in [x.lower().strip() for x in quirk.handler]:
@@ -92,20 +95,20 @@ class QuirkChecker:
                 else:
                     logging.debug('Quirk doesn\'t match')
     
-    def enable_quirks(self):
+    def enable_quirks(self) -> None:
         '''Enable all quirks for a handler'''
         self._check_quirks(True)
 
-    def disable_quirks(self):
+    def disable_quirks(self) -> None:
         '''Disable all quirks for a handler'''
         self._check_quirks(False)
 
-    def _get_destination_path(self, quirk):
+    def _get_destination_path(self, quirk: Any) -> str:
         '''Return the path to the X config file'''
         return '%s/10-%s-%s.conf' % (self._xorg_conf_d_path,
                 self._handler, quirk.id.lower().replace(' ', '-'))
 
-    def _apply_quirk(self, quirk):
+    def _apply_quirk(self, quirk: Quirk) -> bool:
         '''Get the xorg snippet and apply it'''
         # Get the relevant x_snippet
         # Write conf file to /usr/share/X11/xorg.conf.d/file.conf
@@ -125,7 +128,7 @@ class QuirkChecker:
             return False
         return True
 
-    def _unapply_quirk(self, quirk):
+    def _unapply_quirk(self, quirk: Quirk) -> bool:
         '''Remove the file with the xorg snippet'''
         # Get the relevant x_snippet
         # Write conf file to /usr/share/X11/xorg.conf.d/file.conf
@@ -139,7 +142,7 @@ class QuirkChecker:
         return True
 
 
-def main():
+def main() -> int:
 
     a = QuirkChecker('nvidia', path='/home/alberto/oem/jockey/quirks')
     a.enable_quirks()

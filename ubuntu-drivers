@@ -17,6 +17,7 @@ import sys
 import os
 import logging
 import apt_pkg
+from typing import Optional, Any, Dict
 
 from functools import cmp_to_key
 import UbuntuDrivers.detect
@@ -35,19 +36,22 @@ logger.setLevel(level=LOGLEVEL)
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
+
 class Config(object):
-    def __init__(self):
-        self.gpgpu = False
-        self.free_only = False
-        self.package_list = ''
-        self.install_oem_meta = True
-        self.driver_string = ''
-        self.include_dkms = False
-        self.recommended = False
+    def __init__(self) -> None:
+        self.gpgpu: bool = False
+        self.free_only: bool = False
+        self.package_list: str = ''
+        self.install_oem_meta: bool = True
+        self.driver_string: str = ''
+        self.include_dkms: bool = False
+        self.recommended: bool = False
+
 
 pass_config = click.make_pass_decorator(Config, ensure=True)
 
-def command_list(args):
+
+def command_list(args: Config) -> int:
     '''Show all driver packages which apply to the current system.'''
     apt_pkg.init_config()
     apt_pkg.init_system()
@@ -58,7 +62,6 @@ def command_list(args):
         print(ex)
         return 1
 
-
     # First check if kernel needs updating
     kernel_detector = kerneldetection.KernelDetection(cache)
 
@@ -68,7 +71,7 @@ def command_list(args):
         return 1
 
     packages = UbuntuDrivers.detect.system_driver_packages(apt_cache=cache,
-        sys_path=sys_path, freeonly=args.free_only, include_oem=args.install_oem_meta)
+                                                           sys_path=sys_path, freeonly=args.free_only, include_oem=args.install_oem_meta)
 
     for package in packages:
         try:
@@ -85,7 +88,8 @@ def command_list(args):
 
     return 0
 
-def command_list_oem(args):
+
+def command_list_oem(args: Config) -> int:
     '''Show all OEM enablement packages which apply to this system'''
 
     if not args.install_oem_meta:
@@ -99,7 +103,6 @@ def command_list_oem(args):
     except Exception as ex:
         print(ex)
         return 1
-    
 
     # First check if kernel needs updating
     kernel_detector = kerneldetection.KernelDetection(cache)
@@ -122,7 +125,8 @@ def command_list_oem(args):
 
     return 0
 
-def list_gpgpu(args):
+
+def list_gpgpu(args: Config) -> int:
     '''Show all GPGPU driver packages which apply to the current system.'''
     found = False
     apt_pkg.init_config()
@@ -133,7 +137,6 @@ def list_gpgpu(args):
     except Exception as ex:
         print(ex)
         return 1
-
 
     # First check if kernel needs updating
     kernel_detector = kerneldetection.KernelDetection(cache)
@@ -151,7 +154,8 @@ def list_gpgpu(args):
 
     return 0
 
-def command_devices(args):
+
+def command_devices(args: Config) -> Optional[int]:
     '''Show all devices which need drivers, and which packages apply to them.'''
     apt_pkg.init_config()
     apt_pkg.init_system()
@@ -188,7 +192,10 @@ def command_devices(args):
             print('%-9s: %s -%s' % ('driver', pkg, info_str))
         print('')
 
-def command_install(args):
+    return None
+
+
+def command_install(args: Config) -> Optional[int]:
     '''Install drivers that are appropriate for your hardware.'''
     apt_pkg.init_config()
     apt_pkg.init_system()
@@ -202,7 +209,6 @@ def command_install(args):
     with_nvidia_kms = False
     is_nvidia = False
 
-
     # First check if kernel needs updating
     kernel_detector = kerneldetection.KernelDetection(cache)
 
@@ -211,14 +217,13 @@ def command_install(args):
     if should_exit:
         return 1
 
-
     to_install = UbuntuDrivers.detect.get_desktop_package_list(cache, sys_path,
-        free_only=args.free_only, include_oem=args.install_oem_meta,
-        driver_string=args.driver_string, include_dkms=args.include_dkms)
+                                                               free_only=args.free_only, include_oem=args.install_oem_meta,
+                                                               driver_string=args.driver_string, include_dkms=args.include_dkms)
 
     if not to_install:
         print('All the available drivers are already installed.')
-        return
+        return None
 
     for package in to_install:
         if 'nvidia' in package:
@@ -229,7 +234,7 @@ def command_install(args):
         UbuntuDrivers.detect.nvidia_desktop_pre_installation_hook(to_install)
 
     ret = subprocess.call(['apt-get', 'install', '-o',
-        'DPkg::options::=--force-confnew', '-y'] + to_install)
+                           'DPkg::options::=--force-confnew', '-y'] + to_install)
 
     oem_meta_to_install = fnmatch.filter(to_install, 'oem-*-meta')
 
@@ -270,9 +275,10 @@ def command_install(args):
 
     return ret
 
-def install_gpgpu(args):
+
+def install_gpgpu(args: Config) -> int:
     '''Install GPGPU drivers that are appropriate for your hardware.'''
-    candidate = ''
+    candidate: str = ''
     if args.driver_string:
         # Just one driver
         # e.g. --gpgpu 390
@@ -294,7 +300,6 @@ def install_gpgpu(args):
         print(ex)
         return 1
 
-
     # First check if kernel needs updating
     kernel_detector = kerneldetection.KernelDetection(cache)
 
@@ -314,8 +319,8 @@ def install_gpgpu(args):
         return 0
 
     ret = subprocess.call(['apt-get', 'install', '-o',
-        'DPkg::options::=--force-confnew',
-        '--no-install-recommends', '-y'] + to_install)
+                           'DPkg::options::=--force-confnew',
+                           '--no-install-recommends', '-y'] + to_install)
 
     # create package list
     if ret == 0 and args.package_list:
@@ -325,10 +330,11 @@ def install_gpgpu(args):
 
     return ret
 
-def command_debug(args):
+
+def command_debug(args: Config) -> int:
     '''Print all available information and debug data about drivers.'''
 
-    logger = logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
+    logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
 
     print('=== log messages from detection ===')
     aliases = UbuntuDrivers.detect.system_modaliases()
@@ -360,7 +366,7 @@ def command_debug(args):
             inst = '<none>'
         try:
             package_candidate = depcache.get_candidate_ver(p)
-            cand = package_candidate.ver_str
+            cand = package_candidate.ver_str  # type: ignore[union-attr]
         except AttributeError:
             cand = '<none>'
         if package in auto_packages:
@@ -388,11 +394,14 @@ def command_debug(args):
         if 'model' in info:
             info_str += '  model: ' + info['model']
         if support:
-            info_str += '  support level: ' + info['support']
+            info_str += '  support level: ' + support
 
-        print('%s: installed: %s   available: %s%s%s ' % (package, inst, cand, auto,  info_str))
+        print('%s: installed: %s   available: %s%s%s ' % (package, inst, cand, auto, info_str))
+    
+    return 0
 
-def format_welcome_page(data):
+
+def format_welcome_page(data: Dict[str, Any]) -> str:
     '''Format the welcome page output from gathered data.
     
     Args:
@@ -481,7 +490,7 @@ def format_welcome_page(data):
     
     return '\n'.join(lines)
 
-def show_welcome_page():
+def show_welcome_page() -> None:
     '''Display a welcome page showing installed OEM and NVIDIA drivers.'''
     data = UbuntuDrivers.detect.gather_welcome_page_data()
     output = format_welcome_page(data)
@@ -494,10 +503,11 @@ def show_welcome_page():
 
 @click.group(context_settings=CONTEXT_SETTINGS, invoke_without_command=True)
 @pass_config
-def greet(config, **kwargs):
+def greet(config: Config, **kwargs: Any) -> None:
     # Show welcome page if no subcommand is provided
     if not click.get_current_context().invoked_subcommand:
         show_welcome_page()
+
 
 @greet.command()
 @click.argument('driver', nargs=-1)  # add the name argument
@@ -508,14 +518,13 @@ def greet(config, **kwargs):
 @click.option('--no-oem', is_flag=True, metavar='install_oem_meta', help='Do not include OEM enablement packages (these enable an external archive)')
 @click.option('--include-dkms', is_flag=True, help='Also consider DKMS packages')
 @pass_config
-def install(config, **kwargs):
+def install(config: Config, **kwargs: Any) -> None:
     '''Install a driver [driver[:version][,driver[:version]]]'''
 
     # Require root
     if os.geteuid() != 0:
         print("Error: 'ubuntu-drivers install' must be run as root. Try using 'sudo'.", file=sys.stderr)
         sys.exit(1)
-
 
     if kwargs.get('gpgpu'):
         config.gpgpu = True
@@ -527,12 +536,12 @@ def install(config, **kwargs):
     # if kwargs.get('package_list'):
     #     config.package_list = kwargs.get('package_list')
     if kwargs.get('package_list'):
-        config.package_list = ''.join(kwargs.get('package_list'))
+        config.package_list = ''.join(kwargs.get('package_list'))  # type: ignore[arg-type]
     if kwargs.get('no_oem'):
         config.install_oem_meta = False
 
     if kwargs.get('driver'):
-        config.driver_string = ''.join(kwargs.get('driver'))
+        config.driver_string = ''.join(kwargs.get('driver'))  # type: ignore[arg-type]
 
     if config.gpgpu:
         install_gpgpu(config)
@@ -547,18 +556,17 @@ def install(config, **kwargs):
 @click.option('--free-only', is_flag=True, help='Only consider free packages')
 @click.option('--include-dkms', is_flag=True, help='Also consider DKMS packages')
 @pass_config
-def list(config, **kwargs):
+def list(config: Config, **kwargs: Any) -> Optional[int]:
     '''Show all driver packages which apply to the current system.'''
     apt_pkg.init_config()
     apt_pkg.init_system()
-    include_dkms = kwargs.get("include_dkms")
+    include_dkms: bool = kwargs.get("include_dkms", False)
 
     try:
         cache = apt_pkg.Cache(None)
     except Exception as ex:
         print(ex)
         return 1
-
 
     # First check if kernel needs updating
     kernel_detector = kerneldetection.KernelDetection(cache)
@@ -573,10 +581,10 @@ def list(config, **kwargs):
         sort_func = UbuntuDrivers.detect._cmp_gfx_alternatives_gpgpu
     else:
         packages = UbuntuDrivers.detect.system_driver_packages(apt_cache=cache,
-            sys_path=sys_path, freeonly=config.free_only, include_oem=config.install_oem_meta)
+                                                               sys_path=sys_path, freeonly=config.free_only, include_oem=config.install_oem_meta)
         sort_func = UbuntuDrivers.detect._cmp_gfx_alternatives
 
-    for package, info in sorted(packages.items(), key=cmp_to_key(lambda left, right: sort_func(left[0], right[0])), reverse=True):
+    for package, info in sorted(packages.items(), key=cmp_to_key(lambda left, right: sort_func(left[0], right[0])), reverse=True):  # type: ignore[index]
         try:
             linux_modules = UbuntuDrivers.detect.get_linux_modules_metapackage(cache, package)
             if (not linux_modules and "dkms" in package and include_dkms):
@@ -599,29 +607,32 @@ def list(config, **kwargs):
 
     return 0
 
+
 @greet.command()
 @click.argument('list-oem', nargs=-1)
 @click.option('--package-list', nargs=1, metavar='PATH', help='Create file with a list of the available packages')
 @pass_config
-def list_oem(config, **kwargs):
+def list_oem(config: Config, **kwargs: Any) -> None:
     '''Show all OEM enablement packages which apply to this system'''
     if kwargs.get('package_list'):
-        config.package_list = ''.join(kwargs.get('package_list'))
+        config.package_list = ''.join(kwargs.get('package_list'))  # type: ignore[arg-type]
 
     command_list_oem(config)
+
 
 @greet.command()
 @click.argument('debug', nargs=-1)  # add the name argument
 @pass_config
-def debug(config, **kwargs):
+def debug(config: Config, **kwargs: Any) -> None:
     '''Print all available information and debug data about drivers.'''
     command_debug(config)
+
 
 @greet.command()
 @click.argument('devices', nargs=-1)  # add the name argument
 @click.option('--free-only', is_flag=True, help='Only consider free packages')
 @pass_config
-def devices(config, **kwargs):
+def devices(config: Config, **kwargs: Any) -> None:
     '''Show all devices which need drivers, and which packages apply to them.'''
     if kwargs.get('free_only'):
         config.free_only = True
