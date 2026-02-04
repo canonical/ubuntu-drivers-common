@@ -15,7 +15,7 @@ import subprocess
 import functools
 import re
 import json
-from typing import Optional, Dict, List, Set, Tuple, Any, TypedDict, Callable
+from typing import Optional, Dict, List, Set, Tuple, Any, TypedDict
 from functools import cmp_to_key
 
 import apt_pkg
@@ -1170,7 +1170,10 @@ def _process_driver_string(string: str) -> _GpgpuDriver:
     return driver
 
 
-def _sort_packages_by_preference(packages, gpgpu=False):
+def _sort_packages_by_preference(
+        packages: Dict[str, PackageInfo],
+        gpgpu: bool = False
+) -> List[Tuple[str, PackageInfo]]:
     '''
     Sort packages by preference based on desktop or GPGPU mode.
 
@@ -1189,7 +1192,12 @@ def _sort_packages_by_preference(packages, gpgpu=False):
                   reverse=True)
 
 
-def _build_installation_list(cache, sorted_packages, include_dkms, gpgpu=False):
+def _build_installation_list(
+        cache: apt_pkg.Cache,
+        sorted_packages: List[Tuple[str, PackageInfo]],
+        include_dkms: bool,
+        gpgpu: bool = False
+) -> List[str]:
     '''
     Build the list of packages to install including metapackages and modules.
 
@@ -1203,7 +1211,7 @@ def _build_installation_list(cache, sorted_packages, include_dkms, gpgpu=False):
         List of package names to install including metapackages and module packages.
     '''
     depcache = apt_pkg.DepCache(cache)
-    to_install = []
+    to_install: List[str] = []
 
     for p, pkg_info in sorted_packages:
         if not gpgpu:
@@ -1268,7 +1276,10 @@ def _build_installation_list(cache, sorted_packages, include_dkms, gpgpu=False):
     return to_install
 
 
-def _remove_already_installed(cache, packages):
+def _remove_already_installed(
+        cache: Optional[apt_pkg.Cache],
+        packages: List[str]
+) -> List[str]:
     '''
     Filter out packages that are already installed.
 
@@ -1288,7 +1299,12 @@ def _remove_already_installed(cache, packages):
     return filtered
 
 
-def already_installed_filter(cache, packages, include_dkms, gpgpu=False):
+def already_installed_filter(
+        cache: Optional[apt_pkg.Cache],
+        packages: Dict[str, PackageInfo],
+        include_dkms: bool,
+        gpgpu: bool = False
+) -> List[str]:
     '''
     Sort driver branch to install according to preference, then select
     most appropriate modules package and filter out already installed packages.
@@ -1319,7 +1335,7 @@ def already_installed_filter(cache, packages, include_dkms, gpgpu=False):
     # is already installed - so don't filter anything down.
     # (aside from non-coinstallable nvidia-driver-* packages)
     if not cache:
-        to_install = []
+        to_install: List[str] = []
         sorted_packages = _sort_packages_by_preference(packages, gpgpu)
         for p, _ in sorted_packages:
             # Do not add more than one nvidia-driver-* (or associated packages) to to_install
@@ -1342,10 +1358,17 @@ def already_installed_filter(cache, packages, include_dkms, gpgpu=False):
     return to_install
 
 
-def gpgpu_install_filter(cache, include_dkms, packages, drivers_str, get_recommended=True, gpgpu=True):
-    drivers = []
-    allow = []
-    result = {}
+def gpgpu_install_filter(
+        cache: Optional[apt_pkg.Cache],
+        include_dkms: bool,
+        packages: Dict[str, PackageInfo],
+        drivers_str: str,
+        get_recommended: bool = True,
+        gpgpu: bool = True
+) -> List[str]:
+    drivers: List[_GpgpuDriver] = []
+    allow: List[str] = []
+    result: Dict[str, PackageInfo] = {}
     '''
     Sort driver branch to install according to preference, then select
     most appropriate modules package and filter out already installed packages.
@@ -1420,7 +1443,8 @@ def gpgpu_install_filter(cache, include_dkms, packages, drivers_str, get_recomme
             # TODO: raise error here
             logging.debug('Multiple nvidia versions passed at the same time')
             return []
-        vendors_temp.append(vendor)
+        if vendor is not None:
+            vendors_temp.append(vendor)
         it += 1
 
     # If the flavour is not specified, we assume it's nvidia,
@@ -1462,7 +1486,14 @@ def gpgpu_install_filter(cache, include_dkms, packages, drivers_str, get_recomme
     return already_installed_filter(cache, result, include_dkms, gpgpu)
 
 
-def auto_install_filter(cache, include_dkms, packages, drivers_str='', get_recommended=True, gpgpu=False):
+def auto_install_filter(
+        cache: Optional[apt_pkg.Cache],
+        include_dkms: bool,
+        packages: Dict[str, PackageInfo],
+        drivers_str: str = '',
+        get_recommended: bool = True,
+        gpgpu: bool = False
+) -> List[str]:
     '''
     Get packages which are appropriate for automatic installation.
 
