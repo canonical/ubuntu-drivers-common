@@ -1061,7 +1061,10 @@ def system_device_drivers(apt_cache: Optional[apt_pkg.Cache] = None,
     return result
 
 
-def get_installed_packages_by_glob(apt_cache, glob_pattern):
+def get_installed_packages_by_glob(
+        apt_cache: apt_pkg.Cache,
+        glob_pattern: str
+) -> List[str]:
     '''Query apt-cache for installed packages matching a specific glob pattern.
 
     Args:
@@ -1082,8 +1085,13 @@ def get_installed_packages_by_glob(apt_cache, glob_pattern):
 
 
 def get_desktop_package_list(
-        apt_cache, sys_path=None, free_only=False, include_oem=True,
-        driver_string='', include_dkms=False) -> List[str]:
+        apt_cache: apt_pkg.Cache,
+        sys_path: Optional[str] = None,
+        free_only: bool = False,
+        include_oem: bool = True,
+        driver_string: str = '',
+        include_dkms: bool = False
+) -> List[str]:
     '''Return the list of packages that should be installed'''
     packages = system_driver_packages(
         apt_cache, sys_path, freeonly=free_only,
@@ -1966,7 +1974,7 @@ def get_linux_modules_metapackage(apt_cache, candidate: str) -> Optional[str]:  
     return metapackage
 
 
-def _load_grub_cfg(grub_cfg_path='/boot/grub/grub.cfg'):
+def _load_grub_cfg(grub_cfg_path: str = '/boot/grub/grub.cfg') -> Optional[str]:
     '''Load grub configuration file content.
 
     Args:
@@ -1987,7 +1995,10 @@ def _load_grub_cfg(grub_cfg_path='/boot/grub/grub.cfg'):
         return None
 
 
-def _parse_grub_cfg_for_kernel(grub_content, entry_num):
+def _parse_grub_cfg_for_kernel(
+        grub_content: Optional[str],
+        entry_num: str
+) -> Optional[str]:
     '''Parse grub configuration content to find kernel version for given entry.
 
     Args:
@@ -2071,7 +2082,7 @@ def _parse_grub_cfg_for_kernel(grub_content, entry_num):
         return None
 
 
-def _get_kernel_from_grub_entry(entry_num):
+def _get_kernel_from_grub_entry(entry_num: str) -> Optional[str]:
     '''Convert grub entry number to kernel version by parsing grub.cfg.
 
     Args:
@@ -2086,7 +2097,7 @@ def _get_kernel_from_grub_entry(entry_num):
     return _parse_grub_cfg_for_kernel(grub_content, entry_num)
 
 
-def _get_actual_grub_default():
+def _get_actual_grub_default() -> Optional[str]:
     '''Get the actual grub default entry by checking grub configuration'''
     try:
         # Check if GRUB_DEFAULT is set to a specific value
@@ -2134,7 +2145,7 @@ def _get_actual_grub_default():
         return None
 
 
-def _resolve_nvidia_module_path_for_kernel(kernel_version):
+def _resolve_nvidia_module_path_for_kernel(kernel_version: Optional[str]) -> Optional[str]:
     """Return the path to the NVIDIA kernel module for a given kernel version, if present.
 
     Uses find to search for nvidia.ko* files in the kernel modules directory.
@@ -2165,7 +2176,7 @@ def _resolve_nvidia_module_path_for_kernel(kernel_version):
     return None
 
 
-def check_nvidia_module_status():
+def check_nvidia_module_status() -> Dict[str, Any]:
     '''Check NVIDIA module status and kernel compatibility.
 
     Returns:
@@ -2230,7 +2241,7 @@ def check_nvidia_module_status():
     result['needs_reboot'] = bool(result['next_boot_kernel'] and result['next_boot_kernel'] != current_kernel)
 
     # Always try to resolve the next boot module path (even if kernels match)
-    next_path = _resolve_nvidia_module_path_for_kernel(result['next_boot_kernel'])
+    next_path = _resolve_nvidia_module_path_for_kernel(result['next_boot_kernel'])  # type: ignore[arg-type]
     if next_path:
         result['next_boot_module_path'] = next_path
     else:
@@ -2243,7 +2254,7 @@ def check_nvidia_module_status():
     return result
 
 
-def gather_welcome_page_data():
+def gather_welcome_page_data() -> Dict[str, Any]:
     '''Gather data for the welcome page.
 
     Returns:
@@ -2254,7 +2265,7 @@ def gather_welcome_page_data():
             - nvidia_status: NVIDIA module status dict, or None if not applicable
             - nvidia_status_error: Error message if status check failed, or None
     '''
-    data = {
+    data: Dict[str, Any] = {
         'cache_error': None,
         'nvidia_drivers': [],
         'oem_packages': [],

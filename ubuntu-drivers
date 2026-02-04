@@ -17,7 +17,7 @@ import sys
 import os
 import logging
 import apt_pkg
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 
 from functools import cmp_to_key
 import UbuntuDrivers.detect
@@ -331,7 +331,7 @@ def install_gpgpu(args: Config) -> int:
     return ret
 
 
-def command_debug(args: Config) -> Optional[int]:
+def command_debug(args: Config) -> int:
     '''Print all available information and debug data about drivers.'''
 
     logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
@@ -397,8 +397,11 @@ def command_debug(args: Config) -> Optional[int]:
             info_str += '  support level: ' + support
 
         print('%s: installed: %s   available: %s%s%s ' % (package, inst, cand, auto, info_str))
+    
+    return 0
 
-def format_welcome_page(data):
+
+def format_welcome_page(data: Dict[str, Any]) -> str:
     '''Format the welcome page output from gathered data.
     
     Args:
@@ -487,7 +490,7 @@ def format_welcome_page(data):
     
     return '\n'.join(lines)
 
-def show_welcome_page():
+def show_welcome_page() -> None:
     '''Display a welcome page showing installed OEM and NVIDIA drivers.'''
     data = UbuntuDrivers.detect.gather_welcome_page_data()
     output = format_welcome_page(data)
@@ -500,7 +503,7 @@ def show_welcome_page():
 
 @click.group(context_settings=CONTEXT_SETTINGS, invoke_without_command=True)
 @pass_config
-def greet(config, **kwargs):
+def greet(config: Config, **kwargs: Any) -> None:
     # Show welcome page if no subcommand is provided
     if not click.get_current_context().invoked_subcommand:
         show_welcome_page()
