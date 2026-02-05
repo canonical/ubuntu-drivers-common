@@ -92,7 +92,11 @@ class TestStatic(unittest.TestCase):
         """pycodestyle - Python style guide checker"""
 
         subp = subprocess.Popen(
-            [pycodestyle_cmd, "--max-line-length=%d" % PEP8_MAX_LINE_LENGTH]
+            [
+                pycodestyle_cmd,
+                "--max-line-length=%d" % PEP8_MAX_LINE_LENGTH,
+                "--ignore=E203,W503",
+            ]
             + self.all_paths(),
             stdout=subprocess.PIPE,
             universal_newlines=True,

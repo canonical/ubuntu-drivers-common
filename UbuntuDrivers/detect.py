@@ -589,7 +589,7 @@ def _is_runtimepm_supported(
         if m.find("nvidia(") != 0:
             return False
 
-        n = m[m.find("(") + 1: m.find(")")]
+        n = m[m.find("(") + 1 : m.find(")")]
         modaliases = n.split(", ")
         if _is_nv_allowing_runtimepm_supported(alias, ver):
             return True
