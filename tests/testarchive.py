@@ -1,4 +1,4 @@
-'''Provide a fake package archive for testing.'''
+"""Provide a fake package archive for testing."""
 
 # (C) 2012 Martin Pitt <martin.pitt@ubuntu.com>
 #
@@ -16,7 +16,7 @@ import atexit
 
 class Archive:
     def __init__(self):
-        '''Construct a local package test archive.
+        """Construct a local package test archive.
 
         The archive is initially empty. You can create new packages with
         create_deb(). self.path contains the path of the archive, and
@@ -24,26 +24,30 @@ class Archive:
 
         It is kept in a temporary directory which gets removed when the Archive
         object gets deleted.
-        '''
+        """
         self.path = tempfile.mkdtemp()
-        self.dist = 'devel'
-        self.components = ['main', 'universe', 'restricted', 'multiverse']
-        self.archs = ['amd64', 'i386', 'arm64', 'armhf', 'ppc64el', 's390x']
+        self.dist = "devel"
+        self.components = ["main", "universe", "restricted", "multiverse"]
+        self.archs = ["amd64", "i386", "arm64", "armhf", "ppc64el", "s390x"]
 
         atexit.register(shutil.rmtree, self.path)
 
         # Local repository is not signed so trusted is required
-        self.apt_source_pattern = 'deb [trusted=yes] file://%s %s %s'
+        self.apt_source_pattern = "deb [trusted=yes] file://%s %s %s"
         self.apt_source = self.apt_source_pattern % (
-            self.path, self.dist, " ".join(self.components))
+            self.path,
+            self.dist,
+            " ".join(self.components),
+        )
 
         # Configuration file for apt-ftparchive to generate archive indices
         # For simplification Suite and Codename are the same and we nly support
         # one arch. This can be further extended to support other archs if the
         # testsuite requires it
-        self.aptftp_conf = os.path.join(self.path, 'aptftp.conf')
-        with open(self.aptftp_conf, 'w') as f:
-            f.write('''
+        self.aptftp_conf = os.path.join(self.path, "aptftp.conf")
+        with open(self.aptftp_conf, "w") as f:
+            f.write(
+                """
 APT::FTPArchive::Release {{
 Origin "Ubuntu";
 Label "Ubuntu";
@@ -53,11 +57,18 @@ Architectures "{archs}";
 Components "{components}";
 Description "Test Repository";
 }};
-'''.format(suite=self.dist, codename=self.dist, archs=" ".join(self.archs), components=" ".join(self.components)))
+""".format(
+                    suite=self.dist,
+                    codename=self.dist,
+                    archs=" ".join(self.archs),
+                    components=" ".join(self.components),
+                )
+            )
 
-        self.aptftp_generate_conf = os.path.join(self.path, 'aptftpgenerate.conf')
-        with open(self.aptftp_generate_conf, 'w') as f:
-            f.write('''
+        self.aptftp_generate_conf = os.path.join(self.path, "aptftpgenerate.conf")
+        with open(self.aptftp_generate_conf, "w") as f:
+            f.write(
+                """
 Dir::ArchiveDir ".";
 Dir::CacheDir ".";
 TreeDefault::Directory "pool/$(SECTION)/";
@@ -71,21 +82,40 @@ Tree "dists/{dist}" {{
   Sections "{components}";
   Architectures "{archs}";
 }};
-'''.format(dist=self.dist, archs=" ".join(self.archs), components=" ".join(self.components)))
+""".format(
+                    dist=self.dist,
+                    archs=" ".join(self.archs),
+                    components=" ".join(self.components),
+                )
+            )
 
             for arch in self.archs:
                 for component in self.components:
-                    f.write('''
+                    f.write(
+                        """
 BinDirectory "dists/{dist}/{component}/binary-{arch}" {{
   Packages "dists/{dist}/{component}/binary-{arch}/Packages";
   Contents "dists/{dist}/Contents-{arch}";
 }};
-'''.format(dist=self.dist, arch=arch, component=component))
+""".format(
+                            dist=self.dist, arch=arch, component=component
+                        )
+                    )
 
-    def create_deb(self, name, version='1', architecture='all',
-                   dependencies={}, description='test package', extra_tags={},
-                   files={}, component='main', srcpkg=None, update_index=True):
-        '''Build a deb package and add it to the archive.
+    def create_deb(
+        self,
+        name,
+        version="1",
+        architecture="all",
+        dependencies={},
+        description="test package",
+        extra_tags={},
+        files={},
+        component="main",
+        srcpkg=None,
+        update_index=True,
+    ):
+        """Build a deb package and add it to the archive.
 
         The only mandatory argument is the package name. You can additionally
         specify the package version (default '1'), architecture (default
@@ -102,33 +132,39 @@ BinDirectory "dists/{dist}/{component}/binary-{arch}" {{
 
         Return the path to the newly created deb package, in case you only need
         the deb itself, not the archive.
-        '''
+        """
         d = tempfile.mkdtemp()
-        os.mkdir(os.path.join(d, 'DEBIAN'))
-        with open(os.path.join(d, 'DEBIAN', 'control'), 'w') as f:
-            f.write('''Package: %s
+        os.mkdir(os.path.join(d, "DEBIAN"))
+        with open(os.path.join(d, "DEBIAN", "control"), "w") as f:
+            f.write(
+                """Package: %s
 Maintainer: Test User <test@example.com>
 Version: %s
 Priority: optional
 Section: devel
 Architecture: %s
-''' % (name, version, architecture))
+"""
+                % (name, version, architecture)
+            )
 
             for k, v in dependencies.items():
-                f.write('%s: %s\n' % (k, v))
+                f.write("%s: %s\n" % (k, v))
 
-            f.write('''Description: %s
+            f.write(
+                """Description: %s
  Test dummy package.
-''' % description)
+"""
+                % description
+            )
 
             for k, v in extra_tags.items():
-                f.write('%s: %s\n' % (k, v))
+                f.write("%s: %s\n" % (k, v))
 
         for path, contents in files.items():
             if isinstance(contents, bytes):
-                mode = 'wb'
+                mode = "wb"
             else:
-                mode = 'w'
+                mode = "w"
             pathdir = os.path.join(d, os.path.dirname(path))
             if not os.path.isdir(pathdir):
                 os.makedirs(pathdir)
@@ -137,18 +173,18 @@ Architecture: %s
 
         if srcpkg is None:
             srcpkg = name
-        if srcpkg.startswith('lib'):
+        if srcpkg.startswith("lib"):
             prefix = srcpkg[:4]
         else:
             prefix = srcpkg[0]
-        dir = os.path.join(self.path, 'pool', component, prefix, srcpkg)
+        dir = os.path.join(self.path, "pool", component, prefix, srcpkg)
         if not os.path.isdir(dir):
             os.makedirs(dir)
 
-        debpath = os.path.join(dir, '%s_%s_%s.deb' % (name, version,
-                                                      architecture))
-        subprocess.check_call(['dpkg', '-b', d, debpath],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        debpath = os.path.join(dir, "%s_%s_%s.deb" % (name, version, architecture))
+        subprocess.check_call(
+            ["dpkg", "-b", d, debpath], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
 
         shutil.rmtree(d)
         assert os.path.exists(debpath)
@@ -159,17 +195,17 @@ Architecture: %s
         return debpath
 
     def update_index(self):
-        '''Update the "Packages" index.
+        """Update the "Packages" index.
 
         This usually gets done automatically by create_deb(), but needs to be
         done if you manually copy debs into the archive or call create_deb with
         update_index==False.
-        '''
+        """
         old_cwd = os.getcwd()
         try:
             os.chdir(self.path)
-            devnull = open(os.devnull, 'w')     # Make apt-ftparchive quiet
-            dists_dir = os.path.join(self.path, 'dists')
+            devnull = open(os.devnull, "w")  # Make apt-ftparchive quiet
+            dists_dir = os.path.join(self.path, "dists")
 
             # Completely recreates the dist directory to ensure there is no
             # leftover from a previous test.
@@ -177,27 +213,46 @@ Architecture: %s
                 shutil.rmtree(dists_dir)
             for arch in self.archs:
                 for component in self.components:
-                    os.makedirs(os.path.join(dists_dir, self.dist, component, 'binary-%s' % arch))
+                    os.makedirs(
+                        os.path.join(
+                            dists_dir, self.dist, component, "binary-%s" % arch
+                        )
+                    )
 
-            subprocess.check_call(['apt-ftparchive', 'generate', '-c',
-                                   self.aptftp_conf,
-                                   self.aptftp_generate_conf],
-                                  stderr=devnull)
+            subprocess.check_call(
+                [
+                    "apt-ftparchive",
+                    "generate",
+                    "-c",
+                    self.aptftp_conf,
+                    self.aptftp_generate_conf,
+                ],
+                stderr=devnull,
+            )
 
-            with open(os.path.join(dists_dir, self.dist, 'Release'), 'w') as f:
-                subprocess.check_call(['apt-ftparchive', 'release', '-c',
-                                       self.aptftp_conf,
-                                       os.path.join(dists_dir, self.dist)],
-                                      stdout=f, stderr=devnull)
+            with open(os.path.join(dists_dir, self.dist, "Release"), "w") as f:
+                subprocess.check_call(
+                    [
+                        "apt-ftparchive",
+                        "release",
+                        "-c",
+                        self.aptftp_conf,
+                        os.path.join(dists_dir, self.dist),
+                    ],
+                    stdout=f,
+                    stderr=devnull,
+                )
 
             # This is still required by the aptdaemon test structure
-            with open('Packages', 'w') as f:
-                subprocess.check_call(['apt-ftparchive', 'packages', '.'],
-                                      stdout=f, stderr=devnull)
+            with open("Packages", "w") as f:
+                subprocess.check_call(
+                    ["apt-ftparchive", "packages", "."], stdout=f, stderr=devnull
+                )
 
         finally:
             os.chdir(old_cwd)
             devnull.close()
+
 
 # a = Archive()
 # a.create_deb('vanilla')

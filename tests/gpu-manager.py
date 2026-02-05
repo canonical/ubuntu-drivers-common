@@ -26,38 +26,40 @@ with_gdb = False
 
 class GpuTest(object):
 
-    def __init__(self,
-                 has_single_card=False,
-                 requires_offloading=False,
-                 has_intel=False,
-                 intel_loaded=False,
-                 intel_unloaded=False,
-                 has_amd=False,
-                 radeon_loaded=False,
-                 radeon_unloaded=False,
-                 amdgpu_loaded=False,
-                 amdgpu_unloaded=False,
-                 has_nvidia=False,
-                 nouveau_loaded=False,
-                 nouveau_unloaded=False,
-                 nvidia_loaded=False,
-                 nvidia_unloaded=False,
-                 nvidia_blacklisted=False,
-                 has_changed=False,
-                 has_removed_xorg=False,
-                 has_regenerated_xorg=False,
-                 has_created_xorg_conf_d=False,
-                 has_selected_driver=False,
-                 has_not_acted=True,
-                 has_skipped_hybrid=False,
-                 has_added_gpu_from_file=False,
-                 proprietary_installer=False,
-                 matched_quirk=False,
-                 loaded_with_args=False,
-                 module_is_versioned=False,
-                 amdgpu_pro_powersaving=False,
-                 amdgpu_pro_performance=False,
-                 amdgpu_pro_reset=False):
+    def __init__(
+        self,
+        has_single_card=False,
+        requires_offloading=False,
+        has_intel=False,
+        intel_loaded=False,
+        intel_unloaded=False,
+        has_amd=False,
+        radeon_loaded=False,
+        radeon_unloaded=False,
+        amdgpu_loaded=False,
+        amdgpu_unloaded=False,
+        has_nvidia=False,
+        nouveau_loaded=False,
+        nouveau_unloaded=False,
+        nvidia_loaded=False,
+        nvidia_unloaded=False,
+        nvidia_blacklisted=False,
+        has_changed=False,
+        has_removed_xorg=False,
+        has_regenerated_xorg=False,
+        has_created_xorg_conf_d=False,
+        has_selected_driver=False,
+        has_not_acted=True,
+        has_skipped_hybrid=False,
+        has_added_gpu_from_file=False,
+        proprietary_installer=False,
+        matched_quirk=False,
+        loaded_with_args=False,
+        module_is_versioned=False,
+        amdgpu_pro_powersaving=False,
+        amdgpu_pro_performance=False,
+        amdgpu_pro_reset=False,
+    ):
         self.has_single_card = has_single_card
         self.requires_offloading = requires_offloading
         self.has_intel = has_intel
@@ -96,87 +98,115 @@ class GpuManagerTest(unittest.TestCase):
     @classmethod
     def setUpClass(klass):
         klass.last_boot_file = tempfile.NamedTemporaryFile(
-            mode='w', prefix='last_boot_file_', dir=tests_path, delete=False)
+            mode="w", prefix="last_boot_file_", dir=tests_path, delete=False
+        )
         klass.last_boot_file.close()
         klass.new_boot_file = tempfile.NamedTemporaryFile(
-            mode='w', prefix='new_boot_file_', dir=tests_path, delete=False)
+            mode="w", prefix="new_boot_file_", dir=tests_path, delete=False
+        )
         klass.new_boot_file.close()
 
         klass.amdgpu_pro_px_file = tempfile.NamedTemporaryFile(
-            mode='w', prefix='amdgpu_pro_px_file_', dir=tests_path, delete=False)
+            mode="w", prefix="amdgpu_pro_px_file_", dir=tests_path, delete=False
+        )
 
         klass.amd_pcsdb_file = tempfile.NamedTemporaryFile(
-            mode='w', prefix='amd_pcsdb_file_', dir=tests_path, delete=False)
+            mode="w", prefix="amd_pcsdb_file_", dir=tests_path, delete=False
+        )
         klass.amd_pcsdb_file.close()
         klass.fake_lspci = tempfile.NamedTemporaryFile(
-            mode='w', prefix='fake_lspci_', dir=tests_path, delete=False)
+            mode="w", prefix="fake_lspci_", dir=tests_path, delete=False
+        )
         klass.fake_lspci.close()
         klass.fake_modules = tempfile.NamedTemporaryFile(
-            mode='w', prefix='fake_modules_', dir=tests_path, delete=False)
+            mode="w", prefix="fake_modules_", dir=tests_path, delete=False
+        )
         klass.fake_modules.close()
         klass.gpu_detection_path = tests_path or "/tmp"
         klass.module_detection_file = tests_path or "/tmp"
         klass.gpu_detection_file = tests_path or "/tmp"
         klass.prime_settings = tempfile.NamedTemporaryFile(
-            mode='w', prefix='prime_settings_', dir=tests_path, delete=False)
+            mode="w", prefix="prime_settings_", dir=tests_path, delete=False
+        )
         klass.prime_settings.close()
         klass.dmi_product_version_path = tempfile.NamedTemporaryFile(
-            mode='w', prefix='dmi_product_version_path_', dir=tests_path, delete=False)
+            mode="w", prefix="dmi_product_version_path_", dir=tests_path, delete=False
+        )
         klass.dmi_product_version_path.close()
         klass.dmi_product_name_path = tempfile.NamedTemporaryFile(
-            mode='w', prefix='dmi_product_name_path_', dir=tests_path, delete=False)
+            mode="w", prefix="dmi_product_name_path_", dir=tests_path, delete=False
+        )
         klass.dmi_product_name_path.close()
         klass.nvidia_driver_version_path = tempfile.NamedTemporaryFile(
-            mode='w', prefix='nvidia_driver_version_path_', dir=tests_path, delete=False)
+            mode="w", prefix="nvidia_driver_version_path_", dir=tests_path, delete=False
+        )
         klass.nvidia_driver_version_path.close()
         klass.modprobe_d_path = tempfile.NamedTemporaryFile(
-            mode='w', prefix='modprobe_d_path_', dir=tests_path, delete=False)
+            mode="w", prefix="modprobe_d_path_", dir=tests_path, delete=False
+        )
         klass.modprobe_d_path.close()
 
         klass.xorg_conf_d_path = tempfile.NamedTemporaryFile(
-            mode='w', prefix='xorg_conf_d_path_', dir=tests_path, delete=False)
+            mode="w", prefix="xorg_conf_d_path_", dir=tests_path, delete=False
+        )
         klass.xorg_conf_d_path.close()
 
-        klass.log = tempfile.NamedTemporaryFile(mode='w', prefix='log_', dir=tests_path, delete=False)
+        klass.log = tempfile.NamedTemporaryFile(
+            mode="w", prefix="log_", dir=tests_path, delete=False
+        )
         klass.log.close()
 
-        klass.valgrind_log = tempfile.NamedTemporaryFile(mode='w', prefix='valgrind_log_', dir=tests_path, delete=False)
+        klass.valgrind_log = tempfile.NamedTemporaryFile(
+            mode="w", prefix="valgrind_log_", dir=tests_path, delete=False
+        )
         klass.valgrind_log.close()
 
         # Patterns
-        klass.is_driver_loaded_pt = re.compile('Is (.+) loaded\? (.+)')
-        klass.is_driver_unloaded_pt = re.compile('Was (.+) unloaded\? (.+)')
-        klass.is_driver_blacklisted_pt = re.compile('Is (.+) blacklisted\? (.+)')
-        klass.is_driver_versioned_pt = re.compile('Is (.+) versioned\? (.+)')
-        klass.has_card_pt = re.compile('Has (.+)\? (.+)')
-        klass.single_card_pt = re.compile('Single card detected.*')
-        klass.requires_offloading_pt = re.compile('Does it require offloading\? (.+)')
-        klass.no_change_stop_pt = re.compile('No change - nothing to do')
-        klass.has_changed_pt = re.compile('Has the system changed\? (.+)')
+        klass.is_driver_loaded_pt = re.compile("Is (.+) loaded\? (.+)")
+        klass.is_driver_unloaded_pt = re.compile("Was (.+) unloaded\? (.+)")
+        klass.is_driver_blacklisted_pt = re.compile("Is (.+) blacklisted\? (.+)")
+        klass.is_driver_versioned_pt = re.compile("Is (.+) versioned\? (.+)")
+        klass.has_card_pt = re.compile("Has (.+)\? (.+)")
+        klass.single_card_pt = re.compile("Single card detected.*")
+        klass.requires_offloading_pt = re.compile("Does it require offloading\? (.+)")
+        klass.no_change_stop_pt = re.compile("No change - nothing to do")
+        klass.has_changed_pt = re.compile("Has the system changed\? (.+)")
 
-        klass.selected_driver_pt = re.compile('Selecting (.+)')
-        klass.removed_xorg_pt = re.compile('Removing xorg.conf. Path: .+')
-        klass.regenerated_xorg_pt = re.compile('Regenerating xorg.conf. Path: .+')
-        klass.not_modified_xorg_pt = re.compile('No need to modify xorg.conf. Path .+')
-        klass.created_xorg_conf_d_pt = re.compile('Creating (.+)')
-        klass.no_action_pt = re.compile('Nothing to do')
-        klass.has_skipped_hybrid_pt = re.compile('Lightdm is not the default display manager. Nothing to do')
-        klass.matched_quirk_pt = re.compile('Found matching quirk.*')
-        klass.loaded_with_args_pt = re.compile('Loading (.+) with \"(.+)\" parameters.*')
-        klass.has_added_gpu_from_file = re.compile('Adding GPU from file: (.+)')
-        klass.amdgpu_pro_powersaving_pt = re.compile('Enabling power saving mode for amdgpu-pro.*')
-        klass.amdgpu_pro_performance_pt = re.compile('Enabling performance mode for amdgpu-pro.*')
-        klass.amdgpu_pro_reset_pt = re.compile('Resetting the script changes for amdgpu-pro.*')
+        klass.selected_driver_pt = re.compile("Selecting (.+)")
+        klass.removed_xorg_pt = re.compile("Removing xorg.conf. Path: .+")
+        klass.regenerated_xorg_pt = re.compile("Regenerating xorg.conf. Path: .+")
+        klass.not_modified_xorg_pt = re.compile("No need to modify xorg.conf. Path .+")
+        klass.created_xorg_conf_d_pt = re.compile("Creating (.+)")
+        klass.no_action_pt = re.compile("Nothing to do")
+        klass.has_skipped_hybrid_pt = re.compile(
+            "Lightdm is not the default display manager. Nothing to do"
+        )
+        klass.matched_quirk_pt = re.compile("Found matching quirk.*")
+        klass.loaded_with_args_pt = re.compile('Loading (.+) with "(.+)" parameters.*')
+        klass.has_added_gpu_from_file = re.compile("Adding GPU from file: (.+)")
+        klass.amdgpu_pro_powersaving_pt = re.compile(
+            "Enabling power saving mode for amdgpu-pro.*"
+        )
+        klass.amdgpu_pro_performance_pt = re.compile(
+            "Enabling performance mode for amdgpu-pro.*"
+        )
+        klass.amdgpu_pro_reset_pt = re.compile(
+            "Resetting the script changes for amdgpu-pro.*"
+        )
 
-        klass.vendors = {'amd': 0x1002, 'nvidia': 0x10de,
-                         'intel': 0x8086, 'unknown': 0x1016}
+        klass.vendors = {
+            "amd": 0x1002,
+            "nvidia": 0x10DE,
+            "intel": 0x8086,
+            "unknown": 0x1016,
+        }
 
     def setUp(self):
         self.remove_modprobe_d_path()
         self.remove_xorg_conf_d_path()
 
     def tearDown(self):
-        print('%s over\n' % self.this_function_name)
+        print("%s over\n" % self.this_function_name)
         # Remove all the logs
         self.handle_logs(delete=True)
 
@@ -205,10 +235,12 @@ class GpuManagerTest(unittest.TestCase):
             pass
 
     def remove_prime_files(self):
-        for elem in (self.prime_settings,
-                     self.dmi_product_version_path,
-                     self.dmi_product_name_path,
-                     self.nvidia_driver_version_path):
+        for elem in (
+            self.prime_settings,
+            self.dmi_product_version_path,
+            self.dmi_product_name_path,
+            self.nvidia_driver_version_path,
+        ):
             try:
                 os.unlink(elem.name)
             except:
@@ -235,21 +267,23 @@ class GpuManagerTest(unittest.TestCase):
             except:
                 pass
 
-        for file in (self.last_boot_file,
-                     self.new_boot_file,
-                     self.fake_lspci,
-                     self.fake_modules,
-                     self.module_detection_file,
-                     self.gpu_detection_file,
-                     self.prime_settings,
-                     self.dmi_product_version_path,
-                     self.dmi_product_name_path,
-                     self.nvidia_driver_version_path,
-                     self.modprobe_d_path,
-                     self.log,
-                     self.amdgpu_pro_px_file,
-                     self.amd_pcsdb_file,
-                     self.valgrind_log):
+        for file in (
+            self.last_boot_file,
+            self.new_boot_file,
+            self.fake_lspci,
+            self.fake_modules,
+            self.module_detection_file,
+            self.gpu_detection_file,
+            self.prime_settings,
+            self.dmi_product_version_path,
+            self.dmi_product_name_path,
+            self.nvidia_driver_version_path,
+            self.modprobe_d_path,
+            self.log,
+            self.amdgpu_pro_px_file,
+            self.amd_pcsdb_file,
+            self.valgrind_log,
+        ):
             try:
                 file.close()
             except:
@@ -270,56 +304,74 @@ class GpuManagerTest(unittest.TestCase):
                 except:
                     pass
 
-    def exec_manager(self, requires_offloading=False, module_is_available=False,
-                     module_is_versioned=False):
-        fake_requires_offloading = \
-            requires_offloading and '--fake-requires-offloading' or '--fake-no-requires-offloading'
-        fake_module_available = module_is_available and '--fake-module-is-available' or '--fake-module-is-not-available'
+    def exec_manager(
+        self,
+        requires_offloading=False,
+        module_is_available=False,
+        module_is_versioned=False,
+    ):
+        fake_requires_offloading = (
+            requires_offloading
+            and "--fake-requires-offloading"
+            or "--fake-no-requires-offloading"
+        )
+        fake_module_available = (
+            module_is_available
+            and "--fake-module-is-available"
+            or "--fake-module-is-not-available"
+        )
         if with_valgrind:
-            valgrind = ['valgrind', '--tool=memcheck', '--leak-check=full',
-                        '--show-reachable=yes', '--log-file=%s' % self.valgrind_log.name,
-                        '--']
+            valgrind = [
+                "valgrind",
+                "--tool=memcheck",
+                "--leak-check=full",
+                "--show-reachable=yes",
+                "--log-file=%s" % self.valgrind_log.name,
+                "--",
+            ]
         else:
             valgrind = []
 
         if with_gdb:
-            gdb = ['gdb', '-batch', '--args']
+            gdb = ["gdb", "-batch", "--args"]
         else:
             gdb = []
 
-        command = ['share/hybrid/gpu-manager',
-                   '--dry-run',
-                   '--last-boot-file',
-                   self.last_boot_file.name,
-                   '--fake-lspci',
-                   self.fake_lspci.name,
-                   '--amdgpu-pro-px-file',
-                   self.amdgpu_pro_px_file.name,
-                   '--fake-modules-path',
-                   self.fake_modules.name,
-                   '--gpu-detection-path',
-                   self.gpu_detection_path,
-                   '--prime-settings',
-                   self.prime_settings.name,
-                   '--dmi-product-version-path',
-                   self.dmi_product_version_path.name,
-                   '--dmi-product-name-path',
-                   self.dmi_product_name_path.name,
-                   '--nvidia-driver-version-path',
-                   self.nvidia_driver_version_path.name,
-                   '--modprobe-d-path',
-                   self.modprobe_d_path.name,
-                   '--xorg-conf-d-path',
-                   self.xorg_conf_d_path.name,
-                   '--new-boot-file',
-                   self.new_boot_file.name,
-                   fake_requires_offloading,
-                   fake_module_available,
-                   '--log',
-                   self.log.name]
+        command = [
+            "share/hybrid/gpu-manager",
+            "--dry-run",
+            "--last-boot-file",
+            self.last_boot_file.name,
+            "--fake-lspci",
+            self.fake_lspci.name,
+            "--amdgpu-pro-px-file",
+            self.amdgpu_pro_px_file.name,
+            "--fake-modules-path",
+            self.fake_modules.name,
+            "--gpu-detection-path",
+            self.gpu_detection_path,
+            "--prime-settings",
+            self.prime_settings.name,
+            "--dmi-product-version-path",
+            self.dmi_product_version_path.name,
+            "--dmi-product-name-path",
+            self.dmi_product_name_path.name,
+            "--nvidia-driver-version-path",
+            self.nvidia_driver_version_path.name,
+            "--modprobe-d-path",
+            self.modprobe_d_path.name,
+            "--xorg-conf-d-path",
+            self.xorg_conf_d_path.name,
+            "--new-boot-file",
+            self.new_boot_file.name,
+            fake_requires_offloading,
+            fake_module_available,
+            "--log",
+            self.log.name,
+        ]
 
         if module_is_versioned:
-            command.append('--fake-module-is-versioned')
+            command.append("--fake-module-is-versioned")
 
         if valgrind:
             # Prepend the valgrind arguments
@@ -328,20 +380,22 @@ class GpuManagerTest(unittest.TestCase):
             command_ = copy.deepcopy(command)
             command_[:0] = gdb
             print("\n%s" % self.this_function_name)
-            print(' '.join(command_))
+            print(" ".join(command_))
 
-        os.system(' '.join(command))
+        os.system(" ".join(command))
 
         if valgrind:
-            self.valgrind_log = open(self.valgrind_log.name, 'r')
-            errors_pt = re.compile('(.+) ERROR SUMMARY: (.+) errors from (.+) '
-                                   'contexts (suppressed: .+ from .+).*')
+            self.valgrind_log = open(self.valgrind_log.name, "r")
+            errors_pt = re.compile(
+                "(.+) ERROR SUMMARY: (.+) errors from (.+) "
+                "contexts (suppressed: .+ from .+).*"
+            )
             for line in self.valgrind_log.readlines():
                 errors = errors_pt.match(line)
                 if errors:
                     if errors.group(2) != 0:
-                        self.valgrind_log = open(self.valgrind_log.name, 'w')
-                        self.valgrind_log.write(''.join(c, '\n'))
+                        self.valgrind_log = open(self.valgrind_log.name, "w")
+                        self.valgrind_log.write("".join(c, "\n"))
                         self.valgrind_log.close()
                         # Copy the logs
                         self.handle_logs(copy=True)
@@ -353,7 +407,7 @@ class GpuManagerTest(unittest.TestCase):
         gpu_test = GpuTest(**kwargs)
 
         # Open the log for reading
-        log = open(self.log.name, 'r')
+        log = open(self.log.name, "r")
 
         # Look for clues in the log
         for line in log.readlines():
@@ -386,48 +440,74 @@ class GpuManagerTest(unittest.TestCase):
 
             # Detect the vendor
             if has_changed:
-                gpu_test.has_changed = (has_changed.group(1).strip().lower() == 'yes')
+                gpu_test.has_changed = has_changed.group(1).strip().lower() == "yes"
             elif has_card:
-                if has_card.group(1).strip().lower() == 'nvidia':
-                    gpu_test.has_nvidia = (has_card.group(2).strip().lower() == 'yes')
-                elif has_card.group(1).strip().lower() == 'intel':
-                    gpu_test.has_intel = (has_card.group(2).strip().lower() == 'yes')
-                elif has_card.group(1).strip().lower() == 'amd':
-                    gpu_test.has_amd = (has_card.group(2).strip().lower() == 'yes')
+                if has_card.group(1).strip().lower() == "nvidia":
+                    gpu_test.has_nvidia = has_card.group(2).strip().lower() == "yes"
+                elif has_card.group(1).strip().lower() == "intel":
+                    gpu_test.has_intel = has_card.group(2).strip().lower() == "yes"
+                elif has_card.group(1).strip().lower() == "amd":
+                    gpu_test.has_amd = has_card.group(2).strip().lower() == "yes"
             # Detect the kernel modules
             elif is_driver_loaded:
-                if is_driver_loaded.group(1).strip().lower() == 'nouveau':
-                    gpu_test.nouveau_loaded = (is_driver_loaded.group(2).strip().lower() == 'yes')
-                elif is_driver_loaded.group(1).strip().lower() == 'nvidia':
-                    gpu_test.nvidia_loaded = (is_driver_loaded.group(2).strip().lower() == 'yes')
-                elif is_driver_loaded.group(1).strip().lower() == 'intel':
-                    gpu_test.intel_loaded = (is_driver_loaded.group(2).strip().lower() == 'yes')
-                elif is_driver_loaded.group(1).strip().lower() == 'radeon':
-                    gpu_test.radeon_loaded = (is_driver_loaded.group(2).strip().lower() == 'yes')
-                elif is_driver_loaded.group(1).strip().lower() == 'amdgpu':
-                    gpu_test.amdgpu_loaded = (is_driver_loaded.group(2).strip().lower() == 'yes')
+                if is_driver_loaded.group(1).strip().lower() == "nouveau":
+                    gpu_test.nouveau_loaded = (
+                        is_driver_loaded.group(2).strip().lower() == "yes"
+                    )
+                elif is_driver_loaded.group(1).strip().lower() == "nvidia":
+                    gpu_test.nvidia_loaded = (
+                        is_driver_loaded.group(2).strip().lower() == "yes"
+                    )
+                elif is_driver_loaded.group(1).strip().lower() == "intel":
+                    gpu_test.intel_loaded = (
+                        is_driver_loaded.group(2).strip().lower() == "yes"
+                    )
+                elif is_driver_loaded.group(1).strip().lower() == "radeon":
+                    gpu_test.radeon_loaded = (
+                        is_driver_loaded.group(2).strip().lower() == "yes"
+                    )
+                elif is_driver_loaded.group(1).strip().lower() == "amdgpu":
+                    gpu_test.amdgpu_loaded = (
+                        is_driver_loaded.group(2).strip().lower() == "yes"
+                    )
             elif is_driver_unloaded:
-                if is_driver_unloaded.group(1).strip().lower() == 'nouveau':
-                    gpu_test.nouveau_unloaded = (is_driver_unloaded.group(2).strip().lower() == 'yes')
-                elif is_driver_unloaded.group(1).strip().lower() == 'nvidia':
-                    gpu_test.nvidia_unloaded = (is_driver_unloaded.group(2).strip().lower() == 'yes')
-                elif is_driver_unloaded.group(1).strip().lower() == 'intel':
-                    gpu_test.intel_unloaded = (is_driver_unloaded.group(2).strip().lower() == 'yes')
-                elif is_driver_unloaded.group(1).strip().lower() == 'radeon':
-                    gpu_test.radeon_unloaded = (is_driver_unloaded.group(2).strip().lower() == 'yes')
-                elif is_driver_unloaded.group(1).strip().lower() == 'amdgpu':
-                    gpu_test.amdgpu_unloaded = (is_driver_unloaded.group(2).strip().lower() == 'yes')
+                if is_driver_unloaded.group(1).strip().lower() == "nouveau":
+                    gpu_test.nouveau_unloaded = (
+                        is_driver_unloaded.group(2).strip().lower() == "yes"
+                    )
+                elif is_driver_unloaded.group(1).strip().lower() == "nvidia":
+                    gpu_test.nvidia_unloaded = (
+                        is_driver_unloaded.group(2).strip().lower() == "yes"
+                    )
+                elif is_driver_unloaded.group(1).strip().lower() == "intel":
+                    gpu_test.intel_unloaded = (
+                        is_driver_unloaded.group(2).strip().lower() == "yes"
+                    )
+                elif is_driver_unloaded.group(1).strip().lower() == "radeon":
+                    gpu_test.radeon_unloaded = (
+                        is_driver_unloaded.group(2).strip().lower() == "yes"
+                    )
+                elif is_driver_unloaded.group(1).strip().lower() == "amdgpu":
+                    gpu_test.amdgpu_unloaded = (
+                        is_driver_unloaded.group(2).strip().lower() == "yes"
+                    )
             elif is_driver_blacklisted:
-                if is_driver_blacklisted.group(1).strip().lower() == 'nvidia':
-                    gpu_test.nvidia_blacklisted = (is_driver_blacklisted.group(2).strip().lower() == 'yes')
+                if is_driver_blacklisted.group(1).strip().lower() == "nvidia":
+                    gpu_test.nvidia_blacklisted = (
+                        is_driver_blacklisted.group(2).strip().lower() == "yes"
+                    )
             elif is_driver_versioned:
-                if is_driver_versioned.group(1).strip().lower() == 'amdgpu':
+                if is_driver_versioned.group(1).strip().lower() == "amdgpu":
                     # no driver other than amdgpu pro requires this
-                    gpu_test.module_is_versioned = (is_driver_versioned.group(2).strip().lower() == 'yes')
+                    gpu_test.module_is_versioned = (
+                        is_driver_versioned.group(2).strip().lower() == "yes"
+                    )
             elif single_card:
                 gpu_test.has_single_card = True
             elif offloading:
-                gpu_test.requires_offloading = (offloading.group(1).strip().lower() == 'yes')
+                gpu_test.requires_offloading = (
+                    offloading.group(1).strip().lower() == "yes"
+                )
             elif no_change_stop:
                 # gpu_test.has_changed = False
                 gpu_test.has_not_acted = True
@@ -470,9 +550,11 @@ class GpuManagerTest(unittest.TestCase):
         # No driver selection and no changes to xorg.conf
         # We deliberately leave the amdgpu-pro settings
         # out of this for now.
-        if (not gpu_test.has_selected_driver and not
-            (gpu_test.amdgpu_pro_powersaving
-                or amdgpu_pro_performance or amdgpu_pro_reset)):
+        if not gpu_test.has_selected_driver and not (
+            gpu_test.amdgpu_pro_powersaving
+            or amdgpu_pro_performance
+            or amdgpu_pro_reset
+        ):
             gpu_test.has_not_acted = True
 
         # Copy the logs
@@ -498,143 +580,165 @@ class GpuManagerTest(unittest.TestCase):
 
     def _add_pci_ids(self, ids):
         if ids:
-            self.fake_lspci = open(self.fake_lspci.name, 'w')
+            self.fake_lspci = open(self.fake_lspci.name, "w")
             for item in ids:
                 self.fake_lspci.write(item)
             self.fake_lspci.close()
 
     def _add_pci_ids_from_last_boot(self, ids):
         if ids:
-            self.last_boot_file = open(self.last_boot_file.name, 'w')
+            self.last_boot_file = open(self.last_boot_file.name, "w")
             for item in ids:
                 self.last_boot_file.write(item)
             self.last_boot_file.close()
 
-    def _get_cards_from_list(self, cards,
-                             bump_boot_vga_device_id=False,
-                             bump_discrete_device_id=False):
+    def _get_cards_from_list(
+        self, cards, bump_boot_vga_device_id=False, bump_discrete_device_id=False
+    ):
         cards_list = []
         it = 0
-        boot_vga_device_id = 0x68d8
-        discrete_device_id = 0x28e8
+        boot_vga_device_id = 0x68D8
+        discrete_device_id = 0x28E8
         for card in cards:
-            card_line = '%04x:%04x;0000:%02d:%02d:0;%d\n' % (
+            card_line = "%04x:%04x;0000:%02d:%02d:0;%d\n" % (
                 self.vendors.get(card),
-                ((it == 0) and
-                 (bump_boot_vga_device_id
-                    and boot_vga_device_id + 1
-                    or boot_vga_device_id)
-                 or (bump_discrete_device_id
-                     and discrete_device_id + 1
-                     or discrete_device_id)),
+                (
+                    (it == 0)
+                    and (
+                        bump_boot_vga_device_id
+                        and boot_vga_device_id + 1
+                        or boot_vga_device_id
+                    )
+                    or (
+                        bump_discrete_device_id
+                        and discrete_device_id + 1
+                        or discrete_device_id
+                    )
+                ),
                 (it == 0) and 0 or it,
                 (it == 0) and 1 or 0,
-                (it == 0) and 1 or 0)
+                (it == 0) and 1 or 0,
+            )
             cards_list.append(card_line)
             it += 1
         return cards_list
 
-    def set_current_cards(self, cards,
-                          bump_boot_vga_device_id=False,
-                          bump_discrete_device_id=False):
-        '''Set the current cards in the system
+    def set_current_cards(
+        self, cards, bump_boot_vga_device_id=False, bump_discrete_device_id=False
+    ):
+        """Set the current cards in the system
 
         cards is a list of cards such as ["intel", "nvidia"].
         The first cards on the list gets to be the boot_vga
-        one.'''
-        cards_list = self._get_cards_from_list(cards,
-                                               bump_boot_vga_device_id,
-                                               bump_discrete_device_id)
+        one."""
+        cards_list = self._get_cards_from_list(
+            cards, bump_boot_vga_device_id, bump_discrete_device_id
+        )
         self._add_pci_ids(cards_list)
 
     def set_cards_from_last_boot(self, cards):
-        '''Set the cards in the system from last boot
+        """Set the cards in the system from last boot
 
         cards is a list of cards such as ["intel", "nvidia"].
         The first cards on the list gets to be the boot_vga
-        one.'''
+        one."""
         cards_list = self._get_cards_from_list(cards)
         self._add_pci_ids_from_last_boot(cards_list)
 
     def add_kernel_modules(self, modules):
         if modules:
-            self.fake_modules = open(self.fake_modules.name, 'w')
+            self.fake_modules = open(self.fake_modules.name, "w")
             for item in modules:
-                line = '%s 1447330 3 - Live 0x0000000000000000\n' % item
+                line = "%s 1447330 3 - Live 0x0000000000000000\n" % item
                 self.fake_modules.write(line)
             self.fake_modules.close()
 
     def request_prime_discrete_on(self, is_on=True):
-        '''Request that discrete be switched on or off'''
-        self.prime_settings = open(self.prime_settings.name, 'w')
-        self.prime_settings.write(is_on and 'ON' or 'OFF')
+        """Request that discrete be switched on or off"""
+        self.prime_settings = open(self.prime_settings.name, "w")
+        self.prime_settings.write(is_on and "ON" or "OFF")
         self.prime_settings.close()
 
     def request_prime_on_demand(self):
-        '''Request on-demand mode'''
-        self.prime_settings = open(self.prime_settings.name, 'w')
-        self.prime_settings.write('on-demand')
+        """Request on-demand mode"""
+        self.prime_settings = open(self.prime_settings.name, "w")
+        self.prime_settings.write("on-demand")
         self.prime_settings.close()
 
     def set_dmi_product_version(self, label):
-        '''Set dmi product version'''
-        self.dmi_product_version_path = open(self.dmi_product_version_path.name, 'w')
-        self.dmi_product_version_path.write('%s\n' % label)
+        """Set dmi product version"""
+        self.dmi_product_version_path = open(self.dmi_product_version_path.name, "w")
+        self.dmi_product_version_path.write("%s\n" % label)
         self.dmi_product_version_path.close()
 
     def set_dmi_product_name(self, label):
-        '''Set dmi product name'''
-        self.dmi_product_name_path = open(self.dmi_product_name_path.name, 'w')
-        self.dmi_product_name_path.write('%s\n' % label)
+        """Set dmi product name"""
+        self.dmi_product_name_path = open(self.dmi_product_name_path.name, "w")
+        self.dmi_product_name_path.write("%s\n" % label)
         self.dmi_product_name_path.close()
 
     def set_bbswitch_quirks(self):
-        '''Set bbswitch quirks'''
-        self.bbswitch_quirks_path = open(self.bbswitch_quirks_path.name, 'w')
-        self.bbswitch_quirks_path.write('''
+        """Set bbswitch quirks"""
+        self.bbswitch_quirks_path = open(self.bbswitch_quirks_path.name, "w")
+        self.bbswitch_quirks_path.write(
+            """
 "ThinkPad T410" "skip_optimus_dsm=1"
 "ThinkPad T410s" "skip_optimus_dsm=1"
-        ''')
+        """
+        )
         self.bbswitch_quirks_path.close()
 
     def set_nvidia_version(self, nvidia_version):
-        '''Set the nvidia kernel module version'''
-        self.nvidia_driver_version_path = open(self.nvidia_driver_version_path.name, 'w')
-        self.nvidia_driver_version_path.write('%s\n' % nvidia_version)
+        """Set the nvidia kernel module version"""
+        self.nvidia_driver_version_path = open(
+            self.nvidia_driver_version_path.name, "w"
+        )
+        self.nvidia_driver_version_path.write("%s\n" % nvidia_version)
         self.nvidia_driver_version_path.close()
 
     def blacklist_module(self, module):
-        '''Set the nvidia kernel module version'''
-        self.modprobe_d_path = open(self.modprobe_d_path.name, 'a')
-        self.modprobe_d_path.write('blacklist %s\n' % module)
+        """Set the nvidia kernel module version"""
+        self.modprobe_d_path = open(self.modprobe_d_path.name, "a")
+        self.modprobe_d_path.write("blacklist %s\n" % module)
         self.modprobe_d_path.close()
 
     def set_unloaded_module(self, module):
         if module:
-            self.module_detection_file = "%s/u-d-c-%s-was-loaded" % (self.gpu_detection_path, module)
-            module_file = open(self.module_detection_file, 'w')
+            self.module_detection_file = "%s/u-d-c-%s-was-loaded" % (
+                self.gpu_detection_path,
+                module,
+            )
+            module_file = open(self.module_detection_file, "w")
             module_file.close()
 
-            if module == 'nvidia':
+            if module == "nvidia":
                 vendor = self.vendors["nvidia"]
-            elif module == 'amdgpu' or module == 'radeon':
+            elif module == "amdgpu" or module == "radeon":
                 vendor = self.vendors["amd"]
             else:
                 vendor = 0x8086
-            self.gpu_detection_file = "%s/u-d-c-gpu-0000:01:00.0-0x%04x-0x1140" % (self.gpu_detection_path, vendor)
+            self.gpu_detection_file = "%s/u-d-c-gpu-0000:01:00.0-0x%04x-0x1140" % (
+                self.gpu_detection_path,
+                vendor,
+            )
 
-            gpu_file = open(self.gpu_detection_file, 'w')
+            gpu_file = open(self.gpu_detection_file, "w")
             gpu_file.close()
 
-    def set_params(self, last_boot, current_boot,
-                   loaded_modules, available_drivers,
-                   unloaded_module='',
-                   matched_quirk=False,
-                   loaded_with_quirk=False,
-                   bump_boot_vga_device_id=False,
-                   bump_discrete_device_id=False,
-                   first_boot=False,
-                   nvidia_version=''):
+    def set_params(
+        self,
+        last_boot,
+        current_boot,
+        loaded_modules,
+        available_drivers,
+        unloaded_module="",
+        matched_quirk=False,
+        loaded_with_quirk=False,
+        bump_boot_vga_device_id=False,
+        bump_discrete_device_id=False,
+        first_boot=False,
+        nvidia_version="",
+    ):
 
         # Last boot
         if first_boot:
@@ -646,9 +750,9 @@ class GpuManagerTest(unittest.TestCase):
             self.set_cards_from_last_boot(last_boot)
 
         # Current boot
-        self.set_current_cards(current_boot,
-                               bump_boot_vga_device_id,
-                               bump_discrete_device_id)
+        self.set_current_cards(
+            current_boot, bump_boot_vga_device_id, bump_discrete_device_id
+        )
 
         # Kernel modules
         self.add_kernel_modules(loaded_modules)
@@ -659,48 +763,56 @@ class GpuManagerTest(unittest.TestCase):
         if nvidia_version:
             self.set_nvidia_version(nvidia_version)
 
-    def run_manager_and_get_data(self,
-                                 last_boot, current_boot,
-                                 loaded_modules, available_drivers,
-                                 unloaded_module='',
-                                 requires_offloading=False,
-                                 module_is_available=False,
-                                 matched_quirk=False,
-                                 loaded_with_quirk=False,
-                                 bump_boot_vga_device_id=False,
-                                 bump_discrete_device_id=False,
-                                 first_boot=False,
-                                 nvidia_version='',
-                                 module_is_versioned=False):
+    def run_manager_and_get_data(
+        self,
+        last_boot,
+        current_boot,
+        loaded_modules,
+        available_drivers,
+        unloaded_module="",
+        requires_offloading=False,
+        module_is_available=False,
+        matched_quirk=False,
+        loaded_with_quirk=False,
+        bump_boot_vga_device_id=False,
+        bump_discrete_device_id=False,
+        first_boot=False,
+        nvidia_version="",
+        module_is_versioned=False,
+    ):
 
         self.set_params(
-            last_boot, current_boot,
-            loaded_modules, available_drivers,
+            last_boot,
+            current_boot,
+            loaded_modules,
+            available_drivers,
             unloaded_module,
             matched_quirk,
             loaded_with_quirk,
             bump_boot_vga_device_id,
             bump_discrete_device_id,
             first_boot,
-            nvidia_version)
+            nvidia_version,
+        )
 
         # Call the program
-        self.exec_manager(requires_offloading=requires_offloading,
-                          module_is_available=module_is_available,
-                          module_is_versioned=module_is_versioned)
+        self.exec_manager(
+            requires_offloading=requires_offloading,
+            module_is_available=module_is_available,
+            module_is_versioned=module_is_versioned,
+        )
 
         # Return data
         return self.check_vars()
 
     def test_one_intel_no_change(self):
-        '''intel -> intel'''
+        """intel -> intel"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel'],
-                                                 ['i915'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"], ["intel"], ["i915"], ["mesa"]
+        )
 
         # Check the variables
 
@@ -725,16 +837,18 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_nvidia_binary_no_change(self):
-        '''nvidia -> nvidia'''
+        """nvidia -> nvidia"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['nvidia'],
-                                                 ['nvidia'],
-                                                 ['nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 'nvidia',
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["nvidia"],
+            ["nvidia"],
+            ["nvidia"],
+            ["mesa", "nvidia"],
+            "nvidia",
+            requires_offloading=False,
+        )
 
         # Check the variables
         self.assertTrue(gpu_test.has_single_card)
@@ -762,14 +876,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_nvidia_open_no_change(self):
-        '''nvidia (nouveau) -> nvidia (nouveau)'''
+        """nvidia (nouveau) -> nvidia (nouveau)"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['nvidia'],
-                                                 ['nvidia'],
-                                                 ['nouveau'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(
+            ["nvidia"], ["nvidia"], ["nouveau"], ["mesa"]
+        )
 
         # No Intel
         self.assertFalse(gpu_test.has_intel)
@@ -789,13 +902,10 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_amd_open_no_change(self):
-        '''radeon -> radeon'''
+        """radeon -> radeon"""
         self.this_function_name = sys._getframe().f_code.co_name
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['amd'],
-                                                 ['amd'],
-                                                 ['radeon'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(["amd"], ["amd"], ["radeon"], ["mesa"])
 
         # Check the variables
         self.assertTrue(gpu_test.has_single_card)
@@ -817,14 +927,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_intel_to_nvidia_binary(self):
-        '''intel -> nvidia'''
+        """intel -> nvidia"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['nvidia'],
-                                                 ['nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"], ["nvidia"], ["nvidia"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -852,10 +961,9 @@ class GpuManagerTest(unittest.TestCase):
 
         # Let's try again, only this time it's all
         # already in place
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['nvidia'],
-                                                 ['nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"], ["nvidia"], ["nvidia"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -887,10 +995,9 @@ class GpuManagerTest(unittest.TestCase):
         # whereas the open driver is blacklisted
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['nvidia'],
-                                                 ['fake'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"], ["nvidia"], ["fake"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -922,14 +1029,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_intel_to_nvidia_open(self):
-        '''intel -> nouveau'''
+        """intel -> nouveau"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['nvidia'],
-                                                 ['nouveau'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"], ["nvidia"], ["nouveau"], ["mesa"]
+        )
 
         # Check the variables
 
@@ -956,15 +1062,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_intel_to_amd_open(self):
-        '''intel -> radeon'''
+        """intel -> radeon"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['amd'],
-                                                 ['radeon'],
-                                                 ['mesa'],
-                                                 'mesa')
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"], ["amd"], ["radeon"], ["mesa"], "mesa"
+        )
 
         # Check the variables
 
@@ -992,14 +1096,11 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_amd_open_to_intel(self):
-        '''radeon -> intel'''
+        """radeon -> intel"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['amd'],
-                                                 ['intel'],
-                                                 ['i915'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(["amd"], ["intel"], ["i915"], ["mesa"])
 
         # Check the variables
 
@@ -1028,14 +1129,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_amd_open_to_nvidia_open(self):
-        '''radeon -> nouveau'''
+        """radeon -> nouveau"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['amd'],
-                                                 ['nvidia'],
-                                                 ['nouveau'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(
+            ["amd"], ["nvidia"], ["nouveau"], ["mesa"]
+        )
 
         # Check the variables
 
@@ -1064,14 +1164,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_amd_open_to_nvidia_binary(self):
-        '''radeon -> nouveau'''
+        """radeon -> nouveau"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['amd'],
-                                                 ['nvidia'],
-                                                 ['nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["amd"], ["nvidia"], ["nvidia"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -1103,10 +1202,9 @@ class GpuManagerTest(unittest.TestCase):
         # already in place
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['amd'],
-                                                 ['nvidia'],
-                                                 ['nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["amd"], ["nvidia"], ["nvidia"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -1140,10 +1238,9 @@ class GpuManagerTest(unittest.TestCase):
         # whereas the open driver is blacklisted
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['amd'],
-                                                 ['nvidia'],
-                                                 ['fake'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["amd"], ["nvidia"], ["fake"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -1174,14 +1271,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_nvidia_open_to_intel(self):
-        '''nouveau -> intel'''
+        """nouveau -> intel"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['nvidia'],
-                                                 ['intel'],
-                                                 ['i915'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(
+            ["nvidia"], ["intel"], ["i915"], ["mesa"]
+        )
 
         # Check the variables
 
@@ -1210,14 +1306,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_nvidia_open_to_amd_open(self):
-        '''nouveau -> radeon'''
+        """nouveau -> radeon"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['nvidia'],
-                                                 ['amd'],
-                                                 ['radeon'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(
+            ["nvidia"], ["amd"], ["radeon"], ["mesa"]
+        )
 
         # Check the variables
 
@@ -1245,14 +1340,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_nvidia_binary_to_intel(self):
-        '''nvidia -> intel'''
+        """nvidia -> intel"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["nvidia"], ["intel"], ["i915", "nvidia"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -1280,10 +1374,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["nvidia"], ["intel"], ["i915", "nvidia"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -1310,10 +1403,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["nvidia"], ["intel"], ["i915", "fake"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -1340,10 +1432,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["nvidia"], ["intel"], ["i915", "fake"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -1370,14 +1461,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_one_nvidia_binary_to_amd_open(self):
-        '''nvidia -> radeon'''
+        """nvidia -> radeon"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['nvidia'],
-                                                 ['amd'],
-                                                 ['radeon', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["nvidia"], ["amd"], ["radeon", "nvidia"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -1405,10 +1495,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['nvidia'],
-                                                 ['amd'],
-                                                 ['radeon', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["nvidia"], ["amd"], ["radeon", "nvidia"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -1435,10 +1524,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['nvidia'],
-                                                 ['amd'],
-                                                 ['radeon', 'fake'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["nvidia"], ["amd"], ["radeon", "fake"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -1465,10 +1553,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['nvidia'],
-                                                 ['amd'],
-                                                 ['radeon', 'fake'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["nvidia"], ["amd"], ["radeon", "fake"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -1495,17 +1582,19 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_laptop_one_intel_one_amd_open(self):
-        '''laptop: intel + radeon'''
+        """laptop: intel + radeon"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Case 1: the discrete card is now available (BIOS)
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'amd'],
-                                                 ['i915', 'radeon'],
-                                                 ['mesa'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "amd"],
+            ["i915", "radeon"],
+            ["mesa"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -1535,11 +1624,13 @@ class GpuManagerTest(unittest.TestCase):
         # Case 2: the discrete card was already available (BIOS)
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
-                                                 ['intel', 'amd'],
-                                                 ['i915', 'radeon'],
-                                                 ['mesa'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "amd"],
+            ["intel", "amd"],
+            ["i915", "radeon"],
+            ["mesa"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -1569,11 +1660,9 @@ class GpuManagerTest(unittest.TestCase):
         # Case 3: the discrete card is no longer available (BIOS)
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
-                                                 ['intel'],
-                                                 ['i915'],
-                                                 ['mesa'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "amd"], ["intel"], ["i915"], ["mesa"], requires_offloading=False
+        )
 
         # Check the variables
 
@@ -1602,16 +1691,15 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_desktop_one_intel_one_amd_open(self):
-        '''desktop: intel + radeon'''
+        """desktop: intel + radeon"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Case 1: the discrete card is now available (BIOS)
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'amd'],
-                                                 ['i915', 'radeon'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"], ["intel", "amd"], ["i915", "radeon"], ["mesa"]
+        )
 
         # Check the variables
 
@@ -1641,10 +1729,9 @@ class GpuManagerTest(unittest.TestCase):
         # Case 2: the discrete card was already available (BIOS)
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
-                                                 ['intel', 'amd'],
-                                                 ['i915', 'radeon'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "amd"], ["intel", "amd"], ["i915", "radeon"], ["mesa"]
+        )
 
         # Check the variables
 
@@ -1674,10 +1761,9 @@ class GpuManagerTest(unittest.TestCase):
         # Case 3: the discrete card is no longer available (BIOS)
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
-                                                 ['intel'],
-                                                 ['i915'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "amd"], ["intel"], ["i915"], ["mesa"]
+        )
 
         # Check the variables
 
@@ -1706,15 +1792,17 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_laptop_one_intel_one_nvidia_open(self):
-        '''laptop: intel + nouveau'''
+        """laptop: intel + nouveau"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Case 1: the discrete card is now available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nouveau'],
-                                                 ['mesa'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "nouveau"],
+            ["mesa"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -1743,11 +1831,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 2: the discrete card was already available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nouveau'],
-                                                 ['mesa'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "nouveau"],
+            ["mesa"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -1776,11 +1866,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915'],
-                                                 ['mesa'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915"],
+            ["mesa"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -1809,14 +1901,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_desktop_one_intel_one_nvidia_open(self):
-        '''laptop: intel + nouveau'''
+        """laptop: intel + nouveau"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Case 1: the discrete card is now available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nouveau'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"], ["intel", "nvidia"], ["i915", "nouveau"], ["mesa"]
+        )
 
         # Check the variables
 
@@ -1845,10 +1936,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 2: the discrete card was already available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nouveau'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"], ["intel", "nvidia"], ["i915", "nouveau"], ["mesa"]
+        )
 
         # Check the variables
 
@@ -1877,10 +1967,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"], ["intel"], ["i915"], ["mesa"]
+        )
 
         # Check the variables
 
@@ -1909,22 +1998,24 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_laptop_one_intel_one_nvidia_binary(self):
-        '''laptop: intel + nvidia'''
+        """laptop: intel + nvidia"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Case 1a: the discrete card is now available (BIOS)
 
         # Set dmi product version
-        self.set_dmi_product_version('ThinkPad T410s')
+        self.set_dmi_product_version("ThinkPad T410s")
 
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -1964,16 +2055,18 @@ class GpuManagerTest(unittest.TestCase):
         # What if dmi product version is invalid?
 
         # Set dmi product version
-        self.set_dmi_product_version(' ')
+        self.set_dmi_product_version(" ")
 
         # Request action from bbswitch
         self.request_prime_discrete_on(False)
 
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -1985,19 +2078,21 @@ class GpuManagerTest(unittest.TestCase):
         # name is not?
 
         # Set dmi product version
-        self.set_dmi_product_version(' ')
+        self.set_dmi_product_version(" ")
 
         # Set dmi product name
-        self.set_dmi_product_name('ThinkPad T410s')
+        self.set_dmi_product_name("ThinkPad T410s")
 
         # Request action from bbswitch
         self.request_prime_discrete_on(False)
 
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -2010,11 +2105,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "fake"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
         # Check the variables
 
         # Check if laptop
@@ -2051,11 +2148,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -2092,11 +2191,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(False)
 
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -2133,11 +2234,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "fake"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -2175,11 +2278,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -2214,12 +2319,14 @@ class GpuManagerTest(unittest.TestCase):
         # Case 1g: the discrete card is now available (BIOS)
         #          the nvidia driver version is too old to support
         #          prime offloading, so we fall back to Mesa.
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False,
-                                                 nvidia_version="304.123")
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+            nvidia_version="304.123",
+        )
 
         # Check the variables
 
@@ -2254,11 +2361,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -2296,11 +2405,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "fake"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -2337,11 +2448,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -2378,11 +2491,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(False)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -2419,11 +2534,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(False)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "fake"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -2461,11 +2578,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(False)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -2502,11 +2621,13 @@ class GpuManagerTest(unittest.TestCase):
         self.request_prime_discrete_on(True)
 
         # Case 3a: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -2539,12 +2660,14 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3b: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'],
-                                                 'nvidia',
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915", "fake"],
+            ["mesa", "nvidia"],
+            "nvidia",
+            requires_offloading=False,
+        )
         # Check the variables
 
         # Check if laptop
@@ -2580,12 +2703,14 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(False)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'],
-                                                 unloaded_module='nvidia',
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915", "fake"],
+            ["mesa", "nvidia"],
+            unloaded_module="nvidia",
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -2623,12 +2748,14 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'],
-                                                 unloaded_module='nvidia',
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915", "fake"],
+            ["mesa", "nvidia"],
+            unloaded_module="nvidia",
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -2661,11 +2788,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3e: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -2698,12 +2827,14 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3f: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 'prime',
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            "prime",
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -2736,11 +2867,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3g: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -2773,11 +2906,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3h: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -2812,11 +2947,13 @@ class GpuManagerTest(unittest.TestCase):
         # Case 4a: the discrete card is available and we want on-demand mode
         self.request_prime_on_demand()
 
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -2848,24 +2985,25 @@ class GpuManagerTest(unittest.TestCase):
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
-
     def test_laptop_one_intel_one_nvidia_binary_egl(self):
-        '''laptop: intel + nvidia - EGL'''
+        """laptop: intel + nvidia - EGL"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Case 1a: the discrete card is now available (BIOS)
 
         # Set dmi product version
-        self.set_dmi_product_version('ThinkPad T410s')
+        self.set_dmi_product_version("ThinkPad T410s")
 
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -2904,11 +3042,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "fake"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
         # Check the variables
 
         # Check if laptop
@@ -2942,11 +3082,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -2980,11 +3122,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(False)
 
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -3018,11 +3162,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "fake"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -3057,11 +3203,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -3093,12 +3241,14 @@ class GpuManagerTest(unittest.TestCase):
         # Case 1g: the discrete card is now available (BIOS)
         #          the nvidia driver version is too old to support
         #          prime offloading, so we fall back to Mesa.
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False,
-                                                 nvidia_version="304.123")
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+            nvidia_version="304.123",
+        )
 
         # Check the variables
 
@@ -3133,11 +3283,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -3173,11 +3325,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "fake"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -3211,11 +3365,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -3249,11 +3405,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(False)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -3287,11 +3445,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(False)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "fake"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -3326,11 +3486,13 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(False)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -3361,11 +3523,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3a: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -3394,12 +3558,14 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3b: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'],
-                                                 'nvidia',
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915", "fake"],
+            ["mesa", "nvidia"],
+            "nvidia",
+            requires_offloading=False,
+        )
         # Check the variables
 
         # Check if laptop
@@ -3431,12 +3597,14 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(False)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'],
-                                                 unloaded_module='nvidia',
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915", "fake"],
+            ["mesa", "nvidia"],
+            unloaded_module="nvidia",
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -3470,12 +3638,14 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(True)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'],
-                                                 unloaded_module='nvidia',
-                                                 requires_offloading=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915", "fake"],
+            ["mesa", "nvidia"],
+            unloaded_module="nvidia",
+            requires_offloading=True,
+        )
 
         # Check the variables
 
@@ -3504,11 +3674,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3e: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -3537,11 +3709,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3f: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -3570,11 +3744,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3g: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -3603,11 +3779,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3h: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'],
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+            requires_offloading=False,
+        )
 
         # Check the variables
 
@@ -3636,14 +3814,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_desktop_one_intel_one_nvidia_binary(self):
-        '''desktop: intel + nvidia'''
+        """desktop: intel + nvidia"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Case 1a: the discrete card is now available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"], ["intel", "nvidia"], ["i915", "nvidia"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -3672,10 +3849,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 1b: the discrete card is now available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"], ["intel", "nvidia"], ["i915", "fake"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -3706,10 +3882,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 1c: the discrete card is now available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"], ["intel", "nvidia"], ["i915", "nvidia"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -3741,10 +3916,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 1d: the discrete card is now available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"], ["intel", "nvidia"], ["i915", "nvidia"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -3774,10 +3948,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 1e: the discrete card is now available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"], ["intel", "nvidia"], ["i915", "fake"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -3807,10 +3980,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 1f: the discrete card is now available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"], ["intel", "nvidia"], ["i915", "nvidia"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -3840,10 +4012,12 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 2a: the discrete card was already available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+        )
 
         # Check the variables
 
@@ -3872,10 +4046,12 @@ class GpuManagerTest(unittest.TestCase):
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+        )
 
         # No AMD
         self.assertFalse(gpu_test.has_amd)
@@ -3893,10 +4069,12 @@ class GpuManagerTest(unittest.TestCase):
         # No further action is required
         self.assertTrue(gpu_test.has_not_acted)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+        )
 
         # No AMD
         self.assertFalse(gpu_test.has_amd)
@@ -3915,10 +4093,12 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 2b: the discrete card was already available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "fake"],
+            ["mesa", "nvidia"],
+        )
 
         # Check the variables
 
@@ -3948,10 +4128,12 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 2c: the discrete card was already available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+        )
 
         # Check the variables
 
@@ -3981,10 +4163,12 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 2d: the discrete card was already available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "nvidia"],
+            ["mesa", "nvidia"],
+        )
 
         # Check the variables
 
@@ -4014,10 +4198,12 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 2e: the discrete card was already available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel', 'nvidia'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel", "nvidia"],
+            ["i915", "fake"],
+            ["mesa", "nvidia"],
+        )
 
         # Check the variables
 
@@ -4049,10 +4235,9 @@ class GpuManagerTest(unittest.TestCase):
         # Case 2f: the discrete card was already available (BIOS)
 
         # Case 3a: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"], ["intel"], ["i915", "nvidia"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -4081,10 +4266,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3b: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"], ["intel"], ["i915", "fake"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -4113,10 +4297,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3c: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"], ["intel"], ["i915", "nvidia"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -4145,10 +4328,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3d: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"], ["intel"], ["i915", "nvidia"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -4177,10 +4359,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3e: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"], ["intel"], ["i915", "fake"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -4209,10 +4390,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Case 3f: the discrete card is no longer available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'nvidia'],
-                                                 ['mesa', 'nvidia'])
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"], ["intel"], ["i915", "nvidia"], ["mesa", "nvidia"]
+        )
 
         # Check the variables
 
@@ -4241,14 +4421,13 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
     def test_desktop_two_amd_open(self):
-        '''Multiple AMD GPUs radeon'''
+        """Multiple AMD GPUs radeon"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Case 1a: the discrete card is now available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['amd'],
-                                                 ['amd', 'amd'],
-                                                 ['radeon', 'fake'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(
+            ["amd"], ["amd", "amd"], ["radeon", "fake"], ["mesa"]
+        )
 
         # Check the variables
 
@@ -4276,10 +4455,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # What if radeon is blacklisted
-        gpu_test = self.run_manager_and_get_data(['amd'],
-                                                 ['amd', 'amd'],
-                                                 ['fake_old', 'fake'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(
+            ["amd"], ["amd", "amd"], ["fake_old", "fake"], ["mesa"]
+        )
 
         # Check the variables
 
@@ -4311,10 +4489,9 @@ class GpuManagerTest(unittest.TestCase):
         # Same tests, only with amdgpu
 
         # Case 2a: the discrete card is now available (BIOS)
-        gpu_test = self.run_manager_and_get_data(['amd'],
-                                                 ['amd', 'amd'],
-                                                 ['amdgpu', 'fake'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(
+            ["amd"], ["amd", "amd"], ["amdgpu", "fake"], ["mesa"]
+        )
 
         # Check the variables
 
@@ -4342,10 +4519,9 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # What if amdgpu is blacklisted
-        gpu_test = self.run_manager_and_get_data(['amd'],
-                                                 ['amd', 'amd'],
-                                                 ['fake_old', 'fake'],
-                                                 ['mesa'])
+        gpu_test = self.run_manager_and_get_data(
+            ["amd"], ["amd", "amd"], ["fake_old", "fake"], ["mesa"]
+        )
 
         # Check the variables
 
@@ -4378,11 +4554,11 @@ class GpuManagerTest(unittest.TestCase):
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Invalid boot file
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
+        self.last_boot_file = open(self.last_boot_file.name, "w")
 
         it = 0
         while it < 16:
-            item = 'a' * 200
+            item = "a" * 200
             self.last_boot_file.write(item)
             it += 1
 
@@ -4402,20 +4578,20 @@ class GpuManagerTest(unittest.TestCase):
         self.assertFalse(gpu_test.has_selected_driver)
 
         # What if there are no graphics cards in the system?
-        self.fake_lspci = open(self.fake_lspci.name, 'w')
+        self.fake_lspci = open(self.fake_lspci.name, "w")
         it = 0
         while it < 16:
-            item = 'a' * 200
+            item = "a" * 200
             self.fake_lspci.write(item)
             it += 1
         self.fake_lspci.close()
 
         # Invalid boot file
-        self.last_boot_file = open(self.last_boot_file.name, 'w')
+        self.last_boot_file = open(self.last_boot_file.name, "w")
 
         it = 0
         while it < 16:
-            item = 'a' * 200
+            item = "a" * 200
             self.last_boot_file.write(item)
             it += 1
 
@@ -4442,17 +4618,19 @@ class GpuManagerTest(unittest.TestCase):
         # Request action from bbswitch
         self.request_prime_discrete_on(False)
 
-        gpu_test = self.run_manager_and_get_data(['intel', 'nvidia'],
-                                                 ['intel'],
-                                                 ['i915', 'fake'],
-                                                 ['mesa', 'nvidia'],
-                                                 unloaded_module='nvidia',
-                                                 requires_offloading=False)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "nvidia"],
+            ["intel"],
+            ["i915", "fake"],
+            ["mesa", "nvidia"],
+            unloaded_module="nvidia",
+            requires_offloading=False,
+        )
 
         # Check the variables
 
         # Check if laptop
-        #self.assertTrue(gpu_test.requires_offloading)
+        # self.assertTrue(gpu_test.requires_offloading)
 
         self.assertTrue(gpu_test.has_single_card)
 
@@ -4476,26 +4654,28 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
         # Check that the GPU was added from the file
-        #self.assertTrue(gpu_test.has_added_gpu_from_file)
+        # self.assertTrue(gpu_test.has_added_gpu_from_file)
 
     def test_laptop_one_intel_one_amd_amdgpu_pro(self):
-        '''laptop: intel + amdgpu-pro'''
+        """laptop: intel + amdgpu-pro"""
         self.this_function_name = sys._getframe().f_code.co_name
 
         # Case 1a: the discrete card is now available (BIOS)
 
         # Fake the hybrid script
-        amdgpu_pro_px_file = open(self.amdgpu_pro_px_file.name, 'w')
-        amdgpu_pro_px_file.write('testing')
+        amdgpu_pro_px_file = open(self.amdgpu_pro_px_file.name, "w")
+        amdgpu_pro_px_file.write("testing")
         amdgpu_pro_px_file.close()
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['intel'],
-                                                 ['intel', 'amd'],
-                                                 ['i915', 'amdgpu'],
-                                                 ['mesa'],
-                                                 module_is_available=True,
-                                                 module_is_versioned=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel"],
+            ["intel", "amd"],
+            ["i915", "amdgpu"],
+            ["mesa"],
+            module_is_available=True,
+            module_is_versioned=True,
+        )
 
         # Check the variables
 
@@ -4534,17 +4714,19 @@ class GpuManagerTest(unittest.TestCase):
         # Case 2a: the integrated card is no longer available (BIOS)
 
         # Fake the hybrid script
-        amdgpu_pro_px_file = open(self.amdgpu_pro_px_file.name, 'w')
-        amdgpu_pro_px_file.write('testing')
+        amdgpu_pro_px_file = open(self.amdgpu_pro_px_file.name, "w")
+        amdgpu_pro_px_file.write("testing")
         amdgpu_pro_px_file.close()
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
-                                                 ['amd'],
-                                                 ['amdgpu'],
-                                                 ['mesa'],
-                                                 module_is_available=True,
-                                                 module_is_versioned=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "amd"],
+            ["amd"],
+            ["amdgpu"],
+            ["mesa"],
+            module_is_available=True,
+            module_is_versioned=True,
+        )
 
         # Check the variables
 
@@ -4588,12 +4770,14 @@ class GpuManagerTest(unittest.TestCase):
             pass
 
         # Collect data
-        gpu_test = self.run_manager_and_get_data(['intel', 'amd'],
-                                                 ['amd'],
-                                                 ['amdgpu'],
-                                                 ['mesa'],
-                                                 module_is_available=True,
-                                                 module_is_versioned=True)
+        gpu_test = self.run_manager_and_get_data(
+            ["intel", "amd"],
+            ["amd"],
+            ["amdgpu"],
+            ["mesa"],
+            module_is_available=True,
+            module_is_versioned=True,
+        )
 
         # Check the variables
 
@@ -4630,17 +4814,21 @@ class GpuManagerTest(unittest.TestCase):
         self.assertTrue(gpu_test.has_not_acted)
 
 
-if __name__ == '__main__':
-    if '86' not in os.uname()[4]:
+if __name__ == "__main__":
+    if "86" not in os.uname()[4]:
         exit(0)
     # unittest.main() does its own parsing, therefore we
     # do our own parsing, then we create a copy of sys.argv where
     # we remove our custom and unsupported arguments, so that
     # unittest doesn't complain
     parser = argparse.ArgumentParser()
-    parser.add_argument('--save-logs-to', help='Path to save logs to')
-    parser.add_argument('--with-valgrind', action="store_true", help='Run the app within valgrind')
-    parser.add_argument('--with-gdb', action="store_true", help='Run the app within gdb')
+    parser.add_argument("--save-logs-to", help="Path to save logs to")
+    parser.add_argument(
+        "--with-valgrind", action="store_true", help="Run the app within valgrind"
+    )
+    parser.add_argument(
+        "--with-gdb", action="store_true", help="Run the app within gdb"
+    )
 
     args = parser.parse_args()
     tests_path = args.save_logs_to
@@ -4650,8 +4838,9 @@ if __name__ == '__main__':
     new_argv = []
     for elem in sys.argv:
         if (
-                (elem != '--save-logs-to' and elem != args.save_logs_to)
-                and (elem != '--with-valgrind' and elem != args.with_valgrind)
-                and (elem != '--with-gdb' and elem != args.with_gdb)):
+            (elem != "--save-logs-to" and elem != args.save_logs_to)
+            and (elem != "--with-valgrind" and elem != args.with_valgrind)
+            and (elem != "--with-gdb" and elem != args.with_gdb)
+        ):
             new_argv.append(elem)
     unittest.main(argv=new_argv)

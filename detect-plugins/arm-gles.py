@@ -14,26 +14,27 @@
 
 import logging
 
-db = {'OMAP4 Panda board': 'pvr-omap4',
-      'OMAP4430 Panda Board': 'pvr-omap4',
-      'OMAP4430 4430SDP board': 'pvr-omap4',
-      'cardhu': 'nvidia-tegra',
-      'ventana': 'nvidia-tegra',
-      'Toshiba AC100 / Dynabook AZ': 'nvidia-tegra',
-      }
+db = {
+    "OMAP4 Panda board": "pvr-omap4",
+    "OMAP4430 Panda Board": "pvr-omap4",
+    "OMAP4430 4430SDP board": "pvr-omap4",
+    "cardhu": "nvidia-tegra",
+    "ventana": "nvidia-tegra",
+    "Toshiba AC100 / Dynabook AZ": "nvidia-tegra",
+}
 
 
 def detect(apt_cache):
-    board = ''
+    board = ""
     pkg = None
 
     try:
-        with open('/proc/cpuinfo') as file:
+        with open("/proc/cpuinfo") as file:
             for line in file:
-                if 'Hardware' in line:
-                    board = line.split(':')[1].strip()
+                if "Hardware" in line:
+                    board = line.split(":")[1].strip()
     except IOError as err:
-        logging.debug('could not open /proc/cpuinfo: %s', err)
+        logging.debug("could not open /proc/cpuinfo: %s", err)
 
     for pattern in db.keys():
         if pattern in board:

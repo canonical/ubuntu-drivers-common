@@ -13,7 +13,7 @@ import tempfile
 import unittest
 
 # Add parent directory to path to import UbuntuDrivers
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import UbuntuDrivers.detect  # noqa: E402
 
@@ -92,25 +92,29 @@ menuentry 'Ubuntu 20.04' {
     def test_parse_grub_cfg_numeric_entry_first(self):
         """Test parsing grub config with numeric entry for first kernel"""
         result = UbuntuDrivers.detect._parse_grub_cfg_for_kernel(
-            self.simple_grub_cfg, "0")
+            self.simple_grub_cfg, "0"
+        )
         self.assertEqual(result, "6.5.0-15-generic")
 
     def test_parse_grub_cfg_numeric_entry_second(self):
         """Test parsing grub config with numeric entry for second kernel"""
         result = UbuntuDrivers.detect._parse_grub_cfg_for_kernel(
-            self.simple_grub_cfg, "1")
+            self.simple_grub_cfg, "1"
+        )
         self.assertEqual(result, "6.5.0-14-generic")
 
     def test_parse_grub_cfg_numeric_entry_third(self):
         """Test parsing grub config with numeric entry for third kernel"""
         result = UbuntuDrivers.detect._parse_grub_cfg_for_kernel(
-            self.simple_grub_cfg, "2")
+            self.simple_grub_cfg, "2"
+        )
         self.assertEqual(result, "5.4.0-150-generic")
 
     def test_parse_grub_cfg_numeric_entry_out_of_range(self):
         """Test parsing grub config with out of range numeric entry"""
         result = UbuntuDrivers.detect._parse_grub_cfg_for_kernel(
-            self.simple_grub_cfg, "10")
+            self.simple_grub_cfg, "10"
+        )
         self.assertIsNone(result)
 
     def test_parse_grub_cfg_string_id_match(self):
@@ -157,8 +161,7 @@ menuentry 'Some entry' {
     echo "No kernel here"
 }
 """
-        result = UbuntuDrivers.detect._parse_grub_cfg_for_kernel(
-            no_kernel_cfg, "0")
+        result = UbuntuDrivers.detect._parse_grub_cfg_for_kernel(no_kernel_cfg, "0")
         self.assertIsNone(result)
 
     def test_parse_grub_cfg_malformed_linux_line(self):
@@ -169,8 +172,7 @@ menuentry 'Ubuntu' {
     initrd  /boot/initrd.img
 }
 """
-        result = UbuntuDrivers.detect._parse_grub_cfg_for_kernel(
-            malformed_cfg, "0")
+        result = UbuntuDrivers.detect._parse_grub_cfg_for_kernel(malformed_cfg, "0")
         self.assertIsNone(result)
 
     def test_parse_grub_cfg_complex_vmlinuz_path(self):
@@ -182,24 +184,29 @@ quiet
     initrd  /boot/initrd.img
 }
 """
-        result = UbuntuDrivers.detect._parse_grub_cfg_for_kernel(
-            complex_cfg, "0")
+        result = UbuntuDrivers.detect._parse_grub_cfg_for_kernel(complex_cfg, "0")
         self.assertEqual(result, "5.15.0-97-generic-custom")
 
     def test_parse_grub_cfg_with_quotes_in_id(self):
         """Test parsing grub config with various quote styles in ID"""
         # Test with single quotes
-        cfg_single = ("menuentry 'Ubuntu' --id 'my-kernel-id' {\n"
-                      "    linux /vmlinuz-5.15.0-97-generic\n}")
+        cfg_single = (
+            "menuentry 'Ubuntu' --id 'my-kernel-id' {\n"
+            "    linux /vmlinuz-5.15.0-97-generic\n}"
+        )
         result = UbuntuDrivers.detect._parse_grub_cfg_for_kernel(
-            cfg_single, "my-kernel-id")
+            cfg_single, "my-kernel-id"
+        )
         self.assertEqual(result, "5.15.0-97-generic")
 
         # Test with double quotes
-        cfg_double = ('menuentry "Ubuntu" --id "my-kernel-id2" {\n'
-                      '    linux /vmlinuz-5.15.0-91-generic\n}')
+        cfg_double = (
+            'menuentry "Ubuntu" --id "my-kernel-id2" {\n'
+            "    linux /vmlinuz-5.15.0-91-generic\n}"
+        )
         result = UbuntuDrivers.detect._parse_grub_cfg_for_kernel(
-            cfg_double, "my-kernel-id2")
+            cfg_double, "my-kernel-id2"
+        )
         self.assertEqual(result, "5.15.0-91-generic")
 
     def test_parse_grub_cfg_multiple_matches_for_id(self):
@@ -219,20 +226,19 @@ menuentry 'Entry 2' --id 'duplicate-id' {
         f = io.StringIO()
         with redirect_stdout(f):
             result = UbuntuDrivers.detect._parse_grub_cfg_for_kernel(
-                duplicate_cfg, "duplicate-id")
+                duplicate_cfg, "duplicate-id"
+            )
         # Should return None when multiple matches found
         self.assertIsNone(result)
 
     def test_load_grub_cfg_nonexistent_file(self):
         """Test loading non-existent grub.cfg file"""
-        result = UbuntuDrivers.detect._load_grub_cfg(
-            "/nonexistent/path/grub.cfg")
+        result = UbuntuDrivers.detect._load_grub_cfg("/nonexistent/path/grub.cfg")
         self.assertIsNone(result)
 
     def test_load_grub_cfg_with_temp_file(self):
         """Test loading grub.cfg from temporary file"""
-        with tempfile.NamedTemporaryFile(mode='w', delete=False,
-                                         suffix='.cfg') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".cfg") as f:
             f.write(self.simple_grub_cfg)
             temp_path = f.name
 
@@ -250,7 +256,8 @@ _parse_grub_cfg_for_kernel directly"""
         # We test with content directly since we already tested
         # _load_grub_cfg separately
         result = UbuntuDrivers.detect._parse_grub_cfg_for_kernel(
-            self.simple_grub_cfg, "1")
+            self.simple_grub_cfg, "1"
+        )
         self.assertEqual(result, "6.5.0-14-generic")
 
     def test_parse_grub_cfg_with_tabs_and_spaces(self):
@@ -262,26 +269,23 @@ menuentry 'Ubuntu' {
 }
 """
         result = UbuntuDrivers.detect._parse_grub_cfg_for_kernel(
-            mixed_whitespace_cfg, "0")
+            mixed_whitespace_cfg, "0"
+        )
         self.assertEqual(result, "5.15.0-97-generic")
 
     def test_parse_grub_cfg_kernel_with_hyphens_and_dots(self):
         """Test parsing kernel versions with various patterns"""
         test_cases = [
             ("6.8.0-31-generic", "/boot/vmlinuz-6.8.0-31-generic"),
-            ("5.15.0-97-lowlatency",
-             "/boot/vmlinuz-5.15.0-97-lowlatency"),
-            ("5.19.0-45-generic-hwe",
-             "/boot/vmlinuz-5.19.0-45-generic-hwe"),
+            ("5.15.0-97-lowlatency", "/boot/vmlinuz-5.15.0-97-lowlatency"),
+            ("5.19.0-45-generic-hwe", "/boot/vmlinuz-5.19.0-45-generic-hwe"),
         ]
 
         for expected_kernel, vmlinuz_path in test_cases:
             cfg = f"menuentry 'Test' {{\n    linux {vmlinuz_path} ro\n}}"
-            result = UbuntuDrivers.detect._parse_grub_cfg_for_kernel(
-                cfg, "0")
-            self.assertEqual(result, expected_kernel,
-                             f"Failed to parse {vmlinuz_path}")
+            result = UbuntuDrivers.detect._parse_grub_cfg_for_kernel(cfg, "0")
+            self.assertEqual(result, expected_kernel, f"Failed to parse {vmlinuz_path}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

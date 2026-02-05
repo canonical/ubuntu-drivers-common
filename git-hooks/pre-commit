@@ -11,4 +11,8 @@ echo "Running mypy type checking..."
 mypy UbuntuDrivers/ Quirks/ ubuntu-drivers
 
 echo ""
+echo "Running black check..."
+black --check .
+
+echo ""
 echo "✓ All checks passed!"

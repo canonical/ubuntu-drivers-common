@@ -14,6 +14,8 @@ ifeq (, $(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 	PYTHONPATH=. tests/run
 	# Run mypy type checking
 	mypy UbuntuDrivers/ Quirks/ ubuntu-drivers
+	# Run black tests
+	black --check UbuntuDrivers/ Quirks/ ubuntu-drivers
   endif
 endif
 
