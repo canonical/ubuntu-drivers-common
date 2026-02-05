@@ -1,3 +1,19 @@
+ubuntu-drivers-common (1:0.10.5) resolute; urgency=medium
+
+  * Add welcome page to show currently installed / next boot version
+  * Enable apt-style version strings for manual driver branch selection
+  * Refactor gpgpu sorting/filtering to be in detect.py
+  * Add mypy type annotataions and add to build
+  * Run black and add to build process
+
+ -- Mitchell Augustin <mitchell.augustin@canonical.com>  Thu, 05 Feb 2026 08:27:05 -0600
+
+ubuntu-drivers-common (1:0.10.4) resolute; urgency=medium
+
+  * Prevent coinstallation of conflicting Nvidia Drivers (LP: #2125156)
+
+ -- Mitchell Augustin <mitchell.augustin@canonical.com>  Fri, 03 Oct 2025 16:26:02 -0500
+
 ubuntu-drivers-common (1:0.10.3ubuntu1) plucky; urgency=medium
 
   * Check kernel version / Secure Boot status and warn user if needed
