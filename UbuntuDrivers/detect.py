@@ -281,7 +281,9 @@ def apt_cache_modalias_map(apt_cache: apt_pkg.Cache) -> Dict[str, Tuple[Any, Dic
                 if not part:
                     continue
                 module, lst = part.split('(')
-                for alias in lst.split(','):
+                if lst.startswith("of:"):
+                    lst = lst.replace(",", "\\,")
+                for alias in re.split(r'(?<!\\),', lst):
                     alias = alias.strip()
                     bus = alias.split(':', 1)[0]
                     result.setdefault(bus, {}).setdefault(alias, set()).add(package.name)
