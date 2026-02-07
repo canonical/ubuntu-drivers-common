@@ -753,7 +753,6 @@ def system_driver_packages(
                      versions; these have this flag, where exactly one has
                      recommended == True, and all others False.
     """
-    global lookup_cache
     modaliases = system_modaliases(sys_path)
 
     if not apt_cache:
@@ -1000,7 +999,6 @@ def system_gpgpu_driver_packages(
                      versions; these have this flag, where exactly one has
                      recommended == True, and all others False.
     """
-    global lookup_cache
     vendors_whitelist = ["10de"]
     modaliases = system_modaliases(sys_path)
 

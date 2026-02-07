@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.10.6) resolute; urgency=medium
+
+  * Remove unnecessary global assignment (fixes linter failure)
+
+ -- Mitchell Augustin <mitchell.augustin@canonical.com>  Fri, 06 Feb 2026 17:21:05 -0600
+
 ubuntu-drivers-common (1:0.10.5) resolute; urgency=medium
 
   * Add welcome page to show currently installed / next boot version
