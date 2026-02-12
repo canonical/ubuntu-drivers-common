@@ -33,6 +33,7 @@ Build-Depends: debhelper-compat (= 13),
  python3-mypy,
  mypy,
  black,
+ mokutil [!s390x],
 Standards-Version: 3.9.8
 Vcs-Git: git://github.com/canonical/ubuntu-drivers-common.git
 Vcs-Browser: https://github.com/canonical/ubuntu-drivers-common
@@ -42,7 +43,7 @@ Architecture: any
 Depends: ${python3:Depends},
  ${misc:Depends},
  ${shlibs:Depends},
- mokutil,
+ mokutil [!s390x],
  python3-apt,
  python3-xkit,
  python3-click,
