@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.10.7) resolute; urgency=medium
+
+  * Remove mokutil requirement for s390x
+
+ -- Mitchell Augustin <mitchell.augustin@canonical.com>  Thu, 12 Feb 2026 16:16:05 -0600
+
 ubuntu-drivers-common (1:0.10.6) resolute; urgency=medium
 
   * Remove unnecessary global assignment (fixes linter failure)
