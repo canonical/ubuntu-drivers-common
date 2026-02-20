@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.ubuntu.Drivers
+Exec=/bin/false
+SystemdService=ubuntu-drivers.service

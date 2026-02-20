@@ -29,7 +29,7 @@ setup(
     url="http://www.albertomilone.com",
     license="gpl",
     description="Detect and install additional Ubuntu driver packages",
-    packages=["Quirks", "UbuntuDrivers"],
+    packages=["Quirks", "UbuntuDrivers", "UbuntuDrivers/service"],
     data_files=[
         (
             "/usr/share/ubuntu-drivers-common/",
@@ -41,6 +41,8 @@ setup(
         ("/usr/share/doc/ubuntu-drivers-common", ["README"]),
         ("/usr/lib/nvidia/", glob.glob("nvidia-installer-hooks/*")),
         ("/usr/lib/ubiquity/target-config", glob.glob("ubiquity/target-config/*")),
+        ("/usr/lib/systemd/user/", ["systemd/ubuntu-drivers.service"]),
+        ("/usr/libexec/", ["ubuntu-drivers-dbus-service"]),
     ]
     + extra_data,
     scripts=["quirks-handler", "ubuntu-drivers"],
