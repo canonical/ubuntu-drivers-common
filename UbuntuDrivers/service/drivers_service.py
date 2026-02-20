@@ -49,9 +49,11 @@ def build_drivers_payload() -> List[Dict[str, Any]]:
             drivers_list.append(
                 {
                     "name": pkg_name,
-                    "source": "distro"
-                    if pkg_info.get("from_distro", False)
-                    else "third-party",
+                    "source": (
+                        "distro"
+                        if pkg_info.get("from_distro", False)
+                        else "third-party"
+                    ),
                     "free": bool(pkg_info.get("free", False)),
                     "builtin": bool(pkg_info.get("builtin", False)),
                 }
@@ -130,7 +132,7 @@ class DriversService(dbus.service.Object):
         return True
 
     @dbus.service.method(BUS_NAME, in_signature="", out_signature="aa{sv}")
-    def drivers(self) -> List[Dict[str, Any]]:
+    def drivers(self) -> dbus.Array:
         """Return the list of devices and their available drivers."""
 
         self._touch()
@@ -142,7 +144,7 @@ def main() -> None:
 
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     bus = dbus.SessionBus()
-    dbus.service.BusName(DriversService.BUS_NAME, bus)
+    bus.request_name(DriversService.BUS_NAME)
 
     loop = GLib.MainLoop()
     DriversService(bus, mainloop=loop)
