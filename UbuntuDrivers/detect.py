@@ -949,7 +949,8 @@ def system_device_specific_metapackages(
     modalias_map = apt_cache_modalias_map(apt_cache)
     for alias, syspath in modaliases.items():
         for p in packages_for_modalias(apt_cache, alias, modalias_map=modalias_map):
-            if not fnmatch.fnmatch(p.name, "oem-*-meta"):
+            if not fnmatch.fnmatch(p.name, "oem-*-meta") and \
+               not fnmatch.fnmatch(p.name, "hwe-*-meta"):
                 continue
             packages[p.name] = {
                 "modalias": alias,
