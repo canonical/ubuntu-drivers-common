@@ -1,0 +1,9 @@
+#!/usr/bin/python3
+"""Entry point for the ubuntu-drivers D-Bus service."""
+
+from UbuntuDrivers import service
+
+if __name__ == "__main__":
+    from UbuntuDrivers.service.drivers_service import main
+
+    main()

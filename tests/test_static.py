@@ -60,6 +60,7 @@ class TestStatic(unittest.TestCase):
             "debian",
             # Project dirs ignored for the moment
             "Quirks",
+            ".pybuild",
         ]
         # List of files to ignore with ../ stripped from the beginning of the path
         ignore_files = [
@@ -104,7 +105,11 @@ class TestStatic(unittest.TestCase):
         output = subp.communicate()[0].splitlines()
         for line in output:
             print(line)
-        self.assertEqual(0, len(output))
+        self.assertEqual(
+            0,
+            len(output),
+            "pycodestyle errors:\n%s" % "\n".join(output) if output else "",
+        )
 
     @unittest.skipUnless(
         find_on_path(pyflakes_cmd), "%s not found on this system" % pyflakes_cmd
@@ -129,6 +134,7 @@ class TestStatic(unittest.TestCase):
             universal_newlines=True,
         )
         output = subp.communicate()[0].splitlines()
+        failing_lines = []
         for line in output:
             if line.startswith("#"):
                 continue
@@ -137,6 +143,10 @@ class TestStatic(unittest.TestCase):
             canon_line = re.sub(r"line [0-9]+", "line *", canon_line)
             if canon_line not in exclusions:
                 print(line)
+                failing_lines.append(line)
                 error = True
 
-        self.assertFalse(error)
+        self.assertFalse(
+            error,
+            "pyflakes errors:\n%s" % "\n".join(failing_lines) if failing_lines else "",
+        )

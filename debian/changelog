@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.10.8) resolute; urgency=medium
+
+  * Add D-Bus service for Ubuntu Drivers
+
+ -- Jean-Baptiste Lallement <jean-baptiste.lallement@canonical.com>  Thu, 26 Feb 2026 08:50:42 +0100
+
 ubuntu-drivers-common (1:0.10.7) resolute; urgency=medium
 
   * Remove mokutil requirement for s390x

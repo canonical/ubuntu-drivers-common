@@ -19,16 +19,16 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import unittest, os.path, sys, logging, os, atexit
+import unittest, os.path, sys, logging, os, atexit, shutil
 import getopt
 
 def usage():
     instructionsList = ['The only accepted (optional) parameters are:'
     '\n  -o, --output=<dirname>', '\tthe directory where the results \n\
 \t\t\t\tof the tests are saved.'
-    
+
     '\n  -i, --input=<filename>', '\tthe xorg.conf used for the tests.'
-    
+
     '\n  -h, --help', '\t\t\thelp page.'
 
     '\n  [Test ...]', '\t\t\tList of tests, the entire testsuite will be executed otherwise.'
@@ -40,7 +40,7 @@ def main():
     inputFile = os.path.join(cwd, 'xorg.conf')
     outputDir = cwd
     err = 'Error: parameters not recognised'
-    
+
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'h:o:i:', ['help', 'output=', 'input='])
     except getopt.GetoptError as err:
@@ -60,16 +60,16 @@ def main():
             sys.exit()
         else:
             assert False, 'unhandled option'
-    
-    
+
+
     settingsFile = open('settings.py', 'w')
     atexit.register(os.unlink, 'settings.py')
     if inputFile == os.path.join(cwd, 'xorg.conf') and outputDir == cwd:
         settingsFile.write('import os\ncwd = os.getcwd()\ninputFile = os.path.join(cwd, "xorg.conf")\noutputDir = cwd\ninputDir = cwd.replace("tests", "quirks")')
-    else:    
+    else:
         settingsFile.write('inputFile = "%s"\noutputDir = "%s"' % (inputFile, outputDir))
     settingsFile.close()
-        
+
     # run all tests in our directory
     if args:
         suite = unittest.TestLoader().loadTestsFromNames(args)
@@ -84,6 +84,10 @@ def main():
 if __name__ == '__main__':
     # run ourselves through umockdev-wrapper
     if 'umockdev' not in os.environ.get('LD_PRELOAD', ''):
-        os.execvp('umockdev-wrapper', ['umockdev-wrapper'] + sys.argv)
+        wrapper = shutil.which('umockdev-wrapper')
+        if wrapper:
+            os.execvp(wrapper, ['umockdev-wrapper'] + sys.argv)
+        else:
+            print('Warning: umockdev-wrapper not found; running tests without it.')
 
     sys.exit(main())
