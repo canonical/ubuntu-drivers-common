@@ -1,3 +1,10 @@
+ubuntu-drivers-common (1:0.10.9) resolute; urgency=medium
+
+  * Print kernel update warnings to stderr to avoid stopping subiquity in this
+    situation
+
+ -- Mitchell Augustin <mitchell.augustin@canonical.com>  Mon, 09 Mar 2026 17:09:05 -0500
+
 ubuntu-drivers-common (1:0.10.8) resolute; urgency=medium
 
   [ Tobias Heider ]

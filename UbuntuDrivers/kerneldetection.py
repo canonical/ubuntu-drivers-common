@@ -27,6 +27,7 @@ from typing import Optional, Tuple, List
 
 from subprocess import Popen, PIPE
 import os
+import sys
 
 
 class KernelDetection(object):
@@ -307,7 +308,8 @@ class KernelDetection(object):
                             "to enroll a Machine Owner Key (MOK), "
                             "then re-run ubuntu-drivers with --include-dkms. This will install the DKMS modules, "
                             "then prompt you to enroll the new MOK and reboot."
-                            % running
+                            % running,
+                            file=sys.stderr,
                         )
                         return True
                     elif (
@@ -319,13 +321,15 @@ class KernelDetection(object):
                             "you enable it in the future, you will need to sign or reinstall these DKMS modules for "
                             "them to work. "
                             "If you would like to continue, please re-run ubuntu-drivers with --include-dkms."
-                            % running
+                            % running,
+                            file=sys.stderr,
                         )
                         return True
                     elif "this system doesn't support secure boot" in err:
                         print(
                             "Your running kernel (%s) requires DKMS modules. Please use --include-dkms if you want"
-                            " to proceed." % running
+                            " to proceed." % running,
+                            file=sys.stderr,
                         )
                         return True
                     # else: fall through to generic response
@@ -338,7 +342,8 @@ class KernelDetection(object):
                     "Your running kernel (%s) requires DKMS modules, and ubuntu-drivers was unable to determine if"
                     " Secure Boot is enabled. If you have SB enabled, you will need to enroll a MOK to proceed, "
                     "which will require access to your UEFI menu and administrative privileges. Please use "
-                    "--include-dkms if you want to proceed." % running
+                    "--include-dkms if you want to proceed." % running,
+                    file=sys.stderr,
                 )
                 return True
             else:
@@ -349,7 +354,8 @@ class KernelDetection(object):
             print(
                 f"Warning: Your running kernel ({running}) is outdated. "
                 f"A newer kernel ({latest}) is available in the Ubuntu archives. "
-                f"Please run 'sudo apt update && sudo apt upgrade' to update your system."
+                f"Please run 'sudo apt update && sudo apt upgrade' to update your system.",
+                file=sys.stderr,
             )
         # Outdated kernel is only a warning, not a blocker
         return False
