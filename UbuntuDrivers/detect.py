@@ -1315,11 +1315,11 @@ def _build_installation_list(
     depcache = apt_pkg.DepCache(cache)
     to_install: List[str] = []
 
+    driver_found: bool = False
     for p, pkg_info in sorted_packages:
         # in the past, as soon as the driver was found the loop would break
         # but we want the loop to continue to run to make sure we also get hwe- metas,
         # for example.
-        driver_found: bool = False
         logging.debug("Processing package: " + str(p))
         if not p.startswith("hwe-") and driver_found:
             continue
