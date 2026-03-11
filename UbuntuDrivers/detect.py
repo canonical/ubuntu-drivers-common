@@ -1315,7 +1315,15 @@ def _build_installation_list(
     depcache = apt_pkg.DepCache(cache)
     to_install: List[str] = []
 
+    driver_found: bool = False
     for p, pkg_info in sorted_packages:
+        # in the past, as soon as the driver was found the loop would break
+        # but we want the loop to continue to run to make sure we also get hwe- metas,
+        # for example.
+        logging.debug("Processing package: " + str(p))
+        if not p.startswith("hwe-") and driver_found:
+            continue
+
         if not gpgpu:
             candidate_ver = depcache.get_candidate_ver(cache[p])
             records = apt_pkg.PackageRecords(cache)
@@ -1341,7 +1349,8 @@ def _build_installation_list(
         if candidate:
             if cache[candidate].current_ver:
                 to_install = []
-                break
+                driver_found = True
+                continue
             else:
                 to_install.append(p)
                 to_install.append(candidate)
@@ -1373,7 +1382,8 @@ def _build_installation_list(
                 to_install.append(lrm_meta)
                 if p in to_install and gpgpu:
                     to_install.remove(p)
-            break
+            driver_found = True
+            continue
 
     return to_install
 
