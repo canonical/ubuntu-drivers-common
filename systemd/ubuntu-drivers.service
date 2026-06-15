@@ -7,4 +7,3 @@ BusName=org.ubuntu.Drivers
 ExecStart=/usr/libexec/ubuntu-drivers-dbus-service
 StandardOutput=journal
 StandardError=journal
-Environment=PYTHONUNBUFFERED=1

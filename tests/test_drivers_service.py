@@ -4,39 +4,182 @@ import os
 import shutil
 import signal
 import subprocess
+import tempfile
 import threading
-import time
 import unittest
 import xml.etree.ElementTree as ET
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import dbus
-import dbus.service
-import dbus.mainloop.glib
-from gi.repository import GLib
+import apt_pkg
+from gi.repository import Gio, GLib, UMockdev
 
 from UbuntuDrivers.service import drivers_service
 
+import testarchive
+
+
+# Modalias of an NVIDIA card covered by the test nvidia-* packages.
+# Same value as used in test_ubuntu_drivers.py.
+_MODALIAS_NV = "pci:v000010DEd000010C3sv00003842sd00002670bc03sc03i00"
+_MODALIAS_WHITE = "pci:v00001234d00sv00000001sd00bc00sc00i00"
+
+
+class _AptChroot:
+    """Minimal apt chroot backed by a testarchive.Archive.
+
+    Replicates the parts of aptdaemon.test.Chroot that are needed here:
+    a dpkg status file and a populated apt lists directory, with apt_pkg
+    pointed at the chroot root via Dir=.  No aptdaemon dependency required.
+    """
+
+    def __init__(self):
+        self.path = tempfile.mkdtemp(prefix="apt-chroot-")
+        self._saved_dir = None
+        self._saved_status = None
+
+    def setup(self, archive):
+        for subdir in [
+            "var/lib/dpkg",
+            "var/cache/apt/archives/partial",
+            "var/lib/apt/lists/partial",
+            "etc/apt/apt.conf.d",
+            "etc/apt/preferences.d",
+        ]:
+            os.makedirs(os.path.join(self.path, subdir), exist_ok=True)
+        open(os.path.join(self.path, "var/lib/dpkg/status"), "w").close()
+
+        sources_list = os.path.join(self.path, "etc/apt/sources.list")
+        with open(sources_list, "w") as f:
+            f.write("deb [trusted=yes] file://%s devel main\n" % archive.path)
+
+        subprocess.run(
+            [
+                "apt-get",
+                "update",
+                "-o",
+                "Dir=%s" % self.path,
+                "-o",
+                "Dir::Etc::sourcelist=%s" % sources_list,
+                "-o",
+                "Dir::State::Lists=%s/var/lib/apt/lists" % self.path,
+                "-o",
+                "Dir::Cache=%s/var/cache/apt" % self.path,
+            ],
+            check=True,
+            capture_output=True,
+        )
+
+        apt_pkg.init_config()
+        self._saved_dir = apt_pkg.config.get("Dir", "/")
+        self._saved_status = apt_pkg.config.get("Dir::State::status", "")
+        apt_pkg.config["Dir"] = self.path
+        apt_pkg.config["Dir::State::status"] = os.path.join(
+            self.path, "var/lib/dpkg/status"
+        )
+        apt_pkg.init_system()
+
+    def remove(self):
+        apt_pkg.init_config()
+        if self._saved_dir is not None:
+            apt_pkg.config["Dir"] = self._saved_dir
+        else:
+            apt_pkg.config.clear("Dir")
+        if self._saved_status is not None:
+            apt_pkg.config["Dir::State::status"] = self._saved_status
+        else:
+            apt_pkg.config.clear("Dir::State::status")
+        apt_pkg.init_system()
+        shutil.rmtree(self.path, ignore_errors=True)
+
+
+def gen_fakehw():
+    """Return a UMockdev.Testbed with a representative set of fake devices.
+
+    Mirrors the pattern used in test_ubuntu_drivers.gen_fakehw().
+    """
+    t = UMockdev.Testbed.new()
+    # covered by vanilla.deb (main component, free)
+    t.add_device("pci", "white", None, ["modalias", _MODALIAS_WHITE], [])
+    # covered by nvidia-driver-* packages (non-free, recommended = highest version)
+    t.add_device("pci", "graphics", None, ["modalias", _MODALIAS_NV], [])
+    # not covered by any driver package
+    t.add_device("pci", "grey", None, ["modalias", "pci:vDEADBEEFd00"], [])
+    return t
+
+
+def gen_fakearchive():
+    """Return a testarchive.Archive with driver packages for the fake devices."""
+    a = testarchive.Archive()
+    a.create_deb(
+        "vanilla",
+        component="main",
+        extra_tags={
+            "Modaliases": (
+                "vanilla(pci:v00001234d*sv*sd*bc*sc*i*,"
+                " pci:v0000BEEFd*sv*sd*bc*sc*i*)"
+            ),
+        },
+    )
+    a.create_deb(
+        "xserver-xorg-core",
+        version="99:1",
+        dependencies={"Provides": "xorg-video-abi-4"},
+    )
+    a.create_deb(
+        "nvidia-driver-450",
+        dependencies={"Depends": "xorg-video-abi-4"},
+        extra_tags={
+            "Modaliases": "nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)",
+        },
+    )
+    a.create_deb(
+        "nvidia-driver-390",
+        dependencies={"Depends": "xorg-video-abi-4"},
+        extra_tags={
+            "Modaliases": "nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)",
+        },
+    )
+    return a
+
 
 def _normalize_dbus_value(value):
-    if isinstance(value, dbus.Array):
+    """Recursively unpack GLib.Variant values into plain Python types."""
+    if isinstance(value, GLib.Variant):
+        return _normalize_dbus_value(value.unpack())
+    if isinstance(value, list):
         return [_normalize_dbus_value(item) for item in value]
-    if isinstance(value, dbus.Dictionary):
-        return {str(k): _normalize_dbus_value(v) for k, v in value.items()}
-    if isinstance(value, (dbus.String, dbus.ObjectPath)):
-        return str(value)
-    if isinstance(value, dbus.Boolean):
-        return bool(value)
-    if isinstance(value, (dbus.Int32, dbus.Int64, dbus.UInt32, dbus.UInt64)):
-        return int(value)
+    if isinstance(value, tuple):
+        return tuple(_normalize_dbus_value(item) for item in value)
+    if isinstance(value, dict):
+        return {
+            str(k): _normalize_dbus_value(
+                v.unpack() if isinstance(v, GLib.Variant) else v
+            )
+            for k, v in value.items()
+        }
     return value
 
 
 class DriversServiceDbusTests(unittest.TestCase):
+    """Integration tests for the D-Bus drivers service.
+
+    A single D-Bus daemon and service instance are shared across all tests in
+    this class.  Fake hardware is provided via UMockdev and fake packages via a
+    testarchive-backed apt chroot, mirroring the pattern used in DetectTest in
+    test_ubuntu_drivers.py.
+    """
+
     @classmethod
     def setUpClass(cls):
         if not shutil.which("dbus-daemon"):
             raise unittest.SkipTest("dbus-daemon is required for this test")
+
+        cls._umockdev = gen_fakehw()
+        cls._sys_dir = cls._umockdev.get_sys_dir()
+
+        cls._archive = gen_fakearchive()
+        cls._chroot = _AptChroot()
+        cls._chroot.setup(cls._archive)
 
         output = subprocess.check_output(
             [
@@ -52,54 +195,49 @@ class DriversServiceDbusTests(unittest.TestCase):
         if len(lines) < 2:
             raise RuntimeError("Failed to start dbus-daemon for tests")
 
+        cls._old_dbus_address = os.environ.get("DBUS_SESSION_BUS_ADDRESS")
         cls._dbus_address = lines[0].strip()
         cls._dbus_pid = int(lines[1].strip())
-        cls._old_dbus_address = os.environ.get("DBUS_SESSION_BUS_ADDRESS")
         os.environ["DBUS_SESSION_BUS_ADDRESS"] = cls._dbus_address
 
         cls._service_ready = threading.Event()
 
         def _run_service() -> None:
-            dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-            cls._bus = dbus.bus.BusConnection(cls._dbus_address)
-            cls._loop = GLib.MainLoop()
-            cls._bus_name = dbus.service.BusName(
-                drivers_service.DriversService.BUS_NAME, cls._bus
-            )
-            cls._service = drivers_service.DriversService(
-                cls._bus, mainloop=cls._loop, idle_timeout_seconds=300
-            )
+            cls._app = drivers_service.DriversApplication(idle_timeout_seconds=300)
+            cls._app.register(None)
             cls._service_ready.set()
-            cls._loop.run()
+            cls._app.run(None)
 
         cls._loop_thread = threading.Thread(target=_run_service, daemon=True)
         cls._loop_thread.start()
         if not cls._service_ready.wait(timeout=5):
             raise RuntimeError("D-Bus service thread failed to start")
 
-        cls._client_bus = dbus.bus.BusConnection(cls._dbus_address)
+        cls._drivers_proxy = Gio.DBusProxy.new_for_bus_sync(
+            Gio.BusType.SESSION,
+            Gio.DBusProxyFlags.NONE,
+            None,
+            drivers_service.DriversService.BUS_NAME,
+            drivers_service.DriversService.OBJ_PATH,
+            drivers_service.DriversService.BUS_NAME,
+            None,
+        )
+        cls._introspection_proxy = Gio.DBusProxy.new_for_bus_sync(
+            Gio.BusType.SESSION,
+            Gio.DBusProxyFlags.NONE,
+            None,
+            drivers_service.DriversService.BUS_NAME,
+            drivers_service.DriversService.OBJ_PATH,
+            "org.freedesktop.DBus.Introspectable",
+            None,
+        )
 
     @classmethod
     def tearDownClass(cls):
-        if hasattr(cls, "_loop"):
-            cls._loop.quit()
+        if hasattr(cls, "_app"):
+            GLib.idle_add(cls._app.quit)
         if hasattr(cls, "_loop_thread"):
             cls._loop_thread.join(timeout=2)
-
-        if hasattr(cls, "_bus"):
-            try:
-                cls._bus.release_name(drivers_service.DriversService.BUS_NAME)
-            except dbus.DBusException:
-                pass
-
-        if hasattr(cls, "_bus_name"):
-            del cls._bus_name
-
-        if hasattr(cls, "_bus"):
-            cls._bus.close()
-
-        if hasattr(cls, "_client_bus"):
-            cls._client_bus.close()
 
         if hasattr(cls, "_dbus_pid"):
             try:
@@ -113,60 +251,57 @@ class DriversServiceDbusTests(unittest.TestCase):
             else:
                 os.environ["DBUS_SESSION_BUS_ADDRESS"] = cls._old_dbus_address
 
-    @patch(
-        "UbuntuDrivers.service.drivers_service.UbuntuDrivers.detect.system_device_drivers"
-    )
-    def test_dbus_drivers_method(self, mock_detect):
-        device_path = "/sys/devices/pci0000:00/0000:00:01.0/0000:01:00.0"
-        mock_detect.return_value = {
-            device_path: {
-                "modalias": "pci:v000010DEd00001C8Dsv00001558sd0000852Bbc03sc00i00",
-                "vendor": "NVIDIA Corporation",
-                "model": "GP107M [GeForce GTX 1050 Mobile]",
-                "drivers": {
-                    "xserver-xorg-video-nouveau": {
-                        "free": True,
-                        "from_distro": True,
-                        "builtin": True,
-                        "recommended": False,
-                    },
-                    "nvidia-driver-570": {
-                        "free": False,
-                        "from_distro": False,
-                        "builtin": False,
-                        "recommended": True,
-                    },
-                },
-            }
-        }
+        if hasattr(cls, "_chroot"):
+            cls._chroot.remove()
 
-        proxy = self._client_bus.get_object(
-            drivers_service.DriversService.BUS_NAME,
-            drivers_service.DriversService.OBJ_PATH,
+    def _call_drivers(self):
+        result_variant = self._drivers_proxy.call_sync(
+            "drivers",
+            None,
+            Gio.DBusCallFlags.NONE,
+            5000,
+            None,
         )
-        iface = dbus.Interface(proxy, drivers_service.DriversService.BUS_NAME)
+        return _normalize_dbus_value(result_variant)[0]
 
-        # Call the dbus method
-        result = iface.drivers(timeout=5)
+    def test_dbus_drivers_device_fields(self):
+        """drivers() returns complete device entries with correct field values."""
+        with patch.object(drivers_service, "sys_path", self._sys_dir):
+            result = self._call_drivers()
 
-        result = _normalize_dbus_value(result)
+        by_device = {os.path.basename(e["sys_path"]): e for e in result}
 
-        self.assertEqual(result[0]["sys_path"], device_path)
-        self.assertEqual(
-            [driver["name"] for driver in result[0]["drivers"]],
-            ["nvidia-driver-570", "xserver-xorg-video-nouveau"],
-        )
-        self.assertEqual(result[0]["drivers"][0]["source"], "third-party")
-        self.assertEqual(result[0]["drivers"][1]["source"], "distro")
-        self.assertTrue(result[0]["drivers"][1]["builtin"])
+        # "grey" has no matching package and must not appear
+        self.assertNotIn("grey", by_device)
+
+        # "white" is covered by vanilla; no vendor/model in PCI ID database
+        white = by_device["white"]
+        self.assertEqual(white["modalias"], _MODALIAS_WHITE)
+        self.assertEqual(white["vendor"], "")
+        self.assertEqual(white["model"], "")
+        self.assertEqual(len(white["drivers"]), 1)
+        self.assertEqual(white["drivers"][0]["name"], "vanilla")
+        self.assertEqual(white["drivers"][0]["source"], "distro")
+        self.assertTrue(white["drivers"][0]["free"])
+        self.assertFalse(white["drivers"][0]["builtin"])
+        self.assertFalse(white["drivers"][0]["recommended"])
+
+        # "graphics" is the NVIDIA card; PCI IDs provide vendor/model
+        graphics = by_device["graphics"]
+        self.assertEqual(graphics["modalias"], _MODALIAS_NV)
+        self.assertEqual(graphics["vendor"], "NVIDIA Corporation")
+        self.assertIn("GeForce", graphics["model"])
 
     def test_dbus_drivers_signature(self):
-        proxy = self._client_bus.get_object(
-            drivers_service.DriversService.BUS_NAME,
-            drivers_service.DriversService.OBJ_PATH,
+        """The drivers method is advertised with the correct D-Bus signature."""
+        xml_variant = self._introspection_proxy.call_sync(
+            "Introspect",
+            None,
+            Gio.DBusCallFlags.NONE,
+            5000,
+            None,
         )
-        introspect_iface = dbus.Interface(proxy, "org.freedesktop.DBus.Introspectable")
-        xml = introspect_iface.Introspect()
+        xml = _normalize_dbus_value(xml_variant)[0]
         root = ET.fromstring(xml)
 
         method = root.find(
@@ -174,343 +309,209 @@ class DriversServiceDbusTests(unittest.TestCase):
         )
         self.assertIsNotNone(method, "drivers method missing from introspection")
         out_args = method.findall("./arg[@direction='out']")
-        self.assertTrue(out_args, "drivers method has no out args")
-        # D-Bus introspection uses "type" for argument signature.
+        self.assertEqual(len(out_args), 1)
         self.assertEqual(out_args[0].get("type"), "aa{sv}")
 
-    @patch(
-        "UbuntuDrivers.service.drivers_service.UbuntuDrivers.detect.system_device_drivers"
-    )
-    def test_dbus_drivers_empty_devices(self, mock_detect):
-        """Test drivers method with no devices."""
-        mock_detect.return_value = {}
+    @patch("UbuntuDrivers.service.drivers_service.apt_pkg.Cache")
+    def test_dbus_drivers_cache_failure(self, mock_cache):
+        """A D-Bus error with domain CacheFailure is returned when the apt cache fails."""
+        mock_cache.side_effect = Exception("apt cache error")
 
-        proxy = self._client_bus.get_object(
-            drivers_service.DriversService.BUS_NAME,
-            drivers_service.DriversService.OBJ_PATH,
-        )
-        iface = dbus.Interface(proxy, drivers_service.DriversService.BUS_NAME)
+        with self.assertRaises(GLib.Error) as ctx:
+            self._drivers_proxy.call_sync(
+                "drivers",
+                None,
+                Gio.DBusCallFlags.NONE,
+                5000,
+                None,
+            )
 
-        result = iface.drivers(timeout=5)
-        result = _normalize_dbus_value(result)
+        self.assertIn("CacheFailure", ctx.exception.message)
 
+    def test_dbus_drivers_no_covered_devices(self):
+        """drivers() returns an empty list when no device has a matching package."""
+        t = UMockdev.Testbed.new()
+        t.add_device("pci", "grey", None, ["modalias", "pci:vDEADBEEFd00"], [])
+        with patch.object(drivers_service, "sys_path", t.get_sys_dir()):
+            result = self._call_drivers()
+        del t
         self.assertEqual(result, [])
 
-    @patch(
-        "UbuntuDrivers.service.drivers_service.UbuntuDrivers.detect.system_device_drivers"
-    )
-    def test_dbus_drivers_no_drivers_for_device(self, mock_detect):
-        """Test device with no available drivers."""
-        device_path = "/sys/devices/pci0000:00/0000:00:02.0"
-        mock_detect.return_value = {
-            device_path: {
-                "modalias": "pci:v00008086d000012B9sv00008086sd0000FFFABC03sc00i00",
-                "vendor": "Intel Corporation",
-                "model": "Test Device",
-                "drivers": {},
-            }
-        }
+    def test_dbus_drivers_uncovered_device_excluded(self):
+        """drivers() omits devices that have no matching packages."""
+        with patch.object(drivers_service, "sys_path", self._sys_dir):
+            result = self._call_drivers()
 
-        proxy = self._client_bus.get_object(
-            drivers_service.DriversService.BUS_NAME,
-            drivers_service.DriversService.OBJ_PATH,
+        device_names = {os.path.basename(e["sys_path"]) for e in result}
+        self.assertIn("white", device_names)
+        self.assertIn("graphics", device_names)
+        self.assertNotIn("grey", device_names)
+
+    def test_dbus_drivers_recommended_first(self):
+        """The recommended driver is listed first; non-recommended follow."""
+        with patch.object(drivers_service, "sys_path", self._sys_dir):
+            result = self._call_drivers()
+
+        graphics = next(
+            e for e in result if os.path.basename(e["sys_path"]) == "graphics"
         )
-        iface = dbus.Interface(proxy, drivers_service.DriversService.BUS_NAME)
-
-        result = iface.drivers(timeout=5)
-        result = _normalize_dbus_value(result)
-
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["sys_path"], device_path)
-        self.assertEqual(result[0]["drivers"], [])
-
-    @patch(
-        "UbuntuDrivers.service.drivers_service.UbuntuDrivers.detect.system_device_drivers"
-    )
-    def test_dbus_drivers_multiple_devices(self, mock_detect):
-        """Test with multiple devices."""
-        mock_detect.return_value = {
-            "/sys/devices/pci0000:00/0000:00:01.0": {
-                "modalias": "pci:v000010DEd00001C8Dsv00001558sd0000852Bbc03sc00i00",
-                "vendor": "NVIDIA",
-                "model": "GPU 1",
-                "drivers": {
-                    "nvidia-driver-570": {
-                        "free": False,
-                        "from_distro": False,
-                        "builtin": False,
-                        "recommended": True,
-                    }
-                },
-            },
-            "/sys/devices/pci0000:00/0000:00:02.0": {
-                "modalias": "pci:v00008086d000012B9sv00008086sd0000FFFABC03sc00i00",
-                "vendor": "Intel",
-                "model": "iGPU",
-                "drivers": {
-                    "i915": {
-                        "free": True,
-                        "from_distro": True,
-                        "builtin": True,
-                        "recommended": True,
-                    }
-                },
-            },
-        }
-
-        proxy = self._client_bus.get_object(
-            drivers_service.DriversService.BUS_NAME,
-            drivers_service.DriversService.OBJ_PATH,
-        )
-        iface = dbus.Interface(proxy, drivers_service.DriversService.BUS_NAME)
-
-        result = iface.drivers(timeout=5)
-        result = _normalize_dbus_value(result)
-
-        self.assertEqual(len(result), 2)
-        # Devices should be sorted by sys_path
-        self.assertEqual(result[0]["sys_path"], "/sys/devices/pci0000:00/0000:00:01.0")
-        self.assertEqual(result[1]["sys_path"], "/sys/devices/pci0000:00/0000:00:02.0")
-
-    @patch(
-        "UbuntuDrivers.service.drivers_service.UbuntuDrivers.detect.system_device_drivers"
-    )
-    def test_dbus_drivers_sorting(self, mock_detect):
-        """Test that drivers are sorted with recommended first."""
-        device_path = "/sys/devices/pci0000:00/0000:00:01.0"
-        mock_detect.return_value = {
-            device_path: {
-                "modalias": "pci:v000010DEd00001C8D",
-                "vendor": "NVIDIA",
-                "model": "GPU",
-                "drivers": {
-                    "xserver-xorg-video-nouveau": {
-                        "free": True,
-                        "from_distro": True,
-                        "builtin": True,
-                        "recommended": False,
-                    },
-                    "nouveau-firmware": {
-                        "free": True,
-                        "from_distro": True,
-                        "builtin": False,
-                        "recommended": False,
-                    },
-                    "nvidia-driver-570": {
-                        "free": False,
-                        "from_distro": False,
-                        "builtin": False,
-                        "recommended": True,
-                    },
-                },
-            }
-        }
-
-        proxy = self._client_bus.get_object(
-            drivers_service.DriversService.BUS_NAME,
-            drivers_service.DriversService.OBJ_PATH,
-        )
-        iface = dbus.Interface(proxy, drivers_service.DriversService.BUS_NAME)
-
-        result = iface.drivers(timeout=5)
-        result = _normalize_dbus_value(result)
-
-        driver_names = [driver["name"] for driver in result[0]["drivers"]]
-        # Recommended driver should be first
-        self.assertEqual(driver_names[0], "nvidia-driver-570")
-        # Non-recommended drivers should be sorted alphabetically
-        self.assertIn("nouveau-firmware", driver_names[1:])
+        driver_names = [d["name"] for d in graphics["drivers"]]
+        self.assertEqual(driver_names[0], "nvidia-driver-450")
+        self.assertIn("nvidia-driver-390", driver_names[1:])
         self.assertIn("xserver-xorg-video-nouveau", driver_names[1:])
 
-    @patch(
-        "UbuntuDrivers.service.drivers_service.UbuntuDrivers.detect.system_device_drivers"
-    )
-    def test_dbus_drivers_driver_attributes(self, mock_detect):
-        """Test that driver attributes are correctly mapped."""
-        device_path = "/sys/devices/pci0000:00/0000:00:01.0"
-        mock_detect.return_value = {
-            device_path: {
-                "modalias": "pci:v000010DEd00001C8D",
-                "vendor": "NVIDIA",
-                "model": "GPU",
-                "drivers": {
-                    "distro-free": {
-                        "free": True,
-                        "from_distro": True,
-                        "builtin": True,
-                        "recommended": False,
-                    },
-                    "distro-nonfree": {
-                        "free": False,
-                        "from_distro": True,
-                        "builtin": False,
-                        "recommended": False,
-                    },
-                    "third-party-free": {
-                        "free": True,
-                        "from_distro": False,
-                        "builtin": False,
-                        "recommended": False,
-                    },
-                },
-            }
-        }
+    def test_dbus_drivers_nvidia_attributes(self):
+        """Non-free proprietary driver attributes are mapped correctly."""
+        with patch.object(drivers_service, "sys_path", self._sys_dir):
+            result = self._call_drivers()
 
-        proxy = self._client_bus.get_object(
-            drivers_service.DriversService.BUS_NAME,
-            drivers_service.DriversService.OBJ_PATH,
+        graphics = next(
+            e for e in result if os.path.basename(e["sys_path"]) == "graphics"
         )
-        iface = dbus.Interface(proxy, drivers_service.DriversService.BUS_NAME)
+        by_name = {d["name"]: d for d in graphics["drivers"]}
 
-        result = iface.drivers(timeout=5)
-        result = _normalize_dbus_value(result)
+        recommended = by_name["nvidia-driver-450"]
+        self.assertTrue(recommended["recommended"])
+        self.assertFalse(recommended["free"])
+        self.assertFalse(recommended["builtin"])
+        self.assertEqual(recommended["source"], "distro")
 
-        drivers_by_name = {d["name"]: d for d in result[0]["drivers"]}
+        non_recommended = by_name["nvidia-driver-390"]
+        self.assertFalse(non_recommended["recommended"])
+        self.assertFalse(non_recommended["free"])
+        self.assertFalse(non_recommended["builtin"])
+        self.assertEqual(non_recommended["source"], "distro")
 
-        # Test distro free driver
-        self.assertEqual(drivers_by_name["distro-free"]["source"], "distro")
-        self.assertTrue(drivers_by_name["distro-free"]["free"])
-        self.assertTrue(drivers_by_name["distro-free"]["builtin"])
+    def test_dbus_drivers_nouveau_attributes(self):
+        """Built-in free driver (nouveau) attributes are mapped correctly."""
+        with patch.object(drivers_service, "sys_path", self._sys_dir):
+            result = self._call_drivers()
 
-        # Test distro non-free driver
-        self.assertEqual(drivers_by_name["distro-nonfree"]["source"], "distro")
-        self.assertFalse(drivers_by_name["distro-nonfree"]["free"])
-        self.assertFalse(drivers_by_name["distro-nonfree"]["builtin"])
+        graphics = next(
+            e for e in result if os.path.basename(e["sys_path"]) == "graphics"
+        )
+        by_name = {d["name"]: d for d in graphics["drivers"]}
 
-        # Test third-party driver
-        self.assertEqual(drivers_by_name["third-party-free"]["source"], "third-party")
-        self.assertTrue(drivers_by_name["third-party-free"]["free"])
-        self.assertFalse(drivers_by_name["third-party-free"]["builtin"])
+        nouveau = by_name["xserver-xorg-video-nouveau"]
+        self.assertFalse(nouveau["recommended"])
+        self.assertTrue(nouveau["free"])
+        self.assertTrue(nouveau["builtin"])
+        self.assertEqual(nouveau["source"], "distro")
 
 
 class BuildDriversPayloadTests(unittest.TestCase):
-    """Tests for the build_drivers_payload helper function."""
+    """Unit tests for build_drivers_payload().
 
-    @patch(
-        "UbuntuDrivers.service.drivers_service.UbuntuDrivers.detect.system_device_drivers"
-    )
-    def test_build_drivers_payload_empty(self, mock_detect):
-        """Test with no devices."""
-        mock_detect.return_value = {}
-        result = drivers_service.build_drivers_payload()
+    Each test gets its own UMockdev testbed so that the fake hardware can be
+    tailored per scenario, mirroring DetectTest in test_ubuntu_drivers.py.
+    The apt chroot is shared at class level since the package set is fixed.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls._archive = gen_fakearchive()
+        cls._chroot = _AptChroot()
+        cls._chroot.setup(cls._archive)
+
+    @classmethod
+    def tearDownClass(cls):
+        if hasattr(cls, "_chroot"):
+            cls._chroot.remove()
+
+    def setUp(self):
+        self._umockdev = gen_fakehw()
+        self._plugin_dir = tempfile.mkdtemp()
+        self._old_detect_dir = os.environ.get("UBUNTU_DRIVERS_DETECT_DIR")
+        os.environ["UBUNTU_DRIVERS_DETECT_DIR"] = self._plugin_dir
+
+    def tearDown(self):
+        shutil.rmtree(self._plugin_dir)
+        if self._old_detect_dir is None:
+            os.environ.pop("UBUNTU_DRIVERS_DETECT_DIR", None)
+        else:
+            os.environ["UBUNTU_DRIVERS_DETECT_DIR"] = self._old_detect_dir
+
+    def test_build_drivers_payload_graphics_device(self):
+        """build_drivers_payload() returns correct fields for the NVIDIA device."""
+        with patch.object(drivers_service, "sys_path", self._umockdev.get_sys_dir()):
+            result = drivers_service.build_drivers_payload()
+
+        by_device = {os.path.basename(e["sys_path"]): e for e in result}
+        self.assertIn("graphics", by_device)
+
+        entry = by_device["graphics"]
+        self.assertEqual(entry["modalias"], _MODALIAS_NV)
+        self.assertEqual(entry["vendor"], "NVIDIA Corporation")
+        self.assertIn("GeForce", entry["model"])
+
+        by_name = {d["name"]: d for d in entry["drivers"]}
+        self.assertIn("nvidia-driver-450", by_name)
+        self.assertIn("nvidia-driver-390", by_name)
+        self.assertIn("xserver-xorg-video-nouveau", by_name)
+
+    def test_build_drivers_payload_simple_device(self):
+        """build_drivers_payload() returns correct fields for a simple PCI device."""
+        with patch.object(drivers_service, "sys_path", self._umockdev.get_sys_dir()):
+            result = drivers_service.build_drivers_payload()
+
+        by_device = {os.path.basename(e["sys_path"]): e for e in result}
+        self.assertIn("white", by_device)
+
+        entry = by_device["white"]
+        self.assertEqual(entry["modalias"], _MODALIAS_WHITE)
+        self.assertEqual(entry["vendor"], "")
+        self.assertEqual(entry["model"], "")
+        self.assertEqual(len(entry["drivers"]), 1)
+
+        vanilla = entry["drivers"][0]
+        self.assertEqual(vanilla["name"], "vanilla")
+        self.assertTrue(vanilla["free"])
+        self.assertFalse(vanilla["builtin"])
+        self.assertFalse(vanilla["recommended"])
+        self.assertEqual(vanilla["source"], "distro")
+
+    def test_build_drivers_payload_uncovered_device_excluded(self):
+        """build_drivers_payload() omits devices with no matching packages."""
+        with patch.object(drivers_service, "sys_path", self._umockdev.get_sys_dir()):
+            result = drivers_service.build_drivers_payload()
+
+        device_names = {os.path.basename(e["sys_path"]) for e in result}
+        self.assertNotIn("grey", device_names)
+
+    def test_build_drivers_payload_empty(self):
+        """build_drivers_payload() returns [] when no device has a matching package."""
+        t = UMockdev.Testbed.new()
+        t.add_device("pci", "grey", None, ["modalias", "pci:vDEADBEEFd00"], [])
+        with patch.object(drivers_service, "sys_path", t.get_sys_dir()):
+            result = drivers_service.build_drivers_payload()
+        del t
         self.assertEqual(result, [])
 
-    @patch(
-        "UbuntuDrivers.service.drivers_service.UbuntuDrivers.detect.system_device_drivers"
-    )
-    def test_build_drivers_payload_single_device(self, mock_detect):
-        """Test with a single device."""
-        mock_detect.return_value = {
-            "/sys/devices/pci0000:00/0000:00:01.0": {
-                "modalias": "pci:v000010DEd00001C8D",
-                "vendor": "NVIDIA",
-                "model": "GPU",
-                "drivers": {
-                    "nvidia-driver-570": {
-                        "free": False,
-                        "from_distro": False,
-                        "builtin": False,
-                        "recommended": True,
-                    }
-                },
-            }
-        }
-
-        result = drivers_service.build_drivers_payload()
+    def test_build_drivers_payload_recommended_first(self):
+        """build_drivers_payload() places the recommended driver first."""
+        t = UMockdev.Testbed.new()
+        t.add_device("pci", "graphics", None, ["modalias", _MODALIAS_NV], [])
+        with patch.object(drivers_service, "sys_path", t.get_sys_dir()):
+            result = drivers_service.build_drivers_payload()
+        del t
 
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["sys_path"], "/sys/devices/pci0000:00/0000:00:01.0")
-        self.assertEqual(result[0]["vendor"], "NVIDIA")
-        self.assertEqual(result[0]["model"], "GPU")
-        self.assertEqual(len(result[0]["drivers"]), 1)
-        self.assertEqual(result[0]["drivers"][0]["name"], "nvidia-driver-570")
+        drivers = result[0]["drivers"]
+        self.assertEqual(drivers[0]["name"], "nvidia-driver-450")
+        self.assertTrue(drivers[0]["recommended"])
+        non_recommended = [d["name"] for d in drivers[1:]]
+        self.assertIn("nvidia-driver-390", non_recommended)
+        self.assertIn("xserver-xorg-video-nouveau", non_recommended)
 
-    @patch(
-        "UbuntuDrivers.service.drivers_service.UbuntuDrivers.detect.system_device_drivers"
-    )
-    def test_build_drivers_payload_missing_optional_fields(self, mock_detect):
-        """Test handling of devices with missing optional fields."""
-        mock_detect.return_value = {
-            "/sys/devices/pci0000:00/0000:00:01.0": {
-                # modalias, vendor, model are optional
-                "drivers": {}
-            }
-        }
+    @patch("UbuntuDrivers.service.drivers_service.apt_pkg.Cache")
+    def test_build_drivers_payload_cache_failure(self, mock_cache):
+        """build_drivers_payload() raises RuntimeError when the apt cache fails."""
+        mock_cache.side_effect = Exception("apt cache error")
 
-        result = drivers_service.build_drivers_payload()
+        with self.assertRaises(RuntimeError) as ctx:
+            drivers_service.build_drivers_payload()
 
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["sys_path"], "/sys/devices/pci0000:00/0000:00:01.0")
-        self.assertEqual(result[0]["modalias"], "")
-        self.assertEqual(result[0]["vendor"], "")
-        self.assertEqual(result[0]["model"], "")
-
-
-class DriversServiceUnitTests(unittest.TestCase):
-    """Unit tests for DriversService class methods."""
-
-    def test_drivers_service_initialization(self):
-        """Test DriversService initialization without mainloop."""
-        bus = MagicMock(spec=dbus.Bus)
-        service = drivers_service.DriversService(bus)
-
-        self.assertEqual(service.BUS_NAME, "org.ubuntu.Drivers")
-        self.assertEqual(service.OBJ_PATH, "/org/ubuntu/Drivers")
-        self.assertEqual(service._idle_timeout_seconds, 300)
-        self.assertIsNone(service._mainloop)
-
-    def test_drivers_service_initialization_with_timeout(self):
-        """Test DriversService initialization with custom timeout."""
-        bus = MagicMock(spec=dbus.Bus)
-        service = drivers_service.DriversService(bus, idle_timeout_seconds=60)
-
-        self.assertEqual(service._idle_timeout_seconds, 60)
-
-    def test_drivers_service_touch(self):
-        """Test that _touch updates last activity time."""
-        bus = MagicMock(spec=dbus.Bus)
-        service = drivers_service.DriversService(bus)
-
-        initial_time = service._last_activity
-        time.sleep(0.01)  # Small delay to ensure time difference
-        service._touch()
-
-        self.assertGreater(service._last_activity, initial_time)
-
-    def test_drivers_service_check_idle_no_mainloop(self):
-        """Test _check_idle returns True when no mainloop."""
-        bus = MagicMock(spec=dbus.Bus)
-        service = drivers_service.DriversService(bus)
-
-        result = service._check_idle()
-        self.assertTrue(result)
-
-    def test_drivers_service_check_idle_not_expired(self):
-        """Test _check_idle returns True when timeout not reached."""
-        bus = MagicMock(spec=dbus.Bus)
-        mainloop = MagicMock(spec=GLib.MainLoop)
-        service = drivers_service.DriversService(
-            bus, idle_timeout_seconds=300, mainloop=mainloop
-        )
-
-        result = service._check_idle()
-        self.assertTrue(result)
-        mainloop.quit.assert_not_called()
-
-    def test_drivers_service_check_idle_expired(self):
-        """Test _check_idle quits mainloop when timeout expired."""
-        bus = MagicMock(spec=dbus.Bus)
-        mainloop = MagicMock(spec=GLib.MainLoop)
-        service = drivers_service.DriversService(
-            bus,
-            idle_timeout_seconds=0,
-            mainloop=mainloop,  # Immediate timeout
-        )
-
-        # Immediately call _check_idle should detect timeout
-        result = service._check_idle()
-        self.assertFalse(result)
-        mainloop.quit.assert_called_once()
+        self.assertIn("apt cache error", str(ctx.exception))
 
 
 if __name__ == "__main__":

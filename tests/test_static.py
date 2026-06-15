@@ -61,6 +61,7 @@ class TestStatic(unittest.TestCase):
             # Project dirs ignored for the moment
             "Quirks",
             ".pybuild",
+            ".venv",
         ]
         # List of files to ignore with ../ stripped from the beginning of the path
         ignore_files = [
