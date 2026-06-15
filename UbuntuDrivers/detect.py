@@ -795,6 +795,21 @@ def system_driver_packages(
                 lookup_cache[key] = value
         nvidia_packages.sort(key=functools.cmp_to_key(_cmp_gfx_alternatives))
         recommended = nvidia_packages[-1]
+        # On UEFI, do not recommend a branch that boots a Wayland desktop to a black
+        # screen — one without nvidia-drm fbdev console takeover (major < 545) never
+        # evicts the EFI simple-framebuffer (simpledrm), so the panel stays dark
+        # until a VT switch. When the top pick lacks it, prefer the best-ranked
+        # fbdev-capable desktop branch instead (the 535-LTSB -> 580 fix). BIOS/CSM
+        # boots and headless/server selection are unaffected.
+        if _system_is_uefi() and not _nvidia_fbdev_console_takeover(recommended):
+            fb_capable = [
+                p
+                for p in nvidia_packages
+                if _nvidia_fbdev_console_takeover(p)
+                and not NvidiaPkgNameInfo(p).is_server()
+            ]
+            if fb_capable:
+                recommended = fb_capable[-1]
         for p in nvidia_packages:
             packages[p]["recommended"] = p == recommended
 
@@ -1807,6 +1822,22 @@ def _get_fit_level_gpgpu(x: str) -> int:
         if re.search(r"(\d{3})-open$", x):
             return 0
     return 0
+
+
+def _system_is_uefi() -> bool:
+    """The machine booted via UEFI, so the kernel set up an EFI simple-framebuffer
+    (simpledrm) that the NVIDIA driver must take over — otherwise a Wayland desktop
+    boots to a black screen until a VT switch."""
+    return os.path.isdir("/sys/firmware/efi")
+
+
+def _nvidia_fbdev_console_takeover(pkg_name: str) -> bool:
+    """Whether an NVIDIA package's driver has nvidia-drm fbdev console takeover on by
+    default — landed as the default in the 545 branch. Without it (e.g. the 535
+    LTSB) nvidia-drm never evicts the EFI simple-framebuffer, so a UEFI boot into a
+    Wayland session is black until a VT switch."""
+    info = NvidiaPkgNameInfo(pkg_name)
+    return info.is_valid and info.get_major_version() >= 545
 
 
 def _cmp_gfx_alternatives(x: str, y: str) -> int:

@@ -194,6 +194,28 @@ class DetectTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.plugin_dir)
 
+    def test_nvidia_fbdev_console_takeover(self):
+        """nvidia-drm fbdev console takeover is default-on from the 545 branch;
+        without it (e.g. the 535 LTSB) a UEFI boot into a Wayland session is black
+        until a VT switch. Drives the on-UEFI 535 -> 580 recommendation fix."""
+        fb = UbuntuDrivers.detect._nvidia_fbdev_console_takeover
+        for pkg in (
+            "nvidia-driver-545",
+            "nvidia-driver-550",
+            "nvidia-driver-580",
+            "nvidia-driver-580-open",
+            "nvidia-driver-580-server",
+        ):
+            self.assertTrue(fb(pkg), "%s should have fbdev console takeover" % pkg)
+        for pkg in (
+            "nvidia-driver-470",
+            "nvidia-driver-535",
+            "nvidia-driver-535-server",
+            "nvidia-340",
+            "not-nvidia",
+        ):
+            self.assertFalse(fb(pkg), "%s should NOT have fbdev console takeover" % pkg)
+
     @unittest.skipUnless(os.path.isdir("/sys/devices"), "no /sys dir on this system")
     def test_system_modaliases_system(self):
         """system_modaliases() for current system"""
