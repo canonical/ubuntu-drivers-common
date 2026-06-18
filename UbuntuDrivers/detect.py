@@ -1130,9 +1130,11 @@ def system_device_drivers(
             if opt_key in pkginfo:
                 result[device_name][opt_key] = pkginfo[opt_key]  # type: ignore[index, literal-required]
         drivers = result[device_name].setdefault("drivers", {})
-        drivers[pkg] = {"free": pkginfo["free"], "from_distro": pkginfo["from_distro"], "support": pkginfo.get("support")}
+        drivers[pkg] = {"free": pkginfo["free"], "from_distro": pkginfo["from_distro"]}
         if "recommended" in pkginfo:
             drivers[pkg]["recommended"] = pkginfo["recommended"]
+        if "support" in pkginfo:
+            drivers[pkg]["support"] = pkginfo["support"]
 
     # now determine the manual_install device flag: this is true iff all driver
     # packages are "manually installed"
