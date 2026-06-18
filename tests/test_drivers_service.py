@@ -130,6 +130,7 @@ def gen_fakearchive():
         dependencies={"Depends": "xorg-video-abi-4"},
         extra_tags={
             "Modaliases": "nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)",
+            "Support": "PB",
         },
     )
     a.create_deb(
@@ -375,12 +376,14 @@ class DriversServiceDbusTests(unittest.TestCase):
         self.assertFalse(recommended["free"])
         self.assertFalse(recommended["builtin"])
         self.assertEqual(recommended["source"], "distro")
+        self.assertEqual(recommended["support"], "PB")
 
         non_recommended = by_name["nvidia-driver-390"]
         self.assertFalse(non_recommended["recommended"])
         self.assertFalse(non_recommended["free"])
         self.assertFalse(non_recommended["builtin"])
         self.assertEqual(non_recommended["source"], "distro")
+        self.assertEqual(non_recommended["support"], "")
 
     def test_dbus_drivers_nouveau_attributes(self):
         """Built-in free driver (nouveau) attributes are mapped correctly."""
@@ -469,6 +472,7 @@ class BuildDriversPayloadTests(unittest.TestCase):
         self.assertFalse(vanilla["builtin"])
         self.assertFalse(vanilla["recommended"])
         self.assertEqual(vanilla["source"], "distro")
+        self.assertEqual(vanilla["support"], "")
 
     def test_build_drivers_payload_uncovered_device_excluded(self):
         """build_drivers_payload() omits devices with no matching packages."""
@@ -502,6 +506,19 @@ class BuildDriversPayloadTests(unittest.TestCase):
         non_recommended = [d["name"] for d in drivers[1:]]
         self.assertIn("nvidia-driver-390", non_recommended)
         self.assertIn("xserver-xorg-video-nouveau", non_recommended)
+
+    def test_build_drivers_payload_support_field(self):
+        """build_drivers_payload() includes the Support apt field in each driver dict."""
+        with patch.object(drivers_service, "sys_path", self._umockdev.get_sys_dir()):
+            result = drivers_service.build_drivers_payload()
+
+        by_device = {os.path.basename(e["sys_path"]): e for e in result}
+        by_name = {d["name"]: d for d in by_device["graphics"]["drivers"]}
+
+        self.assertEqual(by_name["nvidia-driver-450"]["support"], "PB")
+        self.assertEqual(by_name["nvidia-driver-390"]["support"], "")
+        self.assertEqual(by_name["xserver-xorg-video-nouveau"]["support"], "")
+        self.assertEqual(by_device["white"]["drivers"][0]["support"], "")
 
     @patch("UbuntuDrivers.service.drivers_service.apt_pkg.Cache")
     def test_build_drivers_payload_cache_failure(self, mock_cache):

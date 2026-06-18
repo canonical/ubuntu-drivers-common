@@ -30,6 +30,7 @@ class DriverInfo(TypedDict, total=False):
     builtin: bool
     from_distro: bool
     recommended: bool
+    support: Optional[str]
 
 
 class DeviceInfo(TypedDict, total=False):
@@ -1129,7 +1130,7 @@ def system_device_drivers(
             if opt_key in pkginfo:
                 result[device_name][opt_key] = pkginfo[opt_key]  # type: ignore[index, literal-required]
         drivers = result[device_name].setdefault("drivers", {})
-        drivers[pkg] = {"free": pkginfo["free"], "from_distro": pkginfo["from_distro"]}
+        drivers[pkg] = {"free": pkginfo["free"], "from_distro": pkginfo["from_distro"], "support": pkginfo.get("support")}
         if "recommended" in pkginfo:
             drivers[pkg]["recommended"] = pkginfo["recommended"]
 

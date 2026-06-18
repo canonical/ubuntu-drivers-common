@@ -17,7 +17,7 @@ def build_drivers_payload() -> List[Dict[str, Any]]:
     """Build the driver list payload for the D-Bus API.
 
     Queries the apt cache and system device drivers, returning a list of
-    device dicts sorted by sysfs path. Each device dict has the form::
+    device dicts sorted by sysfs path.     Each device dict has the form::
 
         {
             "sys_path":  str,   # sysfs path identifying the device
@@ -31,6 +31,7 @@ def build_drivers_payload() -> List[Dict[str, Any]]:
                     "free":        bool,  # whether the driver is free software
                     "builtin":     bool,  # whether the driver is built into the kernel
                     "recommended": bool,  # whether this is the recommended driver
+                    "support":     str,   # apt Support field value (e.g. "PB", "NFB", "LTSB", "Legacy"), empty if absent
                 },
                 ...
             ],
@@ -75,6 +76,7 @@ def build_drivers_payload() -> List[Dict[str, Any]]:
                     "free": bool(pkg_info.get("free", False)),
                     "builtin": bool(pkg_info.get("builtin", False)),
                     "recommended": bool(pkg_info.get("recommended", False)),
+                    "support": pkg_info.get("support") or "",
                 }
             )
 
