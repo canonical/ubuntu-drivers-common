@@ -255,6 +255,9 @@ class DriversServiceDbusTests(unittest.TestCase):
         if hasattr(cls, "_chroot"):
             cls._chroot.remove()
 
+    def setUp(self):
+        self._app._service._cached_result = None
+
     def _call_drivers(self):
         result_variant = self._drivers_proxy.call_sync(
             "drivers",
@@ -402,8 +405,14 @@ class DriversServiceDbusTests(unittest.TestCase):
         self.assertEqual(nouveau["source"], "distro")
 
 
+def _call_build_drivers():
+    """Call _build_drivers_variant() and unpack the result into a plain list."""
+    variant = drivers_service._build_drivers_variant()
+    return _normalize_dbus_value(variant)[0]
+
+
 class BuildDriversPayloadTests(unittest.TestCase):
-    """Unit tests for build_drivers_payload().
+    """Unit tests for _build_drivers_variant().
 
     Each test gets its own UMockdev testbed so that the fake hardware can be
     tailored per scenario, mirroring DetectTest in test_ubuntu_drivers.py.
@@ -435,9 +444,9 @@ class BuildDriversPayloadTests(unittest.TestCase):
             os.environ["UBUNTU_DRIVERS_DETECT_DIR"] = self._old_detect_dir
 
     def test_build_drivers_payload_graphics_device(self):
-        """build_drivers_payload() returns correct fields for the NVIDIA device."""
+        """_build_drivers_variant() returns correct fields for the NVIDIA device."""
         with patch.object(drivers_service, "sys_path", self._umockdev.get_sys_dir()):
-            result = drivers_service.build_drivers_payload()
+            result = _call_build_drivers()
 
         by_device = {os.path.basename(e["sys_path"]): e for e in result}
         self.assertIn("graphics", by_device)
@@ -453,9 +462,9 @@ class BuildDriversPayloadTests(unittest.TestCase):
         self.assertIn("xserver-xorg-video-nouveau", by_name)
 
     def test_build_drivers_payload_simple_device(self):
-        """build_drivers_payload() returns correct fields for a simple PCI device."""
+        """_build_drivers_variant() returns correct fields for a simple PCI device."""
         with patch.object(drivers_service, "sys_path", self._umockdev.get_sys_dir()):
-            result = drivers_service.build_drivers_payload()
+            result = _call_build_drivers()
 
         by_device = {os.path.basename(e["sys_path"]): e for e in result}
         self.assertIn("white", by_device)
@@ -475,28 +484,28 @@ class BuildDriversPayloadTests(unittest.TestCase):
         self.assertEqual(vanilla["support"], "")
 
     def test_build_drivers_payload_uncovered_device_excluded(self):
-        """build_drivers_payload() omits devices with no matching packages."""
+        """_build_drivers_variant() omits devices with no matching packages."""
         with patch.object(drivers_service, "sys_path", self._umockdev.get_sys_dir()):
-            result = drivers_service.build_drivers_payload()
+            result = _call_build_drivers()
 
         device_names = {os.path.basename(e["sys_path"]) for e in result}
         self.assertNotIn("grey", device_names)
 
     def test_build_drivers_payload_empty(self):
-        """build_drivers_payload() returns [] when no device has a matching package."""
+        """_build_drivers_variant() returns an empty list when no device has a matching package."""
         t = UMockdev.Testbed.new()
         t.add_device("pci", "grey", None, ["modalias", "pci:vDEADBEEFd00"], [])
         with patch.object(drivers_service, "sys_path", t.get_sys_dir()):
-            result = drivers_service.build_drivers_payload()
+            result = _call_build_drivers()
         del t
         self.assertEqual(result, [])
 
     def test_build_drivers_payload_recommended_first(self):
-        """build_drivers_payload() places the recommended driver first."""
+        """_build_drivers_variant() places the recommended driver first."""
         t = UMockdev.Testbed.new()
         t.add_device("pci", "graphics", None, ["modalias", _MODALIAS_NV], [])
         with patch.object(drivers_service, "sys_path", t.get_sys_dir()):
-            result = drivers_service.build_drivers_payload()
+            result = _call_build_drivers()
         del t
 
         self.assertEqual(len(result), 1)
@@ -508,9 +517,9 @@ class BuildDriversPayloadTests(unittest.TestCase):
         self.assertIn("xserver-xorg-video-nouveau", non_recommended)
 
     def test_build_drivers_payload_support_field(self):
-        """build_drivers_payload() includes the Support apt field in each driver dict."""
+        """_build_drivers_variant() includes the Support apt field in each driver dict."""
         with patch.object(drivers_service, "sys_path", self._umockdev.get_sys_dir()):
-            result = drivers_service.build_drivers_payload()
+            result = _call_build_drivers()
 
         by_device = {os.path.basename(e["sys_path"]): e for e in result}
         by_name = {d["name"]: d for d in by_device["graphics"]["drivers"]}
@@ -522,11 +531,11 @@ class BuildDriversPayloadTests(unittest.TestCase):
 
     @patch("UbuntuDrivers.service.drivers_service.apt_pkg.Cache")
     def test_build_drivers_payload_cache_failure(self, mock_cache):
-        """build_drivers_payload() raises RuntimeError when the apt cache fails."""
+        """_build_drivers_variant() raises RuntimeError when the apt cache fails."""
         mock_cache.side_effect = Exception("apt cache error")
 
         with self.assertRaises(RuntimeError) as ctx:
-            drivers_service.build_drivers_payload()
+            drivers_service._build_drivers_variant()
 
         self.assertIn("apt cache error", str(ctx.exception))
 
