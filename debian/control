@@ -48,7 +48,6 @@ Depends: ${python3:Depends},
  python3-click,
  python3-gi,
  gir1.2-glib-2.0,
- dbus,
  udev,
  pciutils,
  usbutils,
@@ -61,8 +60,8 @@ Description: Detect and install additional Ubuntu driver packages
   - a Python API for detecting driver packages for a particular piece of
     hardware or the whole system.
  .
-  - a D-Bus service (org.ubuntu.Drivers) for querying driver information
-    via the session bus.
+   - a D-Bus service (org.ubuntu.Drivers) for querying driver information
+     via the session bus.
  .
   - an "ubuntu-drivers" command line tool to list or install driver packages
     (mostly for integration in installers).
