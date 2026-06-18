@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import List, Optional
 
 import UbuntuDrivers.detect
 
@@ -12,30 +12,31 @@ import os
 
 sys_path = os.environ.get("UBUNTU_DRIVERS_SYS_DIR")
 
+# D-Bus signature for the drivers() return value.
+_DRIVERS_SIGNATURE = "aa{sv}"
 
-def build_drivers_payload() -> List[Dict[str, Any]]:
-    """Build the driver list payload for the D-Bus API.
 
-    Queries the apt cache and system device drivers, returning a list of
-    device dicts sorted by sysfs path.     Each device dict has the form::
+def _build_drivers_variant() -> GLib.Variant:
+    """Build the driver list as a D-Bus ``(aa{sv})`` GLib.Variant.
 
-        {
-            "sys_path":  str,   # sysfs path identifying the device
-            "modalias":  str,   # modalias string (empty if unavailable)
-            "vendor":    str,   # human-readable vendor name (empty if unavailable)
-            "model":     str,   # human-readable model name (empty if unavailable)
-            "drivers": [        # list of driver dicts, recommended first
-                {
-                    "name":        str,   # package name
-                    "source":      str,   # "distro" or "third-party"
-                    "free":        bool,  # whether the driver is free software
-                    "builtin":     bool,  # whether the driver is built into the kernel
-                    "recommended": bool,  # whether this is the recommended driver
-                    "support":     str,   # apt Support field value (e.g. "PB", "NFB", "LTSB", "Legacy"), empty if absent
-                },
-                ...
-            ],
-        }
+    Queries the apt cache and system device drivers, returning a D-Bus
+    return variant with signature ``(aa{sv})`` — a tuple wrapping an array
+    of string-to-variant dicts.  Each dict represents one device::
+
+        sys_path  s     sysfs path identifying the device
+        modalias  s     modalias string (empty if unavailable)
+        vendor    s     human-readable vendor name (empty if unavailable)
+        model     s     human-readable model name (empty if unavailable)
+        drivers   av    array of driver a{sv} dicts (recommended first)
+
+    Each driver dict (``a{sv}``) contains::
+
+        name        s   package name
+        source      s   "distro" or "third-party"
+        free        b   whether the driver is free software
+        builtin     b   whether the driver is built into the kernel
+        recommended b   whether this is the recommended driver
+        support     s   apt Support field value (e.g. "PB"), empty if absent
 
     Raises:
         RuntimeError: if the apt cache cannot be initialized.
@@ -51,132 +52,53 @@ def build_drivers_payload() -> List[Dict[str, Any]]:
         apt_cache=cache, sys_path=sys_path, freeonly=False
     )
 
-    if not devices:
-        return []
-
-    payload: List[Dict[str, Any]] = []
+    device_list = []
 
     for device_name in sorted(devices):
         info = devices[device_name]
         drivers_info = info.get("drivers", {})
-        drivers_list: List[Dict[str, Any]] = []
 
+        driver_list = []
         for pkg_name, pkg_info in sorted(
             drivers_info.items(),
             key=lambda item: (not item[1].get("recommended", False), item[0]),
         ):
-            drivers_list.append(
-                {
-                    "name": pkg_name,
-                    "source": (
-                        "distro"
-                        if pkg_info.get("from_distro", False)
-                        else "third-party"
-                    ),
-                    "free": bool(pkg_info.get("free", False)),
-                    "builtin": bool(pkg_info.get("builtin", False)),
-                    "recommended": bool(pkg_info.get("recommended", False)),
-                    "support": pkg_info.get("support") or "",
-                }
+            driver_list.append(
+                GLib.Variant(
+                    "a{sv}",
+                    {
+                        "name": GLib.Variant("s", pkg_name),
+                        "source": GLib.Variant(
+                            "s",
+                            "distro"
+                            if pkg_info.get("from_distro", False)
+                            else "third-party",
+                        ),
+                        "free": GLib.Variant("b", bool(pkg_info.get("free", False))),
+                        "builtin": GLib.Variant(
+                            "b", bool(pkg_info.get("builtin", False))
+                        ),
+                        "recommended": GLib.Variant(
+                            "b", bool(pkg_info.get("recommended", False))
+                        ),
+                        "support": GLib.Variant(
+                            "s", pkg_info.get("support") or ""
+                        ),
+                    },
+                )
             )
 
-        payload.append(
+        device_list.append(
             {
-                "sys_path": device_name,
-                "modalias": info.get("modalias", ""),
-                "vendor": info.get("vendor", ""),
-                "model": info.get("model", ""),
-                "drivers": drivers_list,
+                "sys_path": GLib.Variant("s", device_name),
+                "modalias": GLib.Variant("s", info.get("modalias", "")),
+                "vendor": GLib.Variant("s", info.get("vendor", "")),
+                "model": GLib.Variant("s", info.get("model", "")),
+                "drivers": GLib.Variant("av", driver_list),
             }
         )
 
-    return payload
-
-
-def _to_variant(value: Any) -> GLib.Variant:
-    """Recursively convert a Python value to a GLib.Variant for D-Bus serialization.
-
-    Supported types and their D-Bus signatures:
-        dict  -> a{sv}  (string-keyed variant dict)
-        list  -> aa{sv} if all items are dicts, otherwise av
-        bool  -> b
-        str   -> s
-        int   -> x (int64)
-
-    Raises:
-        TypeError: if the value is of an unsupported type.
-    """
-    if isinstance(value, dict):
-        return GLib.Variant("a{sv}", _to_variant_dict(value))
-    if isinstance(value, list):
-        if all(isinstance(item, dict) for item in value):
-            return GLib.Variant("aa{sv}", [_to_variant_dict(item) for item in value])
-        return GLib.Variant("av", [_to_variant(item) for item in value])
-    if isinstance(value, bool):
-        return GLib.Variant("b", value)
-    if isinstance(value, str):
-        return GLib.Variant("s", value)
-    if isinstance(value, int):
-        return GLib.Variant("x", value)
-    raise TypeError(f"Unsupported value for D-Bus serialization: {type(value)!r}")
-
-
-def _to_dbus_payload(payload: List[Dict[str, Any]]) -> GLib.Variant:
-    """Wrap a payload list as a D-Bus return value with signature (aa{sv})."""
-    return GLib.Variant("(aa{sv})", ([_to_variant_dict(item) for item in payload],))
-
-
-def _to_variant_dict(value: Dict[str, Any]) -> Dict[str, GLib.Variant]:
-    """Convert a plain Python dict to a dict of GLib.Variants keyed by string."""
-    return {str(k): _to_variant(v) for k, v in value.items()}
-
-
-class _DriversCall:
-    """Encapsulates the async lifecycle of a single ``drivers`` method invocation.
-
-    Holds the application open for the duration of the call, runs
-    :func:`build_drivers_payload` in a worker thread, then returns the result
-    (or a ``CacheFailure`` D-Bus error) to the client on the main thread.
-
-    Args:
-        app: The owning application; ``hold()``/``release()`` are called around
-             the async work to prevent premature idle-timeout.
-        invocation: The pending D-Bus method invocation to reply to.
-    """
-
-    def __init__(
-        self, app: Gio.Application, invocation: Gio.DBusMethodInvocation
-    ) -> None:
-        self._app = app
-        self._invocation = invocation
-        self._task = Gio.Task.new(None, None, None, None)
-        self._task.set_return_on_cancel(False)
-        self._task.connect("notify::completed", self._on_done)
-
-    def start(self) -> None:
-        """Begin the async payload build in a worker thread."""
-        self._app.hold()
-        self._task.run_in_thread(self._run)
-
-    def _run(self, task: Gio.Task, _obj: None, _data: None, _cancel: None) -> None:
-        try:
-            task.return_value(_to_dbus_payload(build_drivers_payload()))
-        except RuntimeError as ex:
-            task.return_error(
-                GLib.Error(str(ex), "org.ubuntu.Drivers.Error.CacheFailure", 0)
-            )
-
-    def _on_done(self, _source: None, _result: Gio.Task) -> None:
-        try:
-            value = self._task.propagate_value()
-            self._invocation.return_value(value.value)
-        except GLib.Error as ex:
-            self._invocation.return_dbus_error(
-                "org.ubuntu.Drivers.Error.CacheFailure",
-                ex.message,
-            )
-        finally:
-            self._app.release()
+    return GLib.Variant(f"({_DRIVERS_SIGNATURE})", (device_list,))
 
 
 class DriversService:
@@ -186,12 +108,14 @@ class DriversService:
     dispatches the ``drivers`` method call asynchronously so that the GLib main
     loop is never blocked during apt cache initialization or hardware detection.
 
+    Results are cached: the first call triggers detection; subsequent concurrent
+    calls are queued and all receive the same result when detection completes.
+    After a result is cached it is returned immediately to callers.
+
     The object exposes a single interface:
 
         interface org.ubuntu.Drivers
             method drivers() -> aa{sv}
-
-    The returned value is the list produced by :func:`build_drivers_payload`.
 
     Args:
         app: The owning ``Gio.Application``, used to call ``hold()``/``release()``
@@ -217,6 +141,10 @@ class DriversService:
         self._interface_info = Gio.DBusNodeInfo.new_for_xml(
             self._INTROSPECTION_XML
         ).interfaces[0]
+
+        self._cached_result: Optional[GLib.Variant] = None
+        self._pending_invocations: List[Gio.DBusMethodInvocation] = []
+        self._task_running = False
 
     def export(self, connection: Gio.DBusConnection) -> None:
         """Register the D-Bus object on *connection*."""
@@ -252,8 +180,9 @@ class DriversService:
     ) -> None:
         """Dispatch an incoming D-Bus method call.
 
-        Only ``drivers`` is supported. The work is run asynchronously in a
-        thread via :class:`_DriversCall` so the main loop is never blocked.
+        Only ``drivers`` is supported. If detection is already cached the result
+        is returned immediately. If detection is in progress, the invocation is
+        queued. Otherwise, a new worker task is started.
         """
         if method_name != "drivers":
             invocation.return_dbus_error(
@@ -262,7 +191,45 @@ class DriversService:
             )
             return
 
-        _DriversCall(self._app, invocation).start()
+        if self._cached_result is not None:
+            invocation.return_value(self._cached_result)
+            return
+
+        self._pending_invocations.append(invocation)
+
+        if not self._task_running:
+            self._task_running = True
+            self._app.hold()
+            task = Gio.Task.new(None, None, self._on_done, None)
+            task.set_return_on_cancel(True)
+            task.run_in_thread(self._run)
+
+    def _run(self, task: Gio.Task, _obj: None, _data: None, _cancel: None) -> None:
+        try:
+            task.return_value(_build_drivers_variant())
+        except RuntimeError as ex:
+            task.return_error(
+                GLib.Error(str(ex), "org.ubuntu.Drivers.Error.CacheFailure", 0)
+            )
+
+    def _on_done(
+        self, _source: None, result: Gio.Task, _data: None
+    ) -> None:
+        try:
+            value = result.propagate_value()
+            self._cached_result = value.value
+            for invocation in self._pending_invocations:
+                invocation.return_value(self._cached_result)
+        except GLib.Error as ex:
+            for invocation in self._pending_invocations:
+                invocation.return_dbus_error(
+                    "org.ubuntu.Drivers.Error.CacheFailure",
+                    ex.message,
+                )
+        finally:
+            self._pending_invocations.clear()
+            self._task_running = False
+            self._app.release()
 
     def unexport(self, connection: Gio.DBusConnection) -> None:
         """Unregister the D-Bus object from *connection*."""
