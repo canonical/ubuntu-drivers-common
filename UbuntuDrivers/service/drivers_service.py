@@ -294,10 +294,6 @@ class DriversApplication(Gio.Application):
         self.set_inactivity_timeout(idle_timeout_seconds * 1000)
         self._service = DriversService(app=self)
 
-    def do_activate(self) -> None:
-        # D-Bus clients activate the service via method calls; no GUI activation.
-        return
-
     def do_dbus_register(
         self, connection: Gio.DBusConnection, object_path: str
     ) -> bool:
