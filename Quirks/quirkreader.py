@@ -28,7 +28,6 @@ import os
 
 
 class Quirk:
-
     def __init__(
         self,
         id: Optional[str] = None,
@@ -45,7 +44,6 @@ class Quirk:
 
 
 class ReadQuirk:
-
     def __init__(self, source: Optional[str] = None) -> None:
         self.source = source
 

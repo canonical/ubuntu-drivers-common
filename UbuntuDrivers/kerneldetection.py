@@ -31,7 +31,6 @@ import sys
 
 
 class KernelDetection(object):
-
     def __init__(self, cache: Optional[apt_pkg.Cache] = None) -> None:
         if cache:
             self.apt_cache = cache
