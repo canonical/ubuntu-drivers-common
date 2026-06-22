@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+import signal
+import sys
+from typing import Callable, List, Optional
 
 import UbuntuDrivers.detect
 
@@ -70,9 +72,11 @@ def _build_drivers_variant() -> GLib.Variant:
                         "name": GLib.Variant("s", pkg_name),
                         "source": GLib.Variant(
                             "s",
-                            "distro"
-                            if pkg_info.get("from_distro", False)
-                            else "third-party",
+                            (
+                                "distro"
+                                if pkg_info.get("from_distro", False)
+                                else "third-party"
+                            ),
                         ),
                         "free": GLib.Variant("b", bool(pkg_info.get("free", False))),
                         "builtin": GLib.Variant(
@@ -99,6 +103,61 @@ def _build_drivers_variant() -> GLib.Variant:
     return GLib.Variant(f"({_DRIVERS_SIGNATURE})", (device_list,))
 
 
+class _IdleManager:
+    """Inactivity manager that invokes a callback after a period of idle.
+
+    Callers call :meth:`hold` when async work begins and :meth:`release` when
+    it ends. The timeout is only active while no work is in progress.
+
+    Args:
+        on_timeout: Callable invoked when the inactivity timeout fires.
+        timeout_seconds: Seconds of inactivity before invoking `on_timeout`.
+    """
+
+    def __init__(
+        self, on_timeout: Callable[[], object], timeout_seconds: int = 300
+    ) -> None:
+        self._on_timeout_cb = on_timeout
+        self._timeout_seconds = timeout_seconds
+        self._held: bool = False
+        self._timeout_id: Optional[int] = None
+
+    def start(self) -> None:
+        """Begin the inactivity countdown. Call once after the bus name is acquired."""
+        self._schedule()
+
+    def hold(self) -> None:
+        """Mark work as in-progress and cancel any pending quit timeout."""
+        self._held = True
+        self._cancel()
+
+    def release(self) -> None:
+        """Mark work as complete and schedule the quit timeout."""
+        self._held = False
+        self._schedule()
+
+    def cancel(self) -> None:
+        """Cancel any pending timeout permanently (used during shutdown)."""
+        self._cancel()
+
+    def _schedule(self) -> None:
+        self._cancel()
+        self._timeout_id = GLib.timeout_add_seconds(
+            self._timeout_seconds, self._on_timeout
+        )
+
+    def _cancel(self) -> None:
+        if self._timeout_id is not None:
+            GLib.source_remove(self._timeout_id)
+            self._timeout_id = None
+
+    def _on_timeout(self) -> bool:
+        self._timeout_id = None
+        if not self._held:
+            self._on_timeout_cb()
+        return GLib.SOURCE_REMOVE
+
+
 class DriversService:
     """D-Bus object that exposes driver detection results on org.ubuntu.Drivers.
 
@@ -116,9 +175,8 @@ class DriversService:
             method drivers() -> aa{sv}
 
     Args:
-        app: The owning ``Gio.Application``, used to call ``hold()``/``release()``
-             around async work so that the application inactivity timeout is
-             correctly suspended while a request is in flight.
+        hold: Callable invoked when async work begins (prevents idle exit).
+        release: Callable invoked when async work ends (allows idle exit).
     """
 
     BUS_NAME = "org.ubuntu.Drivers"
@@ -133,8 +191,13 @@ class DriversService:
 </node>
 """
 
-    def __init__(self, app: Gio.Application) -> None:
-        self._app = app
+    def __init__(
+        self,
+        hold: Callable[[], None],
+        release: Callable[[], None],
+    ) -> None:
+        self._hold = hold
+        self._release = release
         self._object_registration_id: int | None = None
         self._interface_info = Gio.DBusNodeInfo.new_for_xml(
             self._INTROSPECTION_XML
@@ -176,12 +239,7 @@ class DriversService:
         _parameters: GLib.Variant,
         invocation: Gio.DBusMethodInvocation,
     ) -> None:
-        """Dispatch an incoming D-Bus method call.
-
-        Only ``drivers`` is supported. If detection is already cached the result
-        is returned immediately. If detection is in progress, the invocation is
-        queued. Otherwise, a new worker task is started.
-        """
+        """Dispatch an incoming D-Bus method call."""
         if method_name != "drivers":
             invocation.return_dbus_error(
                 "org.freedesktop.DBus.Error.UnknownMethod",
@@ -197,7 +255,7 @@ class DriversService:
 
         if not self._task_running:
             self._task_running = True
-            self._app.hold()
+            self._hold()
             task = Gio.Task.new(None, None, self._on_done, None)
             task.set_return_on_cancel(True)
             task.run_in_thread(self._run)
@@ -225,7 +283,7 @@ class DriversService:
         finally:
             self._pending_invocations.clear()
             self._task_running = False
-            self._app.release()
+            self._release()
 
     def unexport(self, connection: Gio.DBusConnection) -> None:
         """Unregister the D-Bus object from *connection*."""
@@ -235,44 +293,86 @@ class DriversService:
         self._object_registration_id = None
 
 
-class DriversApplication(Gio.Application):
-    """GApplication that owns the org.ubuntu.Drivers bus name and manages lifecycle.
-
-    Registers the service on the session bus via D-Bus activation and exits
-    automatically after *idle_timeout_seconds* of inactivity using
-    ``GApplication.set_inactivity_timeout``.  Inactivity is defined by GLib as
-    the time since the last ``hold()``/``release()`` pair completed; each
-    in-flight ``drivers`` call holds the application, preventing premature exit.
+class _ServiceRunner:
+    """Owns the bus name and manages the service lifecycle.
 
     Args:
-        idle_timeout_seconds: Seconds of inactivity before the application exits.
-            Defaults to 300 (5 minutes).
+        loop: The GLib main loop to quit once the bus name is released.
+        timeout_seconds: Seconds of inactivity before initiating shutdown.
     """
 
-    def __init__(self, idle_timeout_seconds: int = 300) -> None:
-        super().__init__(
-            application_id=DriversService.BUS_NAME,
-            flags=Gio.ApplicationFlags.IS_SERVICE,
+    def __init__(self, loop: GLib.MainLoop, timeout_seconds: int = 300) -> None:
+        self._loop = loop
+        self._idle_mgr = _IdleManager(
+            on_timeout=self._begin_shutdown,
+            timeout_seconds=timeout_seconds,
         )
-        self.set_inactivity_timeout(idle_timeout_seconds * 1000)
-        self._service = DriversService(app=self)
+        self._service: Optional[DriversService] = None
+        self._connection: Optional[Gio.DBusConnection] = None
+        self._owner_id: int = 0
 
-    def do_dbus_register(
-        self, connection: Gio.DBusConnection, object_path: str
-    ) -> bool:
-        if not Gio.Application.do_dbus_register(self, connection, object_path):
-            return False
+    def run(self) -> None:
+        """Acquire the bus name, install signal handling, and run the main loop."""
+        # Block the default SIGTERM action so the kernel does not kill us
+        # mid-drain.  GLib's Unix signal source delivers it safely on the
+        # next main-loop iteration instead.
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        GLib.unix_signal_add(
+            GLib.PRIORITY_DEFAULT, signal.SIGTERM, self._begin_shutdown
+        )
+
+        self._owner_id = Gio.bus_own_name(
+            Gio.BusType.SYSTEM,
+            DriversService.BUS_NAME,
+            Gio.BusNameOwnerFlags.NONE,
+            self.on_bus_acquired,
+            self.on_name_acquired,
+            self.on_name_lost,
+        )
+
+        try:
+            self._loop.run()
+        finally:
+            if self._service is not None and self._connection is not None:
+                self._service.unexport(self._connection)
+
+    def on_bus_acquired(self, connection: Gio.DBusConnection, _name: str) -> None:
+        self._service = DriversService(
+            hold=self._idle_mgr.hold, release=self._idle_mgr.release
+        )
         self._service.export(connection)
-        return True
+        self._connection = connection
 
-    def do_dbus_unregister(
-        self, connection: Gio.DBusConnection, object_path: str
-    ) -> None:
-        self._service.unexport(connection)
-        Gio.Application.do_dbus_unregister(self, connection, object_path)
+    def on_name_acquired(self, _connection: Gio.DBusConnection, _name: str) -> None:
+        self._idle_mgr.start()
+
+    def on_name_lost(self, connection: Optional[Gio.DBusConnection], name: str) -> None:
+        if connection is None:
+            print(
+                "ubuntu-drivers-dbus-service: fatal: cannot connect to system bus",
+                file=sys.stderr,
+            )
+        elif self._owner_id != 0:
+            # owner_id is zeroed in _begin_shutdown before unowning, so a
+            # non-zero value here is unexpected
+            print(
+                f"ubuntu-drivers-dbus-service: fatal: cannot own '{name}' on system bus",
+                file=sys.stderr,
+            )
+        self._idle_mgr.cancel()
+        self._loop.quit()
+
+    def _begin_shutdown(self) -> bool:
+        """Release the bus name; on_name_lost will quit the loop once dbus-daemon acks."""
+        self._idle_mgr.cancel()
+        owner_id = self._owner_id
+        self._owner_id = 0
+        Gio.bus_unown_name(owner_id)
+        return GLib.SOURCE_REMOVE
 
 
 def main() -> None:
-    """Run the D-Bus service main loop."""
-    app = DriversApplication()
-    app.run(None)
+    """Run the D-Bus system service main loop."""
+    DEFAULT_IDLE_TIMEOUT_SECONDS = 300
+    loop = GLib.MainLoop()
+    _ServiceRunner(loop, timeout_seconds=DEFAULT_IDLE_TIMEOUT_SECONDS).run()

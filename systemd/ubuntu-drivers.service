@@ -7,3 +7,7 @@ BusName=org.ubuntu.Drivers
 ExecStart=/usr/libexec/ubuntu-drivers-dbus-service
 StandardOutput=journal
 StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+Alias=dbus-org.ubuntu.Drivers.service

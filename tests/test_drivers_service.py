@@ -17,7 +17,6 @@ from UbuntuDrivers.service import drivers_service
 
 import testarchive
 
-
 # Modalias of an NVIDIA card covered by the test nvidia-* packages.
 # Same value as used in test_ubuntu_drivers.py.
 _MODALIAS_NV = "pci:v000010DEd000010C3sv00003842sd00002670bc03sc03i00"
@@ -161,11 +160,36 @@ def _normalize_dbus_value(value):
     return value
 
 
+def _write_dbus_system_config(path: str, socket_path: str) -> str:
+    """Write a minimal dbus-daemon system-bus config to `path`.
+
+    The config allows any user to own any name and send any message, which
+    is appropriate for an isolated test daemon. Returns `path`.
+    """
+    config = f"""<!DOCTYPE busconfig PUBLIC
+ "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <type>system</type>
+  <listen>unix:path={socket_path}</listen>
+  <policy context="default">
+    <allow user="*"/>
+    <allow own="*"/>
+    <allow send_destination="*"/>
+    <allow receive_sender="*"/>
+  </policy>
+</busconfig>
+"""
+    with open(path, "w") as f:
+        f.write(config)
+    return path
+
+
 class DriversServiceDbusTests(unittest.TestCase):
     """Integration tests for the D-Bus drivers service.
 
     A single D-Bus daemon and service instance are shared across all tests in
-    this class.  Fake hardware is provided via UMockdev and fake packages via a
+    this class. Fake hardware is provided via UMockdev and fake packages via a
     testarchive-backed apt chroot, mirroring the pattern used in DetectTest in
     test_ubuntu_drivers.py.
     """
@@ -182,10 +206,15 @@ class DriversServiceDbusTests(unittest.TestCase):
         cls._chroot = _AptChroot()
         cls._chroot.setup(cls._archive)
 
+        cls._tmpdir = tempfile.mkdtemp(prefix="udc-dbus-test-")
+        socket_path = os.path.join(cls._tmpdir, "bus.sock")
+        config_path = os.path.join(cls._tmpdir, "test-system-bus.conf")
+        _write_dbus_system_config(config_path, socket_path)
+
         output = subprocess.check_output(
             [
                 "dbus-daemon",
-                "--session",
+                f"--config-file={config_path}",
                 "--print-address=1",
                 "--print-pid=1",
                 "--fork",
@@ -196,18 +225,49 @@ class DriversServiceDbusTests(unittest.TestCase):
         if len(lines) < 2:
             raise RuntimeError("Failed to start dbus-daemon for tests")
 
-        cls._old_dbus_address = os.environ.get("DBUS_SESSION_BUS_ADDRESS")
         cls._dbus_address = lines[0].strip()
         cls._dbus_pid = int(lines[1].strip())
-        os.environ["DBUS_SESSION_BUS_ADDRESS"] = cls._dbus_address
+
+        # Point the GIO system-bus machinery at our private daemon.
+        cls._old_system_bus_address = os.environ.get("DBUS_SYSTEM_BUS_ADDRESS")
+        os.environ["DBUS_SYSTEM_BUS_ADDRESS"] = cls._dbus_address
 
         cls._service_ready = threading.Event()
+        cls._main_loop = None
 
         def _run_service() -> None:
-            cls._app = drivers_service.DriversApplication(idle_timeout_seconds=300)
-            cls._app.register(None)
+            # Obtain a connection to the test daemon directly so we can export
+            # our object before any client tries to call it.
+            connection = Gio.DBusConnection.new_for_address_sync(
+                cls._dbus_address,
+                Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT
+                | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION,
+                None,
+                None,
+            )
+            # Request the well-known bus name so clients can find the service.
+            connection.call_sync(
+                "org.freedesktop.DBus",
+                "/org/freedesktop/DBus",
+                "org.freedesktop.DBus",
+                "RequestName",
+                GLib.Variant("(su)", (drivers_service.DriversService.BUS_NAME, 0)),
+                GLib.VariantType.new("(u)"),
+                Gio.DBusCallFlags.NONE,
+                -1,
+                None,
+            )
+
+            cls._loop = GLib.MainLoop()
+            idle_mgr = drivers_service._IdleManager(cls._loop.quit, timeout_seconds=300)
+            cls._service = drivers_service.DriversService(
+                hold=idle_mgr.hold,
+                release=idle_mgr.release,
+            )
+            cls._service.export(connection)
+            cls._connection = connection
             cls._service_ready.set()
-            cls._app.run(None)
+            cls._loop.run()
 
         cls._loop_thread = threading.Thread(target=_run_service, daemon=True)
         cls._loop_thread.start()
@@ -215,7 +275,7 @@ class DriversServiceDbusTests(unittest.TestCase):
             raise RuntimeError("D-Bus service thread failed to start")
 
         cls._drivers_proxy = Gio.DBusProxy.new_for_bus_sync(
-            Gio.BusType.SESSION,
+            Gio.BusType.SYSTEM,
             Gio.DBusProxyFlags.NONE,
             None,
             drivers_service.DriversService.BUS_NAME,
@@ -224,7 +284,7 @@ class DriversServiceDbusTests(unittest.TestCase):
             None,
         )
         cls._introspection_proxy = Gio.DBusProxy.new_for_bus_sync(
-            Gio.BusType.SESSION,
+            Gio.BusType.SYSTEM,
             Gio.DBusProxyFlags.NONE,
             None,
             drivers_service.DriversService.BUS_NAME,
@@ -235,8 +295,8 @@ class DriversServiceDbusTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        if hasattr(cls, "_app"):
-            GLib.idle_add(cls._app.quit)
+        if hasattr(cls, "_loop"):
+            GLib.idle_add(cls._loop.quit)
         if hasattr(cls, "_loop_thread"):
             cls._loop_thread.join(timeout=2)
 
@@ -246,17 +306,20 @@ class DriversServiceDbusTests(unittest.TestCase):
             except OSError:
                 pass
 
-        if hasattr(cls, "_old_dbus_address"):
-            if cls._old_dbus_address is None:
-                os.environ.pop("DBUS_SESSION_BUS_ADDRESS", None)
+        if hasattr(cls, "_old_system_bus_address"):
+            if cls._old_system_bus_address is None:
+                os.environ.pop("DBUS_SYSTEM_BUS_ADDRESS", None)
             else:
-                os.environ["DBUS_SESSION_BUS_ADDRESS"] = cls._old_dbus_address
+                os.environ["DBUS_SYSTEM_BUS_ADDRESS"] = cls._old_system_bus_address
 
         if hasattr(cls, "_chroot"):
             cls._chroot.remove()
 
+        if hasattr(cls, "_tmpdir"):
+            shutil.rmtree(cls._tmpdir, ignore_errors=True)
+
     def setUp(self):
-        self._app._service._cached_result = None
+        self._service._cached_result = None
 
     def _call_drivers(self):
         result_variant = self._drivers_proxy.call_sync(

@@ -61,7 +61,7 @@ Description: Detect and install additional Ubuntu driver packages
     hardware or the whole system.
  .
    - a D-Bus service (org.ubuntu.Drivers) for querying driver information
-     via the session bus.
+     via the system bus.
  .
   - an "ubuntu-drivers" command line tool to list or install driver packages
     (mostly for integration in installers).
