@@ -260,10 +260,7 @@ class DriversServiceDbusTests(unittest.TestCase):
 
             cls._loop = GLib.MainLoop()
             idle_mgr = drivers_service._IdleManager(cls._loop.quit, timeout_seconds=300)
-            cls._service = drivers_service.DriversService(
-                hold=idle_mgr.hold,
-                release=idle_mgr.release,
-            )
+            cls._service = drivers_service.DriversService(idle_mgr)
             cls._service.export(connection)
             cls._connection = connection
             cls._service_ready.set()
