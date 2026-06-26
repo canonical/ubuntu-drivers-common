@@ -65,19 +65,13 @@ def _build_drivers_variant() -> GLib.Variant:
             drivers_info.items(),
             key=lambda item: (not item[1].get("recommended", False), item[0]),
         ):
+            source = "distro" if pkg_info.get("from_distro", False) else "third-party"
             driver_list.append(
                 GLib.Variant(
                     "a{sv}",
                     {
                         "name": GLib.Variant("s", pkg_name),
-                        "source": GLib.Variant(
-                            "s",
-                            (
-                                "distro"
-                                if pkg_info.get("from_distro", False)
-                                else "third-party"
-                            ),
-                        ),
+                        "source": GLib.Variant("s", source),
                         "free": GLib.Variant("b", bool(pkg_info.get("free", False))),
                         "builtin": GLib.Variant(
                             "b", bool(pkg_info.get("builtin", False))
@@ -104,7 +98,8 @@ def _build_drivers_variant() -> GLib.Variant:
 
 
 class _IdleManager:
-    """Inactivity manager that invokes a callback after a period of idle.
+    """Inactivity manager that invokes a callback after a period of idle. Used
+    for shutting down the `DriversService` after a period of inactivity.
 
     Callers call :meth:`hold` when async work begins and :meth:`release` when
     it ends. The timeout is only active while no work is in progress.
@@ -175,8 +170,7 @@ class DriversService:
             method drivers() -> aa{sv}
 
     Args:
-        hold: Callable invoked when async work begins (prevents idle exit).
-        release: Callable invoked when async work ends (allows idle exit).
+        idle_manager: Instance of _IdleManager to manage inactivity timeouts.
     """
 
     BUS_NAME = "org.ubuntu.Drivers"
@@ -193,11 +187,10 @@ class DriversService:
 
     def __init__(
         self,
-        hold: Callable[[], None],
-        release: Callable[[], None],
+        idle_manager: _IdleManager,
     ) -> None:
-        self._hold = hold
-        self._release = release
+        self._hold = idle_manager.hold
+        self._release = idle_manager.release
         self._object_registration_id: int | None = None
         self._interface_info = Gio.DBusNodeInfo.new_for_xml(
             self._INTROSPECTION_XML
@@ -337,9 +330,7 @@ class _ServiceRunner:
                 self._service.unexport(self._connection)
 
     def on_bus_acquired(self, connection: Gio.DBusConnection, _name: str) -> None:
-        self._service = DriversService(
-            hold=self._idle_mgr.hold, release=self._idle_mgr.release
-        )
+        self._service = DriversService(self._idle_mgr)
         self._service.export(connection)
         self._connection = connection
 
