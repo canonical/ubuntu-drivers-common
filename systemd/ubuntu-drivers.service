@@ -3,11 +3,11 @@ Description=Ubuntu Drivers D-Bus Service
 
 [Service]
 Type=dbus
-BusName=org.ubuntu.Drivers
+BusName=com.ubuntu.Drivers
 ExecStart=/usr/libexec/ubuntu-drivers-dbus-service
 StandardOutput=journal
 StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
-Alias=dbus-org.ubuntu.Drivers.service
+Alias=dbus-com.ubuntu.Drivers.service

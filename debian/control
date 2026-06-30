@@ -60,7 +60,7 @@ Description: Detect and install additional Ubuntu driver packages
   - a Python API for detecting driver packages for a particular piece of
     hardware or the whole system.
  .
-   - a D-Bus service (org.ubuntu.Drivers) for querying driver information
+   - a D-Bus service (com.ubuntu.Drivers) for querying driver information
      via the system bus.
  .
   - an "ubuntu-drivers" command line tool to list or install driver packages

@@ -154,7 +154,7 @@ class _IdleManager:
 
 
 class DriversService:
-    """D-Bus object that exposes driver detection results on org.ubuntu.Drivers.
+    """D-Bus object that exposes driver detection results on com.ubuntu.Drivers.
 
     This class handles registration of the D-Bus object on a connection and
     dispatches the ``drivers`` method call asynchronously so that the GLib main
@@ -166,18 +166,18 @@ class DriversService:
 
     The object exposes a single interface:
 
-        interface org.ubuntu.Drivers
+        interface com.ubuntu.Drivers
             method drivers() -> aa{sv}
 
     Args:
         idle_manager: Instance of _IdleManager to manage inactivity timeouts.
     """
 
-    BUS_NAME = "org.ubuntu.Drivers"
+    BUS_NAME = "com.ubuntu.Drivers"
     OBJ_PATH = "/org/ubuntu/Drivers"
     _INTROSPECTION_XML = """
 <node>
-  <interface name="org.ubuntu.Drivers">
+  <interface name="com.ubuntu.Drivers">
     <method name="drivers">
       <arg type="aa{sv}" direction="out"/>
     </method>
@@ -258,7 +258,7 @@ class DriversService:
             task.return_value(_build_drivers_variant())
         except RuntimeError as ex:
             task.return_error(
-                GLib.Error(str(ex), "org.ubuntu.Drivers.Error.CacheFailure", 0)
+                GLib.Error(str(ex), "com.ubuntu.Drivers.Error.CacheFailure", 0)
             )
 
     def _on_done(self, _source: None, result: Gio.Task, _data: None) -> None:
@@ -270,7 +270,7 @@ class DriversService:
         except GLib.Error as ex:
             for invocation in self._pending_invocations:
                 invocation.return_dbus_error(
-                    "org.ubuntu.Drivers.Error.CacheFailure",
+                    "com.ubuntu.Drivers.Error.CacheFailure",
                     ex.message,
                 )
         finally:

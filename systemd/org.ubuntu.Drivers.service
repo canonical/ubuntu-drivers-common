@@ -1,5 +1,5 @@
 [D-BUS Service]
-Name=org.ubuntu.Drivers
+Name=com.ubuntu.Drivers
 Exec=/bin/false
 User=root
 SystemdService=ubuntu-drivers.service

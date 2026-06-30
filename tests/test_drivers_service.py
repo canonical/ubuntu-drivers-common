@@ -369,7 +369,7 @@ class DriversServiceDbusTests(unittest.TestCase):
         root = ET.fromstring(xml)
 
         method = root.find(
-            ".//interface[@name='org.ubuntu.Drivers']/method[@name='drivers']"
+            ".//interface[@name='com.ubuntu.Drivers']/method[@name='drivers']"
         )
         self.assertIsNotNone(method, "drivers method missing from introspection")
         out_args = method.findall("./arg[@direction='out']")
