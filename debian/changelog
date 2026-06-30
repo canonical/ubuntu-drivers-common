@@ -2,7 +2,7 @@ ubuntu-drivers-common (1:0.10.10) resolute; urgency=medium
 
   * Add D-Bus service for Ubuntu Drivers
 
- -- Jean-Baptiste Lallement <jean-baptiste.lallement@canonical.com>  Mon, 15 Jun 2026 08:50:42 +0100
+ -- ashuntu <ashton.nelson@canonical.com>  Mon, 15 Jun 2026 08:50:42 +0100
 
 ubuntu-drivers-common (1:0.10.9) resolute; urgency=medium
 
@@ -154,7 +154,7 @@ ubuntu-drivers-common (1:0.9.7.7) oracular; urgency=medium
     - Change Makefile to respect CC and CFLAGS environment variables
   * share/hybrid/71-u-d-c-gpu-detection.rules
     - Remove SimpleDRM device when nvidia-drm loads (LP: #2060268)
-  * share/hybrid/gpu-manager.c  
+  * share/hybrid/gpu-manager.c
     - Wait for nvidia-drm to settle before opening /dev/dri/card* (LP: #2060268)
 
  -- Kuba Pawlak <kuba.pawlak@canonical.com>  Wed, 24 Jul 2024 11:00:58 +0200
@@ -1906,7 +1906,7 @@ ubuntu-drivers-common (1:0.2.69) quantal; urgency=low
     (LP: #1045629)
   * setup.py: Only install the upstart job on platforms where we build
     hybrid-detect. (LP: #1045193)
-  * debian/rules: On architectures which do not ship hybrid-detect, generate a 
+  * debian/rules: On architectures which do not ship hybrid-detect, generate a
     .maintscript helper to clean up the /etc/init/hybrid-gfx.conf upstart job
     conffile on upgrade.
   * tests/ubuntu_drivers.py: Add test for a video driver which supports
@@ -2418,7 +2418,7 @@ nvidia-common (0.2.27) natty; urgency=low
 
   * nvidia-detector:
     - Initialise NvidiaDetection() with verbose=False. This should avoid
-      problems when dealing with debconf (LP: #698327). 
+      problems when dealing with debconf (LP: #698327).
 
  -- Alberto Milone <alberto.milone@canonical.com>  Tue, 18 Jan 2011 18:15:44 +0100
 
@@ -2530,7 +2530,7 @@ nvidia-common (0.2.18) lucid; urgency=low
       adapt to the fact that the alternative lives in mesa now.
     - Do not pass arguments to the list_alternatives method.
     - Use subprocess.check_call instead of .call so as to get the exit
-      status in addition to the return code. 
+      status in addition to the return code.
 
  -- Alberto Milone <alberto.milone@canonical.com>  Tue, 19 Jan 2010 17:18:45 +0100
 
@@ -2659,7 +2659,7 @@ nvidia-common (0.2.7) jaunty; urgency=low
 nvidia-common (0.2.6) jaunty; urgency=low
 
   * debian/control:
-    - Drop dependency on nvidia-177-modaliases since it's not 
+    - Drop dependency on nvidia-177-modaliases since it's not
       compatible with Jaunty's X ABI.
     - Add Vcs-Bzr
 
