@@ -1223,6 +1223,7 @@ def nvidia_desktop_post_installation_hook() -> None:
 
 
 class _GpgpuDriver(object):
+
     def __init__(
         self, vendor: Optional[str] = None, flavour: Optional[str] = None
     ) -> None:
