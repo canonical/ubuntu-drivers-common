@@ -670,7 +670,7 @@ def _get_db_name(syspath: str, alias: str) -> Tuple[Optional[str], Optional[str]
     vendor = None
     model = None
     for line in out.splitlines():
-        k, v = line.split("=", 1)
+        (k, v) = line.split("=", 1)
         if "_VENDOR" in k:
             vendor = v
         if "_MODEL" in k:
@@ -780,7 +780,7 @@ def system_driver_packages(
                 "runtimepm": _is_runtimepm_supported(apt_cache, p, alias),
                 "open_preferred": _is_open_prefered(apt_cache, p),
             }
-            vendor, model = _get_db_name(syspath, alias)
+            (vendor, model) = _get_db_name(syspath, alias)
             if vendor is not None:
                 packages[p.name]["vendor"] = vendor
             if model is not None:
@@ -1016,7 +1016,7 @@ def system_gpgpu_driver_packages(
     modalias_map = apt_cache_modalias_map(apt_cache)
     for alias, syspath in modaliases.items():
         for p in packages_for_modalias(apt_cache, alias, modalias_map=modalias_map):
-            vendor, model = _get_db_name(syspath, alias)
+            (vendor, model) = _get_db_name(syspath, alias)
             vendor_id, model_id = _get_vendor_model_from_alias(alias)
             if (vendor_id is not None) and (vendor_id.lower() in vendors_whitelist):
                 packages[p.name] = {
