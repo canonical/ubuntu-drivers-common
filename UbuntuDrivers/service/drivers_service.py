@@ -79,9 +79,7 @@ def _build_drivers_variant() -> GLib.Variant:
                         "recommended": GLib.Variant(
                             "b", bool(pkg_info.get("recommended", False))
                         ),
-                        "support": GLib.Variant(
-                            "s", pkg_info.get("support") or ""
-                        ),
+                        "support": GLib.Variant("s", pkg_info.get("support") or ""),
                     },
                 )
             )
@@ -263,9 +261,7 @@ class DriversService:
                 GLib.Error(str(ex), "com.ubuntu.Drivers.Error.CacheFailure", 0)
             )
 
-    def _on_done(
-        self, _source: None, result: Gio.Task, _data: None
-    ) -> None:
+    def _on_done(self, _source: None, result: Gio.Task, _data: None) -> None:
         try:
             value = result.propagate_value()
             self._cached_result = value.value
