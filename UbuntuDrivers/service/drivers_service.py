@@ -189,8 +189,7 @@ class DriversService:
         self,
         idle_manager: _IdleManager,
     ) -> None:
-        self._hold = idle_manager.hold
-        self._release = idle_manager.release
+        self._idle_manager = idle_manager
         self._object_registration_id: int | None = None
         self._interface_info = Gio.DBusNodeInfo.new_for_xml(
             self._INTROSPECTION_XML
@@ -248,7 +247,7 @@ class DriversService:
 
         if not self._task_running:
             self._task_running = True
-            self._hold()
+            self._idle_manager.hold()
             task = Gio.Task.new(None, None, self._on_done, None)
             task.set_return_on_cancel(True)
             task.run_in_thread(self._run)
@@ -276,7 +275,7 @@ class DriversService:
         finally:
             self._pending_invocations.clear()
             self._task_running = False
-            self._release()
+            self._idle_manager.release()
 
     def unexport(self, connection: Gio.DBusConnection) -> None:
         """Unregister the D-Bus object from *connection*."""
