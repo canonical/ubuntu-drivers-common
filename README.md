@@ -58,7 +58,7 @@ root privileges, D-BUS calls, etc.
 
 This project also provides a session-bus D-Bus service that exposes driver
 information. The service registers as `com.ubuntu.Drivers` on the session bus
-with the object path `/org/ubuntu/Drivers` and exposes a single method:
+with the object path `/com/ubuntu/Drivers` and exposes a single method:
 
 * `drivers`: Returns a list of devices and their available drivers. The first
   driver entry in each list is the recommended one.

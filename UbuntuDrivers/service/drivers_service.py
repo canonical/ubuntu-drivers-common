@@ -174,7 +174,7 @@ class DriversService:
     """
 
     BUS_NAME = "com.ubuntu.Drivers"
-    OBJ_PATH = "/org/ubuntu/Drivers"
+    OBJ_PATH = "/com/ubuntu/Drivers"
     _INTROSPECTION_XML = """
 <node>
   <interface name="com.ubuntu.Drivers">
