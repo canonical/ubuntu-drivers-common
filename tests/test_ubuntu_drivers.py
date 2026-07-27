@@ -16,6 +16,7 @@ import sys
 import tempfile
 import shutil
 import logging
+import importlib.util
 
 # from gi.repository import GLib
 from gi.repository import UMockdev
@@ -37,6 +38,15 @@ APTDAEMON_LOG = False
 APTDAEMON_DEBUG = False
 
 dbus_address = None
+
+
+def load_detect_plugin(name):
+    """Load a detect plugin module from the detect-plugins/ source directory."""
+    path = os.path.join(ROOT_DIR, "detect-plugins", name + ".py")
+    spec = importlib.util.spec_from_file_location("dp_" + name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 # modalias of an nvidia card covered by our nvidia-* packages
@@ -6398,6 +6408,105 @@ Description: broken \xEB encoding
             res["coreutils"], {"free": True, "from_distro": True, "plugin": "extra.py"}
         )
 
+    def test_system_driver_packages_detect_plugins_metadata(self):
+        """system_driver_packages() includes vendor/model metadata from plugins"""
+
+        with open(os.path.join(self.plugin_dir, "extra.py"), "w") as f:
+            f.write(
+                'def detect(apt): return {"packages": ["coreutils"], '
+                '"vendor": "Foo Inc", "model": "Bar 3000"}\n'
+            )
+
+        res = UbuntuDrivers.detect.system_driver_packages(
+            sys_path=self.umockdev.get_sys_dir()
+        )
+        self.assertTrue("coreutils" in res, list(res.keys()))
+        self.assertEqual(
+            res["coreutils"],
+            {
+                "free": True,
+                "from_distro": True,
+                "plugin": "extra.py",
+                "vendor": "Foo Inc",
+                "model": "Bar 3000",
+            },
+        )
+
+    def test_detect_plugin_packages_dict_metadata(self):
+        """detect_plugin_packages() collects vendor/model metadata"""
+
+        apt_pkg.init_config()
+        apt_pkg.init_system()
+        cache = apt_pkg.Cache(None)
+
+        with open(os.path.join(self.plugin_dir, "meta.py"), "w") as f:
+            f.write(
+                'def detect(apt): return {"packages": ["coreutils"], '
+                '"vendor": "Foo Inc", "model": "Bar 3000"}\n'
+            )
+
+        metadata = {}
+        res = UbuntuDrivers.detect.detect_plugin_packages(
+            cache, plugin_metadata=metadata
+        )
+        self.assertEqual(res, {"meta.py": ["coreutils"]})
+        self.assertEqual(
+            metadata, {"meta.py": {"vendor": "Foo Inc", "model": "Bar 3000"}}
+        )
+
+    def test_detect_plugin_packages_dedup_sorted(self):
+        """detect_plugin_packages() deduplicates and sorts package lists"""
+
+        apt_pkg.init_config()
+        apt_pkg.init_system()
+        cache = apt_pkg.Cache(None)
+
+        with open(os.path.join(self.plugin_dir, "dup.py"), "w") as f:
+            f.write('def detect(apt): return ["coreutils", "bash", "coreutils"]\n')
+
+        res = UbuntuDrivers.detect.detect_plugin_packages(cache)
+        self.assertEqual(res, {"dup.py": ["bash", "coreutils"]})
+
+    def test_detect_plugin_packages_invalid_metadata(self):
+        """detect_plugin_packages() validates the dict return format"""
+
+        apt_pkg.init_config()
+        apt_pkg.init_system()
+        cache = apt_pkg.Cache(None)
+
+        # non-string vendor -> whole plugin result is skipped
+        with open(os.path.join(self.plugin_dir, "badvendor.py"), "w") as f:
+            f.write(
+                'def detect(apt): return {"packages": ["coreutils"], "vendor": 1}\n'
+            )
+        # non-string model -> whole plugin result is skipped
+        with open(os.path.join(self.plugin_dir, "badmodel.py"), "w") as f:
+            f.write(
+                'def detect(apt): return {"packages": ["coreutils"], "model": []}\n'
+            )
+        # missing "packages" key -> not a list/set -> skipped
+        with open(os.path.join(self.plugin_dir, "nopackages.py"), "w") as f:
+            f.write('def detect(apt): return {"vendor": "Foo"}\n')
+        # non-string package name is skipped, valid packages are kept
+        with open(os.path.join(self.plugin_dir, "mixed.py"), "w") as f:
+            f.write('def detect(apt): return {"packages": ["coreutils", 5]}\n')
+
+        metadata = {}
+        # suppress logging the deliberate errors in our test plugins to stderr
+        logging.getLogger().setLevel(logging.CRITICAL)
+        try:
+            res = UbuntuDrivers.detect.detect_plugin_packages(
+                cache, plugin_metadata=metadata
+            )
+        finally:
+            logging.getLogger().setLevel(logging.INFO)
+
+        self.assertNotIn("badvendor.py", res)
+        self.assertNotIn("badmodel.py", res)
+        self.assertNotIn("nopackages.py", res)
+        self.assertEqual(res.get("mixed.py"), ["coreutils"])
+        self.assertEqual(metadata, {})
+
     def test_system_device_drivers_chroot(self):
         """system_device_drivers() for test package repository"""
 
@@ -8582,6 +8691,128 @@ class KernelDectionTest(unittest.TestCase):
             self.assertEqual(linux, "linux-oem-20.04")
         finally:
             chroot.remove()
+
+
+class DisplayLinkPluginTest(unittest.TestCase):
+    """Test the DisplayLink USB detection plugin"""
+
+    def setUp(self):
+        self.plugin = load_detect_plugin("displaylink")
+        self.sysfs = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.sysfs)
+
+    def _add_device(self, name, attrs, interfaces=None):
+        """Create a fake USB device directory in the temporary sysfs tree."""
+        dev = os.path.join(self.sysfs, name)
+        os.makedirs(dev)
+        for key, value in attrs.items():
+            with open(os.path.join(dev, key), "w") as f:
+                f.write(value + "\n")
+        for iface_name, iface_attrs in (interfaces or {}).items():
+            iface = os.path.join(dev, iface_name)
+            os.makedirs(iface)
+            for key, value in iface_attrs.items():
+                with open(os.path.join(iface, key), "w") as f:
+                    f.write(value + "\n")
+        return dev
+
+    def test_detect_displaylink_device(self):
+        """A DisplayLink device without a udl interface is detected"""
+
+        self._add_device(
+            "1-1",
+            {"idVendor": "17e9", "idProduct": "4301", "product": "Displaylink Universal Dock"},
+        )
+        res = self.plugin._detect_displaylink_device(sysfs_root=self.sysfs)
+        self.assertEqual(res, {"vendor": "DisplayLink", "model": "Displaylink Universal Dock"})
+
+    def test_udl_device_excluded(self):
+        """A device matching the in-kernel udl driver is not recommended"""
+
+        self._add_device(
+            "1-1",
+            {"idVendor": "17e9", "idProduct": "4301", "product": "Displaylink Universal Dock"},
+            interfaces={
+                "1-1:1.0": {
+                    "bInterfaceClass": "ff",
+                    "bInterfaceSubClass": "00",
+                    "bInterfaceProtocol": "00",
+                }
+            },
+        )
+        self.assertIsNone(
+            self.plugin._detect_displaylink_device(sysfs_root=self.sysfs)
+        )
+
+    def test_device_with_non_udl_interface_detected(self):
+        """A DisplayLink device with a non-matching interface is still detected"""
+
+        self._add_device(
+            "1-1",
+            {"idVendor": "17e9", "idProduct": "4301", "product": "Monitor"},
+            interfaces={
+                "1-1:1.0": {
+                    "bInterfaceClass": "ff",
+                    "bInterfaceSubClass": "01",
+                    "bInterfaceProtocol": "00",
+                }
+            },
+        )
+        res = self.plugin._detect_displaylink_device(sysfs_root=self.sysfs)
+        self.assertEqual(res, {"vendor": "DisplayLink", "model": "Monitor"})
+
+    def test_non_displaylink_vendor(self):
+        """Devices from other vendors are ignored"""
+
+        self._add_device("1-1", {"idVendor": "1234", "idProduct": "0001"})
+        self.assertIsNone(
+            self.plugin._detect_displaylink_device(sysfs_root=self.sysfs)
+        )
+
+    def test_model_fallback_to_product_id(self):
+        """The model falls back to the product id when no product name exists"""
+
+        self._add_device("1-1", {"idVendor": "17e9", "idProduct": "4A01"})
+        res = self.plugin._detect_displaylink_device(sysfs_root=self.sysfs)
+        self.assertEqual(
+            res, {"vendor": "DisplayLink", "model": "USB product 4a01"}
+        )
+
+    def test_missing_sysfs_root(self):
+        """A missing sysfs root does not raise and returns None"""
+
+        res = self.plugin._detect_displaylink_device(
+            sysfs_root=os.path.join(self.sysfs, "does-not-exist")
+        )
+        self.assertIsNone(res)
+
+    def test_detect_returns_package(self):
+        """detect() wraps a detected device into a package recommendation"""
+
+        with patch.object(
+            self.plugin,
+            "_detect_displaylink_device",
+            return_value={"vendor": "DisplayLink", "model": "Displaylink Universal Dock"},
+        ):
+            res = self.plugin.detect(None)
+        self.assertEqual(
+            res,
+            {
+                "packages": ["displaylink-driver"],
+                "vendor": "DisplayLink",
+                "model": "Displaylink Universal Dock",
+            },
+        )
+
+    def test_detect_no_device(self):
+        """detect() returns None when no DisplayLink device is present"""
+
+        with patch.object(
+            self.plugin, "_detect_displaylink_device", return_value=None
+        ):
+            self.assertIsNone(self.plugin.detect(None))
 
 
 if __name__ == "__main__":
