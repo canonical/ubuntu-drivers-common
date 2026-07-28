@@ -39,7 +39,7 @@ setup(
         ),
         ("/var/lib/ubuntu-drivers-common/", []),
         ("/usr/share/ubuntu-drivers-common/quirks", glob.glob("quirks/*")),
-        ("/usr/share/ubuntu-drivers-common/detect", glob.glob("detect-plugins/*")),
+        ("/usr/share/ubuntu-drivers-common/detect", [f for f in glob.glob("detect-plugins/*") if os.path.isfile(f)]),
         ("/usr/share/doc/ubuntu-drivers-common", ["README"]),
         ("/usr/lib/nvidia/", glob.glob("nvidia-installer-hooks/*")),
     ]
