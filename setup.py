@@ -40,7 +40,6 @@ setup(
         ("/usr/share/ubuntu-drivers-common/detect", glob.glob("detect-plugins/*")),
         ("/usr/share/doc/ubuntu-drivers-common", ["README"]),
         ("/usr/lib/nvidia/", glob.glob("nvidia-installer-hooks/*")),
-        ("/usr/lib/ubiquity/target-config", glob.glob("ubiquity/target-config/*")),
     ]
     + extra_data,
     scripts=["quirks-handler", "ubuntu-drivers"],
