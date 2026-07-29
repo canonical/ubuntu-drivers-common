@@ -305,10 +305,9 @@ class _ServiceRunner:
 
     def run(self) -> None:
         """Acquire the bus name, install signal handling, and run the main loop."""
-        # Block the default SIGTERM action so the kernel does not kill us
-        # mid-drain.  GLib's Unix signal source delivers it safely on the
-        # next main-loop iteration instead.
-        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        # GLib's Unix signal source installs its own SIGTERM handler and
+        # dispatches it from the main loop, so shutdown runs on the main thread
+        # rather than in signal context.
         GLib.unix_signal_add(
             GLib.PRIORITY_DEFAULT, signal.SIGTERM, self._begin_shutdown
         )
@@ -353,11 +352,19 @@ class _ServiceRunner:
         self._loop.quit()
 
     def _begin_shutdown(self) -> bool:
-        """Release the bus name; on_name_lost will quit the loop once dbus-daemon acks."""
+        """Release the bus name and quit the main loop.
+
+        ``Gio.bus_unown_name()`` does not invoke the ``name_lost`` handler --
+        that fires only when the name is taken away by the bus -- so the loop
+        must be quit explicitly.  Quitting from an idle callback gives the
+        pending ReleaseName traffic a chance to drain first.
+        """
         self._idle_mgr.cancel()
         owner_id = self._owner_id
         self._owner_id = 0
-        Gio.bus_unown_name(owner_id)
+        if owner_id != 0:
+            Gio.bus_unown_name(owner_id)
+        GLib.idle_add(self._loop.quit)
         return GLib.SOURCE_REMOVE
 
 
