@@ -14,8 +14,9 @@ ifeq (, $(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 	PYTHONPATH=. tests/run
 	# Run mypy type checking
 	mypy UbuntuDrivers/ Quirks/ ubuntu-drivers
-	# Run black tests
-	black --check UbuntuDrivers/ Quirks/ ubuntu-drivers
+	# Run black tests. Same scope as git-hooks/pre-commit, so that a tree
+	# which passes the hook also passes the build.
+	black --check .
   endif
 endif
 
