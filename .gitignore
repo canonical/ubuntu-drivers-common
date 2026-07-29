@@ -4,3 +4,4 @@ share/hybrid/hybrid-detect
 share/hybrid/gpu-manager
 share/hybrid/gpu-manager.o
 share/hybrid/json-parser/*.o
+settings.py
