@@ -1,5 +1,5 @@
 #!/usr/bin/make -f
-DEB_VERSION=$(shell dpkg-parsechangelog | grep ^Version | cut -f2 -d\ |cut -f1 -d-)
+include /usr/share/dpkg/pkg-info.mk
 DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
 TEST_ARCHES=amd64 arm64
 PYBUILD_NAME=ubuntu-drivers-common
@@ -33,7 +33,7 @@ override_dh_install:
 
 	# build dh_modaliases manpage
 	mkdir -p debian/dh-modaliases/usr/share/man/man1
-	pod2man -c Debhelper -r "$(DEB_VERSION)" debhelper/dh_modaliases debian/dh-modaliases/usr/share/man/man1/dh_modaliases.1
+	pod2man -c Debhelper -r "$(DEB_VERSION_EPOCH_UPSTREAM)" debhelper/dh_modaliases debian/dh-modaliases/usr/share/man/man1/dh_modaliases.1
 
 override_dh_python3:
 	dh_python3 --shebang=/usr/bin/python3
