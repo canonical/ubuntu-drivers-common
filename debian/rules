@@ -20,16 +20,10 @@ ifeq (, $(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 endif
 
 override_dh_install:
-	dh_install -Xlib/systemd -Xsbin -Xlib/udev
-
-	# on architectures where we build gpu-manager, install the systemd unit,
-	# the udev rule, and the script for gpu detection
-	if [ -d debian/tmp/lib/systemd ]; then \
-		dh_install -p ubuntu-drivers-common lib/systemd; \
-		dh_systemd_enable -p ubuntu-drivers-common; \
-		dh_install -p ubuntu-drivers-common lib/udev/rules.d; \
-		dh_install -p ubuntu-drivers-common sbin; \
-	fi
+	# on architectures where we build gpu-manager, this also picks up the
+	# systemd unit, the udev rule and the script for gpu detection; they all
+	# live under /usr now, so debian/ubuntu-drivers-common.install covers them
+	dh_install
 
 	# build dh_modaliases manpage
 	mkdir -p debian/dh-modaliases/usr/share/man/man1

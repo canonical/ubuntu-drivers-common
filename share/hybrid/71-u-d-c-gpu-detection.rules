@@ -12,7 +12,7 @@ ACTION=="add", KERNEL=="card[0-9]*", SUBSYSTEM=="drm", DRIVERS=="nvidia", \
     ENV{U_D_C_MODESET}=="Y", ENV{U_D_C_FBDEV}!="Y", TEST=="/run/u-d-c-card0-is-simpledrm", RUN+="/bin/rm /dev/dri/card0"
 
 # Create a file with the card details for gpu-manager
-ACTION=="add", SUBSYSTEM=="drm", DEVPATH=="*/drm/card*", RUN+="/sbin/u-d-c-print-pci-ids"
+ACTION=="add", SUBSYSTEM=="drm", DEVPATH=="*/drm/card*", RUN+="/usr/sbin/u-d-c-print-pci-ids"
 
 # Create a file when a module is loaded
 ACTION=="add", SUBSYSTEMS=="pci", DRIVERS=="nvidia", RUN+="/bin/touch /run/u-d-c-nvidia-was-loaded"
