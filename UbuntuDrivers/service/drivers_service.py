@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import signal
 import sys
 from typing import Callable, List, Optional
@@ -16,6 +17,22 @@ sys_path = os.environ.get("UBUNTU_DRIVERS_SYS_DIR")
 
 # D-Bus signature for the drivers() return value.
 _DRIVERS_SIGNATURE = "aa{sv}"
+
+# D-Bus error names returned by drivers().
+_ERROR_CACHE_FAILURE = "com.ubuntu.Drivers.Error.CacheFailure"
+_ERROR_FAILED = "com.ubuntu.Drivers.Error.Failed"
+
+
+def _dbus_error_name(domain: str) -> str:
+    """Map a GLib error domain onto a D-Bus error name.
+
+    Only our own domains are already well-formed D-Bus error names; anything
+    else (``g-io-error-quark`` and friends) would be rejected by GDBus, so it
+    is reported as a generic failure instead.
+    """
+    if domain.startswith("com.ubuntu.Drivers."):
+        return domain
+    return _ERROR_FAILED
 
 
 def _build_drivers_variant() -> GLib.Variant:
@@ -256,22 +273,38 @@ class DriversService:
         try:
             task.return_value(_build_drivers_variant())
         except RuntimeError as ex:
-            task.return_error(
-                GLib.Error(str(ex), "com.ubuntu.Drivers.Error.CacheFailure", 0)
-            )
+            task.return_error(GLib.Error(str(ex), _ERROR_CACHE_FAILURE, 0))
+        except Exception as ex:
+            # Detection runs arbitrary code (apt lookups, detect plugins), so
+            # it can raise anything.  An exception escaping here would leave
+            # the task without a result, propagate_value() would fail, and no
+            # caller would ever be answered.
+            logging.exception("drivers(): detection failed")
+            task.return_error(GLib.Error(str(ex), _ERROR_FAILED, 0))
 
     def _on_done(self, _source: None, result: Gio.Task, _data: None) -> None:
+        value = None
+        error_name = ""
+        message = ""
+
         try:
-            value = result.propagate_value()
-            self._cached_result = value.value
-            for invocation in self._pending_invocations:
-                invocation.return_value(self._cached_result)
+            value = result.propagate_value().value
         except GLib.Error as ex:
-            for invocation in self._pending_invocations:
-                invocation.return_dbus_error(
-                    "com.ubuntu.Drivers.Error.CacheFailure",
-                    ex.message,
-                )
+            error_name = _dbus_error_name(ex.domain)
+            message = ex.message
+        except Exception as ex:
+            logging.exception("drivers(): could not retrieve the task result")
+            error_name = _ERROR_FAILED
+            message = str(ex)
+
+        try:
+            if error_name:
+                for invocation in self._pending_invocations:
+                    invocation.return_dbus_error(error_name, message)
+            else:
+                self._cached_result = value
+                for invocation in self._pending_invocations:
+                    invocation.return_value(value)
         finally:
             self._pending_invocations.clear()
             self._task_running = False
