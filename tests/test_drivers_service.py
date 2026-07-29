@@ -316,7 +316,7 @@ class DriversServiceDbusTests(unittest.TestCase):
             shutil.rmtree(cls._tmpdir, ignore_errors=True)
 
     def setUp(self):
-        self._service._cached_result = None
+        self._service.invalidate_cache()
 
     def _call_drivers(self):
         result_variant = self._drivers_proxy.call_sync(

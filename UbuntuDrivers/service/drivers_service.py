@@ -181,6 +181,12 @@ class DriversService:
     calls are queued and all receive the same result when detection completes.
     After a result is cached it is returned immediately to callers.
 
+    The cache is never refreshed in place, and serving it does not restart the
+    inactivity timer, so the idle timeout doubles as the upper bound on how
+    stale a reply can be: once it fires the process exits and the next call
+    activates a fresh one.  Use :meth:`invalidate_cache` to force re-detection
+    within the lifetime of a single process.
+
     The object exposes a single interface:
 
         interface com.ubuntu.Drivers
@@ -257,6 +263,10 @@ class DriversService:
             return
 
         if self._cached_result is not None:
+            # Deliberately does not touch the idle manager: a cache hit must
+            # not extend the lifetime of the process, because the cache is
+            # never refreshed while it lives.  The idle timeout is therefore
+            # also the upper bound on how stale a reply can be.
             invocation.return_value(self._cached_result)
             return
 
@@ -309,6 +319,10 @@ class DriversService:
             self._pending_invocations.clear()
             self._task_running = False
             self._idle_manager.release()
+
+    def invalidate_cache(self) -> None:
+        """Drop the cached result so the next call re-runs detection."""
+        self._cached_result = None
 
     def unexport(self, connection: Gio.DBusConnection) -> None:
         """Unregister the D-Bus object from *connection*."""
