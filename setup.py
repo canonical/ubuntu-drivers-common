@@ -29,7 +29,7 @@ setup(
     url="http://www.albertomilone.com",
     license="gpl",
     description="Detect and install additional Ubuntu driver packages",
-    packages=find_packages(),
+    packages=find_packages(include=["Quirks", "UbuntuDrivers", "UbuntuDrivers.*"]),
     data_files=[
         (
             "/usr/share/ubuntu-drivers-common/",
