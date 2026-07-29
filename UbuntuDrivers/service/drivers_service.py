@@ -18,6 +18,9 @@ sys_path = os.environ.get("UBUNTU_DRIVERS_SYS_DIR")
 # D-Bus signature for the drivers() return value.
 _DRIVERS_SIGNATURE = "aa{sv}"
 
+# Seconds of inactivity after which the service shuts down.
+DEFAULT_IDLE_TIMEOUT_SECONDS = 300
+
 # D-Bus error names returned by drivers().
 _ERROR_CACHE_FAILURE = "com.ubuntu.Drivers.Error.CacheFailure"
 _ERROR_FAILED = "com.ubuntu.Drivers.Error.Failed"
@@ -127,7 +130,9 @@ class _IdleManager:
     """
 
     def __init__(
-        self, on_timeout: Callable[[], object], timeout_seconds: int = 300
+        self,
+        on_timeout: Callable[[], object],
+        timeout_seconds: int = DEFAULT_IDLE_TIMEOUT_SECONDS,
     ) -> None:
         self._on_timeout_cb = on_timeout
         self._timeout_seconds = timeout_seconds
@@ -213,7 +218,7 @@ class DriversService:
         idle_manager: _IdleManager,
     ) -> None:
         self._idle_manager = idle_manager
-        self._object_registration_id: int | None = None
+        self._object_registration_id: Optional[int] = None
         self._interface_info = Gio.DBusNodeInfo.new_for_xml(
             self._INTROSPECTION_XML
         ).interfaces[0]
@@ -227,6 +232,10 @@ class DriversService:
         if self._object_registration_id is not None:
             return
 
+        # register_object_with_closures2() is required for the async pattern
+        # used here: the older closure API does not keep the invocation alive
+        # once the handler returns, and _handle_method_call() holds onto it
+        # until detection finishes.  Fall back only where it is unavailable.
         if hasattr(connection, "register_object_with_closures2"):
             self._object_registration_id = connection.register_object_with_closures2(
                 self.OBJ_PATH,
@@ -340,7 +349,11 @@ class _ServiceRunner:
         timeout_seconds: Seconds of inactivity before initiating shutdown.
     """
 
-    def __init__(self, loop: GLib.MainLoop, timeout_seconds: int = 300) -> None:
+    def __init__(
+        self,
+        loop: GLib.MainLoop,
+        timeout_seconds: int = DEFAULT_IDLE_TIMEOUT_SECONDS,
+    ) -> None:
         self._loop = loop
         self._idle_mgr = _IdleManager(
             on_timeout=self._begin_shutdown,
@@ -417,6 +430,4 @@ class _ServiceRunner:
 
 def main() -> None:
     """Run the D-Bus system service main loop."""
-    DEFAULT_IDLE_TIMEOUT_SECONDS = 300
-    loop = GLib.MainLoop()
-    _ServiceRunner(loop, timeout_seconds=DEFAULT_IDLE_TIMEOUT_SECONDS).run()
+    _ServiceRunner(GLib.MainLoop()).run()
