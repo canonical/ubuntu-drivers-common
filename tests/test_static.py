@@ -58,12 +58,9 @@ class TestStatic(unittest.TestCase):
             ".git",
             "__pycache__",
             "debian",
-            # Project dirs ignored for the moment
-            "Quirks",
         ]
         # List of files to ignore with ../ stripped from the beginning of the path
         ignore_files = [
-            "settings.py",
             "setup.py",
             # Project files ignores for the moment
             "tests/gpu-manager.py",

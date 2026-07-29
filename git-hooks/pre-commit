@@ -8,7 +8,7 @@ python3 -m unittest tests.test_static.TestStatic -v
 
 echo ""
 echo "Running mypy type checking..."
-mypy UbuntuDrivers/ Quirks/ ubuntu-drivers
+mypy UbuntuDrivers/ ubuntu-drivers
 
 echo ""
 echo "Running black check..."
