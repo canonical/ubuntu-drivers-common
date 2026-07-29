@@ -20,7 +20,12 @@ ifeq (, $(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 endif
 
 override_dh_install:
-	dh_install -Xlib/systemd -Xsbin -Xlib/udev
+	# -X matches anywhere in the path, so these have to name the gpu-manager
+	# files precisely: a bare -Xlib/systemd would also exclude everything
+	# under usr/lib/systemd, and a bare -Xsbin everything under usr/sbin.
+	dh_install -Xlib/systemd/system/gpu-manager.service \
+		-Xsbin/u-d-c-print-pci-ids \
+		-Xlib/udev/rules.d
 
 	# on architectures where we build gpu-manager, install the systemd unit,
 	# the udev rule, and the script for gpu detection
