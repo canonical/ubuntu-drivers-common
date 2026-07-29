@@ -150,7 +150,7 @@ class _IdleManager:
         self._timeout_id = None
         if not self._held:
             self._on_timeout_cb()
-        return GLib.SOURCE_REMOVE
+        return False  # GLib.SOURCE_REMOVE
 
 
 class DriversService:
@@ -365,7 +365,7 @@ class _ServiceRunner:
         if owner_id != 0:
             Gio.bus_unown_name(owner_id)
         GLib.idle_add(self._loop.quit)
-        return GLib.SOURCE_REMOVE
+        return False  # GLib.SOURCE_REMOVE
 
 
 def main() -> None:
