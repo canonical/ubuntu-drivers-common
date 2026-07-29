@@ -109,7 +109,7 @@ class TestStatic(unittest.TestCase):
         self.assertEqual(
             0,
             len(output),
-            "pycodestyle errors:\n%s" % "\n".join(output) if output else "",
+            ("pycodestyle errors:\n%s" % "\n".join(output)) if output else "",
         )
 
     @unittest.skipUnless(
@@ -149,5 +149,9 @@ class TestStatic(unittest.TestCase):
 
         self.assertFalse(
             error,
-            "pyflakes errors:\n%s" % "\n".join(failing_lines) if failing_lines else "",
+            (
+                ("pyflakes errors:\n%s" % "\n".join(failing_lines))
+                if failing_lines
+                else ""
+            ),
         )
