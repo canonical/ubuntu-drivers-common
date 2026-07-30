@@ -25,6 +25,13 @@ DEFAULT_IDLE_TIMEOUT_SECONDS = 300
 _ERROR_CACHE_FAILURE = "com.ubuntu.Drivers.Error.CacheFailure"
 _ERROR_FAILED = "com.ubuntu.Drivers.Error.Failed"
 
+# gi ships no type information, so GLib.SOURCE_REMOVE is Any and returning it
+# straight from a "-> bool" callback trips mypy's warn_return_any.  Binding it
+# once here keeps the GLib constant as the source of the value -- rather than
+# hardcoding False and naming the constant in a comment -- while giving the
+# callbacks below something typed to return.
+_SOURCE_REMOVE: bool = GLib.SOURCE_REMOVE
+
 
 def _dbus_error_name(domain: str) -> str:
     """Map a GLib error domain onto a D-Bus error name.
@@ -172,7 +179,7 @@ class _IdleManager:
         self._timeout_id = None
         if not self._held:
             self._on_timeout_cb()
-        return False  # GLib.SOURCE_REMOVE
+        return _SOURCE_REMOVE
 
 
 class DriversService:
@@ -425,7 +432,7 @@ class _ServiceRunner:
         if owner_id != 0:
             Gio.bus_unown_name(owner_id)
         GLib.idle_add(self._loop.quit)
-        return False  # GLib.SOURCE_REMOVE
+        return _SOURCE_REMOVE
 
 
 def main() -> None:
