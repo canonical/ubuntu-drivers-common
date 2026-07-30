@@ -19,64 +19,17 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import unittest, os.path, sys, logging, os, atexit
-import getopt
-
-def usage():
-    instructionsList = ['The only accepted (optional) parameters are:'
-    '\n  -o, --output=<dirname>', '\tthe directory where the results \n\
-\t\t\t\tof the tests are saved.'
-    
-    '\n  -i, --input=<filename>', '\tthe xorg.conf used for the tests.'
-    
-    '\n  -h, --help', '\t\t\thelp page.'
-
-    '\n  [Test ...]', '\t\t\tList of tests, the entire testsuite will be executed otherwise.'
-    ]
-    print(''.join(instructionsList))
+import unittest, os.path, sys, logging, os
 
 def main():
-    cwd = os.getcwd()
-    inputFile = os.path.join(cwd, 'xorg.conf')
-    outputDir = cwd
-    err = 'Error: parameters not recognised'
-    
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], 'h:o:i:', ['help', 'output=', 'input='])
-    except getopt.GetoptError as err:
-        # print help information and exit:
-        print(err) # will print something like 'option -a not recognized'
-        usage()
-        sys.exit(2)
-    printonly = None
-    verbose = None
-    for o, a in opts:
-        if o in ('-i', '--input'):
-            inputFile = a
-        elif o in ('-o', '--output'):
-            outputDir = a
-        elif o in ('-h', '--help'):
-            usage()
-            sys.exit()
-        else:
-            assert False, 'unhandled option'
-    
-    
-    settingsFile = open('settings.py', 'w')
-    atexit.register(os.unlink, 'settings.py')
-    if inputFile == os.path.join(cwd, 'xorg.conf') and outputDir == cwd:
-        settingsFile.write('import os\ncwd = os.getcwd()\ninputFile = os.path.join(cwd, "xorg.conf")\noutputDir = cwd\ninputDir = cwd.replace("tests", "quirks")')
-    else:    
-        settingsFile.write('inputFile = "%s"\noutputDir = "%s"' % (inputFile, outputDir))
-    settingsFile.close()
-        
-    # run all tests in our directory
+    # run all tests in our directory, or just the ones given as arguments
+    args = sys.argv[1:]
     if args:
         suite = unittest.TestLoader().loadTestsFromNames(args)
     else:
         suite = unittest.TestLoader().loadTestsFromNames(
             [t[:-3] for t in os.listdir(os.path.dirname(__file__))
-            if t.endswith('.py') and t not in ['settings.py', '__init__.py', 'patchos.py'] and not
+            if t.endswith('.py') and t not in ['__init__.py', 'patchos.py'] and not
             (t == 'gpu-manager.py' and '86' not in os.uname()[4])])
     res = unittest.TextTestRunner(verbosity=2).run(suite)
     return len(res.errors) + len(res.failures)
