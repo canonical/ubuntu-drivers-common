@@ -2816,7 +2816,7 @@ int main(int argc, char *argv[]) {
         pacc = pci_alloc();
 
         if (!pacc) {
-            fprintf(log_handle, "Error: failed to acces the PCI library\n");
+            fprintf(log_handle, "Error: failed to access the PCI library\n");
             goto end;
         }
         /* Initialize the PCI library */

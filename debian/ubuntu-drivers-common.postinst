@@ -1,0 +1,10 @@
+#! /bin/sh
+set -e
+
+# The package ships a debconf config script and templates, so the postinst
+# has to load a debconf library too (see debconf-devel(7)).
+. /usr/share/debconf/confmodule
+
+#DEBHELPER#
+
+exit 0

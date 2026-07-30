@@ -1,6 +1,5 @@
 Source: ubuntu-drivers-common
 Section: admin
-Priority: optional
 Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
 Build-Depends: debhelper-compat (= 13),
  dh-python,
@@ -35,7 +34,7 @@ Build-Depends: debhelper-compat (= 13),
  black,
  mokutil [!s390x],
 Standards-Version: 3.9.8
-Vcs-Git: git://github.com/canonical/ubuntu-drivers-common.git
+Vcs-Git: https://github.com/canonical/ubuntu-drivers-common.git
 Vcs-Browser: https://github.com/canonical/ubuntu-drivers-common
 
 Package: ubuntu-drivers-common
