@@ -89,6 +89,22 @@ which can do any kind of detection and then return the resulting set of
 packages that apply to the current system. Please note that this cannot rely on
 having root privileges.
 
+A plugin may alternatively return a dictionary in order to provide optional
+human readable vendor and model information about the detected device:
+
+   def detect(apt_cache):
+      # do detection logic here
+      return {
+          'packages': ['driver_package', ...],
+          'vendor': 'Vendor Name',   # optional
+          'model': 'Product Name',   # optional
+      }
+
+The "packages" key is mandatory and has the same meaning as the list return
+value above. The optional "vendor" and "model" strings are propagated into the
+information returned by system_driver_packages(), matching the metadata already
+available for modalias-based driver detection.
+
 
 Autopkgtest
 -----------

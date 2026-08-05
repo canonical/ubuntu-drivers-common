@@ -58,6 +58,13 @@ class PackageInfo(TypedDict, total=False):
     metapackage: str
 
 
+class PluginMetadata(TypedDict, total=False):
+    """Optional metadata returned by a driver detection plugin."""
+
+    vendor: str
+    model: str
+
+
 system_architecture = ""
 lookup_cache = {}
 custom_supported_gpus_json = "/etc/custom_supported_gpus.json"
@@ -669,7 +676,7 @@ def _get_db_name(syspath: str, alias: str) -> Tuple[Optional[str], Optional[str]
     vendor = None
     model = None
     for line in out.splitlines():
-        (k, v) = line.split("=", 1)
+        k, v = line.split("=", 1)
         if "_VENDOR" in k:
             vendor = v
         if "_MODEL" in k:
@@ -779,7 +786,7 @@ def system_driver_packages(
                 "runtimepm": _is_runtimepm_supported(apt_cache, p, alias),
                 "open_preferred": _is_open_prefered(apt_cache, p),
             }
-            (vendor, model) = _get_db_name(syspath, alias)
+            vendor, model = _get_db_name(syspath, alias)
             if vendor is not None:
                 packages[p.name]["vendor"] = vendor
             if model is not None:
@@ -798,16 +805,39 @@ def system_driver_packages(
         for p in nvidia_packages:
             packages[p]["recommended"] = p == recommended
 
+    # Keep the existing package result returned by detect_plugin_packages(),
+    # while collecting optional metadata separately. This preserves
+    # compatibility with callers which expect a mapping of plugin names to
+    # package-name lists.
+    plugin_metadata: Dict[str, PluginMetadata] = {}
+    plugin_packages = detect_plugin_packages(
+        apt_cache,
+        plugin_metadata=plugin_metadata,
+    )
+
     # add available packages which need custom detection code
-    for plugin, pkgs in detect_plugin_packages(apt_cache).items():
+    for plugin, pkgs in plugin_packages.items():
+        metadata = plugin_metadata.get(plugin, {})
+
         for p in pkgs:
             try:
                 apt_p = apt_cache[p]
-                packages[p] = {
+
+                package_info: PackageInfo = {
                     "free": _is_package_free(apt_cache, apt_p),
                     "from_distro": _is_package_from_distro(apt_cache, apt_p),
                     "plugin": plugin,
                 }
+
+                vendor = metadata.get("vendor")
+                if vendor:
+                    package_info["vendor"] = vendor
+
+                model = metadata.get("model")
+                if model:
+                    package_info["model"] = model
+
+                packages[p] = package_info
             except KeyError:
                 logging.debug("Package %s plugin not available. Skipping." % p)
 
@@ -1015,7 +1045,7 @@ def system_gpgpu_driver_packages(
     modalias_map = apt_cache_modalias_map(apt_cache)
     for alias, syspath in modaliases.items():
         for p in packages_for_modalias(apt_cache, alias, modalias_map=modalias_map):
-            (vendor, model) = _get_db_name(syspath, alias)
+            vendor, model = _get_db_name(syspath, alias)
             vendor_id, model_id = _get_vendor_model_from_alias(alias)
             if (vendor_id is not None) and (vendor_id.lower() in vendors_whitelist):
                 packages[p.name] = {
@@ -1660,6 +1690,7 @@ def auto_install_filter(
 
 def detect_plugin_packages(
     apt_cache: Optional[apt_pkg.Cache] = None,
+    plugin_metadata: Optional[Dict[str, PluginMetadata]] = None,
 ) -> Dict[str, List[str]]:
     """Get driver packages from custom detection plugins.
 
@@ -1670,12 +1701,23 @@ def detect_plugin_packages(
     returned lists for packages which are available for installation, and
     return the joined results.
 
-    If you already have an existing apt_pkg.Cache() object, you can pass it as an
-    argument for efficiency.
+    Plugins normally return a list or set of package names. A plugin may
+    alternatively return a dictionary containing a mandatory "packages"
+    entry and optional "vendor" and "model" entries.
+
+    Optional metadata is copied into plugin_metadata, keyed by plugin
+    filename. The function's existing return type remains unchanged.
+
+    If you already have an existing apt_pkg.Cache() object, you
+    can pass it as an argument for efficiency.
 
     Return pluginname -> [package, ...] map.
     """
     packages: Dict[str, List[str]] = {}
+
+    if plugin_metadata is not None:
+        plugin_metadata.clear()
+
     plugindir = os.environ.get(
         "UBUNTU_DRIVERS_DETECT_DIR", "/usr/share/ubuntu-drivers-common/detect/"
     )
@@ -1708,23 +1750,68 @@ def detect_plugin_packages(
 
             if result is None:
                 continue
-            if type(result) not in (list, set):
+
+            result_packages = result
+            metadata: PluginMetadata = {}
+
+            if isinstance(result, dict):
+                result_packages = result.get("packages")
+
+                vendor = result.get("vendor")
+                if vendor is not None:
+                    if not isinstance(vendor, str):
+                        logging.error(
+                            "plugin %s returned a non-string vendor value",
+                            plugin,
+                        )
+                        continue
+                    metadata["vendor"] = vendor
+
+                model = result.get("model")
+                if model is not None:
+                    if not isinstance(model, str):
+                        logging.error(
+                            "plugin %s returned a non-string model value",
+                            plugin,
+                        )
+                        continue
+                    metadata["model"] = model
+
+            if not isinstance(result_packages, (list, set)):
                 logging.error(
-                    "plugin %s returned a bad type %s (must be list or set)",
+                    "plugin %s returned a bad package type %s" " (must be list or set)",
                     plugin,
-                    type(result),
+                    type(result_packages),
                 )
                 continue
 
-            for pkg in result:
+            valid_packages = []
+
+            for pkg in result_packages:
+                if not isinstance(pkg, str):
+                    logging.error(
+                        "plugin %s returned a non-string package name",
+                        plugin,
+                    )
+                    continue
+
                 try:
                     package = apt_cache[pkg]
                     if _check_video_abi_compat(apt_cache, package):
-                        packages.setdefault(fname, []).append(pkg)
+                        valid_packages.append(pkg)
                 except KeyError:
                     logging.debug(
-                        "Ignoring unavailable package %s from plugin %s", pkg, plugin
+                        "Ignoring unavailable package %s" " from plugin %s", pkg, plugin
                     )
+
+            if valid_packages:
+                # Sort and deduplicate the result to ensure deterministic
+                # output if a plugin encounters more than one matching
+                # device.
+                packages[fname] = sorted(set(valid_packages))
+
+                if plugin_metadata is not None and metadata:
+                    plugin_metadata[fname] = metadata
 
     return packages
 

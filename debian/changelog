@@ -1,3 +1,16 @@
+ubuntu-drivers-common (1:0.10.10) resolute; urgency=medium
+
+  [ Marcin Grzegorz Kaspryk ]
+  * Add a DisplayLink USB device detection plugin, which recommends the
+    displaylink-driver package for DisplayLink (vendor 17e9) devices that are
+    not already handled by the in-kernel udl DRM driver.
+  * Support optional vendor/model metadata from driver detection plugins:
+    plugins may now return a dictionary with a mandatory "packages" key and
+    optional "vendor" and "model" entries, which are wired into
+    system_driver_packages().
+
+ -- Marcin Grzegorz Kaspryk <mkaspryk@synaptics.com>  Wed, 05 Aug 2026 12:00:00 +0200
+
 ubuntu-drivers-common (1:0.10.9) resolute; urgency=medium
 
   [ Mitchell Augustin ]
