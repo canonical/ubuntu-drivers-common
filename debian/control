@@ -25,7 +25,6 @@ Build-Depends: debhelper-compat (= 13),
  udev,
  pciutils,
  libdrm-dev,
- python3-dbus,
  libkmod-dev,
  pycodestyle|pep8,
  pyflakes3,
@@ -46,6 +45,8 @@ Depends: ${python3:Depends},
  python3-apt,
  python3-xkit,
  python3-click,
+ python3-gi,
+ gir1.2-glib-2.0,
  udev,
  pciutils,
  usbutils,
@@ -57,6 +58,9 @@ Description: Detect and install additional Ubuntu driver packages
  .
   - a Python API for detecting driver packages for a particular piece of
     hardware or the whole system.
+ .
+   - a D-Bus service (com.ubuntu.Drivers) for querying driver information
+     via the system bus.
  .
   - an "ubuntu-drivers" command line tool to list or install driver packages
     (mostly for integration in installers).

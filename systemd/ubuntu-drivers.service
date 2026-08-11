@@ -1,0 +1,12 @@
+[Unit]
+Description=Ubuntu Drivers D-Bus Service
+
+[Service]
+Type=dbus
+BusName=com.ubuntu.Drivers
+ExecStart=/usr/libexec/ubuntu-drivers-dbus-service
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+Alias=dbus-com.ubuntu.Drivers.service

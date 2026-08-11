@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 import subprocess, glob, os.path
 import os
@@ -31,7 +31,7 @@ setup(
     url="http://www.albertomilone.com",
     license="gpl",
     description="Detect and install additional Ubuntu driver packages",
-    packages=["Quirks", "UbuntuDrivers"],
+    packages=find_packages(include=["Quirks", "UbuntuDrivers", "UbuntuDrivers.*"]),
     data_files=[
         (
             "/usr/share/ubuntu-drivers-common/",
