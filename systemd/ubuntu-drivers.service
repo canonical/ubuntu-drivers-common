@@ -9,5 +9,4 @@ StandardOutput=journal
 StandardError=journal
 
 [Install]
-WantedBy=multi-user.target
 Alias=dbus-com.ubuntu.Drivers.service

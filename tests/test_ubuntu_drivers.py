@@ -6457,7 +6457,9 @@ Description: broken \xEB encoding
             white_dict,
             {
                 "modalias": "pci:v00001234d00sv00000001sd00bc00sc00i00",
-                "drivers": {"vanilla": {"free": True, "from_distro": False, "support": None}},
+                "drivers": {
+                    "vanilla": {"free": True, "from_distro": False, "support": None}
+                },
             },
         )
 
@@ -6465,7 +6467,9 @@ Description: broken \xEB encoding
             black_dict,
             {
                 "modalias": "usb:v9876dABCDsv01sd02bc00sc01i05",
-                "drivers": {"chocolate": {"free": True, "from_distro": False, "support": None}},
+                "drivers": {
+                    "chocolate": {"free": True, "from_distro": False, "support": None}
+                },
             },
         )
 
@@ -6480,11 +6484,21 @@ Description: broken \xEB encoding
         )
         self.assertEqual(
             graphics_dict["drivers"]["nvidia-driver-440"],
-            {"free": False, "from_distro": False, "recommended": False, "support": None},
+            {
+                "free": False,
+                "from_distro": False,
+                "recommended": False,
+                "support": None,
+            },
         )
         self.assertEqual(
             graphics_dict["drivers"]["nvidia-driver-450-server"],
-            {"free": False, "from_distro": False, "recommended": False, "support": None},
+            {
+                "free": False,
+                "from_distro": False,
+                "recommended": False,
+                "support": None,
+            },
         )
         self.assertEqual(
             graphics_dict["drivers"]["xserver-xorg-video-nouveau"],

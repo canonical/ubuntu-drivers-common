@@ -1108,6 +1108,8 @@ def system_device_drivers(
       'recommended': Some drivers (nvidia, fglrx) come in multiple variants and
                      versions; these have this flag, where exactly one has
                      recommended == True, and all others False.
+      'support':     Value of the package's apt "Support" field ("PB", "NFB",
+                     "LTSB" or "Legacy"), or None if it declares none.
     """
     result: Dict[str, DeviceInfo] = {}
     if not apt_cache:

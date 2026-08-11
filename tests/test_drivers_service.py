@@ -11,11 +11,16 @@ import xml.etree.ElementTree as ET
 from unittest.mock import patch
 
 import apt_pkg
-from gi.repository import Gio, GLib, UMockdev
+import gi
 
 from UbuntuDrivers.service import drivers_service
 
 import testarchive
+
+# must precede the gi.repository import, and so must come after every other
+# import to keep them all at the top of the file
+gi.require_version("UMockdev", "1.0")
+from gi.repository import Gio, GLib, UMockdev  # noqa: E402
 
 # Modalias of an NVIDIA card covered by the test nvidia-* packages.
 # Same value as used in test_ubuntu_drivers.py.
@@ -316,7 +321,7 @@ class DriversServiceDbusTests(unittest.TestCase):
             shutil.rmtree(cls._tmpdir, ignore_errors=True)
 
     def setUp(self):
-        self._service._cached_result = None
+        self._service.invalidate_cache()
 
     def _call_drivers(self):
         result_variant = self._drivers_proxy.call_sync(

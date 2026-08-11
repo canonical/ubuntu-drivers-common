@@ -13,20 +13,25 @@ ifeq (, $(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 	./setup.py egg_info
 	PYTHONPATH=. tests/run
 	# Run mypy type checking
-	mypy UbuntuDrivers/ Quirks/ ubuntu-drivers | grep -v "Quirks/quirkreader.py:71: error: Unused \"type: ignore\" comment  [unused-ignore]"
-	# Run black tests
-	black --check UbuntuDrivers/ Quirks/ ubuntu-drivers
+	mypy UbuntuDrivers/ Quirks/ ubuntu-drivers
+	# Run black tests. Same scope as git-hooks/pre-commit, so that a tree
+	# which passes the hook also passes the build.
+	black --check .
   endif
 endif
 
 override_dh_install:
-	dh_install -Xlib/systemd -Xsbin -Xlib/udev
+	# -X matches anywhere in the path, so these have to name the gpu-manager
+	# files precisely: a bare -Xlib/systemd would also exclude everything
+	# under usr/lib/systemd, and a bare -Xsbin everything under usr/sbin.
+	dh_install -Xlib/systemd/system/gpu-manager.service \
+		-Xsbin/u-d-c-print-pci-ids \
+		-Xlib/udev/rules.d
 
 	# on architectures where we build gpu-manager, install the systemd unit,
 	# the udev rule, and the script for gpu detection
 	if [ -d debian/tmp/lib/systemd ]; then \
 		dh_install -p ubuntu-drivers-common lib/systemd; \
-		dh_systemd_enable -p ubuntu-drivers-common; \
 		dh_install -p ubuntu-drivers-common lib/udev/rules.d; \
 		dh_install -p ubuntu-drivers-common sbin; \
 	fi
@@ -34,6 +39,14 @@ override_dh_install:
 	# build dh_modaliases manpage
 	mkdir -p debian/dh-modaliases/usr/share/man/man1
 	pod2man -c Debhelper -r "$(DEB_VERSION)" debhelper/dh_modaliases debian/dh-modaliases/usr/share/man/man1/dh_modaliases.1
+
+override_dh_installsystemd:
+	# com.ubuntu.Drivers is D-Bus activated: enable it so that the
+	# dbus-com.ubuntu.Drivers.service alias gets created, but never start it
+	# at install time. dbus-daemon starts it on the first method call and it
+	# exits again once idle.
+	dh_installsystemd --name=ubuntu-drivers --no-start
+	dh_installsystemd --name=gpu-manager
 
 override_dh_python3:
 	dh_python3 --shebang=/usr/bin/python3

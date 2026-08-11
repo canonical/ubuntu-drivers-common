@@ -87,6 +87,10 @@ if __name__ == '__main__':
         wrapper = shutil.which('umockdev-wrapper')
         if wrapper:
             os.execvp(wrapper, ['umockdev-wrapper'] + sys.argv)
+        elif os.environ.get('CI') or os.environ.get('DEB_BUILD_OPTIONS') is not None:
+            # Running without it silently degrades the suite, which is fine
+            # when hacking locally but must never pass unnoticed in a build.
+            sys.exit('Error: umockdev-wrapper not found; install the umockdev package.')
         else:
             print('Warning: umockdev-wrapper not found; running tests without it.')
 
