@@ -42,6 +42,13 @@ setup(
         ("/usr/share/ubuntu-drivers-common/detect", glob.glob("detect-plugins/*")),
         ("/usr/share/doc/ubuntu-drivers-common", ["README"]),
         ("/usr/lib/nvidia/", glob.glob("nvidia-installer-hooks/*")),
+        ("/usr/lib/systemd/system/", ["systemd/ubuntu-drivers.service"]),
+        ("/usr/libexec/", ["ubuntu-drivers-dbus-service"]),
+        (
+            "/usr/share/dbus-1/system-services/",
+            ["systemd/com.ubuntu.Drivers.service"],
+        ),
+        ("/usr/share/dbus-1/system.d/", ["systemd/com.ubuntu.Drivers.conf"]),
     ]
     + extra_data,
     scripts=["quirks-handler", "ubuntu-drivers"],
