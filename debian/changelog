@@ -1,3 +1,9 @@
+ubuntu-drivers-common (1:0.10.10) resolute; urgency=medium
+
+  * Add D-Bus service for Ubuntu Drivers
+
+ -- ashuntu <ashton.nelson@canonical.com>  Mon, 15 Jun 2026 08:50:42 +0100
+
 ubuntu-drivers-common (1:0.10.9) resolute; urgency=medium
 
   [ Mitchell Augustin ]

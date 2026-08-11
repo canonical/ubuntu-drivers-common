@@ -54,6 +54,49 @@ The three main functions are:
 These functions only use python-apt. They do not need any other dependencies,
 root privileges, D-BUS calls, etc.
 
+## D-Bus API
+
+This project also provides a system-bus D-Bus service that exposes driver
+information. The service registers as `com.ubuntu.Drivers` on the system bus
+with the object path `/com/ubuntu/Drivers` and exposes a single method:
+
+* `drivers`: Returns a list of devices and their available drivers. The first
+  driver entry in each list is the recommended one.
+
+The returned structure is a list of dictionaries like:
+
+```python
+[
+   {
+      "sys_path": "/sys/devices/...",
+      "modalias": "pci:...",
+      "vendor": "NVIDIA Corporation",
+      "model": "GP107M [GeForce GTX 1050 Mobile]",
+      "drivers": [
+         {
+            "name": "nvidia-driver-570",
+            "source": "distro",
+            "free": False,
+            "builtin": False,
+            "recommended": True,
+            "support": "PB",
+         },
+         ...
+      ],
+   },
+   ...
+]
+```
+
+`source` is either `"distro"` or `"third-party"`, and `support` carries the
+package's apt `Support` field (`"PB"`, `"NFB"`, `"LTSB"` or `"Legacy"`), empty
+when the package does not declare one.
+
+The D-Bus service implementation lives in
+`UbuntuDrivers/service/drivers_service.py`. It is activated on demand by
+`dbus-daemon` and exits after a short period of inactivity, so results are
+never more than one idle period stale.
+
 ## Detection logic
 
 The principal method of mapping hardware to driver packages is to use modalias
@@ -109,7 +152,7 @@ For the autopkgtest of ubuntu-drivers, the following command can be used when
 developing test cases:
 
 ```shell
-$ PYTHONPATH=. tests/run test_ubuntu_drivers
+PYTHONPATH=. tests/run test_ubuntu_drivers
 ```
 
 Testing in a clean environment is always recommended. Using a pbuilder chroot,

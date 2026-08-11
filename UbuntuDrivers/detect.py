@@ -30,6 +30,7 @@ class DriverInfo(TypedDict, total=False):
     builtin: bool
     from_distro: bool
     recommended: bool
+    support: Optional[str]
 
 
 class DeviceInfo(TypedDict, total=False):
@@ -1107,6 +1108,8 @@ def system_device_drivers(
       'recommended': Some drivers (nvidia, fglrx) come in multiple variants and
                      versions; these have this flag, where exactly one has
                      recommended == True, and all others False.
+      'support':     Value of the package's apt "Support" field ("PB", "NFB",
+                     "LTSB" or "Legacy"), or None if it declares none.
     """
     result: Dict[str, DeviceInfo] = {}
     if not apt_cache:
@@ -1132,6 +1135,8 @@ def system_device_drivers(
         drivers[pkg] = {"free": pkginfo["free"], "from_distro": pkginfo["from_distro"]}
         if "recommended" in pkginfo:
             drivers[pkg]["recommended"] = pkginfo["recommended"]
+        if "support" in pkginfo:
+            drivers[pkg]["support"] = pkginfo["support"]
 
     # now determine the manual_install device flag: this is true iff all driver
     # packages are "manually installed"
