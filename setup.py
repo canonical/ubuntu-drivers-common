@@ -10,10 +10,12 @@ extra_data = []
 if "86" in os.uname()[4]:
     subprocess.check_call(["make", "-C", "share/hybrid", "all"])
     extra_data.append(("/usr/bin/", ["share/hybrid/gpu-manager"]))
-    extra_data.append(("/lib/systemd/system/", ["share/hybrid/gpu-manager.service"]))
-    extra_data.append(("/sbin/", ["share/hybrid/u-d-c-print-pci-ids"]))
     extra_data.append(
-        ("/lib/udev/rules.d/", ["share/hybrid/71-u-d-c-gpu-detection.rules"])
+        ("/usr/lib/systemd/system/", ["share/hybrid/gpu-manager.service"])
+    )
+    extra_data.append(("/usr/sbin/", ["share/hybrid/u-d-c-print-pci-ids"]))
+    extra_data.append(
+        ("/usr/lib/udev/rules.d/", ["share/hybrid/71-u-d-c-gpu-detection.rules"])
     )
 
 # Make the nvidia-installer hooks executable
@@ -40,11 +42,6 @@ setup(
         ("/usr/share/ubuntu-drivers-common/detect", glob.glob("detect-plugins/*")),
         ("/usr/share/doc/ubuntu-drivers-common", ["README"]),
         ("/usr/lib/nvidia/", glob.glob("nvidia-installer-hooks/*")),
-        ("/usr/lib/ubiquity/target-config", glob.glob("ubiquity/target-config/*")),
-        ("/usr/lib/systemd/system/", ["systemd/ubuntu-drivers.service"]),
-        ("/usr/libexec/", ["ubuntu-drivers-dbus-service"]),
-        ("/usr/share/dbus-1/system-services/", ["systemd/com.ubuntu.Drivers.service"]),
-        ("/usr/share/dbus-1/system.d/", ["systemd/com.ubuntu.Drivers.conf"]),
     ]
     + extra_data,
     scripts=["quirks-handler", "ubuntu-drivers"],

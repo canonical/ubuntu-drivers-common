@@ -1,5 +1,5 @@
 #!/usr/bin/make -f
-DEB_VERSION=$(shell dpkg-parsechangelog | grep ^Version | cut -f2 -d\ |cut -f1 -d-)
+include /usr/share/dpkg/pkg-info.mk
 DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
 TEST_ARCHES=amd64 arm64
 PYBUILD_NAME=ubuntu-drivers-common
@@ -21,24 +21,14 @@ ifeq (, $(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 endif
 
 override_dh_install:
-	# -X matches anywhere in the path, so these have to name the gpu-manager
-	# files precisely: a bare -Xlib/systemd would also exclude everything
-	# under usr/lib/systemd, and a bare -Xsbin everything under usr/sbin.
-	dh_install -Xlib/systemd/system/gpu-manager.service \
-		-Xsbin/u-d-c-print-pci-ids \
-		-Xlib/udev/rules.d
-
-	# on architectures where we build gpu-manager, install the systemd unit,
-	# the udev rule, and the script for gpu detection
-	if [ -d debian/tmp/lib/systemd ]; then \
-		dh_install -p ubuntu-drivers-common lib/systemd; \
-		dh_install -p ubuntu-drivers-common lib/udev/rules.d; \
-		dh_install -p ubuntu-drivers-common sbin; \
-	fi
+	# on architectures where we build gpu-manager, this also picks up the
+	# systemd unit, the udev rule and the script for gpu detection; they all
+	# live under /usr now, so debian/ubuntu-drivers-common.install covers them
+	dh_install
 
 	# build dh_modaliases manpage
 	mkdir -p debian/dh-modaliases/usr/share/man/man1
-	pod2man -c Debhelper -r "$(DEB_VERSION)" debhelper/dh_modaliases debian/dh-modaliases/usr/share/man/man1/dh_modaliases.1
+	pod2man -c Debhelper -r "$(DEB_VERSION_EPOCH_UPSTREAM)" debhelper/dh_modaliases debian/dh-modaliases/usr/share/man/man1/dh_modaliases.1
 
 override_dh_installsystemd:
 	# com.ubuntu.Drivers is D-Bus activated: enable it so that the
