@@ -61,7 +61,7 @@ class PackageInfo(TypedDict, total=False):
 
 
 system_architecture = ""
-lookup_cache = {}
+lookup_cache: Dict[str, Dict[str, Any]] = {}
 custom_supported_gpus_json = "/etc/custom_supported_gpus.json"
 
 
