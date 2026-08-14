@@ -36,6 +36,14 @@ logger.setLevel(level=LOGLEVEL)
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
+LXC_INSTALL_WARNING = (
+    "You appear to be attempting to run ubuntu-drivers inside an LXC/LXD container. "
+    "This is not supported and may have undefined behavior. Instead, you should "
+    "refer to https://canonical.com/lxd/docs/latest/howto/container_gpu_passthrough_with_docker/ "
+    "for passthrough instructions that will expose your host driver stack. To "
+    "override this and install anyway, re-run with `--install-in-container-anyway`"
+)
+
 
 class Config(object):
     def __init__(self) -> None:
@@ -49,6 +57,21 @@ class Config(object):
 
 
 pass_config = click.make_pass_decorator(Config, ensure=True)
+
+
+def is_lxc_container() -> bool:
+    try:
+        result = subprocess.run(
+            ["systemd-detect-virt", "--container"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+    except OSError:
+        return False
+
+    return result.stdout.strip() == "lxc"
 
 
 def command_list(args: Config) -> int:
@@ -601,6 +624,11 @@ def greet(config: Config, **kwargs: Any) -> None:
     help="Do not include OEM enablement packages (these enable an external archive)",
 )
 @click.option("--include-dkms", is_flag=True, help="Also consider DKMS packages")
+@click.option(
+    "--install-in-container-anyway",
+    is_flag=True,
+    help="Allow driver installation inside an LXC container",
+)
 @pass_config
 def install(config: Config, **kwargs: Any) -> None:
     """Install a driver [driver[:version][,driver[:version]]]"""
@@ -611,6 +639,10 @@ def install(config: Config, **kwargs: Any) -> None:
             "Error: 'ubuntu-drivers install' must be run as root. Try using 'sudo'.",
             file=sys.stderr,
         )
+        sys.exit(1)
+
+    if is_lxc_container() and not kwargs.get("install_in_container_anyway"):
+        print(LXC_INSTALL_WARNING, file=sys.stderr)
         sys.exit(1)
 
     if kwargs.get("gpgpu"):
