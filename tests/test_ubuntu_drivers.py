@@ -7119,9 +7119,7 @@ class DmidecodeModaliasTest(unittest.TestCase):
             UbuntuDrivers.detect._get_dmidecode_string("processor-family"), ""
         )
 
-    @patch(
-        "UbuntuDrivers.detect.subprocess.run", side_effect=OSError("no dmidecode")
-    )
+    @patch("UbuntuDrivers.detect.subprocess.run", side_effect=OSError("no dmidecode"))
     def test_get_dmidecode_string_missing_binary(self, mock_run):
         """_get_dmidecode_string() returns '' when dmidecode is absent (OSError)"""
 
