@@ -194,6 +194,57 @@ def system_modaliases(sys_path: Optional[str] = None) -> Dict[str, str]:
 
         aliases[modalias] = path
 
+    aliases.update(_dmidecode_processor_modaliases())
+    return aliases
+
+
+def _get_dmidecode_string(value: str) -> str:
+    try:
+        proc = subprocess.run(
+            ["dmidecode", "--string", value],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as e:
+        logging.debug("_get_dmidecode_string(): could not run dmidecode: %s", e)
+        return ""
+
+    if proc.returncode != 0:
+        logging.debug(
+            "_get_dmidecode_string(): dmidecode exited with %s: %s",
+            proc.returncode,
+            proc.stderr.strip(),
+        )
+        return ""
+    return proc.stdout.strip()
+
+
+def _normalize(value: str) -> str:
+    """Normalize program output for comparison.
+
+    Removes spaces and replaces commas with nothing. This is a best-effort
+    attempt to make the output of commands more comparable across different
+    systems. It is not guaranteed to be perfect, but it should be good enough
+    for most cases.
+    """
+    value = value.replace(" ", "").replace(",", "")
+    return value
+
+
+def _dmidecode_processor_modaliases() -> Dict[str, str]:
+    """Collect processor specific aliases using dmidecode.
+
+    Uses `dmidecode --string processor-xx` as the source.
+    A failure yields an empty dictionary or a partially filled dictionary.
+    """
+    aliases: Dict[str, str] = {}
+    for entry in ["family", "manufacturer", "version", "frequency"]:
+        ret = _get_dmidecode_string(f"processor-{entry}")
+        if not ret:
+            continue
+        ret = _normalize(ret)
+        aliases["processor:" + entry + ":" + ret] = "dmidecode"
     return aliases
 
 
