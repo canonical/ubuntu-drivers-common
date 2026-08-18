@@ -207,7 +207,8 @@ class DetectTest(unittest.TestCase):
             self.assertGreater(len(res), 3)
             self.assertTrue(":" in list(res)[0])
 
-    def test_system_modaliases_fake(self):
+    @patch("UbuntuDrivers.detect._dmidecode_processor_modaliases", return_value={})
+    def test_system_modaliases_fake(self, mock_proc):
         """system_modaliases() for fake sysfs"""
 
         res = UbuntuDrivers.detect.system_modaliases(self.umockdev.get_sys_dir())
@@ -7031,6 +7032,201 @@ def detect(apt):
             self.assertEqual(linux, "linux-generic-lts-quantal")
         finally:
             chroot.remove()
+
+
+class DmidecodeModaliasTest(unittest.TestCase):
+    """Test the dmidecode-based processor modalias helpers in
+    UbuntuDrivers.detect (see _dmidecode_processor_modaliases and friends)."""
+
+    #
+    # _normalize()
+    #
+
+    def test_normalize_removes_spaces(self):
+        """_normalize() strips all spaces"""
+
+        self.assertEqual(
+            UbuntuDrivers.detect._normalize("Intel Xeon Gold"), "IntelXeonGold"
+        )
+
+    def test_normalize_removes_commas(self):
+        """_normalize() strips all commas"""
+
+        self.assertEqual(UbuntuDrivers.detect._normalize("a,b,c"), "abc")
+
+    def test_normalize_removes_spaces_and_commas(self):
+        """_normalize() strips spaces and commas together"""
+
+        self.assertEqual(
+            UbuntuDrivers.detect._normalize("ARM, Cortex A72"), "ARMCortexA72"
+        )
+
+    def test_normalize_empty_string(self):
+        """_normalize() leaves an empty string empty"""
+
+        self.assertEqual(UbuntuDrivers.detect._normalize(""), "")
+
+    def test_normalize_noop(self):
+        """_normalize() leaves a value without spaces/commas unchanged"""
+
+        self.assertEqual(
+            UbuntuDrivers.detect._normalize("AuthenticAMD"), "AuthenticAMD"
+        )
+
+    #
+    # _get_dmidecode_string()
+    #
+
+    @patch("UbuntuDrivers.detect.subprocess.run")
+    def test_get_dmidecode_string_success(self, mock_run):
+        """_get_dmidecode_string() returns stdout on a zero exit code"""
+
+        mock_run.return_value = subprocess.CompletedProcess(
+            args=["dmidecode", "--string", "processor-version"],
+            returncode=0,
+            stdout="Cortex-A72\n",
+            stderr="",
+        )
+        self.assertEqual(
+            UbuntuDrivers.detect._get_dmidecode_string("processor-version"),
+            "Cortex-A72",
+        )
+        # invoked dmidecode with the expected argv
+        mock_run.assert_called_once()
+        args, kwargs = mock_run.call_args
+        self.assertEqual(args[0], ["dmidecode", "--string", "processor-version"])
+
+    @patch("UbuntuDrivers.detect.subprocess.run")
+    def test_get_dmidecode_string_strips_whitespace(self, mock_run):
+        """_get_dmidecode_string() strips surrounding whitespace/newlines"""
+
+        mock_run.return_value = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="  ARM  \n\n", stderr=""
+        )
+        self.assertEqual(
+            UbuntuDrivers.detect._get_dmidecode_string("processor-manufacturer"),
+            "ARM",
+        )
+
+    @patch("UbuntuDrivers.detect.subprocess.run")
+    def test_get_dmidecode_string_nonzero_returncode(self, mock_run):
+        """_get_dmidecode_string() returns '' on a non-zero exit code"""
+
+        mock_run.return_value = subprocess.CompletedProcess(
+            args=[], returncode=1, stdout="ignored", stderr="permission denied"
+        )
+        self.assertEqual(
+            UbuntuDrivers.detect._get_dmidecode_string("processor-family"), ""
+        )
+
+    @patch(
+        "UbuntuDrivers.detect.subprocess.run", side_effect=OSError("no dmidecode")
+    )
+    def test_get_dmidecode_string_missing_binary(self, mock_run):
+        """_get_dmidecode_string() returns '' when dmidecode is absent (OSError)"""
+
+        self.assertEqual(
+            UbuntuDrivers.detect._get_dmidecode_string("processor-family"), ""
+        )
+
+    @patch(
+        "UbuntuDrivers.detect.subprocess.run",
+        side_effect=subprocess.TimeoutExpired(cmd="dmidecode", timeout=10),
+    )
+    def test_get_dmidecode_string_timeout(self, mock_run):
+        """_get_dmidecode_string() returns '' when dmidecode times out"""
+
+        self.assertEqual(
+            UbuntuDrivers.detect._get_dmidecode_string("processor-frequency"), ""
+        )
+
+    #
+    # _dmidecode_processor_modaliases()
+    #
+
+    @patch("UbuntuDrivers.detect._get_dmidecode_string")
+    def test_processor_modaliases_all_fields(self, mock_get):
+        """_dmidecode_processor_modaliases() builds a processor:<field>:<value>
+        alias per non-empty field, with values normalized"""
+
+        values = {
+            "processor-family": "ARMv8",
+            "processor-manufacturer": "ARM",
+            "processor-version": "Cortex A72",
+            "processor-frequency": "1500 MHz",
+        }
+        mock_get.side_effect = lambda v: values[v]
+        res = UbuntuDrivers.detect._dmidecode_processor_modaliases()
+        self.assertEqual(
+            res,
+            {
+                "processor:family:ARMv8": "dmidecode",
+                "processor:manufacturer:ARM": "dmidecode",
+                "processor:version:CortexA72": "dmidecode",
+                "processor:frequency:1500MHz": "dmidecode",
+            },
+        )
+
+    @patch("UbuntuDrivers.detect._get_dmidecode_string")
+    def test_processor_modaliases_queries_expected_strings(self, mock_get):
+        """_dmidecode_processor_modaliases() queries the four processor-* strings"""
+
+        mock_get.return_value = ""
+        UbuntuDrivers.detect._dmidecode_processor_modaliases()
+        queried = [c.args[0] for c in mock_get.call_args_list]
+        self.assertEqual(
+            queried,
+            [
+                "processor-family",
+                "processor-manufacturer",
+                "processor-version",
+                "processor-frequency",
+            ],
+        )
+
+    @patch("UbuntuDrivers.detect._get_dmidecode_string")
+    def test_processor_modaliases_skips_empty_fields(self, mock_get):
+        """_dmidecode_processor_modaliases() skips fields that come back empty"""
+
+        values = {
+            "processor-family": "ARMv8",
+            "processor-manufacturer": "",
+            "processor-version": "Cortex A72",
+            "processor-frequency": "",
+        }
+        mock_get.side_effect = lambda v: values[v]
+        res = UbuntuDrivers.detect._dmidecode_processor_modaliases()
+        self.assertEqual(
+            res,
+            {
+                "processor:family:ARMv8": "dmidecode",
+                "processor:version:CortexA72": "dmidecode",
+            },
+        )
+
+    @patch("UbuntuDrivers.detect._get_dmidecode_string", return_value="")
+    def test_processor_modaliases_all_empty(self, mock_get):
+        """_dmidecode_processor_modaliases() returns {} when nothing is available"""
+
+        self.assertEqual(UbuntuDrivers.detect._dmidecode_processor_modaliases(), {})
+
+    #
+    # system_modaliases() integration
+    #
+
+    @patch("UbuntuDrivers.detect._dmidecode_processor_modaliases")
+    def test_system_modaliases_merges_processor_aliases(self, mock_proc):
+        """system_modaliases() merges the dmidecode processor aliases in with
+        the sysfs-derived ones"""
+
+        mock_proc.return_value = {"processor:manufacturer:ARM": "dmidecode"}
+        umockdev = gen_fakehw()
+        res = UbuntuDrivers.detect.system_modaliases(umockdev.get_sys_dir())
+        # the processor alias was merged in
+        self.assertIn("processor:manufacturer:ARM", res)
+        self.assertEqual(res["processor:manufacturer:ARM"], "dmidecode")
+        # regular sysfs modaliases are still present
+        self.assertIn("pci:vDEADBEEFd00", res)
 
 
 class ToolTest(unittest.TestCase):
