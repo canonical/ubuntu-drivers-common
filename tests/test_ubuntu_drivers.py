@@ -6425,6 +6425,32 @@ class DetectTest(unittest.TestCase):
                     "Modaliases": "meta(dmi:*pnXPS137390:*, pci:*sv00001028sd00000962*)"
                 },
             )
+            archive.create_deb(
+                "oem-wasabi-meta",
+                extra_tags={"Udc-Midr": "0x000000004e0f0100"},
+            )
+            archive.create_deb(
+                "oem-nonmatching-meta",
+                extra_tags={"Udc-Midr": "0x00000000410fd4f0"},
+            )
+            archive.create_deb(
+                "midr-wasabi",
+                extra_tags={"Udc-Midr": "0x000000004e0f0100"},
+            )
+
+            identification_dir = os.path.join(
+                self.umockdev.get_sys_dir(),
+                "devices",
+                "system",
+                "cpu",
+                "cpu0",
+                "regs",
+                "identification",
+            )
+            os.makedirs(identification_dir)
+            with open(os.path.join(identification_dir, "midr_el1"), "w") as midr_file:
+                midr_file.write("0x000000004e0f0100\n")
+
             chroot.add_repository(archive.path, True, False)
             dpkg_status = os.path.abspath(
                 os.path.join(chroot.path, "var", "lib", "dpkg", "status")
@@ -6437,7 +6463,8 @@ class DetectTest(unittest.TestCase):
             )
         finally:
             chroot.remove()
-        self.assertTrue("oem-pistacchio-meta" in res)
+        self.assertEqual(set(res), {"oem-pistacchio-meta", "oem-wasabi-meta"})
+        self.assertEqual(res["oem-wasabi-meta"]["midr"], "0x000000004e0f0100")
 
     def test_system_driver_packages_bad_encoding(self):
         """system_driver_packages() with badly encoded Packages index"""
@@ -7309,6 +7336,28 @@ APT::Get::AllowUnauthenticated "true";
                 "Modaliases": "meta(dmi:*pnXPS137390:*, pci:*sv00001028sd00000962*)"
             },
         )
+        self.archive.create_deb(
+            "oem-wasabi-meta",
+            extra_tags={"Udc-Midr": "0x000000004e0f0100"},
+        )
+        self.archive.create_deb(
+            "oem-nonmatching-meta",
+            extra_tags={"Udc-Midr": "0x00000000410fd4f0"},
+        )
+
+        identification_dir = os.path.join(
+            self.umockdev.get_sys_dir(),
+            "devices",
+            "system",
+            "cpu",
+            "cpu0",
+            "regs",
+            "identification",
+        )
+        os.makedirs(identification_dir)
+        with open(os.path.join(identification_dir, "midr_el1"), "w") as midr_file:
+            midr_file.write("0x000000004e0f0100\n")
+
         self.chroot.add_repository(self.archive.path, True, False)
 
         ud = subprocess.Popen(
@@ -7319,11 +7368,12 @@ APT::Get::AllowUnauthenticated "true";
         )
         out, err = ud.communicate()
         self.assertEqual(err, "")
-        self.assertEqual(set(out.splitlines()), set(["oem-pistacchio-meta"]))
+        expected_packages = {"oem-pistacchio-meta", "oem-wasabi-meta"}
+        self.assertEqual(set(out.splitlines()), expected_packages)
         self.assertEqual(ud.returncode, 0)
 
         with open(listfile) as f:
-            self.assertEqual(f.read(), "oem-pistacchio-meta\n")
+            self.assertEqual(set(f.read().splitlines()), expected_packages)
 
     def test_list_detect_plugins(self):
         """ubuntu-drivers list includes custom detection plugins"""
