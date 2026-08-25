@@ -902,21 +902,22 @@ def system_driver_packages(
             if model is not None:
                 packages[p.name]["model"] = model
 
-    midr_map = apt_cache_midr_map(apt_cache)
-    for midr, syspath in midrs.items():
-        for p in packages_for_midr(apt_cache, midr, midr_map=midr_map):
-            if freeonly and not _is_package_free(apt_cache, p):
-                continue
-            if not include_oem and fnmatch.fnmatch(p.name, "oem-*-meta"):
-                continue
-            packages[p.name] = {
-                "midr": midr,
-                "syspath": syspath,
-                "free": _is_package_free(apt_cache, p),
-                "from_distro": _is_package_from_distro(apt_cache, p),
-                "support": _pkg_get_support(apt_cache, p),
-                "open_preferred": _is_open_prefered(apt_cache, p),
-            }
+    if midrs:
+        midr_map = apt_cache_midr_map(apt_cache)
+        for midr, syspath in midrs.items():
+            for p in packages_for_midr(apt_cache, midr, midr_map=midr_map):
+                if freeonly and not _is_package_free(apt_cache, p):
+                    continue
+                if not include_oem and fnmatch.fnmatch(p.name, "oem-*-meta"):
+                    continue
+                packages[p.name] = {
+                    "midr": midr,
+                    "syspath": syspath,
+                    "free": _is_package_free(apt_cache, p),
+                    "from_distro": _is_package_from_distro(apt_cache, p),
+                    "support": _pkg_get_support(apt_cache, p),
+                    "open_preferred": _is_open_prefered(apt_cache, p),
+                }
 
     # Add "recommended" flags for NVidia alternatives
     nvidia_packages = [p for p in packages if p.startswith("nvidia-")]
@@ -1097,22 +1098,23 @@ def system_device_specific_metapackages(
                 "open_preferred": _is_open_preferred(apt_cache, p),
             }
 
-    midr_map = apt_cache_midr_map(apt_cache)
-    for midr, syspath in midrs.items():
-        for p in packages_for_midr(apt_cache, midr, midr_map=midr_map):
-            if not fnmatch.fnmatch(p.name, "oem-*-meta") and not fnmatch.fnmatch(
-                p.name, "hwe-*-meta"
-            ):
-                continue
-            packages[p.name] = {
-                "midr": midr,
-                "syspath": syspath,
-                "free": _is_package_free(apt_cache, p),
-                "from_distro": _is_package_from_distro(apt_cache, p),
-                "recommended": True,
-                "support": _pkg_get_support(apt_cache, p),
-                "open_preferred": _is_open_prefered(apt_cache, p),
-            }
+    if midrs:
+        midr_map = apt_cache_midr_map(apt_cache)
+        for midr, syspath in midrs.items():
+            for p in packages_for_midr(apt_cache, midr, midr_map=midr_map):
+                if not fnmatch.fnmatch(p.name, "oem-*-meta") and not fnmatch.fnmatch(
+                    p.name, "hwe-*-meta"
+                ):
+                    continue
+                packages[p.name] = {
+                    "midr": midr,
+                    "syspath": syspath,
+                    "free": _is_package_free(apt_cache, p),
+                    "from_distro": _is_package_from_distro(apt_cache, p),
+                    "recommended": True,
+                    "support": _pkg_get_support(apt_cache, p),
+                    "open_preferred": _is_open_prefered(apt_cache, p),
+                }
 
     return packages
 
