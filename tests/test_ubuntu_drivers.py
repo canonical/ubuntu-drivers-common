@@ -229,6 +229,68 @@ class DetectTest(unittest.TestCase):
         )
         self.assertTrue(res["pci:vDEADBEEFd00"].endswith("/sys/devices/grey"))
 
+    def test_system_midr_fake(self):
+        """system_midr() returns all unique CPU types"""
+
+        sys_dir = self.umockdev.get_sys_dir()
+        midr_values = [
+            "0x00000000410fd4f0",
+            "0x00000000410fd4f0",
+            "0x00000000410fd050",
+            "0x000000004e0f0100",
+        ]
+        for cpu, midr in enumerate(midr_values):
+            identification_dir = os.path.join(
+                sys_dir,
+                "devices",
+                "system",
+                "cpu",
+                "cpu%i" % cpu,
+                "regs",
+                "identification",
+            )
+            os.makedirs(identification_dir)
+            with open(os.path.join(identification_dir, "midr_el1"), "w") as midr_file:
+                midr_file.write(midr + "\n")
+
+        res = UbuntuDrivers.detect.system_midr(sys_dir)
+
+        self.assertEqual(set(res), set(midr_values))
+        self.assertTrue(res["0x00000000410fd4f0"].endswith("/identification"))
+
+    def test_system_midr_missing(self):
+        """system_midr() ignores systems without MIDR files"""
+
+        self.assertEqual(
+            UbuntuDrivers.detect.system_midr(self.umockdev.get_sys_dir()), {}
+        )
+
+    def test_parse_midr(self):
+        """parse_midr() decodes each MIDR_EL1 field"""
+
+        self.assertEqual(
+            UbuntuDrivers.detect.parse_midr("0x0000000041a1d053"),
+            UbuntuDrivers.detect.MidrInfo(
+                implementer=0x41,
+                variant=0xA,
+                architecture=0x1,
+                part_number=0xD05,
+                revision=0x3,
+            ),
+        )
+        self.assertEqual(
+            UbuntuDrivers.detect.parse_midr("0x000000004e0f0100"),
+            UbuntuDrivers.detect.MidrInfo(
+                implementer=0x4E,
+                variant=0x0,
+                architecture=0xF,
+                part_number=0x010,
+                revision=0x0,
+            ),
+        )
+        self.assertIsNone(UbuntuDrivers.detect.parse_midr("0x410fd0*"))
+        self.assertIsNone(UbuntuDrivers.detect.parse_midr("not-a-midr"))
+
     def test_system_driver_packages_performance(self):
         """system_driver_packages() performance for a lot of modaliases"""
 
@@ -283,7 +345,43 @@ class DetectTest(unittest.TestCase):
                 dependencies={"Depends": "xorg-video-abi-3 | xorg-video-abi-4"},
                 extra_tags={"Modaliases": "nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)"},
             )
+            archive.create_deb(
+                "midr-sherbet-1",
+                extra_tags={"Udc-Midr": "0x00000000410fd050"},
+            )
+            archive.create_deb(
+                "midr-sherbet-2",
+                extra_tags={"Udc-Midr": "0x00000000410fd4f0"},
+            )
+            archive.create_deb(
+                "midr-wasabi",
+                extra_tags={"Udc-Midr": "0x000000004e0f0100"},
+            )
             chroot.add_repository(archive.path, True, False)
+
+            sys_dir = self.umockdev.get_sys_dir()
+            for cpu, midr in enumerate(
+                (
+                    "0x00000000410fd4f0",
+                    "0x00000000410fd050",
+                    "0x00000000410fd4f0",
+                    "0x000000004e0f0100",
+                )
+            ):
+                identification_dir = os.path.join(
+                    sys_dir,
+                    "devices",
+                    "system",
+                    "cpu",
+                    "cpu%i" % cpu,
+                    "regs",
+                    "identification",
+                )
+                os.makedirs(identification_dir)
+                with open(
+                    os.path.join(identification_dir, "midr_el1"), "w"
+                ) as midr_file:
+                    midr_file.write(midr + "\n")
 
             # # Overwrite sources list generate by aptdaemon testsuite to add
             # # options to apt and ignore unsigned repository
@@ -318,6 +416,9 @@ class DetectTest(unittest.TestCase):
                     "neapolitan",
                     "tuttifrutti",
                     "stracciatella",
+                    "midr-sherbet-1",
+                    "midr-sherbet-2",
+                    "midr-wasabi",
                 ]
             ),
         )
@@ -366,6 +467,9 @@ class DetectTest(unittest.TestCase):
         self.assertEqual(res["nvidia-340"]["recommended"], False)
 
         self.assertFalse(res["neapolitan"]["free"])
+        self.assertEqual(res["midr-sherbet-1"]["midr"], "0x00000000410fd050")
+        self.assertEqual(res["midr-sherbet-2"]["midr"], "0x00000000410fd4f0")
+        self.assertEqual(res["midr-wasabi"]["midr"], "0x000000004e0f0100")
 
     def test_system_driver_packages_chroot_support_branch(self):
         """system_driver_packages() LTSB vs NFB"""
