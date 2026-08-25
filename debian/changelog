@@ -1,8 +1,13 @@
-ubuntu-drivers-common (1:0.10.10) resolute; urgency=medium
+ubuntu-drivers-common (1:0.10.9.1) stonking; urgency=medium
 
+  [ Mitchell Augustin ]
+
+  * Add MIDR detection (LP: #2165071)
+
+  [ Ashton Nelson ]
   * Add D-Bus service for Ubuntu Drivers
 
- -- ashuntu <ashton.nelson@canonical.com>  Mon, 15 Jun 2026 08:50:42 +0100
+ -- Mitchell Augustin <mitchell.augustin@canonical.com>  Fri, 25 Sep 2026 12:23:02 -0500
 
 ubuntu-drivers-common (1:0.10.9) resolute; urgency=medium
 
