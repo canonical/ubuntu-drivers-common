@@ -21,6 +21,15 @@ optimizations.
 It extracts DMI aliases from a package file
 B<debian/>I<package>B<.dmialiases> (see below).
 
+It creates a package substitution variable C<${dmialiases}> which you should add
+to C<debian/control> as
+
+=over 4
+
+XB-Dmidecode: ${dmialiases}
+
+=back
+
 This enables software looking for packages that support a particular machine
 to identify packages using DMI data obtained through B<dmidecode>.
 

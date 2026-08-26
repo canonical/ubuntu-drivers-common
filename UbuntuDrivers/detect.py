@@ -250,7 +250,7 @@ def _dmidecode_processor_modaliases() -> Dict[str, str]:
         if not ret:
             continue
         ret = _normalize(ret)
-        aliases["processor:" + entry + ":" + ret] = "dmidecode"
+        aliases["dmidecode:processor:" + entry + ":" + ret] = "dmidecode"
     return aliases
 
 
