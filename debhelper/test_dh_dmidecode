@@ -1,0 +1,76 @@
+#!/bin/sh
+# test dh_dmidecode
+set -e
+
+fail() 
+{
+    /bin/echo -e "$1"
+    exit 1
+}
+
+dh=$(dirname `readlink -f $0`)/dh_dmidecode
+
+# build sandbox
+D=`mktemp -d`
+trap "rm -r $D" 0 HUP INT QUIT ILL ABRT FPE SEGV PIPE TERM
+cd $D
+
+# create test package
+mkdir -p src/debian
+cd src
+
+cat <<EOF > debian/control
+Source: foo
+Build-Depends: debhelper (>= 7)
+Maintainer: Joe Tester <joe@example.com>
+
+Package: foo
+Architecture: any
+Description: test
+Depends: \${shlibs:Depends}
+XB-Dmidecode: \${dmialiases}
+EOF
+cat <<EOF > debian/rules
+#!/usr/bin/make -f
+%:
+	dh \$@
+
+override_dh_install:
+	dh_install
+	$dh -v
+EOF
+cat <<EOF > debian/changelog
+foo (1) test; urgency=low
+
+  * Test
+
+ -- Joe Tester <joe@example.com>  Thu, 18 Nov 2010 16:15:29 +0100
+EOF
+echo 7 > debian/compat
+
+# without a .dmialiases file, dh_dmidecode must not emit any DMI aliases
+dpkg-buildpackage -us -uc
+
+header=`dpkg -I ../foo_1_*.deb`
+echo "$header" | grep -q '^[[:space:]]*Package: foo$' || fail "No proper Package: header in\n$header"
+if echo "$header" | grep -qE '^[[:space:]]*Dmidecode:[[:space:]]+[^[:space:]]'; then
+    fail "Unexpected DMI aliases without a .dmialiases file in\n$header"
+fi
+
+# now provide a manual DMI alias file; aliases are grouped by package,
+# packages are sorted, and any extra tokens after the package are ignored
+cat <<EOF > debian/foo.dmialiases
+# machine specific metapackages
+alias dmidecode:processor:Version:AMDRyzenAI7PRO350w/Radeon860M oem-amd-meta
+alias dmidecode:processor:Version:GB10 oem-nvidia-meta ignorethisextrafield
+alias dmidecode:processor:Version:GB300 oem-nvidia-meta
+EOF
+
+# build it and check the generated Dmidecode header
+dpkg-buildpackage -us -uc
+
+header=`dpkg -I ../foo_1_*.deb`
+echo "$header" | grep -q '^[[:space:]]*Package: foo$' || fail "No proper Package: header in\n$header"
+echo "$header" | grep -q '^[[:space:]]*Dmidecode: oem-amd-meta(dmidecode:processor:Version:AMDRyzenAI7PRO350w/Radeon860M), oem-nvidia-meta(dmidecode:processor:Version:GB10, dmidecode:processor:Version:GB300)$' || fail "No proper DMI aliases in\n$header"
+
+echo "PASSED"

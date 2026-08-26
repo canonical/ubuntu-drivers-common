@@ -30,6 +30,10 @@ override_dh_install:
 	mkdir -p debian/dh-modaliases/usr/share/man/man1
 	pod2man -c Debhelper -r "$(DEB_VERSION_EPOCH_UPSTREAM)" debhelper/dh_modaliases debian/dh-modaliases/usr/share/man/man1/dh_modaliases.1
 
+	# build dh_dmidecode manpage
+	mkdir -p debian/dh-dmidecode/usr/share/man/man1
+	pod2man -c Debhelper -r "$(DEB_VERSION_EPOCH_UPSTREAM)" debhelper/dh_dmidecode debian/dh-dmidecode/usr/share/man/man1/dh_dmidecode.1
+
 override_dh_installsystemd:
 	# com.ubuntu.Drivers is D-Bus activated: enable it so that the
 	# dbus-com.ubuntu.Drivers.service alias gets created, but never start it
