@@ -1,0 +1,97 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+dh_dmidecode - provide a substvar for DMI aliases
+
+=cut
+
+use strict;
+use File::Find;
+use Debian::Debhelper::Dh_Lib;
+
+=head1 SYNOPSIS
+
+B<dh_dmidecode> [S<I<debhelper options>>]
+
+=head1 DESCRIPTION
+
+B<dh_dmidecode> is useful for packages that provide machine-dependent
+optimizations.
+It extracts DMI aliases from a package file
+B<debian/>I<package>B<.dmialiases> (see below).
+
+This enables software looking for packages that support a particular machine
+to identify packages using DMI data obtained through B<dmidecode>.
+
+=head1 PACKAGE DMI ALIAS FILES
+
+The DMI aliases must be provided manually in a package file named
+B<debian/>I<package>B<.dmialiases>.
+
+Each non-comment line must contain an alias and the package providing it:
+
+=over 4
+
+alias <dmi-alias> <package>
+
+=back
+
+Lines beginning with C<#> are ignored.
+
+=head1 OPTIONS
+
+The standard debhelper options are supported.
+
+=cut
+
+init();
+
+my $aliases;
+
+sub dmialiases_from_pkgfile {
+    my %module_alias_map = ();
+    open F, $_[0];
+    while (<F>) {
+	next if /^#/;
+
+	if (/^alias\s*([^[:space:]]+)\s*([^[:space:]]+)/) {
+	    verbose_print("package file $_[0]: module $2 has alias $1");
+	    push @{$module_alias_map{$2}}, $1;
+	} else {
+	    warning("$_[0]: cannot translate line into modalias: $_");
+	}
+    }
+
+    foreach my $m (sort keys %module_alias_map) {
+	if ($aliases) {
+	    $aliases .= ', ';
+	}
+	$aliases .= $m . '(' . (join ', ', @{$module_alias_map{$m}}) . ')';
+    }
+}
+
+foreach my $package (@{$dh{DOPACKAGES}}) 
+{
+    my $tmp = tmpdir($package);
+
+    delsubstvar($package, 'dmialiases');
+    $aliases = '';
+    my $manual_list = pkgfile($package, 'dmialiases');
+    if ($manual_list) {
+	dmialiases_from_pkgfile $manual_list;
+    }
+    addsubstvar($package, 'dmialiases', $aliases);
+}
+
+=head1 SEE ALSO
+
+L<debhelper(1)>, L<dmidecode(8)>
+
+This program is an extension to debhelper.
+
+=head1 AUTHOR
+
+Martin Pitt <martin.pitt@ubuntu.com>
+
+=cut
