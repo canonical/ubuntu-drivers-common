@@ -7434,10 +7434,10 @@ class DmidecodeModaliasTest(unittest.TestCase):
         self.assertEqual(
             res,
             {
-                "processor:family:ARMv8": "dmidecode",
-                "processor:manufacturer:ARM": "dmidecode",
-                "processor:version:CortexA72": "dmidecode",
-                "processor:frequency:1500MHz": "dmidecode",
+                "dmidecode:processor:family:ARMv8": "dmidecode",
+                "dmidecode:processor:manufacturer:ARM": "dmidecode",
+                "dmidecode:processor:version:CortexA72": "dmidecode",
+                "dmidecode:processor:frequency:1500MHz": "dmidecode",
             },
         )
 
@@ -7473,8 +7473,8 @@ class DmidecodeModaliasTest(unittest.TestCase):
         self.assertEqual(
             res,
             {
-                "processor:family:ARMv8": "dmidecode",
-                "processor:version:CortexA72": "dmidecode",
+                "dmidecode:processor:family:ARMv8": "dmidecode",
+                "dmidecode:processor:version:CortexA72": "dmidecode",
             },
         )
 
@@ -7485,20 +7485,27 @@ class DmidecodeModaliasTest(unittest.TestCase):
         self.assertEqual(UbuntuDrivers.detect._dmidecode_processor_modaliases(), {})
 
     #
-    # system_modaliases() integration
+    # dmidecode_aliases() / system_modaliases() integration
     #
 
     @patch("UbuntuDrivers.detect._dmidecode_processor_modaliases")
-    def test_system_modaliases_merges_processor_aliases(self, mock_proc):
-        """system_modaliases() merges the dmidecode processor aliases in with
-        the sysfs-derived ones"""
+    def test_dmidecode_aliases_returns_processor_aliases(self, mock_proc):
+        """dmidecode_aliases() returns the dmidecode processor aliases"""
 
-        mock_proc.return_value = {"processor:manufacturer:ARM": "dmidecode"}
+        mock_proc.return_value = {"dmidecode:processor:manufacturer:ARM": "dmidecode"}
+        res = UbuntuDrivers.detect.dmidecode_aliases()
+        self.assertEqual(res, {"dmidecode:processor:manufacturer:ARM": "dmidecode"})
+
+    @patch("UbuntuDrivers.detect._dmidecode_processor_modaliases")
+    def test_system_modaliases_excludes_processor_aliases(self, mock_proc):
+        """system_modaliases() no longer merges the dmidecode processor aliases;
+        those are provided separately via dmidecode_aliases()"""
+
+        mock_proc.return_value = {"dmidecode:processor:manufacturer:ARM": "dmidecode"}
         umockdev = gen_fakehw()
         res = UbuntuDrivers.detect.system_modaliases(umockdev.get_sys_dir())
-        # the processor alias was merged in
-        self.assertIn("processor:manufacturer:ARM", res)
-        self.assertEqual(res["processor:manufacturer:ARM"], "dmidecode")
+        # dmidecode aliases are not merged into the sysfs-derived ones
+        self.assertNotIn("dmidecode:processor:manufacturer:ARM", res)
         # regular sysfs modaliases are still present
         self.assertIn("pci:vDEADBEEFd00", res)
 
@@ -7507,6 +7514,16 @@ class ToolTest(unittest.TestCase):
     """Test ubuntu-drivers tool"""
 
     maxDiff = None
+
+    @staticmethod
+    def _filter_root_warning(err):
+        """Drop the informational non-root warning that 'ubuntu-drivers list'
+        emits when not run as root, so tests can assert on real errors only."""
+        return "\n".join(
+            line
+            for line in err.splitlines()
+            if "is not being run as root" not in line
+        )
 
     @classmethod
     def setUpClass(klass):
@@ -7576,7 +7593,7 @@ APT::Get::AllowUnauthenticated "true";
             stderr=subprocess.PIPE,
         )
         out, err = ud.communicate()
-        self.assertEqual(err, "")
+        self.assertEqual(self._filter_root_warning(err), "")
         self.assertEqual(
             set(out.splitlines()),
             set(
@@ -7662,7 +7679,7 @@ APT::Get::AllowUnauthenticated "true";
             stderr=subprocess.PIPE,
         )
         out, err = ud.communicate()
-        self.assertEqual(err, "")
+        self.assertEqual(self._filter_root_warning(err), "")
         self.assertEqual(
             set(out.splitlines()),
             set(
@@ -7844,7 +7861,7 @@ APT::Get::AllowUnauthenticated "true";
             stderr=subprocess.PIPE,
         )
         out, err = ud.communicate()
-        self.assertEqual(err, "")
+        self.assertEqual(self._filter_root_warning(err), "")
         self.assertNotIn("=== Welcome to ubuntu-drivers ===", out)
         self.assertNotIn("This tool helps you install and manage hardware drivers", out)
         self.assertNotIn("--- Installed OEM / NVIDIA Drivers ---", out)
