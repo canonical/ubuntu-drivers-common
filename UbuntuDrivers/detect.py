@@ -292,6 +292,11 @@ def system_modaliases(sys_path: Optional[str] = None) -> Dict[str, str]:
 
         aliases[modalias] = path
 
+    return aliases
+
+
+def dmidecode_aliases() -> Dict[str, str]:
+    aliases: dict[str, str] = {}
     aliases.update(_dmidecode_processor_modaliases())
     return aliases
 
@@ -1210,6 +1215,7 @@ def system_device_specific_metapackages(
 
     modaliases = system_modaliases(sys_path)
     midrs = system_midrs(sys_path)
+    dmidecode = dmidecode_aliases()
 
     if not apt_cache:
         try:
@@ -1255,6 +1261,23 @@ def system_device_specific_metapackages(
                         "open_preferred": _is_open_preferred(apt_cache, p),
                     }
                 )
+
+    for alias, _ in dmidecode.items():
+        for p in packages_for_modalias(apt_cache, alias, modalias_map=modalias_map):
+            # TODO: Keep the matching mechanism to skip packages that are not oem-*-meta or hwe-*-meta
+            if not fnmatch.fnmatch(p.name, "oem-*-meta") and not fnmatch.fnmatch(
+                p.name, "hwe-*-meta"
+            ):
+                continue
+            packages[p.name] = {
+                "modalias": alias,
+                "syspath": "",
+                "free": _is_package_free(apt_cache, p),
+                "from_distro": _is_package_from_distro(apt_cache, p),
+                "recommended": True,
+                "support": _pkg_get_support(apt_cache, p),
+                "open_preferred": _is_open_prefered(apt_cache, p),
+            }
 
     return packages
 
