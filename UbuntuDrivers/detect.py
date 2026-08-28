@@ -326,12 +326,12 @@ def _check_video_abi_compat(apt_cache: apt_pkg.Cache, package: apt_pkg.Package) 
     return True
 
 
-def apt_cache_modalias_map(
-    apt_cache: apt_pkg.Cache, key: str = "Modaliases"
+def apt_cache_map(
+    apt_cache: apt_pkg.Cache, key: str
 ) -> Dict[str, Tuple[Any, Dict[str, Set[str]]]]:
-    """Build a modalias map from an apt_pkg.Cache object.
+    """Build a key map from an apt_pkg.Cache object.
 
-    This filters out uninstallable video drivers (i. e. which depend on a video
+    This filters out uninstallable video drivers (i.e., which depend on a video
     ABI that xserver-xorg-core does not provide).
 
     Return a map bus -> modalias -> [package, ...], where "bus" is the prefix of
@@ -342,7 +342,7 @@ def apt_cache_modalias_map(
 
     result: Dict[str, Dict[str, Set[str]]] = {}
     for package in apt_cache.packages:
-        # skip packages without a modalias field
+        # skip packages without the correct key field
         try:
             candidate = depcache.get_candidate_ver(package)
             records.lookup(candidate.file_list[0])
@@ -374,7 +374,7 @@ def apt_cache_modalias_map(
                     )
         except ValueError:
             logging.error(
-                "Package %s has invalid modalias header: %s" % (package.name, m)
+                "Package %s has invalid %s header: %s" % (package.name, key, m)
             )
 
     result2: Dict[str, Tuple[Any, Dict[str, Set[str]]]] = {}
@@ -386,6 +386,12 @@ def apt_cache_modalias_map(
         result2[bus] = (pat, alias_map)
 
     return result2
+
+
+def apt_cache_modalias_map(
+    apt_cache: apt_pkg.Cache,
+) -> Dict[str, Tuple[Any, Dict[str, Set[str]]]]:
+    return apt_cache_map(apt_cache, key="Modaliases")
 
 
 def path_get_custom_supported_gpus() -> str:
@@ -870,7 +876,7 @@ def system_driver_packages(
                 logging.debug("Package %s plugin not available. Skipping." % p)
 
     dmidecode = dmidecode_aliases()
-    alias_map = apt_cache_modalias_map(apt_cache, key="Dmidecode")
+    alias_map = apt_cache_map(apt_cache, key="Dmidecode")
     for alias, _ in dmidecode.items():
         for p in packages_for_modalias(apt_cache, alias, modalias_map=alias_map):
             packages[p.name] = {
