@@ -459,7 +459,7 @@ def _check_video_abi_compat(apt_cache: apt_pkg.Cache, package: apt_pkg.Package) 
 
 
 def apt_cache_modalias_map(
-    apt_cache: apt_pkg.Cache,
+    apt_cache: apt_pkg.Cache, key: str = "Modaliases"
 ) -> Dict[str, Tuple[Any, Dict[str, Set[str]]]]:
     """Build a modalias map from an apt_pkg.Cache object.
 
@@ -478,7 +478,7 @@ def apt_cache_modalias_map(
         try:
             candidate = depcache.get_candidate_ver(package)
             records.lookup(candidate.file_list[0])
-            m = records["Modaliases"]
+            m = records[key]
             if not m:
                 continue
         except (KeyError, AttributeError, UnicodeDecodeError):
@@ -1086,6 +1086,20 @@ def system_driver_packages(
             except KeyError:
                 logging.debug("Package %s plugin not available. Skipping." % p)
 
+    dmidecode = dmidecode_aliases()
+    alias_map = apt_cache_modalias_map(apt_cache, key="Dmidecode")
+    for alias, _ in dmidecode.items():
+        for p in packages_for_modalias(apt_cache, alias, modalias_map=alias_map):
+            packages[p.name] = {
+                "modalias": alias,
+                "syspath": "",
+                "free": _is_package_free(apt_cache, p),
+                "from_distro": _is_package_from_distro(apt_cache, p),
+                "recommended": True,
+                "support": _pkg_get_support(apt_cache, p),
+                "open_preferred": _is_open_prefered(apt_cache, p),
+            }
+
     return packages
 
 
@@ -1215,7 +1229,6 @@ def system_device_specific_metapackages(
 
     modaliases = system_modaliases(sys_path)
     midrs = system_midrs(sys_path)
-    dmidecode = dmidecode_aliases()
 
     if not apt_cache:
         try:
@@ -1261,24 +1274,6 @@ def system_device_specific_metapackages(
                         "open_preferred": _is_open_preferred(apt_cache, p),
                     }
                 )
-
-    for alias, _ in dmidecode.items():
-        for p in packages_for_modalias(apt_cache, alias, modalias_map=modalias_map):
-            # TODO: Keep the matching mechanism to skip packages that are not oem-*-meta or hwe-*-meta
-            if not fnmatch.fnmatch(p.name, "oem-*-meta") and not fnmatch.fnmatch(
-                p.name, "hwe-*-meta"
-            ):
-                continue
-            packages[p.name] = {
-                "modalias": alias,
-                "syspath": "",
-                "free": _is_package_free(apt_cache, p),
-                "from_distro": _is_package_from_distro(apt_cache, p),
-                "recommended": True,
-                "support": _pkg_get_support(apt_cache, p),
-                "open_preferred": _is_open_prefered(apt_cache, p),
-            }
-
     return packages
 
 
