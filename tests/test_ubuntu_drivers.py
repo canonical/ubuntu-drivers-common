@@ -7520,9 +7520,7 @@ class ToolTest(unittest.TestCase):
         """Drop the informational non-root warning that 'ubuntu-drivers list'
         emits when not run as root, so tests can assert on real errors only."""
         return "\n".join(
-            line
-            for line in err.splitlines()
-            if "is not being run as root" not in line
+            line for line in err.splitlines() if "is not being run as root" not in line
         )
 
     @classmethod
