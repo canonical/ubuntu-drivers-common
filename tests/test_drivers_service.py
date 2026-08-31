@@ -144,6 +144,14 @@ def gen_fakearchive():
             "Modaliases": "nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)",
         },
     )
+    a.create_deb(
+        "nvidia-driver-350",
+        dependencies={"Depends": "xorg-video-abi-4"},
+        extra_tags={
+            "Modaliases": "nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)",
+            "Prefer-Variant": "Open",
+        },
+    )
     return a
 
 
@@ -445,6 +453,7 @@ class DriversServiceDbusTests(unittest.TestCase):
         self.assertFalse(recommended["builtin"])
         self.assertEqual(recommended["source"], "distro")
         self.assertEqual(recommended["support"], "PB")
+        self.assertFalse(recommended["open_preferred"])
 
         non_recommended = by_name["nvidia-driver-390"]
         self.assertFalse(non_recommended["recommended"])
@@ -452,6 +461,15 @@ class DriversServiceDbusTests(unittest.TestCase):
         self.assertFalse(non_recommended["builtin"])
         self.assertEqual(non_recommended["source"], "distro")
         self.assertEqual(non_recommended["support"], "")
+        self.assertFalse(non_recommended["open_preferred"])
+
+        prefers_open = by_name["nvidia-driver-350"]
+        self.assertFalse(prefers_open["recommended"])
+        self.assertFalse(prefers_open["free"])
+        self.assertFalse(prefers_open["builtin"])
+        self.assertEqual(prefers_open["source"], "distro")
+        self.assertEqual(prefers_open["support"], "")
+        self.assertTrue(prefers_open["open_preferred"])
 
     def test_dbus_drivers_nouveau_attributes(self):
         """Built-in free driver (nouveau) attributes are mapped correctly."""

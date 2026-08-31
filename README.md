@@ -35,7 +35,7 @@ for automatic installation.
 
 The three main functions are:
 
-1. Which driver packages apply to this system?  
+1. Which driver packages apply to this system?
 
    `packages = UbuntuDrivers.detect.system_driver_packages()`
 
@@ -80,6 +80,7 @@ The returned structure is a list of dictionaries like:
             "builtin": False,
             "recommended": True,
             "support": "PB",
+            "open_preferred": False,
          },
          ...
       ],
@@ -90,7 +91,9 @@ The returned structure is a list of dictionaries like:
 
 `source` is either `"distro"` or `"third-party"`, and `support` carries the
 package's apt `Support` field (`"PB"`, `"NFB"`, `"LTSB"` or `"Legacy"`), empty
-when the package does not declare one.
+when the package does not declare one. `open_preferred` is `True` when Ubuntu's
+driver-selection logic prefers the "open" kernel module variant over the
+closed-source variant for this driver.
 
 The D-Bus service implementation lives in
 `UbuntuDrivers/service/drivers_service.py`. It is activated on demand by

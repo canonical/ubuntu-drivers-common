@@ -6458,7 +6458,12 @@ Description: broken \xEB encoding
             {
                 "modalias": "pci:v00001234d00sv00000001sd00bc00sc00i00",
                 "drivers": {
-                    "vanilla": {"free": True, "from_distro": False, "support": None}
+                    "vanilla": {
+                        "free": True,
+                        "from_distro": False,
+                        "support": None,
+                        "open_preferred": False,
+                    }
                 },
             },
         )
@@ -6468,7 +6473,12 @@ Description: broken \xEB encoding
             {
                 "modalias": "usb:v9876dABCDsv01sd02bc00sc01i05",
                 "drivers": {
-                    "chocolate": {"free": True, "from_distro": False, "support": None}
+                    "chocolate": {
+                        "free": True,
+                        "from_distro": False,
+                        "support": None,
+                        "open_preferred": False,
+                    }
                 },
             },
         )
@@ -6480,7 +6490,13 @@ Description: broken \xEB encoding
         # should contain nouveau driver
         self.assertEqual(
             graphics_dict["drivers"]["nvidia-driver-450"],
-            {"free": False, "from_distro": False, "recommended": True, "support": None},
+            {
+                "free": False,
+                "from_distro": False,
+                "recommended": True,
+                "support": None,
+                "open_preferred": False,
+            },
         )
         self.assertEqual(
             graphics_dict["drivers"]["nvidia-driver-440"],
@@ -6489,6 +6505,7 @@ Description: broken \xEB encoding
                 "from_distro": False,
                 "recommended": False,
                 "support": None,
+                "open_preferred": False,
             },
         )
         self.assertEqual(
@@ -6498,6 +6515,7 @@ Description: broken \xEB encoding
                 "from_distro": False,
                 "recommended": False,
                 "support": None,
+                "open_preferred": False,
             },
         )
         self.assertEqual(

@@ -66,6 +66,8 @@ def _build_drivers_variant() -> GLib.Variant:
         builtin     b   whether the driver is built into the kernel
         recommended b   whether this is the recommended driver
         support     s   apt Support field value (e.g. "PB"), empty if absent
+        open_preferred b   whether the "open" kernel module variant is
+                           preferred over the closed one for this driver
 
     Raises:
         RuntimeError: if the apt cache cannot be initialized.
@@ -107,6 +109,9 @@ def _build_drivers_variant() -> GLib.Variant:
                             "b", bool(pkg_info.get("recommended", False))
                         ),
                         "support": GLib.Variant("s", pkg_info.get("support") or ""),
+                        "open_preferred": GLib.Variant(
+                            "b", bool(pkg_info.get("open_preferred", False))
+                        ),
                     },
                 )
             )
