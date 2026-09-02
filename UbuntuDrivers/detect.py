@@ -1231,7 +1231,6 @@ def nvidia_desktop_post_installation_hook() -> None:
 
 
 class _GpgpuDriver(object):
-
     def __init__(
         self, vendor: Optional[str] = None, flavour: Optional[str] = None
     ) -> None:
@@ -1310,6 +1309,8 @@ def _build_installation_list(
     sorted_packages: List[Tuple[str, PackageInfo]],
     include_dkms: bool,
     gpgpu: bool = False,
+    filter_installed: bool = True,
+    skip_runtimepm_marker: bool = False,
 ) -> List[str]:
     """
     Build the list of packages to install including metapackages and modules.
@@ -1319,6 +1320,15 @@ def _build_installation_list(
         sorted_packages: List of (package_name, package_info) tuples sorted by preference.
         include_dkms: Boolean indicating whether to include DKMS packages.
         gpgpu: Boolean flag indicating whether to use GPGPU (server) mode.
+        filter_installed: Boolean, if False, currently-installed metapackages
+            and modules packages no longer short-circuit the loop, so the
+            returned list reflects the complete install set rather than only
+            what is not yet installed. With filter_installed=False, the
+            modules/lrm-meta "already installed" check below no longer
+            prevents driver_found from being set, so the loop still stops at
+            the first resolved driver (aside from hwe- metas).
+        skip_runtimepm_marker: Boolean, if True, skip creating
+            /run/nvidia_runtimepm_supported
 
     Returns:
         List of package names to install including metapackages and module packages.
@@ -1335,7 +1345,7 @@ def _build_installation_list(
         if not p.startswith("hwe-") and driver_found:
             continue
 
-        if not gpgpu:
+        if not gpgpu and not skip_runtimepm_marker:
             candidate_ver = depcache.get_candidate_ver(cache[p])
             records = apt_pkg.PackageRecords(cache)
             records.lookup(candidate_ver.file_list[0])
@@ -1358,7 +1368,7 @@ def _build_installation_list(
                 continue
 
         if candidate:
-            if cache[candidate].current_ver:
+            if filter_installed and cache[candidate].current_ver:
                 to_install = []
                 driver_found = True
                 continue
@@ -1373,7 +1383,9 @@ def _build_installation_list(
         # Add the matching linux modules package
         modules_package = get_linux_modules_metapackage(cache, p)
         logging.debug(modules_package)
-        if modules_package and not cache[modules_package].current_ver:
+        if modules_package and not (
+            filter_installed and cache[modules_package].current_ver
+        ):
             if not include_dkms and "dkms" in modules_package:
                 if p in to_install:
                     to_install.remove(p)
@@ -1388,7 +1400,7 @@ def _build_installation_list(
             to_install.append(modules_package)
 
             lrm_meta = get_userspace_lrm_meta(cache, p)
-            if lrm_meta and not cache[lrm_meta].current_ver:
+            if lrm_meta and not (filter_installed and cache[lrm_meta].current_ver):
                 # Add the lrm meta and drop the non lrm one
                 to_install.append(lrm_meta)
                 if p in to_install and gpgpu:
@@ -1426,6 +1438,8 @@ def already_installed_filter(
     packages: Dict[str, PackageInfo],
     include_dkms: bool,
     gpgpu: bool = False,
+    filter_installed: bool = True,
+    skip_runtimepm_marker: bool = False,
 ) -> List[str]:
     """
     Sort driver branch to install according to preference, then select
@@ -1438,6 +1452,11 @@ def already_installed_filter(
             and is filtered depending on the mode (desktop vs gpgpu) and user preferences.
         include_dkms: Boolean indicating whether to include DKMS packages.
         gpgpu: Boolean flag indicating whether to use GPGPU (server) sorting preferences.
+        filter_installed: Boolean, if False, the returned list is the
+            complete install set rather than only the subset not yet
+            installed.
+        skip_runtimepm_marker: Boolean, if True, suppress side effects of computing
+            the install set.
 
     Takes a list of packages of this format:
     {'modalias': 'pci:v000010DEd000010C3sv00003842sd00002670bc03sc03i00',
@@ -1471,10 +1490,18 @@ def already_installed_filter(
     sorted_packages = _sort_packages_by_preference(packages, gpgpu)
 
     # Step 2: Build the installation list with metapackages and modules
-    to_install = _build_installation_list(cache, sorted_packages, include_dkms, gpgpu)
+    to_install = _build_installation_list(
+        cache,
+        sorted_packages,
+        include_dkms,
+        gpgpu,
+        filter_installed,
+        skip_runtimepm_marker,
+    )
 
     # Step 3: Filter out already installed packages
-    to_install = _remove_already_installed(cache, to_install)
+    if filter_installed:
+        to_install = _remove_already_installed(cache, to_install)
 
     logging.debug("to_install_final:  " + str(to_install))
     return to_install
@@ -1487,6 +1514,8 @@ def gpgpu_install_filter(
     drivers_str: str,
     get_recommended: bool = True,
     gpgpu: bool = True,
+    filter_installed: bool = True,
+    skip_runtimepm_marker: bool = False,
 ) -> List[str]:
     drivers: List[_GpgpuDriver] = []
     allow: List[str] = []
@@ -1504,6 +1533,11 @@ def gpgpu_install_filter(
         drivers_str: String specifying driver(s) and version(s) to filter for.
         get_recommended: Boolean, if True only recommended packages are considered.
         gpgpu: Boolean flag indicating whether to use GPGPU (server) sorting preferences.
+        filter_installed: Boolean, if False, the returned list is the
+            complete install set rather than only the subset not yet
+            installed.
+        skip_runtimepm_marker: Boolean, if True, suppress side effects of computing
+            the install set.
 
     Returns:
         A list of drivers to be installed, of the form
@@ -1605,7 +1639,9 @@ def gpgpu_install_filter(
                         result[p] = packages[p]
                         # print('Found "recommended" flavour in %s' % (packages[p]))
                 break
-    return already_installed_filter(cache, result, include_dkms, gpgpu)
+    return already_installed_filter(
+        cache, result, include_dkms, gpgpu, filter_installed, skip_runtimepm_marker
+    )
 
 
 def auto_install_filter(
@@ -1615,6 +1651,8 @@ def auto_install_filter(
     drivers_str: str = "",
     get_recommended: bool = True,
     gpgpu: bool = False,
+    filter_installed: bool = True,
+    skip_runtimepm_marker: bool = False,
 ) -> List[str]:
     """
     Get packages which are appropriate for automatic installation.
@@ -1628,6 +1666,11 @@ def auto_install_filter(
         drivers_str: String specifying driver(s) and version(s) to filter for (optional).
         get_recommended: Boolean, if True only recommended packages are considered.
         gpgpu: Boolean flag indicating whether to use GPGPU (server) sorting preferences.
+        filter_installed: Boolean, if False, the returned list is the
+            complete install set rather than only the subset not yet
+            installed.
+        skip_runtimepm_marker: Boolean, if True, suppress side effects of computing
+            the install set.
 
     Returns:
         The subset of the given list of packages which are appropriate for
@@ -1651,7 +1694,14 @@ def auto_install_filter(
     # If users specify a driver, use gpgpu_install_filter()
     if drivers_str:
         results = gpgpu_install_filter(
-            cache, include_dkms, packages, drivers_str, True, gpgpu
+            cache,
+            include_dkms,
+            packages,
+            drivers_str,
+            True,
+            gpgpu,
+            filter_installed=filter_installed,
+            skip_runtimepm_marker=skip_runtimepm_marker,
         )
         return results
 
@@ -1666,7 +1716,9 @@ def auto_install_filter(
                 result[p] = packages[p]
         else:
             result[p] = packages[p]
-    return already_installed_filter(cache, result, include_dkms, gpgpu)
+    return already_installed_filter(
+        cache, result, include_dkms, gpgpu, filter_installed, skip_runtimepm_marker
+    )
 
 
 def detect_plugin_packages(

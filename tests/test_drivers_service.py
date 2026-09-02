@@ -41,13 +41,21 @@ class _AptChroot:
         self._saved_dir = None
         self._saved_status = None
 
-    def setup(self, archive):
+    def setup(self, archive, installed=()):
+        """Set up the chroot for *archive*.
+
+        installed: paths of .deb files (as returned by
+        testarchive.Archive.create_deb()) to install into the chroot via
+        real `dpkg`, so code that only considers installed packages (e.g.
+        kernel/image detection) can see them as such.
+        """
         for subdir in [
             "var/lib/dpkg",
             "var/cache/apt/archives/partial",
             "var/lib/apt/lists/partial",
             "etc/apt/apt.conf.d",
             "etc/apt/preferences.d",
+            "var/log",
         ]:
             os.makedirs(os.path.join(self.path, subdir), exist_ok=True)
         open(os.path.join(self.path, "var/lib/dpkg/status"), "w").close()
@@ -72,6 +80,22 @@ class _AptChroot:
             check=True,
             capture_output=True,
         )
+
+        for deb_path in installed:
+            subprocess.run(
+                [
+                    "fakeroot",
+                    "dpkg",
+                    "--root",
+                    self.path,
+                    "--log=%s/var/log/dpkg.log" % self.path,
+                    "--force-depends",
+                    "--install",
+                    deb_path,
+                ],
+                check=True,
+                capture_output=True,
+            )
 
         apt_pkg.init_config()
         self._saved_dir = apt_pkg.config.get("Dir", "/")
@@ -621,6 +645,316 @@ class BuildDriversPayloadTests(unittest.TestCase):
             drivers_service._build_drivers_variant()
 
         self.assertIn("apt cache error", str(ctx.exception))
+
+    def test_build_drivers_payload_packages_fields(self):
+        """packages/gpgpu_packages report the base driver package"""
+        with patch.object(drivers_service, "sys_path", self._umockdev.get_sys_dir()):
+            result = _call_build_drivers()
+
+        by_device = {os.path.basename(e["sys_path"]): e for e in result}
+        by_name = {d["name"]: d for d in by_device["graphics"]["drivers"]}
+
+        self.assertEqual(
+            by_name["nvidia-driver-450"]["packages"], ["nvidia-driver-450"]
+        )
+        self.assertEqual(
+            by_name["nvidia-driver-450"]["gpgpu_packages"], ["nvidia-driver-450"]
+        )
+        self.assertEqual(
+            by_name["nvidia-driver-390"]["packages"], ["nvidia-driver-390"]
+        )
+        self.assertEqual(
+            by_name["nvidia-driver-390"]["gpgpu_packages"], ["nvidia-driver-390"]
+        )
+        self.assertEqual(by_name["xserver-xorg-video-nouveau"]["packages"], [])
+        self.assertEqual(by_name["xserver-xorg-video-nouveau"]["gpgpu_packages"], [])
+
+        self.assertEqual(by_device["white"]["drivers"][0]["packages"], ["vanilla"])
+        self.assertEqual(by_device["white"]["drivers"][0]["gpgpu_packages"], [])
+
+
+def _gen_fakearchive_with_kernel():
+    """Like gen_fakearchive(), plus a kernel and a matching prebuilt
+    linux-modules-nvidia-450-generic package, so the canonical install-list
+    filters have a kernel to resolve a modules package against
+
+    Returns (archive, installed_deb_paths, modules_deb_path)
+    """
+    a = gen_fakearchive()
+    kernel_image_deb = a.create_deb("linux-image-5.4.0-25-generic")
+    kernel_meta_deb = a.create_deb(
+        "linux-image-generic",
+        dependencies={"Depends": "linux-image-5.4.0-25-generic"},
+    )
+    a.create_deb(
+        "linux-modules-nvidia-450-5.4.0-25-generic",
+        dependencies={"Depends": "linux-image-5.4.0-25-generic"},
+    )
+    modules_deb = a.create_deb(
+        "linux-modules-nvidia-450-generic",
+        dependencies={"Depends": "linux-modules-nvidia-450-5.4.0-25-generic"},
+    )
+    return a, [kernel_image_deb, kernel_meta_deb], modules_deb
+
+
+class PackagesFieldIntegrationTests(unittest.TestCase):
+    """End-to-end tests of the packages/gpgpu_packages fields"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._archive, cls._installed, _ = _gen_fakearchive_with_kernel()
+        cls._archive.create_deb("nvidia-driver-lrm-450")
+        cls._chroot = _AptChroot()
+        cls._chroot.setup(cls._archive, installed=cls._installed)
+
+    @classmethod
+    def tearDownClass(cls):
+        if hasattr(cls, "_chroot"):
+            cls._chroot.remove()
+
+    def setUp(self):
+        self._umockdev = gen_fakehw()
+        self._plugin_dir = tempfile.mkdtemp()
+        self._old_detect_dir = os.environ.get("UBUNTU_DRIVERS_DETECT_DIR")
+        os.environ["UBUNTU_DRIVERS_DETECT_DIR"] = self._plugin_dir
+
+    def tearDown(self):
+        shutil.rmtree(self._plugin_dir)
+        if self._old_detect_dir is None:
+            os.environ.pop("UBUNTU_DRIVERS_DETECT_DIR", None)
+        else:
+            os.environ["UBUNTU_DRIVERS_DETECT_DIR"] = self._old_detect_dir
+
+    def test_packages_includes_prebuilt_modules_and_lrm_package(self):
+        """With a kernel image installed, the recommended driver's desktop
+        install list includes both its LRM userspace package and the
+        prebuilt kernel modules"""
+        with patch.object(drivers_service, "sys_path", self._umockdev.get_sys_dir()):
+            result = _call_build_drivers()
+
+        by_device = {os.path.basename(e["sys_path"]): e for e in result}
+        by_name = {d["name"]: d for d in by_device["graphics"]["drivers"]}
+
+        self.assertEqual(
+            sorted(by_name["nvidia-driver-450"]["packages"]),
+            sorted(
+                [
+                    "nvidia-driver-lrm-450",
+                    "nvidia-driver-450",
+                    "linux-modules-nvidia-450-generic",
+                ]
+            ),
+        )
+        # On the gpgpu (headless) profile, the base nvidia-driver-450
+        # package itself is dropped in favor of its LRM/modules packages.
+        self.assertEqual(
+            sorted(by_name["nvidia-driver-450"]["gpgpu_packages"]),
+            sorted(["nvidia-driver-lrm-450", "linux-modules-nvidia-450-generic"]),
+        )
+        self.assertEqual(
+            by_name["nvidia-driver-390"]["packages"], ["nvidia-driver-390"]
+        )
+        self.assertEqual(
+            by_name["nvidia-driver-390"]["gpgpu_packages"], ["nvidia-driver-390"]
+        )
+
+
+class PackagesFieldAlreadyInstalledIntegrationTests(unittest.TestCase):
+    """D-Bus result reflects the complete install set"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._archive, cls._installed, modules_deb = _gen_fakearchive_with_kernel()
+        lrm_deb = cls._archive.create_deb("nvidia-driver-lrm-450")
+        cls._chroot = _AptChroot()
+        cls._chroot.setup(
+            cls._archive,
+            installed=list(cls._installed) + [modules_deb, lrm_deb],
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        if hasattr(cls, "_chroot"):
+            cls._chroot.remove()
+
+    def setUp(self):
+        self._umockdev = gen_fakehw()
+        self._plugin_dir = tempfile.mkdtemp()
+        self._old_detect_dir = os.environ.get("UBUNTU_DRIVERS_DETECT_DIR")
+        os.environ["UBUNTU_DRIVERS_DETECT_DIR"] = self._plugin_dir
+
+    def tearDown(self):
+        shutil.rmtree(self._plugin_dir)
+        if self._old_detect_dir is None:
+            os.environ.pop("UBUNTU_DRIVERS_DETECT_DIR", None)
+        else:
+            os.environ["UBUNTU_DRIVERS_DETECT_DIR"] = self._old_detect_dir
+
+    def test_packages_includes_already_installed_lrm_and_modules(self):
+        with patch.object(drivers_service, "sys_path", self._umockdev.get_sys_dir()):
+            result = _call_build_drivers()
+
+        by_device = {os.path.basename(e["sys_path"]): e for e in result}
+        by_name = {d["name"]: d for d in by_device["graphics"]["drivers"]}
+
+        self.assertEqual(
+            sorted(by_name["nvidia-driver-450"]["packages"]),
+            sorted(
+                [
+                    "nvidia-driver-lrm-450",
+                    "nvidia-driver-450",
+                    "linux-modules-nvidia-450-generic",
+                ]
+            ),
+        )
+        self.assertEqual(
+            sorted(by_name["nvidia-driver-450"]["gpgpu_packages"]),
+            sorted(["nvidia-driver-lrm-450", "linux-modules-nvidia-450-generic"]),
+        )
+
+
+class PackagesFieldHeadlessMetapackageIntegrationTests(unittest.TestCase):
+    """End-to-end test of the GPGPU/headless metapackage appearing in
+    gpgpu_packages via gpgpu_install_filter()."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._archive = gen_fakearchive()
+        cls._archive.create_deb("nvidia-headless-no-dkms-450")
+        cls._chroot = _AptChroot()
+        cls._chroot.setup(cls._archive)
+
+    @classmethod
+    def tearDownClass(cls):
+        if hasattr(cls, "_chroot"):
+            cls._chroot.remove()
+
+    def setUp(self):
+        self._umockdev = gen_fakehw()
+        self._plugin_dir = tempfile.mkdtemp()
+        self._old_detect_dir = os.environ.get("UBUNTU_DRIVERS_DETECT_DIR")
+        os.environ["UBUNTU_DRIVERS_DETECT_DIR"] = self._plugin_dir
+
+    def tearDown(self):
+        shutil.rmtree(self._plugin_dir)
+        if self._old_detect_dir is None:
+            os.environ.pop("UBUNTU_DRIVERS_DETECT_DIR", None)
+        else:
+            os.environ["UBUNTU_DRIVERS_DETECT_DIR"] = self._old_detect_dir
+
+    def test_gpgpu_packages_includes_headless_metapackage(self):
+        with patch.object(drivers_service, "sys_path", self._umockdev.get_sys_dir()):
+            result = _call_build_drivers()
+
+        by_device = {os.path.basename(e["sys_path"]): e for e in result}
+        by_name = {d["name"]: d for d in by_device["graphics"]["drivers"]}
+
+        self.assertEqual(
+            sorted(by_name["nvidia-driver-450"]["gpgpu_packages"]),
+            sorted(["nvidia-headless-no-dkms-450", "nvidia-driver-450"]),
+        )
+        # The desktop profile is unaffected: it does not use the headless
+        # metapackage.
+        self.assertEqual(
+            by_name["nvidia-driver-450"]["packages"], ["nvidia-driver-450"]
+        )
+        # nvidia-driver-390 has no corresponding headless metapackage in
+        # the archive, so its gpgpu profile is just itself.
+        self.assertEqual(
+            by_name["nvidia-driver-390"]["gpgpu_packages"], ["nvidia-driver-390"]
+        )
+
+
+class InstallListTests(unittest.TestCase):
+    def test_install_list_desktop(self):
+        catalog = {"nvidia-driver-450": {"free": False, "from_distro": True}}
+        with patch(
+            "UbuntuDrivers.detect.auto_install_filter",
+            return_value=["nvidia-driver-450", "linux-modules-nvidia-450-generic"],
+        ) as mock_filter:
+            result = drivers_service._install_list(
+                None, "nvidia-driver-450", catalog, gpgpu=False
+            )
+
+        mock_filter.assert_called_once_with(
+            None,
+            drivers_service._INCLUDE_DKMS,
+            catalog,
+            "nvidia-driver-450",
+            get_recommended=False,
+            filter_installed=False,
+            skip_runtimepm_marker=True,
+        )
+        self.assertEqual(
+            result, ["nvidia-driver-450", "linux-modules-nvidia-450-generic"]
+        )
+
+    def test_install_list_gpgpu(self):
+        catalog = {
+            "nvidia-driver-450": {
+                "free": False,
+                "from_distro": True,
+                "metapackage": "nvidia-headless-no-dkms-450",
+            }
+        }
+        with patch(
+            "UbuntuDrivers.detect.gpgpu_install_filter",
+            return_value=["nvidia-headless-no-dkms-450", "nvidia-driver-450"],
+        ) as mock_filter:
+            result = drivers_service._install_list(
+                None, "nvidia-driver-450", catalog, gpgpu=True
+            )
+
+        mock_filter.assert_called_once_with(
+            None,
+            drivers_service._INCLUDE_DKMS,
+            catalog,
+            "nvidia-driver-450",
+            get_recommended=False,
+            filter_installed=False,
+            skip_runtimepm_marker=True,
+        )
+        self.assertEqual(result, ["nvidia-headless-no-dkms-450", "nvidia-driver-450"])
+
+    def test_install_list_package_not_in_catalog(self):
+        """A package absent from the given catalog is never passed to the filters"""
+        with patch("UbuntuDrivers.detect.auto_install_filter") as mock_filter:
+            result = drivers_service._install_list(
+                None, "xserver-xorg-video-nouveau", {}, gpgpu=False
+            )
+
+        mock_filter.assert_not_called()
+        self.assertEqual(result, [])
+
+    def test_extra_packages_falls_back_for_non_nvidia_package(self):
+        """A non-NVIDIA driver falls back to naming itself"""
+        catalog = {"bcmwl-kernel-source": {"free": False, "from_distro": True}}
+        with (
+            patch("UbuntuDrivers.detect.auto_install_filter", return_value=[]),
+            patch("UbuntuDrivers.detect.gpgpu_install_filter", return_value=[]),
+        ):
+            packages, gpgpu_packages = drivers_service._package_lists(
+                None, "bcmwl-kernel-source", catalog, {}
+            )
+
+        self.assertEqual(packages, ["bcmwl-kernel-source"])
+        self.assertEqual(gpgpu_packages, [])
+
+    def test_extra_packages_does_not_pad_empty_nvidia_result(self):
+        """An NVIDIA driver resolving to an empty install list (e.g.
+        because it is already installed) is a meaningful result and must
+        not be padded with a fallback."""
+        catalog = {"nvidia-driver-450": {"free": False, "from_distro": True}}
+        with (
+            patch("UbuntuDrivers.detect.auto_install_filter", return_value=[]),
+            patch("UbuntuDrivers.detect.gpgpu_install_filter", return_value=[]),
+        ):
+            packages, gpgpu_packages = drivers_service._package_lists(
+                None, "nvidia-driver-450", catalog, catalog
+            )
+
+        self.assertEqual(packages, [])
+        self.assertEqual(gpgpu_packages, [])
 
 
 if __name__ == "__main__":

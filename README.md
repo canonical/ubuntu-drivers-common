@@ -81,6 +81,8 @@ The returned structure is a list of dictionaries like:
             "recommended": True,
             "support": "PB",
             "open_preferred": False,
+            "packages": ["nvidia-driver-570", "linux-modules-nvidia-570-generic"],
+            "gpgpu_packages": ["nvidia-headless-no-dkms-570", "linux-modules-nvidia-570-generic"],
          },
          ...
       ],
@@ -94,6 +96,11 @@ package's apt `Support` field (`"PB"`, `"NFB"`, `"LTSB"` or `"Legacy"`), empty
 when the package does not declare one. `open_preferred` is `True` when Ubuntu's
 driver-selection logic prefers the "open" kernel module variant over the
 closed-source variant for this driver.
+
+`packages` is what `ubuntu-drivers install <name>` would install for this
+driver: the complete install set, not filtered by installed state.
+`gpgpu_packages` is the equivalent for `ubuntu-drivers install --gpgpu
+<name>`. Either list may be empty when the driver would require DKMS.
 
 The D-Bus service implementation lives in
 `UbuntuDrivers/service/drivers_service.py`. It is activated on demand by
