@@ -1096,6 +1096,10 @@ def system_driver_packages(
     alias_map = apt_cache_map(apt_cache, key="Dmidecode")
     for alias, _ in dmidecode.items():
         for p in packages_for_modalias(apt_cache, alias, modalias_map=alias_map):
+            if freeonly and not _is_package_free(apt_cache, p):
+                continue
+            if not include_oem and fnmatch.fnmatch(p.name, "oem-*-meta"):
+                continue
             packages[p.name] = {
                 "modalias": alias,
                 "syspath": "",
