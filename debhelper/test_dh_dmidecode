@@ -61,9 +61,9 @@ fi
 # packages are sorted, and any extra tokens after the package are ignored
 cat <<EOF > debian/foo.dmialiases
 # machine specific metapackages
-alias dmidecode:processor:Version:AMDRyzenAI7PRO350w/Radeon860M oem-amd-meta
-alias dmidecode:processor:Version:GB10 oem-nvidia-meta ignorethisextrafield
-alias dmidecode:processor:Version:GB300 oem-nvidia-meta
+alias dmidecode:processor:version:AMDRyzenAI7PRO350w/Radeon860M oem-amd-meta
+alias dmidecode:processor:version:GB10 oem-nvidia-meta ignorethisextrafield
+alias dmidecode:processor:version:GB300 oem-nvidia-meta
 EOF
 
 # build it and check the generated Dmidecode header
@@ -71,6 +71,6 @@ dpkg-buildpackage -us -uc
 
 header=`dpkg -I ../foo_1_*.deb`
 echo "$header" | grep -q '^[[:space:]]*Package: foo$' || fail "No proper Package: header in\n$header"
-echo "$header" | grep -q '^[[:space:]]*Dmidecode: oem-amd-meta(dmidecode:processor:Version:AMDRyzenAI7PRO350w/Radeon860M), oem-nvidia-meta(dmidecode:processor:Version:GB10, dmidecode:processor:Version:GB300)$' || fail "No proper DMI aliases in\n$header"
+echo "$header" | grep -q '^[[:space:]]*Dmidecode: oem-amd-meta(dmidecode:processor:version:AMDRyzenAI7PRO350w/Radeon860M), oem-nvidia-meta(dmidecode:processor:version:GB10, dmidecode:processor:version:GB300)$' || fail "No proper DMI aliases in\n$header"v
 
 echo "PASSED"
