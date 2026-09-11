@@ -890,6 +890,7 @@ def system_driver_packages(
                 "from_distro": _is_package_from_distro(apt_cache, p),
                 "recommended": True,
                 "support": _pkg_get_support(apt_cache, p),
+                "runtimepm": _is_runtimepm_supported(apt_cache, p, alias),
                 "open_preferred": _is_open_prefered(apt_cache, p),
             }
 
