@@ -230,7 +230,7 @@ def system_modaliases(sys_path: Optional[str] = None) -> Dict[str, str]:
     return aliases
 
 
-def system_midr(sys_path: Optional[str] = None) -> Dict[str, str]:
+def system_midrs(sys_path: Optional[str] = None) -> Dict[str, str]:
     """Get unique MIDR values present in the system.
 
     Return a MIDR value → sysfs path map.
@@ -246,13 +246,13 @@ def system_midr(sys_path: Optional[str] = None) -> Dict[str, str]:
             with open(midr_path) as midr_file:
                 midr = midr_file.read().strip()
         except IOError as e:
-            logging.debug("system_midr(): Cannot read %s: %s", midr_path, e)
+            logging.debug("system_midrs(): Cannot read %s: %s", midr_path, e)
             continue
 
         parsed_midr = parse_midr(midr)
         if parsed_midr is None:
             logging.debug(
-                "system_midr(): Invalid MIDR value in %s: %s", midr_path, midr
+                "system_midrs(): Invalid MIDR value in %s: %s", midr_path, midr
             )
             continue
 
@@ -396,7 +396,7 @@ def apt_cache_modalias_map(
     return result2
 
 
-def apt_cache_midr_map(
+def apt_cache_midrs_map(
     apt_cache: apt_pkg.Cache,
 ) -> Dict[MidrInfo, Set[str]]:
     """Build a parsed MIDR map from an apt_pkg.Cache object."""
@@ -517,7 +517,7 @@ def packages_for_midr(
 ) -> List["apt_pkg.Package"]:
     """Search packages whose Udc-Midr field matches the given MIDR."""
     if midr_map is None:
-        midr_map = apt_cache_midr_map(apt_cache)
+        midr_map = apt_cache_midrs_map(apt_cache)
 
     parsed_midr = parse_midr(midr)
     if parsed_midr is None:
@@ -873,7 +873,7 @@ def system_driver_packages(
                      recommended == True, and all others False.
     """
     modaliases = system_modaliases(sys_path)
-    midrs = system_midr(sys_path)
+    midrs = system_midrs(sys_path)
 
     if not apt_cache:
         try:
@@ -906,7 +906,7 @@ def system_driver_packages(
                 packages[p.name]["model"] = model
 
     if midrs:
-        midr_map = apt_cache_midr_map(apt_cache)
+        midr_map = apt_cache_midrs_map(apt_cache)
         for midr, syspath in midrs.items():
             for p in packages_for_midr(apt_cache, midr, midr_map=midr_map):
                 if freeonly and not _is_package_free(apt_cache, p):
@@ -1074,7 +1074,7 @@ def system_device_specific_metapackages(
         return {}
 
     modaliases = system_modaliases(sys_path)
-    midrs = system_midr(sys_path)
+    midrs = system_midrs(sys_path)
 
     if not apt_cache:
         try:
@@ -1102,7 +1102,7 @@ def system_device_specific_metapackages(
             }
 
     if midrs:
-        midr_map = apt_cache_midr_map(apt_cache)
+        midr_map = apt_cache_midrs_map(apt_cache)
         for midr, syspath in midrs.items():
             for p in packages_for_midr(apt_cache, midr, midr_map=midr_map):
                 if not fnmatch.fnmatch(p.name, "oem-*-meta") and not fnmatch.fnmatch(

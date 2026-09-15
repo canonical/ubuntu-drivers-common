@@ -229,8 +229,8 @@ class DetectTest(unittest.TestCase):
         )
         self.assertTrue(res["pci:vDEADBEEFd00"].endswith("/sys/devices/grey"))
 
-    def test_system_midr_fake(self):
-        """system_midr() returns all unique CPU types"""
+    def test_system_midrs_fake(self):
+        """system_midrs() returns all unique CPU types"""
 
         sys_dir = self.umockdev.get_sys_dir()
         midr_values = [
@@ -253,16 +253,16 @@ class DetectTest(unittest.TestCase):
             with open(os.path.join(identification_dir, "midr_el1"), "w") as midr_file:
                 midr_file.write(midr + "\n")
 
-        res = UbuntuDrivers.detect.system_midr(sys_dir)
+        res = UbuntuDrivers.detect.system_midrs(sys_dir)
 
         self.assertEqual(set(res), set(midr_values))
         self.assertTrue(res["0x00000000410fd4f0"].endswith("/identification"))
 
-    def test_system_midr_missing(self):
-        """system_midr() ignores systems without MIDR files"""
+    def test_system_midrs_missing(self):
+        """system_midrs() ignores systems without MIDR files"""
 
         self.assertEqual(
-            UbuntuDrivers.detect.system_midr(self.umockdev.get_sys_dir()), {}
+            UbuntuDrivers.detect.system_midrs(self.umockdev.get_sys_dir()), {}
         )
 
     def test_parse_midr(self):
