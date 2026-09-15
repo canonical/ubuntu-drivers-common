@@ -77,8 +77,11 @@ class MidrInfo(NamedTuple):
 
 def parse_midr(value: str) -> Optional[MidrInfo]:
     """Parse a MIDR string into the fields defined by MIDR_EL1."""
+    if not value.startswith("0x"):
+        return None
+
     try:
-        midr = int(value, 0)
+        midr = int(value, 16)
     except ValueError:
         return None
 

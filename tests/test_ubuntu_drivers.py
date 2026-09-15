@@ -289,6 +289,7 @@ class DetectTest(unittest.TestCase):
             ),
         )
         self.assertIsNone(UbuntuDrivers.detect.parse_midr("0x410fd0*"))
+        self.assertIsNone(UbuntuDrivers.detect.parse_midr("410fd4f0"))
         self.assertIsNone(UbuntuDrivers.detect.parse_midr("not-a-midr"))
 
     def test_system_driver_packages_performance(self):
