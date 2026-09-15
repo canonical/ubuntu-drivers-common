@@ -919,7 +919,7 @@ def system_driver_packages(
                     "free": _is_package_free(apt_cache, p),
                     "from_distro": _is_package_from_distro(apt_cache, p),
                     "support": _pkg_get_support(apt_cache, p),
-                    "open_preferred": _is_open_prefered(apt_cache, p),
+                    "open_preferred": _is_open_preferred(apt_cache, p),
                 }
 
     # Add "recommended" flags for NVidia alternatives
@@ -1116,7 +1116,7 @@ def system_device_specific_metapackages(
                     "from_distro": _is_package_from_distro(apt_cache, p),
                     "recommended": True,
                     "support": _pkg_get_support(apt_cache, p),
-                    "open_preferred": _is_open_prefered(apt_cache, p),
+                    "open_preferred": _is_open_preferred(apt_cache, p),
                 }
 
     return packages
