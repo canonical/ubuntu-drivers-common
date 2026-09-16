@@ -77,7 +77,9 @@ lookup_cache: Dict[str, Dict[str, Any]] = {}
 custom_supported_gpus_json = "/etc/custom_supported_gpus.json"
 
 
-class MidrInfo(NamedTuple):
+# A full MIDR_EL1 value read from the system and parsed into
+# its constituent fields
+class SystemMidr(NamedTuple):
     implementer: int
     variant: int
     architecture: int
@@ -85,6 +87,10 @@ class MidrInfo(NamedTuple):
     revision: int
 
 
+# A set of MIDR_EL1 fields parsed from a package's d/control.
+# This is separated from SystemMidr since it represents
+# partial constraints rather than a full MIDR value.
+# Treat an undefined field as unconstrained, not 0.
 MidrFields = FrozenSet[Tuple[str, int]]
 MIDR_FIELD_MAX = {
     "implementer": 0xFF,
@@ -95,7 +101,7 @@ MIDR_FIELD_MAX = {
 }
 
 
-def parse_midr(value: str) -> Optional[MidrInfo]:
+def parse_midr(value: str) -> Optional[SystemMidr]:
     """Parse a MIDR string into the fields defined by MIDR_EL1."""
     if not value.startswith("0x"):
         return None
@@ -108,7 +114,7 @@ def parse_midr(value: str) -> Optional[MidrInfo]:
     if not 0 <= midr <= 0xFFFFFFFF:
         return None
 
-    return MidrInfo(
+    return SystemMidr(
         implementer=(midr >> 24) & 0xFF,
         variant=(midr >> 20) & 0xF,
         architecture=(midr >> 16) & 0xF,
