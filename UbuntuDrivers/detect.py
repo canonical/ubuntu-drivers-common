@@ -15,7 +15,17 @@ import subprocess
 import functools
 import re
 import json
-from typing import Optional, Dict, List, Set, Tuple, Any, TypedDict, NamedTuple
+from typing import (
+    Optional,
+    Dict,
+    List,
+    Set,
+    Tuple,
+    Any,
+    TypedDict,
+    NamedTuple,
+    FrozenSet,
+)
 from functools import cmp_to_key
 
 import apt_pkg
@@ -75,6 +85,16 @@ class MidrInfo(NamedTuple):
     revision: int
 
 
+MidrFields = FrozenSet[Tuple[str, int]]
+MIDR_FIELD_MAX = {
+    "implementer": 0xFF,
+    "variant": 0xF,
+    "architecture": 0xF,
+    "part_number": 0xFFF,
+    "revision": 0xF,
+}
+
+
 def parse_midr(value: str) -> Optional[MidrInfo]:
     """Parse a MIDR string into the fields defined by MIDR_EL1."""
     if not value.startswith("0x"):
@@ -95,6 +115,36 @@ def parse_midr(value: str) -> Optional[MidrInfo]:
         part_number=(midr >> 4) & 0xFFF,
         revision=midr & 0xF,
     )
+
+
+def parse_midr_fields(value: str) -> Optional[MidrFields]:
+    """Parse MIDR field constraints from a package header."""
+    fields = []
+    seen = set()
+    for item in value.split(","):
+        try:
+            name, field_value = (part.strip() for part in item.split(":", 1))
+        except ValueError:
+            return None
+
+        # Fail if the field name has been seen - should never accept a duplicate
+        # (potentially conflicting) value
+        if name not in MIDR_FIELD_MAX or name in seen:
+            return None
+        if not field_value.startswith("0x"):
+            return None
+
+        try:
+            parsed_value = int(field_value, 16)
+        except ValueError:
+            return None
+        if not 0 <= parsed_value <= MIDR_FIELD_MAX[name]:
+            return None
+
+        fields.append((name, parsed_value))
+        seen.add(name)
+
+    return frozenset(fields) or None
 
 
 class NvidiaPkgNameInfo(object):
@@ -398,18 +448,18 @@ def apt_cache_modalias_map(
 
 def apt_cache_midrs_map(
     apt_cache: apt_pkg.Cache,
-) -> Dict[MidrInfo, Set[str]]:
-    """Build a parsed MIDR map from an apt_pkg.Cache object."""
+) -> Dict[MidrFields, Set[str]]:
+    """Build a MIDR field constraint map from an apt_pkg.Cache object."""
     depcache = apt_pkg.DepCache(apt_cache)
     records = apt_pkg.PackageRecords(apt_cache)
-    midr_map: Dict[MidrInfo, Set[str]] = {}
+    midr_map: Dict[MidrFields, Set[str]] = {}
 
     for package in apt_cache.packages:
         try:
             candidate = depcache.get_candidate_ver(package)
             records.lookup(candidate.file_list[0])
-            values = records["Udc-Midr"]  # Defined as XB-Udc-Midr
-            if not values:
+            value = records["Midr"]
+            if not value:
                 continue
         except (KeyError, AttributeError, UnicodeDecodeError):
             continue
@@ -417,18 +467,15 @@ def apt_cache_midrs_map(
         if package.architecture not in ("all", get_apt_arch()):
             continue
 
-        for value in re.split(r"[\s,]+", values):
-            if not value:
-                continue
-            midr = parse_midr(value)
-            if midr is None:
-                logging.debug(
-                    "Package %s has invalid Udc-Midr value: %s",
-                    package.name,
-                    value,
-                )
-                continue
-            midr_map.setdefault(midr, set()).add(package.name)
+        fields = parse_midr_fields(value)
+        if fields is None:
+            logging.debug(
+                "Package %s has invalid Midr value: %s",
+                package.name,
+                value,
+            )
+            continue
+        midr_map.setdefault(fields, set()).add(package.name)
 
     return midr_map
 
@@ -513,9 +560,9 @@ def packages_for_modalias(
 def packages_for_midr(
     apt_cache: apt_pkg.Cache,
     midr: str,
-    midr_map: Optional[Dict[MidrInfo, Set[str]]] = None,
+    midr_map: Optional[Dict[MidrFields, Set[str]]] = None,
 ) -> List["apt_pkg.Package"]:
-    """Search packages whose Udc-Midr field matches the given MIDR."""
+    """Search packages whose Midr field constraints match the given MIDR."""
     if midr_map is None:
         midr_map = apt_cache_midrs_map(apt_cache)
 
@@ -523,7 +570,12 @@ def packages_for_midr(
     if parsed_midr is None:
         return []
 
-    return [apt_cache[package] for package in midr_map.get(parsed_midr, set())]
+    packages = set()
+    for fields, matching_packages in midr_map.items():
+        if all(getattr(parsed_midr, name) == value for name, value in fields):
+            packages.update(matching_packages)
+
+    return [apt_cache[package] for package in packages]
 
 
 def _is_package_free(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> bool:

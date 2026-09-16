@@ -292,6 +292,46 @@ class DetectTest(unittest.TestCase):
         self.assertIsNone(UbuntuDrivers.detect.parse_midr("410fd4f0"))
         self.assertIsNone(UbuntuDrivers.detect.parse_midr("not-a-midr"))
 
+    def test_parse_midr_fields(self):
+        """parse_midr_fields() accepts valid MIDR field constraints"""
+
+        expected = frozenset(
+            (
+                ("implementer", 0x4E),
+                ("variant", 0x0),
+                ("architecture", 0xF),
+                ("part_number", 0x010),
+                ("revision", 0x0),
+            )
+        )
+        self.assertEqual(
+            UbuntuDrivers.detect.parse_midr_fields(
+                "implementer:0x4e,variant:0x0,architecture:0xf,"
+                "part_number:0x010,revision:0x0"
+            ),
+            expected,
+        )
+        self.assertEqual(
+            UbuntuDrivers.detect.parse_midr_fields(
+                "revision:0x0,part_number:0x010,architecture:0xf,"
+                "variant:0x0,implementer:0x4e"
+            ),
+            expected,
+        )
+        self.assertEqual(
+            UbuntuDrivers.detect.parse_midr_fields(
+                "revision:0x0,part_number:0x10,architecture:0xf,"
+                "variant:0x0,implementer:0x4e"
+            ),
+            expected,
+        )
+        self.assertIsNone(UbuntuDrivers.detect.parse_midr_fields("unknown:0x1"))
+        self.assertIsNone(UbuntuDrivers.detect.parse_midr_fields("implementer:4e"))
+        self.assertIsNone(
+            UbuntuDrivers.detect.parse_midr_fields("implementer:0x4e,implementer:0x41")
+        )
+        self.assertIsNone(UbuntuDrivers.detect.parse_midr_fields("part_number:0x1000"))
+
     def test_system_driver_packages_performance(self):
         """system_driver_packages() performance for a lot of modaliases"""
 
@@ -348,15 +388,15 @@ class DetectTest(unittest.TestCase):
             )
             archive.create_deb(
                 "midr-sherbet-1",
-                extra_tags={"Udc-Midr": "0x00000000410fd050"},
+                extra_tags={"Midr": "implementer:0x41,part_number:0xd05"},
             )
             archive.create_deb(
                 "midr-sherbet-2",
-                extra_tags={"Udc-Midr": "0x00000000410fd4f0"},
+                extra_tags={"Midr": "implementer:0x41,part_number:0xd4f"},
             )
             archive.create_deb(
                 "midr-wasabi",
-                extra_tags={"Udc-Midr": "0x000000004e0f0100"},
+                extra_tags={"Midr": "implementer:0x4e,part_number:0x010"},
             )
             chroot.add_repository(archive.path, True, False)
 
@@ -6428,15 +6468,19 @@ class DetectTest(unittest.TestCase):
             )
             archive.create_deb(
                 "oem-wasabi-meta",
-                extra_tags={"Udc-Midr": "0x000000004e0f0100"},
+                extra_tags={"Midr": "implementer:0x4e,part_number:0x010"},
+            )
+            archive.create_deb(
+                "oem-implementer-meta",
+                extra_tags={"Midr": "implementer:0x4e"},
             )
             archive.create_deb(
                 "oem-nonmatching-meta",
-                extra_tags={"Udc-Midr": "0x00000000410fd4f0"},
+                extra_tags={"Midr": "implementer:0x4e,part_number:0xd4f"},
             )
             archive.create_deb(
                 "midr-wasabi",
-                extra_tags={"Udc-Midr": "0x000000004e0f0100"},
+                extra_tags={"Midr": "implementer:0x4e,part_number:0x010"},
             )
 
             identification_dir = os.path.join(
@@ -6464,7 +6508,10 @@ class DetectTest(unittest.TestCase):
             )
         finally:
             chroot.remove()
-        self.assertEqual(set(res), {"oem-pistacchio-meta", "oem-wasabi-meta"})
+        self.assertEqual(
+            set(res),
+            {"oem-pistacchio-meta", "oem-wasabi-meta", "oem-implementer-meta"},
+        )
         self.assertEqual(res["oem-wasabi-meta"]["midr"], "0x000000004e0f0100")
 
     def test_system_driver_packages_bad_encoding(self):
@@ -7339,11 +7386,11 @@ APT::Get::AllowUnauthenticated "true";
         )
         self.archive.create_deb(
             "oem-wasabi-meta",
-            extra_tags={"Udc-Midr": "0x000000004e0f0100"},
+            extra_tags={"Midr": "implementer:0x4e,part_number:0x010"},
         )
         self.archive.create_deb(
             "oem-nonmatching-meta",
-            extra_tags={"Udc-Midr": "0x00000000410fd4f0"},
+            extra_tags={"Midr": "implementer:0x41,part_number:0xd4f"},
         )
 
         identification_dir = os.path.join(
