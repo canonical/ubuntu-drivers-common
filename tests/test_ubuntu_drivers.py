@@ -270,7 +270,7 @@ class DetectTest(unittest.TestCase):
 
         self.assertEqual(
             UbuntuDrivers.detect.parse_midr("0x0000000041a1d053"),
-            UbuntuDrivers.detect.MidrInfo(
+            UbuntuDrivers.detect.SystemMidr(
                 implementer=0x41,
                 variant=0xA,
                 architecture=0x1,
@@ -280,7 +280,7 @@ class DetectTest(unittest.TestCase):
         )
         self.assertEqual(
             UbuntuDrivers.detect.parse_midr("0x000000004e0f0100"),
-            UbuntuDrivers.detect.MidrInfo(
+            UbuntuDrivers.detect.SystemMidr(
                 implementer=0x4E,
                 variant=0x0,
                 architecture=0xF,
