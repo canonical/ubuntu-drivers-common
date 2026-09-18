@@ -710,7 +710,7 @@ def _is_package_from_distro(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> b
 def _pkg_get_open_preference(
     apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package
 ) -> Optional[Any]:
-    """Determine if -open package is prefered from apt Package object"""
+    """Determine if -open package is preferred from apt Package object"""
     depcache = apt_pkg.DepCache(apt_cache)
     candidate = depcache.get_candidate_ver(pkg)
     records = apt_pkg.PackageRecords(apt_cache)
@@ -1108,7 +1108,7 @@ def system_driver_packages(
                 "recommended": True,
                 "support": _pkg_get_support(apt_cache, p),
                 "runtimepm": _is_runtimepm_supported(apt_cache, p, alias),
-                "open_preferred": _is_open_prefered(apt_cache, p),
+                "open_preferred": _is_open_preferred(apt_cache, p),
             }
 
     return packages
@@ -1303,7 +1303,7 @@ def system_device_specific_metapackages(
                 "recommended": True,
                 "support": _pkg_get_support(apt_cache, p),
                 "runtimepm": _is_runtimepm_supported(apt_cache, p, alias),
-                "open_preferred": _is_open_prefered(apt_cache, p),
+                "open_preferred": _is_open_preferred(apt_cache, p),
             }
     return packages
 
@@ -1403,7 +1403,7 @@ def system_gpgpu_driver_packages(
                 "recommended": True,
                 "support": _pkg_get_support(apt_cache, p),
                 "runtimepm": _is_runtimepm_supported(apt_cache, p, alias),
-                "open_preferred": _is_open_prefered(apt_cache, p),
+                "open_preferred": _is_open_preferred(apt_cache, p),
             }
 
     return packages
@@ -2167,7 +2167,7 @@ def _pkg_open_preferred_from_cache(x: str) -> bool:
 def _get_fit_level(x: str) -> int:
     """decide how well the package fits desktop environment"""
 
-    # for desktop non-server packages are prefered to -server ones
+    # for desktop non-server packages are preferred to -server ones
     # if a package preferes open variants, these come on top
 
     if _pkg_open_preferred_from_cache(x):
@@ -2200,7 +2200,7 @@ def _get_fit_level(x: str) -> int:
 def _get_fit_level_gpgpu(x: str) -> int:
     """decide how well the package fits server environment"""
 
-    # for server environment -server packages are prefered to non-server ones
+    # for server environment -server packages are preferred to non-server ones
     # if a package preferes open variants, these come on top
 
     if _pkg_open_preferred_from_cache(x):
