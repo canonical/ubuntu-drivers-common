@@ -84,3 +84,16 @@ Description: debhelper extension for scanning kernel module aliases
  This enables software which is looking for missing driver packages (such as
  Jockey or the operating system installer) to identify which package(s) will
  provide a driver for a piece of hardware, identified by its modalias.
+
+Package: dh-dmidecode
+Architecture: all
+Depends: ${perl:Depends},
+ ${misc:Depends}
+Enhances: debhelper
+Description: debhelper extension for dmidecode based aliases
+ dh_dmidecode is useful for packages that ship machine dependent optimizations.
+ It extracts the alias from from a package file debian/packagename.dmialiases.
+ .
+ This enables software which is looking for missing driver packages (such as
+ Jockey or the operating system installer) to identify which package(s) will
+ provide a driver for a piece of hardware, identified by the provided dmidecode aliases.
