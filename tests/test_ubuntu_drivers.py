@@ -7651,7 +7651,7 @@ APT::Get::AllowUnauthenticated "true";
             stderr=subprocess.PIPE,
         )
         out, err = ud.communicate()
-        self.assertEqual(err, "")
+        self.assertEqual(self._filter_root_warning(err), "")
         expected_packages = {"oem-pistacchio-meta", "oem-wasabi-meta"}
         self.assertEqual(set(out.splitlines()), expected_packages)
         self.assertEqual(ud.returncode, 0)
