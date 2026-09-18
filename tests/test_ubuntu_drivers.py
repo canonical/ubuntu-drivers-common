@@ -7423,7 +7423,7 @@ APT::Get::AllowUnauthenticated "true";
             stderr=subprocess.PIPE,
         )
         out, err = ud.communicate()
-        self.assertEqual(err, "")
+        self.assertEqual(self._filter_root_warning(err), "")
         self.assertEqual(set(out.splitlines()), set(["oem-pistacchio-meta"]))
         self.assertEqual(ud.returncode, 0)
 
