@@ -71,6 +71,6 @@ dpkg-buildpackage -us -uc
 
 header=`dpkg -I ../foo_1_*.deb`
 echo "$header" | grep -q '^[[:space:]]*Package: foo$' || fail "No proper Package: header in\n$header"
-echo "$header" | grep -q '^[[:space:]]*Dmidecode: oem-amd-meta(dmidecode:processor:version:AMDRyzenAI7PRO350w/Radeon860M), oem-nvidia-meta(dmidecode:processor:version:GB10, dmidecode:processor:version:GB300)$' || fail "No proper DMI aliases in\n$header"v
+echo "$header" | grep -q '^[[:space:]]*Dmidecode: oem-amd-meta(dmidecode:processor:version:AMDRyzenAI7PRO350w/Radeon860M), oem-nvidia-meta(dmidecode:processor:version:GB10, dmidecode:processor:version:GB300)$' || fail "No proper DMI aliases in\n$header"
 
 echo "PASSED"
