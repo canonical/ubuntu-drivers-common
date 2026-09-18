@@ -1046,6 +1046,25 @@ def system_device_specific_metapackages(
                 "open_preferred": _is_open_preferred(apt_cache, p),
             }
 
+    # check for dmidecode based oem-meta or hwe-meta packages
+    dmidecode = dmidecode_aliases()
+    alias_map = apt_cache_map(apt_cache, key="Dmidecode")
+    for alias, _ in dmidecode.items():
+        for p in packages_for_modalias(apt_cache, alias, modalias_map=alias_map):
+            if not fnmatch.fnmatch(p.name, "oem-*-meta") and not fnmatch.fnmatch(
+                p.name, "hwe-*-meta"
+            ):
+                continue
+            packages[p.name] = {
+                "modalias": alias,
+                "syspath": "",
+                "free": _is_package_free(apt_cache, p),
+                "from_distro": _is_package_from_distro(apt_cache, p),
+                "recommended": True,
+                "support": _pkg_get_support(apt_cache, p),
+                "runtimepm": _is_runtimepm_supported(apt_cache, p, alias),
+                "open_preferred": _is_open_prefered(apt_cache, p),
+            }
     return packages
 
 
@@ -1130,6 +1149,22 @@ def system_gpgpu_driver_packages(
         recommended = nvidia_packages[-1]
         for p in nvidia_packages:
             packages[p]["recommended"] = p == recommended
+
+    # also check dmidecode based aliases
+    dmidecode = dmidecode_aliases()
+    alias_map = apt_cache_map(apt_cache, key="Dmidecode")
+    for alias, _ in dmidecode.items():
+        for p in packages_for_modalias(apt_cache, alias, modalias_map=alias_map):
+            packages[p.name] = {
+                "modalias": alias,
+                "syspath": "",
+                "free": _is_package_free(apt_cache, p),
+                "from_distro": _is_package_from_distro(apt_cache, p),
+                "recommended": True,
+                "support": _pkg_get_support(apt_cache, p),
+                "runtimepm": _is_runtimepm_supported(apt_cache, p, alias),
+                "open_preferred": _is_open_prefered(apt_cache, p),
+            }
 
     return packages
 
