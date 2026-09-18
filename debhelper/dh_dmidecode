@@ -60,13 +60,14 @@ my $aliases;
 
 sub dmialiases_from_pkgfile {
     my %module_alias_map = ();
+    my ($pkgname) = $_[0] =~ m|debian/(.+?)\.dmialiases$|;
     open F, $_[0];
     while (<F>) {
 	next if /^#/;
 
-	if (/^alias\s*([^[:space:]]+)\s*([^[:space:]]+)/) {
-	    verbose_print("package file $_[0]: module $2 has alias $1");
-	    push @{$module_alias_map{$2}}, $1;
+	if (/^alias\s*([^[:space:]]+)/) {
+	    verbose_print("package file $_[0]: alias $1");
+	    push @{$module_alias_map{$pkgname}}, $1;
 	} else {
 	    warning("$_[0]: cannot translate line into modalias: $_");
 	}
@@ -102,5 +103,6 @@ This program is an extension to debhelper.
 =head1 AUTHOR
 
 Martin Pitt <martin.pitt@ubuntu.com>
+Andreas Glinserer <andreas.glinserer@canonical.com>
 
 =cut
