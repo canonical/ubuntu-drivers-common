@@ -388,7 +388,10 @@ class DetectTest(unittest.TestCase):
             )
             archive.create_deb(
                 "midr-sherbet-1",
-                extra_tags={"Midr": "implementer:0x41,part_number:0xd05"},
+                extra_tags={
+                    "Midr": "implementer:0x41,part_number:0xd05",
+                    "Modaliases": "meta(pci:v00001234d00sv00000001sd00bc00sc00i00)",
+                },
             )
             archive.create_deb(
                 "midr-sherbet-2",
@@ -441,6 +444,10 @@ class DetectTest(unittest.TestCase):
             res = UbuntuDrivers.detect.system_driver_packages(
                 cache, sys_path=self.umockdev.get_sys_dir()
             )
+            with patch("UbuntuDrivers.detect._is_manual_install", return_value=False):
+                devices = UbuntuDrivers.detect.system_device_drivers(
+                    cache, sys_path=sys_dir
+                )
         finally:
             chroot.remove()
         self.assertEqual(
@@ -509,8 +516,19 @@ class DetectTest(unittest.TestCase):
 
         self.assertFalse(res["neapolitan"]["free"])
         self.assertEqual(res["midr-sherbet-1"]["midr"], "0x00000000410fd050")
+        self.assertEqual(res["midr-sherbet-1"]["modalias"], res["vanilla"]["modalias"])
+        self.assertEqual(res["midr-sherbet-1"]["syspath"], res["vanilla"]["syspath"])
+        self.assertEqual(
+            res["midr-sherbet-1"]["midr_syspath"],
+            os.path.join(sys_dir, "devices/system/cpu/cpu1/regs/identification"),
+        )
         self.assertEqual(res["midr-sherbet-2"]["midr"], "0x00000000410fd4f0")
         self.assertEqual(res["midr-wasabi"]["midr"], "0x000000004e0f0100")
+        self.assertNotIn("syspath", res["midr-wasabi"])
+        self.assertIn("midr-sherbet-1", devices[res["vanilla"]["syspath"]]["drivers"])
+        self.assertIn(
+            "midr-wasabi", devices[res["midr-wasabi"]["midr_syspath"]]["drivers"]
+        )
 
     def test_system_driver_packages_chroot_support_branch(self):
         """system_driver_packages() LTSB vs NFB"""
@@ -6463,7 +6481,8 @@ class DetectTest(unittest.TestCase):
             archive.create_deb(
                 "oem-pistacchio-meta",
                 extra_tags={
-                    "Modaliases": "meta(dmi:*pnXPS137390:*, pci:*sv00001028sd00000962*)"
+                    "Modaliases": "meta(dmi:*pnXPS137390:*, pci:*sv00001028sd00000962*)",
+                    "Midr": "implementer:0x4e,part_number:0x010",
                 },
             )
             archive.create_deb(
@@ -6513,6 +6532,14 @@ class DetectTest(unittest.TestCase):
             {"oem-pistacchio-meta", "oem-wasabi-meta", "oem-implementer-meta"},
         )
         self.assertEqual(res["oem-wasabi-meta"]["midr"], "0x000000004e0f0100")
+        self.assertEqual(res["oem-wasabi-meta"]["midr_syspath"], identification_dir)
+        self.assertNotIn("syspath", res["oem-wasabi-meta"])
+        self.assertEqual(res["oem-pistacchio-meta"]["midr"], "0x000000004e0f0100")
+        self.assertEqual(res["oem-pistacchio-meta"]["midr_syspath"], identification_dir)
+        self.assertEqual(res["oem-pistacchio-meta"]["modalias"], "dmi:aaapnXPS137390:a")
+        self.assertTrue(
+            res["oem-pistacchio-meta"]["syspath"].endswith("/devices/pistacchio")
+        )
 
     def test_system_driver_packages_bad_encoding(self):
         """system_driver_packages() with badly encoded Packages index"""
