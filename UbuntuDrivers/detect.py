@@ -62,6 +62,7 @@ class PackageInfo(TypedDict, total=False):
     modalias: str
     midr: str
     syspath: str
+    midr_syspath: str
     plugin: str
     free: bool
     from_distro: bool
@@ -116,11 +117,11 @@ def parse_midr(value: str) -> Optional[SystemMidr]:
         return None
 
     return SystemMidr(
-        implementer=(midr >> 24) & 0xFF,
-        variant=(midr >> 20) & 0xF,
-        architecture=(midr >> 16) & 0xF,
-        part_number=(midr >> 4) & 0xFFF,
-        revision=midr & 0xF,
+        implementer=(midr >> 24) & MIDR_FIELD_MAX["implementer"],
+        variant=(midr >> 20) & MIDR_FIELD_MAX["variant"],
+        architecture=(midr >> 16) & MIDR_FIELD_MAX["architecture"],
+        part_number=(midr >> 4) & MIDR_FIELD_MAX["part_number"],
+        revision=midr & MIDR_FIELD_MAX["revision"],
     )
 
 
@@ -525,7 +526,7 @@ def package_get_nv_allowing_driver(did: str) -> Optional[str]:
 def packages_for_modalias(
     apt_cache: apt_pkg.Cache,
     modalias: str,
-    modalias_map: Optional[Dict[Any, Tuple[Any, Dict[str, Set[str]]]]] = None,
+    modalias_map: Optional[Dict[str, Tuple[Any, Dict[str, Set[str]]]]] = None,
 ) -> List["apt_pkg.Package"]:
     """Search packages which match the given modalias.
 
@@ -918,6 +919,8 @@ def system_driver_packages(
                      drivers from detect plugins)
       'syspath':     sysfs directory for the device that needs this driver
                      (not for drivers from detect plugins)
+      'midr':        MIDR value of a matching CPU, if detected.
+      'midr_syspath':sysfs identification directory of that CPU.
       'plugin':      Name of plugin that detected this package (only for
                      drivers from detect plugins)
       'free':        Boolean flag whether driver is free, i. e. in the "main"
@@ -972,14 +975,16 @@ def system_driver_packages(
                     continue
                 if not include_oem and fnmatch.fnmatch(p.name, "oem-*-meta"):
                     continue
-                packages[p.name] = {
-                    "midr": midr,
-                    "syspath": syspath,
-                    "free": _is_package_free(apt_cache, p),
-                    "from_distro": _is_package_from_distro(apt_cache, p),
-                    "support": _pkg_get_support(apt_cache, p),
-                    "open_preferred": _is_open_preferred(apt_cache, p),
-                }
+                packages.setdefault(p.name, {}).update(
+                    {
+                        "midr": midr,
+                        "midr_syspath": syspath,
+                        "free": _is_package_free(apt_cache, p),
+                        "from_distro": _is_package_from_distro(apt_cache, p),
+                        "support": _pkg_get_support(apt_cache, p),
+                        "open_preferred": _is_open_preferred(apt_cache, p),
+                    }
+                )
 
     # Add "recommended" flags for NVidia alternatives
     nvidia_packages = [p for p in packages if p.startswith("nvidia-")]
@@ -1117,6 +1122,8 @@ def system_device_specific_metapackages(
                      drivers from detect plugins)
       'syspath':     sysfs directory for the device that needs this driver
                      (not for drivers from detect plugins)
+      'midr':        MIDR value of a matching CPU, if detected.
+      'midr_syspath': sysfs identification directory of that CPU.
       'plugin':      Name of plugin that detected this package (only for
                      drivers from detect plugins)
       'free':        Boolean flag whether driver is free, i. e. in the "main"
@@ -1168,15 +1175,17 @@ def system_device_specific_metapackages(
                     p.name, "hwe-*-meta"
                 ):
                     continue
-                packages[p.name] = {
-                    "midr": midr,
-                    "syspath": syspath,
-                    "free": _is_package_free(apt_cache, p),
-                    "from_distro": _is_package_from_distro(apt_cache, p),
-                    "recommended": True,
-                    "support": _pkg_get_support(apt_cache, p),
-                    "open_preferred": _is_open_preferred(apt_cache, p),
-                }
+                packages.setdefault(p.name, {}).update(
+                    {
+                        "midr": midr,
+                        "midr_syspath": syspath,
+                        "free": _is_package_free(apt_cache, p),
+                        "from_distro": _is_package_from_distro(apt_cache, p),
+                        "recommended": True,
+                        "support": _pkg_get_support(apt_cache, p),
+                        "open_preferred": _is_open_preferred(apt_cache, p),
+                    }
+                )
 
     return packages
 
@@ -1342,6 +1351,8 @@ def system_device_drivers(
     ).items():
         if "syspath" in pkginfo:
             device_name = pkginfo["syspath"]
+        elif "midr_syspath" in pkginfo:
+            device_name = pkginfo["midr_syspath"]
         else:
             device_name = pkginfo["plugin"]
         result.setdefault(device_name, {})
