@@ -11,6 +11,7 @@
 import os
 import logging
 import fnmatch
+import glob
 import subprocess
 import functools
 import re
@@ -293,11 +294,11 @@ def system_midrs(sys_path: Optional[str] = None) -> Dict[str, str]:
     """
     midrs = {}
     cpus = f"{sys_path}/devices/system/cpu" if sys_path else "/sys/devices/system/cpu"
-    for path, dirs, files in os.walk(cpus):
-        if "midr_el1" not in files:
-            continue
-
-        midr_path = os.path.join(path, "midr_el1")
+    pattern = os.path.join(
+        glob.escape(cpus), "cpu[0-9]*", "regs", "identification", "midr_el1"
+    )
+    for midr_path in glob.iglob(pattern):
+        path = os.path.dirname(midr_path)
         try:
             with open(midr_path) as midr_file:
                 midr = midr_file.read().strip()
