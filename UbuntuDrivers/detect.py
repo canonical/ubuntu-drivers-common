@@ -104,7 +104,10 @@ MIDR_FIELD_MAX = {
 
 
 def parse_midr(value: str) -> Optional[SystemMidr]:
-    """Parse a MIDR string into the fields defined by MIDR_EL1."""
+    """Decode a 0x-prefixed MIDR string into its five MIDR_EL1 fields.
+
+    Return None for invalid input or values outside the 32-bit range.
+    """
     if not value.startswith("0x"):
         return None
 
@@ -126,7 +129,11 @@ def parse_midr(value: str) -> Optional[SystemMidr]:
 
 
 def parse_midr_fields(value: str) -> Optional[MidrFields]:
-    """Parse MIDR field constraints from a package header."""
+    """Parse comma-separated name:0xvalue constraints from a Midr header.
+
+    Omitted fields are unconstrained. Return None for empty input, unknown or
+    duplicate fields, invalid hexadecimal values, or out-of-range values.
+    """
     fields = []
     seen = set()
     for item in value.split(","):
@@ -291,7 +298,10 @@ def system_modaliases(sys_path: Optional[str] = None) -> Dict[str, str]:
 def system_midrs(sys_path: Optional[str] = None) -> Dict[str, str]:
     """Get unique MIDR values present in the system.
 
-    Return a MIDR value → sysfs path map.
+    Read cpu*/regs/identification/midr_el1 under the supplied sysfs root
+    (default /sys), skipping unreadable or invalid values. Return normalized
+    MIDR strings mapped to their containing identification directories, keeping
+    one path per distinct value so heterogeneous CPU types are all represented.
     """
     midrs = {}
     cpus = f"{sys_path}/devices/system/cpu" if sys_path else "/sys/devices/system/cpu"
@@ -457,7 +467,11 @@ def apt_cache_modalias_map(
 def apt_cache_midrs_map(
     apt_cache: apt_pkg.Cache,
 ) -> Dict[MidrFields, Set[str]]:
-    """Build a MIDR field constraint map from an apt_pkg.Cache object."""
+    """Map parsed Midr constraints to sets of package names in the apt cache.
+
+    Use candidate package headers, accepting native or architecture-independent
+    packages and skipping missing or invalid Midr headers.
+    """
     depcache = apt_pkg.DepCache(apt_cache)
     records = apt_pkg.PackageRecords(apt_cache)
     midr_map: Dict[MidrFields, Set[str]] = {}
@@ -570,7 +584,11 @@ def packages_for_midr(
     midr: str,
     midr_map: Optional[Dict[MidrFields, Set[str]]] = None,
 ) -> List["apt_pkg.Package"]:
-    """Search packages whose Midr field constraints match the given MIDR."""
+    """Return packages whose specified Midr fields all match the given MIDR.
+
+    Unspecified fields impose no constraint; invalid MIDR input returns an
+    empty list. Reuse midr_map when supplied, otherwise build it from apt_cache.
+    """
     if midr_map is None:
         midr_map = apt_cache_midrs_map(apt_cache)
 
