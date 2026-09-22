@@ -6,9 +6,13 @@ ubuntu-drivers-common (1:0.10.12) stonking; urgency=medium
 
 ubuntu-drivers-common (1:0.10.11) stonking; urgency=medium
 
-  * Refuse to install on lxc containers unless specified
+  [ Ashton Nelson ]
+  * Fix dbus service output to include missing fields (LP: #2166233)
 
- -- Mitchell Augustin <mitchell.augustin@canonical.com>  Fri, 14 Aug 2026 16:28:22 -0500
+  [ Mitchell Augustin ]
+  * Refuse to install on lxc containers unless specified (LP: #2167724)
+
+ -- Mitchell Augustin <mitchell.augustin@canonical.com>  Fri, 18 Sep 2026 11:34:22 -0500
 
 ubuntu-drivers-common (1:0.10.10) stonking; urgency=medium
 
