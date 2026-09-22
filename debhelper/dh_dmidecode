@@ -42,7 +42,7 @@ Each non-comment line must contain an alias and the package providing it:
 
 =over 4
 
-alias <dmi-alias> <package>
+alias <dmi-alias>
 
 =back
 
