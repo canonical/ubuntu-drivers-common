@@ -194,10 +194,99 @@ class DetectTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.plugin_dir)
 
+    def test_path_get_custom_supported_gpus_priority(self):
+        """path_get_custom_supported_gpus() prefers /etc over oem-*-meta"""
+        etc_path = "/etc/custom_supported_gpus.json"
+        oem_a = "/usr/share/oem-a-meta/custom_supported_gpus.json"
+        oem_b = "/usr/share/oem-b-meta/custom_supported_gpus.json"
+
+        # /etc wins even when an oem-*-meta file is also present
+        with patch(
+            "os.path.exists", side_effect=lambda p: p in (etc_path, oem_a)
+        ), patch("glob.glob", return_value=[oem_a]):
+            self.assertEqual(
+                UbuntuDrivers.detect.path_get_custom_supported_gpus(), etc_path
+            )
+
+        # fall back to an oem-*-meta file when /etc does not exist
+        with patch(
+            "os.path.exists", side_effect=lambda p: p.startswith("/usr/share/oem-")
+        ), patch("glob.glob", return_value=[oem_b, oem_a]):
+            self.assertEqual(
+                UbuntuDrivers.detect.path_get_custom_supported_gpus(), oem_a
+            )
+
+        # default to the /etc path when nothing exists
+        with patch("os.path.exists", return_value=False), patch(
+            "glob.glob", return_value=[]
+        ):
+            self.assertEqual(
+                UbuntuDrivers.detect.path_get_custom_supported_gpus(), etc_path
+            )
+
+    @patch("UbuntuDrivers.detect.path_get_custom_supported_gpus")
+    def test_is_nv_allowing_runtimepm_supported(self, mocked_pgcsg):
+        """_is_nv_allowing_runtimepm_supported() handles -open branches"""
+        csg = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+        csg.write(
+            """{
+  "chips": [
+    {
+      "devid": "0x2D98",
+      "name": "GN22-X2",
+      "branch": "570-open",
+      "features": ["kernelopen", "runtimepm"]
+    },
+    {
+      "devid": "0x2C38",
+      "name": "RTX PRO 5000",
+      "branch": "580-open",
+      "features": ["runtimepm"]
+    },
+    {
+      "devid": "0x2D2C",
+      "name": "WN22 ES",
+      "branch": "580-open",
+      "features": ["kernelopen"]
+    }
+  ]
+}"""
+        )
+        csg.close()
+        self.addCleanup(os.unlink, csg.name)
+        mocked_pgcsg.return_value = csg.name
+
+        def alias(did):
+            return "pci:v000010DEd0000%ssv00001028sd00000C03bc03sc00i00" % did
+
+        detect = UbuntuDrivers.detect
+        # -open branch matches the numeric candidate series
+        self.assertTrue(
+            detect._is_nv_allowing_runtimepm_supported(alias("2D98"), "570")
+        )
+        self.assertTrue(
+            detect._is_nv_allowing_runtimepm_supported(alias("2C38"), "580")
+        )
+        # wrong series must not match
+        self.assertFalse(
+            detect._is_nv_allowing_runtimepm_supported(alias("2D98"), "580")
+        )
+        # a partial numeric string must not substring-match "580-open"
+        self.assertFalse(
+            detect._is_nv_allowing_runtimepm_supported(alias("2C38"), "58")
+        )
+        # device without the runtimepm feature is not supported
+        self.assertFalse(
+            detect._is_nv_allowing_runtimepm_supported(alias("2D2C"), "580")
+        )
+        # unknown device is not supported
+        self.assertFalse(
+            detect._is_nv_allowing_runtimepm_supported(alias("FFFF"), "580")
+        )
+
     @unittest.skipUnless(os.path.isdir("/sys/devices"), "no /sys dir on this system")
     def test_system_modaliases_system(self):
         """system_modaliases() for current system"""
-
         # Let's skip the test on s390x
         if "s390x" in os.uname().machine:
             self.assertTrue(True)
@@ -2190,8 +2279,24 @@ class DetectTest(unittest.TestCase):
  ]
 }"""
                 )
-            res_470_no_390 = UbuntuDrivers.detect.system_driver_packages(
+            res_390_no_470 = UbuntuDrivers.detect.system_driver_packages(
                 cache, sys_path=self.umockdev.get_sys_dir()
+            )
+
+            # With recommended=True only the custom pinned series is listed.
+            res_390_only_recommended = UbuntuDrivers.detect.system_driver_packages(
+                cache, sys_path=self.umockdev.get_sys_dir(), recommended=True
+            )
+
+            # "ubuntu-drivers install" (auto) selects the custom pinned series.
+            install_390 = UbuntuDrivers.detect.get_desktop_package_list(
+                cache, sys_path=self.umockdev.get_sys_dir()
+            )
+            # An explicit driver request is honored over the custom pin.
+            install_470_explicit = UbuntuDrivers.detect.get_desktop_package_list(
+                cache,
+                sys_path=self.umockdev.get_sys_dir(),
+                driver_string="nvidia-driver-470",
             )
 
             # point to the same version as candidate.
@@ -2290,14 +2395,30 @@ class DetectTest(unittest.TestCase):
             set(packages), set(["linux-modules-nvidia-470-generic-hwe-20.04"])
         )
 
-        self.assertTrue("nvidia-driver-470" in res_470_no_390)
-        self.assertTrue("nvidia-driver-390" in res_470_no_390)
+        self.assertTrue("nvidia-driver-470" in res_390_no_470)
+        self.assertTrue("nvidia-driver-390" in res_390_no_470)
+        # Plain "list" still shows all drivers but prioritizes the custom
+        # configuration as the recommended one.
+        self.assertTrue(res_390_no_470["nvidia-driver-390"]["recommended"])
+        self.assertFalse(res_390_no_470["nvidia-driver-470"]["recommended"])
         packages = UbuntuDrivers.detect.gpgpu_install_filter(
-            cache, True, res_470_no_390, "nvidia"
+            cache, True, res_390_no_470, "nvidia"
         )
         self.assertEqual(
-            set(packages), set(["linux-modules-nvidia-470-generic-hwe-20.04"])
+            set(packages), set(["linux-modules-nvidia-390-generic-hwe-20.04"])
         )
+
+        # ubuntu-drivers list --recommended lists only the custom pinned series.
+        self.assertTrue("nvidia-driver-390" in res_390_only_recommended)
+        self.assertFalse("nvidia-driver-470" in res_390_only_recommended)
+        self.assertTrue(res_390_only_recommended["nvidia-driver-390"]["recommended"])
+
+        # ubuntu-drivers install auto-selects the custom pinned series, but an
+        # explicitly requested driver takes precedence over the custom pin.
+        self.assertTrue("nvidia-driver-390" in install_390)
+        self.assertFalse("nvidia-driver-470" in install_390)
+        self.assertTrue("nvidia-driver-470" in install_470_explicit)
+        self.assertFalse("nvidia-driver-390" in install_470_explicit)
 
         self.assertTrue("nvidia-driver-470" in res_same_470)
         packages = UbuntuDrivers.detect.gpgpu_install_filter(
@@ -6896,6 +7017,45 @@ exec /sbin/modinfo "$@"
                 None, True, pkgs, "nvidia-driver:410"
             ),
             [],
+        )
+
+        # When an explicit flavour is requested without a variant suffix and
+        # the matched metapackage prefers the open variant (Prefer-Variant:
+        # Open, reflected by open_preferred), the "-open" counterpart must be
+        # selected instead (LP: honor packaging preference).
+        pkgs_open = {
+            "nvidia-driver-595": {"open_preferred": True},
+            "nvidia-driver-595-open": {"open_preferred": True},
+        }
+        self.assertEqual(
+            set(
+                UbuntuDrivers.detect.gpgpu_install_filter(
+                    None, True, pkgs_open, "nvidia:595"
+                )
+            ),
+            set(["nvidia-driver-595-open"]),
+        )
+        # Asking explicitly for the open variant still works
+        self.assertEqual(
+            set(
+                UbuntuDrivers.detect.gpgpu_install_filter(
+                    None, True, pkgs_open, "nvidia:595-open"
+                )
+            ),
+            set(["nvidia-driver-595-open"]),
+        )
+        # If the closed metapackage does not prefer open, it is kept as-is
+        pkgs_closed = {
+            "nvidia-driver-470": {"open_preferred": False},
+            "nvidia-driver-470-open": {"open_preferred": False},
+        }
+        self.assertEqual(
+            set(
+                UbuntuDrivers.detect.gpgpu_install_filter(
+                    None, True, pkgs_closed, "nvidia:470"
+                )
+            ),
+            set(["nvidia-driver-470"]),
         )
 
     def test_already_installed_filter_filter_installed_false(self):

@@ -722,11 +722,18 @@ def list(config: Config, **kwargs: Any) -> Optional[int]:
             sys_path=sys_path,
             freeonly=config.free_only,
             include_oem=config.install_oem_meta,
+            recommended=bool(kwargs.get("recommended")),
         )
         sort_func = UbuntuDrivers.detect._cmp_gfx_alternatives
 
     for package, info in sorted(packages.items(), key=cmp_to_key(lambda left, right: sort_func(left[0], right[0])), reverse=True):  # type: ignore[index]
         try:
+            # In recommended mode, collapse variant driver groups (e.g. the
+            # nvidia driver alternatives) to the single recommended package,
+            # while still showing every other suggested package.
+            if kwargs.get("recommended") and info.get("recommended") is False:
+                continue
+
             linux_modules = UbuntuDrivers.detect.get_linux_modules_metapackage(
                 cache, package
             )
@@ -740,7 +747,6 @@ def list(config: Config, **kwargs: Any) -> Optional[int]:
                     # This is just a space separated two item line
                     # Such as "nvidia-headless-no-dkms-470-server linux-modules-nvidia-470-server-generic"
                     print("%s %s" % (package, linux_modules))
-                    break
                 else:
                     print(
                         "%s, (kernel modules provided by %s)" % (package, linux_modules)
