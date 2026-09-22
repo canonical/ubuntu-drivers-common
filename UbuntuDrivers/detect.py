@@ -11,11 +11,22 @@
 import os
 import logging
 import fnmatch
+import glob
 import subprocess
 import functools
 import re
 import json
-from typing import Optional, Dict, List, Set, Tuple, Any, TypedDict
+from typing import (
+    Optional,
+    Dict,
+    List,
+    Set,
+    Tuple,
+    Any,
+    TypedDict,
+    NamedTuple,
+    FrozenSet,
+)
 from functools import cmp_to_key
 
 import apt_pkg
@@ -38,6 +49,7 @@ class DeviceInfo(TypedDict, total=False):
     """Type definition for device information with associated drivers."""
 
     modalias: str
+    midr: str
     vendor: str
     model: str
     drivers: Dict[str, DriverInfo]
@@ -48,7 +60,9 @@ class PackageInfo(TypedDict, total=False):
     """Type definition for driver package information dictionaries."""
 
     modalias: str
+    midr: str
     syspath: str
+    midr_syspath: str
     plugin: str
     free: bool
     from_distro: bool
@@ -63,6 +77,89 @@ class PackageInfo(TypedDict, total=False):
 system_architecture = ""
 lookup_cache: Dict[str, Dict[str, Any]] = {}
 custom_supported_gpus_json = "/etc/custom_supported_gpus.json"
+
+
+# A full MIDR_EL1 value read from the system and parsed into
+# its constituent fields
+class SystemMidr(NamedTuple):
+    implementer: int
+    variant: int
+    architecture: int
+    part_number: int
+    revision: int
+
+
+# A set of MIDR_EL1 fields parsed from a package's d/control.
+# This is separated from SystemMidr since it represents
+# partial constraints rather than a full MIDR value.
+# Treat an undefined field as unconstrained, not 0.
+MidrFields = FrozenSet[Tuple[str, int]]
+MIDR_FIELD_MAX = {
+    "implementer": 0xFF,
+    "variant": 0xF,
+    "architecture": 0xF,
+    "part_number": 0xFFF,
+    "revision": 0xF,
+}
+
+
+def parse_midr(value: str) -> Optional[SystemMidr]:
+    """Decode a 0x-prefixed MIDR string into its five MIDR_EL1 fields.
+
+    Return None for invalid input or values outside the 32-bit range.
+    """
+    if not value.startswith("0x"):
+        return None
+
+    try:
+        midr = int(value, 16)
+    except ValueError:
+        return None
+
+    if not 0 <= midr <= 0xFFFFFFFF:
+        return None
+
+    return SystemMidr(
+        implementer=(midr >> 24) & MIDR_FIELD_MAX["implementer"],
+        variant=(midr >> 20) & MIDR_FIELD_MAX["variant"],
+        architecture=(midr >> 16) & MIDR_FIELD_MAX["architecture"],
+        part_number=(midr >> 4) & MIDR_FIELD_MAX["part_number"],
+        revision=midr & MIDR_FIELD_MAX["revision"],
+    )
+
+
+def parse_midr_fields(value: str) -> Optional[MidrFields]:
+    """Parse comma-separated name:0xvalue constraints from a Midr header.
+
+    Omitted fields are unconstrained. Return None for empty input, unknown or
+    duplicate fields, invalid hexadecimal values, or out-of-range values.
+    """
+    fields = []
+    seen = set()
+    for item in value.split(","):
+        try:
+            name, field_value = (part.strip() for part in item.split(":", 1))
+        except ValueError:
+            return None
+
+        # Fail if the field name has been seen - should never accept a duplicate
+        # (potentially conflicting) value
+        if name not in MIDR_FIELD_MAX or name in seen:
+            return None
+        if not field_value.startswith("0x"):
+            return None
+
+        try:
+            parsed_value = int(field_value, 16)
+        except ValueError:
+            return None
+        if not 0 <= parsed_value <= MIDR_FIELD_MAX[name]:
+            return None
+
+        fields.append((name, parsed_value))
+        seen.add(name)
+
+    return frozenset(fields) or None
 
 
 class NvidiaPkgNameInfo(object):
@@ -196,6 +293,41 @@ def system_modaliases(sys_path: Optional[str] = None) -> Dict[str, str]:
         aliases[modalias] = path
 
     return aliases
+
+
+def system_midrs(sys_path: Optional[str] = None) -> Dict[str, str]:
+    """Get unique MIDR values present in the system.
+
+    Read cpu*/regs/identification/midr_el1 under the supplied sysfs root
+    (default /sys), skipping unreadable or invalid values. Return normalized
+    MIDR strings mapped to their containing identification directories, keeping
+    one path per distinct value so heterogeneous CPU types are all represented.
+    """
+    midrs = {}
+    cpus = f"{sys_path}/devices/system/cpu" if sys_path else "/sys/devices/system/cpu"
+    pattern = os.path.join(
+        glob.escape(cpus), "cpu[0-9]*", "regs", "identification", "midr_el1"
+    )
+    for midr_path in glob.iglob(pattern):
+        path = os.path.dirname(midr_path)
+        try:
+            with open(midr_path) as midr_file:
+                midr = midr_file.read().strip()
+        except IOError as e:
+            logging.debug("system_midrs(): Cannot read %s: %s", midr_path, e)
+            continue
+
+        parsed_midr = parse_midr(midr)
+        if parsed_midr is None:
+            logging.debug(
+                "system_midrs(): Invalid MIDR value in %s: %s", midr_path, midr
+            )
+            continue
+
+        # big.LITTLE systems match all packages matching any of their CPU types.
+        midrs[f"0x{int(midr, 0):016x}"] = path
+
+    return midrs
 
 
 def _check_video_abi_compat(apt_cache: apt_pkg.Cache, package: apt_pkg.Package) -> bool:
@@ -332,6 +464,44 @@ def apt_cache_modalias_map(
     return result2
 
 
+def apt_cache_midrs_map(
+    apt_cache: apt_pkg.Cache,
+) -> Dict[MidrFields, Set[str]]:
+    """Map parsed Midr constraints to sets of package names in the apt cache.
+
+    Use candidate package headers, accepting native or architecture-independent
+    packages and skipping missing or invalid Midr headers.
+    """
+    depcache = apt_pkg.DepCache(apt_cache)
+    records = apt_pkg.PackageRecords(apt_cache)
+    midr_map: Dict[MidrFields, Set[str]] = {}
+
+    for package in apt_cache.packages:
+        try:
+            candidate = depcache.get_candidate_ver(package)
+            records.lookup(candidate.file_list[0])
+            value = records["Midr"]
+            if not value:
+                continue
+        except (KeyError, AttributeError, UnicodeDecodeError):
+            continue
+
+        if package.architecture not in ("all", get_apt_arch()):
+            continue
+
+        fields = parse_midr_fields(value)
+        if fields is None:
+            logging.debug(
+                "Package %s has invalid Midr value: %s",
+                package.name,
+                value,
+            )
+            continue
+        midr_map.setdefault(fields, set()).add(package.name)
+
+    return midr_map
+
+
 def path_get_custom_supported_gpus() -> str:
     return custom_supported_gpus_json
 
@@ -407,6 +577,31 @@ def packages_for_modalias(
                 pkgs.add(p)
 
     return [apt_cache[p] for p in pkgs]
+
+
+def packages_for_midr(
+    apt_cache: apt_pkg.Cache,
+    midr: str,
+    midr_map: Optional[Dict[MidrFields, Set[str]]] = None,
+) -> List["apt_pkg.Package"]:
+    """Return packages whose specified Midr fields all match the given MIDR.
+
+    Unspecified fields impose no constraint; invalid MIDR input returns an
+    empty list. Reuse midr_map when supplied, otherwise build it from apt_cache.
+    """
+    if midr_map is None:
+        midr_map = apt_cache_midrs_map(apt_cache)
+
+    parsed_midr = parse_midr(midr)
+    if parsed_midr is None:
+        return []
+
+    packages = set()
+    for fields, matching_packages in midr_map.items():
+        if all(getattr(parsed_midr, name) == value for name, value in fields):
+            packages.update(matching_packages)
+
+    return [apt_cache[package] for package in packages]
 
 
 def _is_package_free(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> bool:
@@ -742,6 +937,8 @@ def system_driver_packages(
                      drivers from detect plugins)
       'syspath':     sysfs directory for the device that needs this driver
                      (not for drivers from detect plugins)
+      'midr':        MIDR value of a matching CPU, if detected.
+      'midr_syspath':sysfs identification directory of that CPU.
       'plugin':      Name of plugin that detected this package (only for
                      drivers from detect plugins)
       'free':        Boolean flag whether driver is free, i. e. in the "main"
@@ -756,6 +953,7 @@ def system_driver_packages(
                      recommended == True, and all others False.
     """
     modaliases = system_modaliases(sys_path)
+    midrs = system_midrs(sys_path)
 
     if not apt_cache:
         try:
@@ -786,6 +984,25 @@ def system_driver_packages(
                 packages[p.name]["vendor"] = vendor
             if model is not None:
                 packages[p.name]["model"] = model
+
+    if midrs:
+        midr_map = apt_cache_midrs_map(apt_cache)
+        for midr, syspath in midrs.items():
+            for p in packages_for_midr(apt_cache, midr, midr_map=midr_map):
+                if freeonly and not _is_package_free(apt_cache, p):
+                    continue
+                if not include_oem and fnmatch.fnmatch(p.name, "oem-*-meta"):
+                    continue
+                packages.setdefault(p.name, {}).update(
+                    {
+                        "midr": midr,
+                        "midr_syspath": syspath,
+                        "free": _is_package_free(apt_cache, p),
+                        "from_distro": _is_package_from_distro(apt_cache, p),
+                        "support": _pkg_get_support(apt_cache, p),
+                        "open_preferred": _is_open_preferred(apt_cache, p),
+                    }
+                )
 
     # Add "recommended" flags for NVidia alternatives
     nvidia_packages = [p for p in packages if p.startswith("nvidia-")]
@@ -923,6 +1140,8 @@ def system_device_specific_metapackages(
                      drivers from detect plugins)
       'syspath':     sysfs directory for the device that needs this driver
                      (not for drivers from detect plugins)
+      'midr':        MIDR value of a matching CPU, if detected.
+      'midr_syspath': sysfs identification directory of that CPU.
       'plugin':      Name of plugin that detected this package (only for
                      drivers from detect plugins)
       'free':        Boolean flag whether driver is free, i. e. in the "main"
@@ -939,6 +1158,7 @@ def system_device_specific_metapackages(
         return {}
 
     modaliases = system_modaliases(sys_path)
+    midrs = system_midrs(sys_path)
 
     if not apt_cache:
         try:
@@ -964,6 +1184,26 @@ def system_device_specific_metapackages(
                 "support": _pkg_get_support(apt_cache, p),
                 "open_preferred": _is_open_preferred(apt_cache, p),
             }
+
+    if midrs:
+        midr_map = apt_cache_midrs_map(apt_cache)
+        for midr, syspath in midrs.items():
+            for p in packages_for_midr(apt_cache, midr, midr_map=midr_map):
+                if not fnmatch.fnmatch(p.name, "oem-*-meta") and not fnmatch.fnmatch(
+                    p.name, "hwe-*-meta"
+                ):
+                    continue
+                packages.setdefault(p.name, {}).update(
+                    {
+                        "midr": midr,
+                        "midr_syspath": syspath,
+                        "free": _is_package_free(apt_cache, p),
+                        "from_distro": _is_package_from_distro(apt_cache, p),
+                        "recommended": True,
+                        "support": _pkg_get_support(apt_cache, p),
+                        "open_preferred": _is_open_preferred(apt_cache, p),
+                    }
+                )
 
     return packages
 
@@ -1129,10 +1369,12 @@ def system_device_drivers(
     ).items():
         if "syspath" in pkginfo:
             device_name = pkginfo["syspath"]
+        elif "midr_syspath" in pkginfo:
+            device_name = pkginfo["midr_syspath"]
         else:
             device_name = pkginfo["plugin"]
         result.setdefault(device_name, {})
-        for opt_key in ("modalias", "vendor", "model"):
+        for opt_key in ("modalias", "midr", "vendor", "model"):
             if opt_key in pkginfo:
                 result[device_name][opt_key] = pkginfo[opt_key]  # type: ignore[index, literal-required]
         drivers = result[device_name].setdefault("drivers", {})

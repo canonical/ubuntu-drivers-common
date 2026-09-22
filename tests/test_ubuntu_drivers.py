@@ -229,6 +229,109 @@ class DetectTest(unittest.TestCase):
         )
         self.assertTrue(res["pci:vDEADBEEFd00"].endswith("/sys/devices/grey"))
 
+    def test_system_midrs_fake(self):
+        """system_midrs() returns all unique CPU types"""
+
+        sys_dir = self.umockdev.get_sys_dir()
+        midr_values = [
+            "0x00000000410fd4f0",
+            "0x00000000410fd4f0",
+            "0x00000000410fd050",
+            "0x000000004e0f0100",
+        ]
+        for cpu, midr in enumerate(midr_values):
+            identification_dir = os.path.join(
+                sys_dir,
+                "devices",
+                "system",
+                "cpu",
+                "cpu%i" % cpu,
+                "regs",
+                "identification",
+            )
+            os.makedirs(identification_dir)
+            with open(os.path.join(identification_dir, "midr_el1"), "w") as midr_file:
+                midr_file.write(midr + "\n")
+
+        res = UbuntuDrivers.detect.system_midrs(sys_dir)
+
+        self.assertEqual(set(res), set(midr_values))
+        self.assertTrue(res["0x00000000410fd4f0"].endswith("/identification"))
+
+    def test_system_midrs_missing(self):
+        """system_midrs() ignores systems without MIDR files"""
+
+        self.assertEqual(
+            UbuntuDrivers.detect.system_midrs(self.umockdev.get_sys_dir()), {}
+        )
+
+    def test_parse_midr(self):
+        """parse_midr() decodes each MIDR_EL1 field"""
+
+        self.assertEqual(
+            UbuntuDrivers.detect.parse_midr("0x0000000041a1d053"),
+            UbuntuDrivers.detect.SystemMidr(
+                implementer=0x41,
+                variant=0xA,
+                architecture=0x1,
+                part_number=0xD05,
+                revision=0x3,
+            ),
+        )
+        self.assertEqual(
+            UbuntuDrivers.detect.parse_midr("0x000000004e0f0100"),
+            UbuntuDrivers.detect.SystemMidr(
+                implementer=0x4E,
+                variant=0x0,
+                architecture=0xF,
+                part_number=0x010,
+                revision=0x0,
+            ),
+        )
+        self.assertIsNone(UbuntuDrivers.detect.parse_midr("0x410fd0*"))
+        self.assertIsNone(UbuntuDrivers.detect.parse_midr("410fd4f0"))
+        self.assertIsNone(UbuntuDrivers.detect.parse_midr("not-a-midr"))
+
+    def test_parse_midr_fields(self):
+        """parse_midr_fields() accepts valid MIDR field constraints"""
+
+        expected = frozenset(
+            (
+                ("implementer", 0x4E),
+                ("variant", 0x0),
+                ("architecture", 0xF),
+                ("part_number", 0x010),
+                ("revision", 0x0),
+            )
+        )
+        self.assertEqual(
+            UbuntuDrivers.detect.parse_midr_fields(
+                "implementer:0x4e,variant:0x0,architecture:0xf,"
+                "part_number:0x010,revision:0x0"
+            ),
+            expected,
+        )
+        self.assertEqual(
+            UbuntuDrivers.detect.parse_midr_fields(
+                "revision:0x0,part_number:0x010,architecture:0xf,"
+                "variant:0x0,implementer:0x4e"
+            ),
+            expected,
+        )
+        self.assertEqual(
+            UbuntuDrivers.detect.parse_midr_fields(
+                "revision:0x0,part_number:0x10,architecture:0xf,"
+                "variant:0x0,implementer:0x4e"
+            ),
+            expected,
+        )
+        self.assertIsNone(UbuntuDrivers.detect.parse_midr_fields("unknown:0x1"))
+        self.assertIsNone(UbuntuDrivers.detect.parse_midr_fields("implementer:4e"))
+        self.assertIsNone(
+            UbuntuDrivers.detect.parse_midr_fields("implementer:0x4e,implementer:0x41")
+        )
+        self.assertIsNone(UbuntuDrivers.detect.parse_midr_fields("part_number:0x1000"))
+
     def test_system_driver_packages_performance(self):
         """system_driver_packages() performance for a lot of modaliases"""
 
@@ -283,7 +386,46 @@ class DetectTest(unittest.TestCase):
                 dependencies={"Depends": "xorg-video-abi-3 | xorg-video-abi-4"},
                 extra_tags={"Modaliases": "nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)"},
             )
+            archive.create_deb(
+                "midr-sherbet-1",
+                extra_tags={
+                    "Midr": "implementer:0x41,part_number:0xd05",
+                    "Modaliases": "meta(pci:v00001234d00sv00000001sd00bc00sc00i00)",
+                },
+            )
+            archive.create_deb(
+                "midr-sherbet-2",
+                extra_tags={"Midr": "implementer:0x41,part_number:0xd4f"},
+            )
+            archive.create_deb(
+                "midr-wasabi",
+                extra_tags={"Midr": "implementer:0x4e,part_number:0x010"},
+            )
             chroot.add_repository(archive.path, True, False)
+
+            sys_dir = self.umockdev.get_sys_dir()
+            for cpu, midr in enumerate(
+                (
+                    "0x00000000410fd4f0",
+                    "0x00000000410fd050",
+                    "0x00000000410fd4f0",
+                    "0x000000004e0f0100",
+                )
+            ):
+                identification_dir = os.path.join(
+                    sys_dir,
+                    "devices",
+                    "system",
+                    "cpu",
+                    "cpu%i" % cpu,
+                    "regs",
+                    "identification",
+                )
+                os.makedirs(identification_dir)
+                with open(
+                    os.path.join(identification_dir, "midr_el1"), "w"
+                ) as midr_file:
+                    midr_file.write(midr + "\n")
 
             # # Overwrite sources list generate by aptdaemon testsuite to add
             # # options to apt and ignore unsigned repository
@@ -302,6 +444,10 @@ class DetectTest(unittest.TestCase):
             res = UbuntuDrivers.detect.system_driver_packages(
                 cache, sys_path=self.umockdev.get_sys_dir()
             )
+            with patch("UbuntuDrivers.detect._is_manual_install", return_value=False):
+                devices = UbuntuDrivers.detect.system_device_drivers(
+                    cache, sys_path=sys_dir
+                )
         finally:
             chroot.remove()
         self.assertEqual(
@@ -318,6 +464,9 @@ class DetectTest(unittest.TestCase):
                     "neapolitan",
                     "tuttifrutti",
                     "stracciatella",
+                    "midr-sherbet-1",
+                    "midr-sherbet-2",
+                    "midr-wasabi",
                 ]
             ),
         )
@@ -366,6 +515,20 @@ class DetectTest(unittest.TestCase):
         self.assertEqual(res["nvidia-340"]["recommended"], False)
 
         self.assertFalse(res["neapolitan"]["free"])
+        self.assertEqual(res["midr-sherbet-1"]["midr"], "0x00000000410fd050")
+        self.assertEqual(res["midr-sherbet-1"]["modalias"], res["vanilla"]["modalias"])
+        self.assertEqual(res["midr-sherbet-1"]["syspath"], res["vanilla"]["syspath"])
+        self.assertEqual(
+            res["midr-sherbet-1"]["midr_syspath"],
+            os.path.join(sys_dir, "devices/system/cpu/cpu1/regs/identification"),
+        )
+        self.assertEqual(res["midr-sherbet-2"]["midr"], "0x00000000410fd4f0")
+        self.assertEqual(res["midr-wasabi"]["midr"], "0x000000004e0f0100")
+        self.assertNotIn("syspath", res["midr-wasabi"])
+        self.assertIn("midr-sherbet-1", devices[res["vanilla"]["syspath"]]["drivers"])
+        self.assertIn(
+            "midr-wasabi", devices[res["midr-wasabi"]["midr_syspath"]]["drivers"]
+        )
 
     def test_system_driver_packages_chroot_support_branch(self):
         """system_driver_packages() LTSB vs NFB"""
@@ -6318,9 +6481,40 @@ class DetectTest(unittest.TestCase):
             archive.create_deb(
                 "oem-pistacchio-meta",
                 extra_tags={
-                    "Modaliases": "meta(dmi:*pnXPS137390:*, pci:*sv00001028sd00000962*)"
+                    "Modaliases": "meta(dmi:*pnXPS137390:*, pci:*sv00001028sd00000962*)",
+                    "Midr": "implementer:0x4e,part_number:0x010",
                 },
             )
+            archive.create_deb(
+                "oem-wasabi-meta",
+                extra_tags={"Midr": "implementer:0x4e,part_number:0x010"},
+            )
+            archive.create_deb(
+                "oem-implementer-meta",
+                extra_tags={"Midr": "implementer:0x4e"},
+            )
+            archive.create_deb(
+                "oem-nonmatching-meta",
+                extra_tags={"Midr": "implementer:0x4e,part_number:0xd4f"},
+            )
+            archive.create_deb(
+                "midr-wasabi",
+                extra_tags={"Midr": "implementer:0x4e,part_number:0x010"},
+            )
+
+            identification_dir = os.path.join(
+                self.umockdev.get_sys_dir(),
+                "devices",
+                "system",
+                "cpu",
+                "cpu0",
+                "regs",
+                "identification",
+            )
+            os.makedirs(identification_dir)
+            with open(os.path.join(identification_dir, "midr_el1"), "w") as midr_file:
+                midr_file.write("0x000000004e0f0100\n")
+
             chroot.add_repository(archive.path, True, False)
             dpkg_status = os.path.abspath(
                 os.path.join(chroot.path, "var", "lib", "dpkg", "status")
@@ -6333,7 +6527,19 @@ class DetectTest(unittest.TestCase):
             )
         finally:
             chroot.remove()
-        self.assertTrue("oem-pistacchio-meta" in res)
+        self.assertEqual(
+            set(res),
+            {"oem-pistacchio-meta", "oem-wasabi-meta", "oem-implementer-meta"},
+        )
+        self.assertEqual(res["oem-wasabi-meta"]["midr"], "0x000000004e0f0100")
+        self.assertEqual(res["oem-wasabi-meta"]["midr_syspath"], identification_dir)
+        self.assertNotIn("syspath", res["oem-wasabi-meta"])
+        self.assertEqual(res["oem-pistacchio-meta"]["midr"], "0x000000004e0f0100")
+        self.assertEqual(res["oem-pistacchio-meta"]["midr_syspath"], identification_dir)
+        self.assertEqual(res["oem-pistacchio-meta"]["modalias"], "dmi:aaapnXPS137390:a")
+        self.assertTrue(
+            res["oem-pistacchio-meta"]["syspath"].endswith("/devices/pistacchio")
+        )
 
     def test_system_driver_packages_bad_encoding(self):
         """system_driver_packages() with badly encoded Packages index"""
@@ -7205,6 +7411,28 @@ APT::Get::AllowUnauthenticated "true";
                 "Modaliases": "meta(dmi:*pnXPS137390:*, pci:*sv00001028sd00000962*)"
             },
         )
+        self.archive.create_deb(
+            "oem-wasabi-meta",
+            extra_tags={"Midr": "implementer:0x4e,part_number:0x010"},
+        )
+        self.archive.create_deb(
+            "oem-nonmatching-meta",
+            extra_tags={"Midr": "implementer:0x41,part_number:0xd4f"},
+        )
+
+        identification_dir = os.path.join(
+            self.umockdev.get_sys_dir(),
+            "devices",
+            "system",
+            "cpu",
+            "cpu0",
+            "regs",
+            "identification",
+        )
+        os.makedirs(identification_dir)
+        with open(os.path.join(identification_dir, "midr_el1"), "w") as midr_file:
+            midr_file.write("0x000000004e0f0100\n")
+
         self.chroot.add_repository(self.archive.path, True, False)
 
         ud = subprocess.Popen(
@@ -7215,11 +7443,12 @@ APT::Get::AllowUnauthenticated "true";
         )
         out, err = ud.communicate()
         self.assertEqual(err, "")
-        self.assertEqual(set(out.splitlines()), set(["oem-pistacchio-meta"]))
+        expected_packages = {"oem-pistacchio-meta", "oem-wasabi-meta"}
+        self.assertEqual(set(out.splitlines()), expected_packages)
         self.assertEqual(ud.returncode, 0)
 
         with open(listfile) as f:
-            self.assertEqual(f.read(), "oem-pistacchio-meta\n")
+            self.assertEqual(set(f.read().splitlines()), expected_packages)
 
     def test_list_detect_plugins(self):
         """ubuntu-drivers list includes custom detection plugins"""

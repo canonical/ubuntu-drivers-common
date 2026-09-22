@@ -109,6 +109,17 @@ never more than one idle period stale.
 
 ## Detection logic
 
+Hardware detection uses three complementary mechanisms:
+
+* **Modaliases:** match device identifiers from sysfs against package
+   `Modaliases` patterns
+* **MIDR:** match ARM CPU identification fields against package `Midr`
+   fields
+* **Plugins:** run custom checks for hardware that needs additional detection
+   logic (see below)
+
+### Modaliases
+
 The principal method of mapping hardware to driver packages is to use modalias
 patterns. Hardware devices export a "modalias" sysfs attribute, for example
 
@@ -135,6 +146,21 @@ add these headers to the package with `dh_modaliases(1)`.
 `ubuntu-drivers-common` uses these package headers to map a particular piece of
 hardware (identified by a modalias) to the driver packages which cover that
 hardware.
+
+### ARM CPU MIDR matching
+
+MIDR detection reads `/sys/devices/system/cpu/cpu*/regs/identification/midr_el1`
+and considers every distinct CPU type. Packages can declare constraints such as:
+
+```text
+Midr: implementer:0x41,part_number:0xd05
+```
+
+(Note: Within your source package, declare this field as `XB-Midr`. The `XB-` will be stripped in the deb.)
+
+Supported fields: `implementer`, `variant`, `architecture`, `part_number`,
+and `revision`. All specified fields must match at least one CPU's MIDR; omitted fields
+are unconstrained. Missing or invalid MIDR data is ignored.
 
 ## Custom detection plugins
 
