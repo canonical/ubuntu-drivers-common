@@ -7315,38 +7315,33 @@ class DmidecodeModaliasTest(unittest.TestCase):
     UbuntuDrivers.detect (see _dmidecode_processor_modaliases and friends)."""
 
     #
-    # _normalize()
+    # _normalize_dmidecode_value()
     #
 
     def test_normalize_removes_spaces(self):
-        """_normalize() strips all spaces"""
+        """_normalize_dmidecode_value() strips all spaces"""
 
         self.assertEqual(
-            UbuntuDrivers.detect._normalize("Intel Xeon Gold"), "IntelXeonGold"
+            UbuntuDrivers.detect._normalize_dmidecode_value("Intel Xeon Gold"), "IntelXeonGold"
         )
 
-    def test_normalize_removes_commas(self):
-        """_normalize() strips all commas"""
-
-        self.assertEqual(UbuntuDrivers.detect._normalize("a,b,c"), "abc")
-
-    def test_normalize_removes_spaces_and_commas(self):
-        """_normalize() strips spaces and commas together"""
+    def test_normalize_check_values(self):
+        """_normalize_dmidecode_value() strips spaces and commas together"""
 
         self.assertEqual(
-            UbuntuDrivers.detect._normalize("ARM, Cortex A72"), "ARMCortexA72"
+            UbuntuDrivers.detect._normalize_dmidecode_value("ARM, Cortex A72 (Hyper:X Edition)"), "ARMCortexA72HyperXEdition"
         )
 
     def test_normalize_empty_string(self):
-        """_normalize() leaves an empty string empty"""
+        """_normalize_dmidecode_value() leaves an empty string empty"""
 
-        self.assertEqual(UbuntuDrivers.detect._normalize(""), "")
+        self.assertEqual(UbuntuDrivers.detect._normalize_dmidecode_value(""), "")
 
     def test_normalize_noop(self):
-        """_normalize() leaves a value without spaces/commas unchanged"""
+        """_normalize_dmidecode_value() leaves a value without spaces/commas unchanged"""
 
         self.assertEqual(
-            UbuntuDrivers.detect._normalize("AuthenticAMD"), "AuthenticAMD"
+            UbuntuDrivers.detect._normalize_dmidecode_value("AuthenticAMD"), "AuthenticAMD"
         )
 
     #

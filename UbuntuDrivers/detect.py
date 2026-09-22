@@ -323,7 +323,7 @@ def _get_dmidecode_string(value: str) -> str:
     return proc.stdout.strip()
 
 
-def _normalize(value: str) -> str:
+def _normalize_dmidecode_value(value: str) -> str:
     """Normalize program output for comparison.
 
     Removes spaces and replaces commas with nothing. This is a best-effort
@@ -331,7 +331,11 @@ def _normalize(value: str) -> str:
     systems. It is not guaranteed to be perfect, but it should be good enough
     for most cases.
     """
-    value = value.replace(" ", "").replace(",", "")
+    # these are characters also used in the mapping logic in apt_cache_map
+    # space is also added to this list for safety
+    to_replace = [" ", ",", "(", ")", ":"]
+    for c in to_replace:
+        value = value.replace(c, "")
     return value
 
 
@@ -346,7 +350,7 @@ def _dmidecode_processor_modaliases() -> Dict[str, str]:
         ret = _get_dmidecode_string(f"processor-{entry}")
         if not ret:
             continue
-        ret = _normalize(ret)
+        ret = _normalize_dmidecode_value(ret)
         aliases["dmidecode:processor:" + entry + ":" + ret] = "dmidecode"
     return aliases
 
