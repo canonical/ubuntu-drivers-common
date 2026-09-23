@@ -6457,7 +6457,14 @@ Description: broken \xEB encoding
             white_dict,
             {
                 "modalias": "pci:v00001234d00sv00000001sd00bc00sc00i00",
-                "drivers": {"vanilla": {"free": True, "from_distro": False}},
+                "drivers": {
+                    "vanilla": {
+                        "free": True,
+                        "from_distro": False,
+                        "support": None,
+                        "open_preferred": False,
+                    }
+                },
             },
         )
 
@@ -6465,7 +6472,14 @@ Description: broken \xEB encoding
             black_dict,
             {
                 "modalias": "usb:v9876dABCDsv01sd02bc00sc01i05",
-                "drivers": {"chocolate": {"free": True, "from_distro": False}},
+                "drivers": {
+                    "chocolate": {
+                        "free": True,
+                        "from_distro": False,
+                        "support": None,
+                        "open_preferred": False,
+                    }
+                },
             },
         )
 
@@ -6476,15 +6490,33 @@ Description: broken \xEB encoding
         # should contain nouveau driver
         self.assertEqual(
             graphics_dict["drivers"]["nvidia-driver-450"],
-            {"free": False, "from_distro": False, "recommended": True},
+            {
+                "free": False,
+                "from_distro": False,
+                "recommended": True,
+                "support": None,
+                "open_preferred": False,
+            },
         )
         self.assertEqual(
             graphics_dict["drivers"]["nvidia-driver-440"],
-            {"free": False, "from_distro": False, "recommended": False},
+            {
+                "free": False,
+                "from_distro": False,
+                "recommended": False,
+                "support": None,
+                "open_preferred": False,
+            },
         )
         self.assertEqual(
             graphics_dict["drivers"]["nvidia-driver-450-server"],
-            {"free": False, "from_distro": False, "recommended": False},
+            {
+                "free": False,
+                "from_distro": False,
+                "recommended": False,
+                "support": None,
+                "open_preferred": False,
+            },
         )
         self.assertEqual(
             graphics_dict["drivers"]["xserver-xorg-video-nouveau"],
@@ -6658,6 +6690,58 @@ exec /sbin/modinfo "$@"
             ),
             [],
         )
+
+    def test_already_installed_filter_filter_installed_false(self):
+        """already_installed_filter(filter_installed=False) must not wipe
+        the install list to [] just because the metapackage is already
+        installed"""
+
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+            deb_path = archive.create_deb(
+                "nvidia-driver-410",
+                dependencies={"Depends": "xorg-video-abi-4"},
+                extra_tags={"Modaliases": "nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*)"},
+            )
+            archive.create_deb(
+                "nvidia-headless-no-dkms-410",
+                dependencies={"Depends": "xorg-video-abi-3 | xorg-video-abi-4"},
+            )
+
+            chroot.add_repository(archive.path, True, False)
+            chroot.install_debfile(deb_path, force_depends=True)
+
+            dpkg_status = os.path.abspath(
+                os.path.join(chroot.path, "var", "lib", "dpkg", "status")
+            )
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+
+            pkgs = {
+                "nvidia-headless-no-dkms-410": {
+                    "metapackage": "nvidia-driver-410",
+                    "recommended": True,
+                },
+            }
+
+            wiped = UbuntuDrivers.detect.already_installed_filter(
+                cache, pkgs, True, gpgpu=True
+            )
+            self.assertEqual(wiped, [])
+
+            kept = UbuntuDrivers.detect.already_installed_filter(
+                cache, pkgs, True, gpgpu=True, filter_installed=False
+            )
+            self.assertEqual(
+                set(kept),
+                set(["nvidia-headless-no-dkms-410", "nvidia-driver-410"]),
+            )
+        finally:
+            chroot.remove()
 
     def test_system_driver_packages_freeonly(self):
         """system_driver_packages() returns only free packages"""
