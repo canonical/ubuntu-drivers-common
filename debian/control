@@ -51,6 +51,7 @@ Depends: ${python3:Depends},
  pciutils,
  usbutils,
  kmod | module-init-tools,
+ dmidecode,
 Suggests: python3-aptdaemon.pkcompat
 Description: Detect and install additional Ubuntu driver packages
  This package aggregates and abstracts Ubuntu specific logic and knowledge
@@ -88,7 +89,7 @@ Description: debhelper extension for scanning kernel module aliases
 Package: dh-dmidecode
 Architecture: all
 Depends: ${perl:Depends},
- ${misc:Depends}
+ ${misc:Depends},
 Enhances: debhelper
 Description: debhelper extension for dmidecode based aliases
  dh_dmidecode is useful for packages that ship machine dependent optimizations.
