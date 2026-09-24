@@ -2112,7 +2112,8 @@ class DetectTest(unittest.TestCase):
 
             # Force install a nvidia driver, normal case
             with open(csg_file, "w") as csg:
-                csg.write("""{
+                csg.write(
+                    """{
  "chips": [
    {
      "devid": "0x10C3",
@@ -2131,14 +2132,16 @@ class DetectTest(unittest.TestCase):
      ]
    }
  ]
-}""")
+}"""
+                )
             res_install_510 = UbuntuDrivers.detect.system_driver_packages(
                 cache, sys_path=self.umockdev.get_sys_dir()
             )
 
             # Extra a
             with open(csg_file, "w") as csg:
-                csg.write("""{
+                csg.write(
+                    """{
  "chips": [
    {
      "devida": "0x10C3", # tried 'devida' an extra 'a'
@@ -2157,14 +2160,16 @@ class DetectTest(unittest.TestCase):
      ]
    }
  ]
-}""")
+}"""
+                )
             res_wrong_json = UbuntuDrivers.detect.system_driver_packages(
                 cache, sys_path=self.umockdev.get_sys_dir()
             )
 
             # point to the older version than candidate.
             with open(csg_file, "w") as csg:
-                csg.write("""{
+                csg.write(
+                    """{
  "chips": [
    {
      "devid": "0x10C3",
@@ -2183,14 +2188,16 @@ class DetectTest(unittest.TestCase):
      ]
    }
  ]
-}""")
+}"""
+                )
             res_470_no_390 = UbuntuDrivers.detect.system_driver_packages(
                 cache, sys_path=self.umockdev.get_sys_dir()
             )
 
             # point to the same version as candidate.
             with open(csg_file, "w") as csg:
-                csg.write("""{
+                csg.write(
+                    """{
  "chips": [
    {
      "devid": "0x10C3",
@@ -2209,14 +2216,16 @@ class DetectTest(unittest.TestCase):
      ]
    }
  ]
-}""")
+}"""
+                )
             res_same_470 = UbuntuDrivers.detect.system_driver_packages(
                 cache, sys_path=self.umockdev.get_sys_dir()
             )
 
             # point to a non-exist version of ubuntu-archive (source list).
             with open(csg_file, "w") as csg:
-                csg.write("""{
+                csg.write(
+                    """{
  "chips": [
    {
      "devid": "0x10C3",
@@ -2235,7 +2244,8 @@ class DetectTest(unittest.TestCase):
      ]
    }
  ]
-}""")
+}"""
+                )
             res_470_no_490 = UbuntuDrivers.detect.system_driver_packages(
                 cache, sys_path=self.umockdev.get_sys_dir()
             )
@@ -2243,7 +2253,8 @@ class DetectTest(unittest.TestCase):
             # point to a specific version from ubuntu-archive (source list) which ID
             # doesn't exist in any other old version
             with open(csg_file, "w") as csg:
-                csg.write("""{
+                csg.write(
+                    """{
  "chips": [
    {
      "devid": "0x2777",
@@ -2254,7 +2265,8 @@ class DetectTest(unittest.TestCase):
      ]
    }
  ]
-}""")
+}"""
+                )
             res_520_only = UbuntuDrivers.detect.system_driver_packages(
                 cache, sys_path=self.umockdev.get_sys_dir()
             )
@@ -6541,7 +6553,8 @@ class DetectTest(unittest.TestCase):
 
             # add a package entry with a broken encoding
             with open(os.path.join(archive.path, "Packages"), "ab") as f:
-                f.write(b"""
+                f.write(
+                    b"""
 Package: broken
 Architecture: all
 Priority: optional
@@ -6549,7 +6562,8 @@ Version: 1
 Maintainer: Test A\xebB User <test@example.com>
 Filename: ./vanilla_1_all.deb
 Description: broken \xeb encoding
-""")
+"""
+                )
             chroot.add_repository(archive.path, True, False)
             dpkg_status = os.path.abspath(
                 os.path.join(chroot.path, "var", "lib", "dpkg", "status")
@@ -6752,13 +6766,15 @@ Description: broken \xeb encoding
 
             # add a wrapper modinfo binary
             with open(os.path.join(chroot.path, "modinfo"), "w") as f:
-                f.write("""#!/bin/sh -e
+                f.write(
+                    """#!/bin/sh -e
 if [ "$1" = nvidia ]; then
     echo "filename:  /some/path/nvidia.ko"
     exit 0
 fi
 exec /sbin/modinfo "$@"
-""")
+"""
+                )
             os.chmod(os.path.join(chroot.path, "modinfo"), 0o755)
             orig_path = os.environ["PATH"]
             os.environ["PATH"] = "%s:%s" % (chroot.path, os.environ["PATH"])
@@ -7058,12 +7074,14 @@ exec /sbin/modinfo "$@"
         with open(os.path.join(self.plugin_dir, "bogus"), "w") as f:
             f.write("I am not a plugin")
         with open(os.path.join(self.plugin_dir, "picky.py"), "w") as f:
-            f.write("""import os, os.path
+            f.write(
+                """import os, os.path
 
 def detect(apt):
     if os.path.exists("/sys/pickyon"):
         return ["picky"]
-""")
+"""
+            )
 
     def test_get_linux_headers_chroot(self):
         """get_linux_headers() for test package repository"""
@@ -7523,12 +7541,15 @@ class ToolTest(unittest.TestCase):
         klass.chroot.add_repository(klass.archive.path, True, False)
         klass.chroot_apt_conf = os.path.join(klass.chroot.path, "aptconfig")
         with open(klass.chroot_apt_conf, "w") as f:
-            f.write("""Dir "%(root)s";
+            f.write(
+                """Dir "%(root)s";
 Dir::State::status "%(root)s/var/lib/dpkg/status";
 Debug::NoLocking "true";
 DPKG::options:: "--root=%(root)s --log=%(root)s/var/log/dpkg.log";
 APT::Get::AllowUnauthenticated "true";
-""" % {"root": klass.chroot.path})
+"""
+                % {"root": klass.chroot.path}
+            )
         os.environ["APT_CONFIG"] = klass.chroot_apt_conf
 
         klass.tool_path = os.path.join(ROOT_DIR, "ubuntu-drivers")
