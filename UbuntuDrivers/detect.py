@@ -295,6 +295,66 @@ def system_modaliases(sys_path: Optional[str] = None) -> Dict[str, str]:
     return aliases
 
 
+def dmidecode_aliases() -> Dict[str, str]:
+    aliases: dict[str, str] = {}
+    aliases.update(_dmidecode_processor_modaliases())
+    return aliases
+
+
+def _get_dmidecode_string(value: str) -> str:
+    try:
+        proc = subprocess.run(
+            ["dmidecode", "--string", value],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as e:
+        logging.debug("_get_dmidecode_string(): could not run dmidecode: %s", e)
+        return ""
+
+    if proc.returncode != 0:
+        logging.debug(
+            "_get_dmidecode_string(): dmidecode exited with %s: %s",
+            proc.returncode,
+            proc.stderr.strip(),
+        )
+        return ""
+    return proc.stdout.strip()
+
+
+def _normalize_dmidecode_value(value: str) -> str:
+    """Normalize program output for comparison.
+
+    Removes spaces and replaces commas with nothing. This is a best-effort
+    attempt to make the output of commands more comparable across different
+    systems. It is not guaranteed to be perfect, but it should be good enough
+    for most cases.
+    """
+    # these are characters also used in the mapping logic in apt_cache_map
+    # space is also added to this list for safety
+    to_replace = [" ", ",", "(", ")", ":"]
+    for c in to_replace:
+        value = value.replace(c, "")
+    return value
+
+
+def _dmidecode_processor_modaliases() -> Dict[str, str]:
+    """Collect processor specific aliases using dmidecode.
+
+    Uses `dmidecode --string processor-xx` as the source.
+    A failure yields an empty dictionary or a partially filled dictionary.
+    """
+    aliases: Dict[str, str] = {}
+    for entry in ["family", "manufacturer", "version", "frequency"]:
+        ret = _get_dmidecode_string(f"processor-{entry}")
+        if not ret:
+            continue
+        ret = _normalize_dmidecode_value(ret)
+        aliases["dmidecode:processor:" + entry + ":" + ret] = "dmidecode"
+    return aliases
+
+
 def system_midrs(sys_path: Optional[str] = None) -> Dict[str, str]:
     """Get unique MIDR values present in the system.
 
@@ -402,12 +462,12 @@ def _check_video_abi_compat(apt_cache: apt_pkg.Cache, package: apt_pkg.Package) 
     return True
 
 
-def apt_cache_modalias_map(
-    apt_cache: apt_pkg.Cache,
+def apt_cache_map(
+    apt_cache: apt_pkg.Cache, key: str
 ) -> Dict[str, Tuple[Any, Dict[str, Set[str]]]]:
-    """Build a modalias map from an apt_pkg.Cache object.
+    """Build a key map from an apt_pkg.Cache object.
 
-    This filters out uninstallable video drivers (i. e. which depend on a video
+    This filters out uninstallable video drivers (i.e., which depend on a video
     ABI that xserver-xorg-core does not provide).
 
     Return a map bus -> modalias -> [package, ...], where "bus" is the prefix of
@@ -418,11 +478,11 @@ def apt_cache_modalias_map(
 
     result: Dict[str, Dict[str, Set[str]]] = {}
     for package in apt_cache.packages:
-        # skip packages without a modalias field
+        # skip packages without the correct key field
         try:
             candidate = depcache.get_candidate_ver(package)
             records.lookup(candidate.file_list[0])
-            m = records["Modaliases"]
+            m = records[key]
             if not m:
                 continue
         except (KeyError, AttributeError, UnicodeDecodeError):
@@ -450,7 +510,7 @@ def apt_cache_modalias_map(
                     )
         except ValueError:
             logging.error(
-                "Package %s has invalid modalias header: %s" % (package.name, m)
+                "Package %s has invalid %s header: %s" % (package.name, key, m)
             )
 
     result2: Dict[str, Tuple[Any, Dict[str, Set[str]]]] = {}
@@ -500,6 +560,12 @@ def apt_cache_midrs_map(
         midr_map.setdefault(fields, set()).add(package.name)
 
     return midr_map
+
+
+def apt_cache_modalias_map(
+    apt_cache: apt_pkg.Cache,
+) -> Dict[str, Tuple[Any, Dict[str, Set[str]]]]:
+    return apt_cache_map(apt_cache, key="Modaliases")
 
 
 def path_get_custom_supported_gpus() -> str:
@@ -648,7 +714,7 @@ def _is_package_from_distro(apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package) -> b
 def _pkg_get_open_preference(
     apt_cache: apt_pkg.Cache, pkg: apt_pkg.Package
 ) -> Optional[Any]:
-    """Determine if -open package is prefered from apt Package object"""
+    """Determine if -open package is preferred from apt Package object"""
     depcache = apt_pkg.DepCache(apt_cache)
     candidate = depcache.get_candidate_ver(pkg)
     records = apt_pkg.PackageRecords(apt_cache)
@@ -1030,6 +1096,25 @@ def system_driver_packages(
             except KeyError:
                 logging.debug("Package %s plugin not available. Skipping." % p)
 
+    dmidecode = dmidecode_aliases()
+    alias_map = apt_cache_map(apt_cache, key="Dmidecode")
+    for alias, _ in dmidecode.items():
+        for p in packages_for_modalias(apt_cache, alias, modalias_map=alias_map):
+            if freeonly and not _is_package_free(apt_cache, p):
+                continue
+            if not include_oem and fnmatch.fnmatch(p.name, "oem-*-meta"):
+                continue
+            packages[p.name] = {
+                "modalias": alias,
+                "syspath": "",
+                "free": _is_package_free(apt_cache, p),
+                "from_distro": _is_package_from_distro(apt_cache, p),
+                "recommended": True,
+                "support": _pkg_get_support(apt_cache, p),
+                "runtimepm": _is_runtimepm_supported(apt_cache, p, alias),
+                "open_preferred": _is_open_preferred(apt_cache, p),
+            }
+
     return packages
 
 
@@ -1205,6 +1290,25 @@ def system_device_specific_metapackages(
                     }
                 )
 
+    # check for dmidecode based oem-meta or hwe-meta packages
+    dmidecode = dmidecode_aliases()
+    alias_map = apt_cache_map(apt_cache, key="Dmidecode")
+    for alias, _ in dmidecode.items():
+        for p in packages_for_modalias(apt_cache, alias, modalias_map=alias_map):
+            if not fnmatch.fnmatch(p.name, "oem-*-meta") and not fnmatch.fnmatch(
+                p.name, "hwe-*-meta"
+            ):
+                continue
+            packages[p.name] = {
+                "modalias": alias,
+                "syspath": "",
+                "free": _is_package_free(apt_cache, p),
+                "from_distro": _is_package_from_distro(apt_cache, p),
+                "recommended": True,
+                "support": _pkg_get_support(apt_cache, p),
+                "runtimepm": _is_runtimepm_supported(apt_cache, p, alias),
+                "open_preferred": _is_open_preferred(apt_cache, p),
+            }
     return packages
 
 
@@ -1289,6 +1393,22 @@ def system_gpgpu_driver_packages(
         recommended = nvidia_packages[-1]
         for p in nvidia_packages:
             packages[p]["recommended"] = p == recommended
+
+    # also check dmidecode based aliases
+    dmidecode = dmidecode_aliases()
+    alias_map = apt_cache_map(apt_cache, key="Dmidecode")
+    for alias, _ in dmidecode.items():
+        for p in packages_for_modalias(apt_cache, alias, modalias_map=alias_map):
+            packages[p.name] = {
+                "modalias": alias,
+                "syspath": "",
+                "free": _is_package_free(apt_cache, p),
+                "from_distro": _is_package_from_distro(apt_cache, p),
+                "recommended": True,
+                "support": _pkg_get_support(apt_cache, p),
+                "runtimepm": _is_runtimepm_supported(apt_cache, p, alias),
+                "open_preferred": _is_open_preferred(apt_cache, p),
+            }
 
     return packages
 
@@ -2051,7 +2171,7 @@ def _pkg_open_preferred_from_cache(x: str) -> bool:
 def _get_fit_level(x: str) -> int:
     """decide how well the package fits desktop environment"""
 
-    # for desktop non-server packages are prefered to -server ones
+    # for desktop non-server packages are preferred to -server ones
     # if a package preferes open variants, these come on top
 
     if _pkg_open_preferred_from_cache(x):
@@ -2084,7 +2204,7 @@ def _get_fit_level(x: str) -> int:
 def _get_fit_level_gpgpu(x: str) -> int:
     """decide how well the package fits server environment"""
 
-    # for server environment -server packages are prefered to non-server ones
+    # for server environment -server packages are preferred to non-server ones
     # if a package preferes open variants, these come on top
 
     if _pkg_open_preferred_from_cache(x):
