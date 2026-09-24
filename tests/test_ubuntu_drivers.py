@@ -7329,7 +7329,8 @@ class DmidecodeModaliasTest(unittest.TestCase):
         """_normalize_dmidecode_value() strips spaces and commas together"""
 
         self.assertEqual(
-            UbuntuDrivers.detect._normalize_dmidecode_value("ARM, Cortex A72 (Hyper:X Edition)"), "ARMCortexA72HyperXEdition"
+            UbuntuDrivers.detect._normalize_dmidecode_value(
+                "ARM, Cortex A72 (Hyper:X Edition)"), "ARMCortexA72HyperXEdition"
         )
 
     def test_normalize_empty_string(self):
