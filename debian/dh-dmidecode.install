@@ -1,0 +1,2 @@
+debhelper/dh_dmidecode usr/bin
+debhelper/dmidecode.pm usr/share/perl5/Debian/Debhelper/Sequence

@@ -683,6 +683,18 @@ def install(config: Config, **kwargs: Any) -> None:
 @pass_config
 def list(config: Config, **kwargs: Any) -> Optional[int]:
     """Show all driver packages which apply to the current system."""
+    # Some hardware information (e.g. DMI/SMBIOS modaliases) is only readable by
+    # root; without it matching devices are silently skipped, so the list may be
+    # incomplete. Warn the user rather than presenting a truncated list as final.
+    if os.geteuid() != 0:
+        print(
+            "Warning: 'ubuntu-drivers list' is not being run as root; some driver "
+            "packages may be omitted because part of the hardware information "
+            "(e.g. DMI/SMBIOS data) is only readable by root. Re-run with 'sudo' "
+            "for complete results.",
+            file=sys.stderr,
+        )
+
     apt_pkg.init_config()
     apt_pkg.init_system()
     include_dkms: bool = kwargs.get("include_dkms", False)
@@ -754,6 +766,18 @@ def list_oem(config: Config, **kwargs: Any) -> None:
     """Show all OEM enablement packages which apply to this system"""
     if kwargs.get("package_list"):
         config.package_list = "".join(kwargs.get("package_list"))  # type: ignore[arg-type]
+
+    # Some hardware information (e.g. DMI/SMBIOS modaliases) is only readable by
+    # root; without it matching devices are silently skipped, so the list may be
+    # incomplete. Warn the user rather than presenting a truncated list as final.
+    if os.geteuid() != 0:
+        print(
+            "Warning: 'ubuntu-drivers list' is not being run as root; some driver "
+            "packages may be omitted because part of the hardware information "
+            "(e.g. DMI/SMBIOS data) is only readable by root. Re-run with 'sudo' "
+            "for complete results.",
+            file=sys.stderr,
+        )
 
     command_list_oem(config)
 
