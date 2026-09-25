@@ -1,8 +1,15 @@
-ubuntu-drivers-common (1:0.10.9.1) stonking; urgency=medium
+ubuntu-drivers-common (1:0.10.9ubuntu0.1) resolute; urgency=medium
 
+  [ Mitchell Augustin ]
   * Add MIDR detection (LP: #2165071)
 
- -- Mitchell Augustin <mitchell.augustin@canonical.com>  Tue, 25 Aug 2026 14:23:02 -0500
+  [ Andreas Glinserer ]
+  * Add modalias detection (LP #2165071) 
+
+  [ Ashton Nelson ]
+  * Add dbus interface (LP: #2166233)
+
+ -- Mitchell Augustin <mitchell.augustin@canonical.com>  Tue, 25 Sep 2026 13:23:02 -0500
 
 ubuntu-drivers-common (1:0.10.9) resolute; urgency=medium
 
