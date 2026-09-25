@@ -7768,13 +7768,96 @@ APT::Get::AllowUnauthenticated "true";
         )
         self.assertEqual(ud.returncode, 0)
 
+    def test_list_recommended_chroot(self):
+        """ubuntu-drivers list --recommended collapses the nvidia variants"""
+
+        # Add more nvidia alternatives for the fake nvidia card, so that the
+        # variant group holds more than one candidate. nvidia-driver-470 is
+        # the best candidate of the group, and thus the recommended one.
+        debs = []
+        for package in ("nvidia-driver-390", "nvidia-driver-470"):
+            debs.append(
+                self.archive.create_deb(
+                    package,
+                    dependencies={"Depends": "xorg-video-abi-4"},
+                    extra_tags={
+                        "Modaliases": (
+                            "nv(pci:v000010DEd000010C3sv*sd*bc03sc*i*,"
+                            " pci:v000010DEd000010C4sv*sd*bc03sc*i*,)"
+                        )
+                    },
+                )
+            )
+        self.chroot.add_repository(self.archive.path, True, False)
+
+        def drop_nvidia_alternatives():
+            for deb in debs:
+                os.unlink(deb)
+            self.archive.update_index()
+            self.chroot.add_repository(self.archive.path, True, False)
+
+        self.addCleanup(drop_nvidia_alternatives)
+
+        # a plain list shows every applicable driver
+        ud = subprocess.Popen(
+            [self.tool_path, "list"],
+            universal_newlines=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        out, err = ud.communicate()
+        self.assertEqual(self._filter_root_warning(err), "")
+        self.assertEqual(ud.returncode, 0)
+        self.assertEqual(
+            set(out.splitlines()),
+            set(
+                [
+                    "vanilla",
+                    "chocolate",
+                    "bcmwl-kernel-source",
+                    "nvidia-driver-xxx",
+                    "nvidia-driver-390",
+                    "nvidia-driver-470",
+                    "stracciatella",
+                    "tuttifrutti",
+                    "neapolitan",
+                ]
+            ),
+        )
+
+        # --recommended only keeps the recommended driver of the variant
+        # group, while every other suggested package is still listed
+        ud = subprocess.Popen(
+            [self.tool_path, "list", "--recommended"],
+            universal_newlines=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        out, err = ud.communicate()
+        self.assertEqual(self._filter_root_warning(err), "")
+        self.assertEqual(ud.returncode, 0)
+        self.assertEqual(
+            set(out.splitlines()),
+            set(
+                [
+                    "vanilla",
+                    "chocolate",
+                    "bcmwl-kernel-source",
+                    "nvidia-driver-470",
+                    "stracciatella",
+                    "tuttifrutti",
+                    "neapolitan",
+                ]
+            ),
+        )
+
     def test_list_oem_chroot(self):
         """ubuntu-drivers list-oem for fake sysfs and chroot"""
         listfile = os.path.join(self.chroot.path, "pkgs")
         self.addCleanup(os.unlink, listfile)
 
         # Add an oem metapackage
-        self.archive.create_deb(
+        oem_deb = self.archive.create_deb(
             "oem-pistacchio-meta",
             extra_tags={
                 "Modaliases": "meta(dmi:*pnXPS137390:*, pci:*sv00001028sd00000962*)"
@@ -7803,6 +7886,13 @@ APT::Get::AllowUnauthenticated "true";
             midr_file.write("0x000000004e0f0100\n")
 
         self.chroot.add_repository(self.archive.path, True, False)
+
+        def drop_oem_metapackage():
+            os.unlink(oem_deb)
+            self.archive.update_index()
+            self.chroot.add_repository(self.archive.path, True, False)
+
+        self.addCleanup(drop_oem_metapackage)
 
         ud = subprocess.Popen(
             [self.tool_path, "list-oem", "--package-list", listfile],
