@@ -162,6 +162,65 @@ Supported fields: `implementer`, `variant`, `architecture`, `part_number`,
 and `revision`. All specified fields must match at least one CPU's MIDR; omitted fields
 are unconstrained. Missing or invalid MIDR data is ignored.
 
+## Custom NVIDIA configuration (`custom_supported_gpus.json`)
+
+For NVIDIA GPUs, the modalias-based detection can be overridden by a custom
+configuration file, which pins a specific driver series to a given PCI device
+ID and declares extra device features. This is mainly used by OEM enablement
+to ship a validated driver for a particular platform.
+
+The file is looked up in this order, and the first one found wins:
+
+1. `/etc/custom_supported_gpus.json`
+2. `/usr/share/oem-*-meta/custom_supported_gpus.json` (first match in sorted
+   order)
+
+### Format
+
+```json
+{
+  "chips": [
+    {
+      "devid": "0x25BA",
+      "name": "TEST 25BA",
+      "branch": "580",
+      "features": [
+        "runtimepm"
+      ]
+    }
+  ]
+}
+```
+
+* `devid`: the PCI device ID of the GPU, as an uppercase hexadecimal string
+  with a `0x` prefix (this is the `d0000....` part of the modalias).
+* `name`: a human-readable name, only used for logging.
+* `branch`: the pinned driver series. Anything after the first `.` is ignored,
+  so both `"580"` and `"580.1234"` select the `580` series.
+* `features`: a list of feature flags. `runtimepm` marks the device as
+  supporting runtime power management for the pinned series, which makes
+  `ubuntu-drivers` enable runtime PM for the NVIDIA driver during
+  installation.
+
+### Behaviour
+
+`branch` is mapped to the exact package name `nvidia-driver-<branch>`, which
+must exist in the apt package pool; otherwise the entry is ignored and normal
+detection applies. Because the match is on the exact package name, a `branch`
+of `"580"` pins `nvidia-driver-580` and never the `nvidia-driver-580-open`
+variant, even when the open variant would otherwise be preferred. To pin the
+open variant, set `"branch": "580-open"`.
+
+The pinned driver is used as follows:
+
+* `ubuntu-drivers list` and `ubuntu-drivers devices` still show every
+  applicable driver, but the pinned one is flagged as `recommended`.
+* `ubuntu-drivers list --recommended`, `ubuntu-drivers autoinstall` and
+  `ubuntu-drivers install` without an explicit driver argument collapse the
+  NVIDIA alternatives to the pinned driver only.
+* `ubuntu-drivers install <driver>` with an explicit driver argument still
+  honors the user's choice.
+
 ## Custom detection plugins
 
 For some kinds of drivers the modalias detection approach does not work. For
