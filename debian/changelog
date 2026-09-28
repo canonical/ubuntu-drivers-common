@@ -1,4 +1,4 @@
-ubuntu-drivers-common (1:0.10.9ubuntu0.1) resolute; urgency=medium
+ubuntu-drivers-common (1:0.10.9ubuntu0.2) resolute; urgency=medium
 
   [ Mitchell Augustin ]
   * Add MIDR detection (LP: #2165071)
@@ -9,7 +9,7 @@ ubuntu-drivers-common (1:0.10.9ubuntu0.1) resolute; urgency=medium
   [ Ashton Nelson ]
   * Add dbus interface (LP: #2166233)
 
- -- Mitchell Augustin <mitchell.augustin@canonical.com>  Fri, 25 Sep 2026 13:23:02 -0500
+ -- Mitchell Augustin <mitchell.augustin@canonical.com>  Mon, 28 Sep 2026 08:44:02 -0500
 
 ubuntu-drivers-common (1:0.10.9) resolute; urgency=medium
 
