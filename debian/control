@@ -51,7 +51,7 @@ Depends: ${python3:Depends},
  pciutils,
  usbutils,
  kmod | module-init-tools,
- dmidecode,
+ dmidecode [!s390x !ppc64el],
 Suggests: python3-aptdaemon.pkcompat
 Description: Detect and install additional Ubuntu driver packages
  This package aggregates and abstracts Ubuntu specific logic and knowledge
