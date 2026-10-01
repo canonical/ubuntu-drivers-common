@@ -9,7 +9,10 @@ ubuntu-drivers-common (1:0.10.9ubuntu0.2) resolute; urgency=medium
   [ Ashton Nelson ]
   * Add dbus interface (LP: #2166233)
 
- -- Mitchell Augustin <mitchell.augustin@canonical.com>  Mon, 28 Sep 2026 08:44:02 -0500
+  [ Kai Chuan Hsieh ]
+  * Prioritize custom GPU config and fix runtimepm/-open handling (LP: #2168955)
+
+ -- Mitchell Augustin <mitchell.augustin@canonical.com>  Thu, 01 Oct 2026 13:54:43 -0500
 
 ubuntu-drivers-common (1:0.10.9) resolute; urgency=medium
 
