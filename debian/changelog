@@ -1,3 +1,13 @@
+ubuntu-drivers-common (1:0.10.13) stonking; urgency=medium
+
+  [ Mitchell Augustin ]
+  * Exclude dmidecode from dependency list on ppc64el and s390x
+
+  [ Kai Chuan Hsieh ]
+  * Prioritize custom GPU config and fix runtimepm/-open handling (LP: #2168955)
+
+ -- Mitchell Augustin <mitchell.augustin@canonical.com>  Thu, 01 Oct 2026 13:54:43 -0500
+
 ubuntu-drivers-common (1:0.10.12) stonking; urgency=medium
 
   [ Andreas Glinserer ]
