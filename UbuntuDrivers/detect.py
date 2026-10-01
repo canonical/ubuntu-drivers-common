@@ -72,11 +72,13 @@ class PackageInfo(TypedDict, total=False):
     support: Optional[str]
     open_preferred: bool
     metapackage: str
+    is_custom_pinned_driver: bool
 
 
 system_architecture = ""
 lookup_cache: Dict[str, Dict[str, Any]] = {}
 custom_supported_gpus_json = "/etc/custom_supported_gpus.json"
+custom_supported_gpus_oem_glob = "/usr/share/oem-*-meta/custom_supported_gpus.json"
 
 
 # A full MIDR_EL1 value read from the system and parsed into
@@ -569,6 +571,21 @@ def apt_cache_modalias_map(
 
 
 def path_get_custom_supported_gpus() -> str:
+    """Return the highest-priority custom_supported_gpus.json path.
+
+    The file is looked up under /etc and under /usr/share/oem-*-meta. The file
+    under /etc takes precedence; if it does not exist, a file shipped by an
+    oem-*-meta package is used instead. If no file exists, the default /etc path
+    is returned.
+    """
+    if os.path.exists(custom_supported_gpus_json):
+        return custom_supported_gpus_json
+
+    for path in sorted(glob.glob(custom_supported_gpus_oem_glob)):
+        if os.path.exists(path):
+            logging.debug("Using custom_supported_gpus.json from %s" % path)
+            return path
+
     return custom_supported_gpus_json
 
 
@@ -610,9 +627,16 @@ def packages_for_modalias(
 ) -> List["apt_pkg.Package"]:
     """Search packages which match the given modalias.
 
+    Return every package that matches the modalias, including all NVIDIA driver
+    alternatives. Any pruning of candidate drivers (e.g. collapsing the NVIDIA
+    driver alternatives to a series pinned by custom_supported_gpus.json) is
+    intentionally left to the filtering stage (see auto_install_filter), so that
+    the pinning decision is made once over the combined candidate set of all
+    devices rather than per device.
+
     Return a list of apt.Package objects.
     """
-    pkgs = set()
+    pkgs: Set[str] = set()
 
     if modalias_map is None:
         modalias_map = apt_cache_modalias_map(apt_cache)
@@ -626,8 +650,8 @@ def packages_for_modalias(
         if nvamd is not None:
             nvamdn = "nvidia-driver-%s" % nvamd
             nvamda = "pci:v000010DEd0000%s*" % did
-            for p in apt_cache.packages:
-                if p.get_fullname().split(":")[0] == nvamdn:
+            for pkg in apt_cache.packages:
+                if pkg.get_fullname().split(":")[0] == nvamdn:
                     bus_map[nvamda] = set([nvamdn])
                     found = 1
         if nvamd is not None and not found:
@@ -815,14 +839,13 @@ def _is_nv_allowing_runtimepm_supported(alias: str, ver: str) -> bool:
                 gpus = list(json.load(stream)["chips"])
                 for gpu in gpus:
                     if gpu["devid"] == did and "runtimepm" in gpu["features"]:
-                        if gpu["branch"].split(".")[0] != ver:
-                            logging.debug(
-                                "Candidate version does not match %s != %s"
-                                % (gpu["branch"].split(".")[0], ver)
-                            )
-                            return False
-                        logging.info("Found runtimepm supports on %s." % did)
-                        return True
+                        # branch may carry a variant/point suffix such as
+                        # "580-open" or "580.1234"; compare the numeric series.
+                        branch_series = gpu["branch"].split(".")[0].split("-")[0]
+                        if branch_series == ver:
+                            logging.info("Found runtimepm supports on %s." % did)
+                            return True
+                logging.debug("%s has no matched driver to support runtimepm" % did)
             except Exception:
                 logging.debug(
                     "_is_nv_allowing_runtimepm_supported(): unexpected json detected"
@@ -1017,6 +1040,18 @@ def system_driver_packages(
       'recommended': Some drivers (nvidia, fglrx) come in multiple variants and
                      versions; these have this flag, where exactly one has
                      recommended == True, and all others False.
+      'is_custom_pinned_driver':
+                     Boolean flag set on the NVIDIA driver series that a custom
+                     configuration (custom_supported_gpus.json) pins for one of
+                     the system's devices. All applicable drivers are always
+                     returned; this flag lets the filtering stage
+                     (auto_install_filter) collapse the NVIDIA driver
+                     alternatives to the pinned series when auto-installing.
+
+    All applicable drivers are returned. When a custom configuration
+    (custom_supported_gpus.json) pins a specific NVIDIA driver series, that
+    series is additionally flagged as recommended and as
+    is_custom_pinned_driver.
     """
     modaliases = system_modaliases(sys_path)
     midrs = system_midrs(sys_path)
@@ -1027,6 +1062,16 @@ def system_driver_packages(
         except Exception as ex:
             logging.error(ex)
             return {}
+
+    # Determine which NVIDIA drivers are pinned by the custom configuration
+    # so that they can be prioritized as the recommended candidate.
+    custom_nvidia_packages = set()
+    for alias in modaliases:
+        vid, did = _get_vendor_model_from_alias(alias)
+        if vid == "10DE":
+            nvamd = package_get_nv_allowing_driver("0x" + did)
+            if nvamd is not None:
+                custom_nvidia_packages.add("nvidia-driver-%s" % nvamd)
 
     packages = {}
     modalias_map = apt_cache_modalias_map(apt_cache)
@@ -1079,9 +1124,27 @@ def system_driver_packages(
             if key.startswith("nvidia-"):
                 lookup_cache[key] = value
         nvidia_packages.sort(key=functools.cmp_to_key(_cmp_gfx_alternatives))
-        recommended = nvidia_packages[-1]
+        recommended_pkg = nvidia_packages[-1]
+        # Prioritize a custom-configured driver if one applies. The match is
+        # intentionally done on the exact package name, so a custom entry of
+        # "595" pins "nvidia-driver-595" and never falls back to the "-open"
+        # variant, even when that variant is open_preferred. To pin the open
+        # variant, the custom configuration must name it explicitly.
         for p in nvidia_packages:
-            packages[p]["recommended"] = p == recommended
+            if p in custom_nvidia_packages:
+                recommended_pkg = p
+                break
+        for p in nvidia_packages:
+            packages[p]["recommended"] = p == recommended_pkg
+
+    # Flag the NVIDIA driver series pinned by the custom configuration so that
+    # the filtering stage can collapse the alternatives to it when
+    # auto-installing. This is done over the combined candidate set of all
+    # devices, so a pin for one GPU is not undone by another GPU re-adding the
+    # non-pinned alternatives.
+    for p in custom_nvidia_packages:
+        if p in packages:
+            packages[p]["is_custom_pinned_driver"] = True
 
     # add available packages which need custom detection code
     for plugin, pkgs in detect_plugin_packages(apt_cache).items():
@@ -1552,8 +1615,15 @@ def get_desktop_package_list(
     include_dkms: bool = False,
 ) -> List[str]:
     """Return the list of packages that should be installed"""
+    # When no driver is explicitly requested, honor the custom configuration
+    # (custom_supported_gpus.json): auto_install_filter collapses the nvidia
+    # driver alternatives to the pinned series. If the user asked for a specific
+    # driver, that choice is respected by the driver_string path instead.
     packages = system_driver_packages(
-        apt_cache, sys_path, freeonly=free_only, include_oem=include_oem
+        apt_cache,
+        sys_path,
+        freeonly=free_only,
+        include_oem=include_oem,
     )
 
     to_install = auto_install_filter(
@@ -2001,6 +2071,27 @@ def gpgpu_install_filter(
                         result[p] = packages[p]
                         # print('Found "recommended" flavour in %s' % (packages[p]))
                 break
+
+    # Honor the "Prefer-Variant: Open" packaging preference: when an explicit
+    # flavour was requested without an explicit variant suffix (e.g.
+    # "nvidia:595"), the flavour glob only matches the closed metapackage
+    # (nvidia-driver-595) and never the "-open" one. If the matched metapackage
+    # prefers the open variant and an "-open" counterpart exists, install that
+    # instead so the packaging preference is respected.
+    for p in list(result.keys()):
+        if not p.startswith("nvidia-driver-") or p.endswith("-open"):
+            continue
+        open_name = "%s-open" % p
+        if open_name in packages and packages[p].get("open_preferred"):
+            logging.debug(
+                "gpgpu_install_filter: %s prefers open variant, "
+                "selecting %s instead",
+                p,
+                open_name,
+            )
+            del result[p]
+            result[open_name] = packages[open_name]
+
     return already_installed_filter(
         cache, result, include_dkms, gpgpu, filter_installed, skip_runtimepm_marker
     )
@@ -2070,6 +2161,19 @@ def auto_install_filter(
     allow = []
     for pattern in whitelist:
         allow.extend(fnmatch.filter(packages, pattern))
+
+    # If a custom configuration (custom_supported_gpus.json) pins a specific
+    # NVIDIA driver series, collapse the nvidia-driver-* alternatives to the
+    # pinned series so it is the one installed. Packages that are not
+    # nvidia-driver-* alternatives (e.g. the pinned driver's metapackages or
+    # unrelated drivers) are kept.
+    pinned_drivers = [p for p in allow if packages[p].get("is_custom_pinned_driver")]
+    if pinned_drivers:
+        allow = [
+            p
+            for p in allow
+            if not p.startswith("nvidia-driver-") or p in pinned_drivers
+        ]
 
     result = {}
     for p in allow:
