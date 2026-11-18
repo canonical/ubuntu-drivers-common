@@ -85,7 +85,9 @@ class KernelDetection(object):
         version = ""
         prefix = "linux-%s" % ("headers" if target == "headers" else "image")
 
-        pattern = re.compile("linux-image-(?:unsigned-)?(.+)-([0-9]+)-(.+)")
+        # The version has to start with a digit, so that packages like
+        # linux-image-hmac-$version-$flavour (FIPS) are not taken for images
+        pattern = re.compile("linux-image-(?:unsigned-)?([0-9].*)-([0-9]+)-(.+)")
 
         for package_name in map(self._filter_cache, self.apt_cache.packages):
             if package_name:
@@ -122,6 +124,9 @@ class KernelDetection(object):
                         candidate_pkg = self.apt_cache[candidate]
                         if (
                             candidate.startswith(prefix)
+                            # linux-image-hmac-$version-$flavour (FIPS) depends
+                            # on the image, but it is not a metapackage
+                            and "hmac" not in candidate
                             and (
                                 candidate_pkg
                                 and (
@@ -185,7 +190,11 @@ class KernelDetection(object):
             if candidate:
                 for dep_list in candidate.depends_list_str.get("Depends"):  # type: ignore[attr-defined]
                     for dep_name, dep_ver, dep_op in dep_list:
-                        if dep_name.startswith("linux-image"):
+                        # Skip linux-image-hmac-$version-$flavour (FIPS)
+                        if (
+                            dep_name.startswith("linux-image")
+                            and "hmac" not in dep_name
+                        ):
                             linux_version = dep_name.strip().replace("linux-image-", "")
                             break
         except KeyError:
