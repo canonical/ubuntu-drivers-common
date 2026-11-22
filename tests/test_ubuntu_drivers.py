@@ -9421,6 +9421,98 @@ class KernelDectionTest(unittest.TestCase):
         finally:
             chroot.remove()
 
+    def test_linux_detection_fips_hmac_chroot(self):
+        """FIPS linux-image-hmac-* packages are not kernel images"""
+        chroot = aptdaemon.test.Chroot()
+        try:
+            chroot.setup()
+            chroot.add_test_repository()
+            archive = gen_fakearchive()
+
+            # Images, their HMAC files and headers
+            for abi in ("5.15.0-163-fips", "5.15.0-164-fips"):
+                archive.create_deb(
+                    "linux-image-%s" % abi, extra_tags={"Source": "linux-signed-fips"}
+                )
+                archive.create_deb(
+                    "linux-image-hmac-%s" % abi,
+                    dependencies={"Depends": "linux-image-%s" % abi},
+                    extra_tags={"Source": "linux-signed-fips"},
+                )
+                archive.create_deb(
+                    "linux-headers-%s" % abi, extra_tags={"Source": "linux-fips"}
+                )
+
+            # Metapackages
+            archive.create_deb(
+                "linux-image-fips",
+                dependencies={
+                    "Depends": "linux-image-5.15.0-164-fips, "
+                    "linux-image-hmac-5.15.0-164-fips"
+                },
+                extra_tags={"Source": "linux-meta-fips"},
+            )
+            archive.create_deb(
+                "linux-headers-fips",
+                dependencies={"Depends": "linux-headers-5.15.0-164-fips"},
+                extra_tags={"Source": "linux-meta-fips"},
+            )
+            archive.create_deb(
+                "linux-fips",
+                dependencies={"Depends": "linux-image-fips, linux-headers-fips"},
+                extra_tags={"Source": "linux-meta-fips"},
+            )
+
+            chroot.add_repository(archive.path, True, False)
+
+            apt_pkg.init_config()
+            dpkg_status = os.path.abspath(
+                os.path.join(chroot.path, "var", "lib", "dpkg", "status")
+            )
+            apt_pkg.config.set("Dir::State::status", dpkg_status)
+            apt_pkg.init_system()
+            cache = apt_pkg.Cache(None)
+            depcache = apt_pkg.DepCache(cache)
+
+            # Install kernel packages
+            for pkg in (
+                "linux-image-5.15.0-163-fips",
+                "linux-image-hmac-5.15.0-163-fips",
+                "linux-headers-5.15.0-163-fips",
+                "linux-image-5.15.0-164-fips",
+                "linux-image-hmac-5.15.0-164-fips",
+                "linux-headers-5.15.0-164-fips",
+                "linux-image-fips",
+                "linux-headers-fips",
+                "linux-fips",
+            ):
+                package = cache.__getitem__(pkg)
+                depcache.mark_install(package)
+
+            kernel_detection = UbuntuDrivers.kerneldetection.KernelDetection(cache)
+
+            # dpkg --compare-versions prints its warnings straight to fd 2
+            with tempfile.TemporaryFile() as stderr:
+                saved_stderr = os.dup(2)
+                os.dup2(stderr.fileno(), 2)
+                try:
+                    linux = kernel_detection.get_linux_metapackage()
+                    linux_image = kernel_detection.get_linux_image_metapackage()
+                finally:
+                    os.dup2(saved_stderr, 2)
+                    os.close(saved_stderr)
+                stderr.seek(0)
+                self.assertNotIn(b"dpkg: warning", stderr.read())
+
+            self.assertEqual(linux, "linux-fips")
+            self.assertEqual(linux_image, "linux-image-fips")
+            linux_headers = kernel_detection.get_linux_headers_metapackage()
+            self.assertEqual(linux_headers, "linux-headers-fips")
+            linux_version = kernel_detection.get_linux_version()
+            self.assertEqual(linux_version, "5.15.0-164-fips")
+        finally:
+            chroot.remove()
+
 
 if __name__ == "__main__":
     if "umockdev" not in os.environ.get("LD_PRELOAD", ""):
