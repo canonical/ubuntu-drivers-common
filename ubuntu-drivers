@@ -615,7 +615,10 @@ def greet(config: Config, **kwargs: Any) -> None:
     "--package-list",
     nargs=1,
     metavar="PATH",
-    help="Create file with list of installed packages (in install mode)",
+    help=(
+        "After a successful APT install, append the explicitly requested "
+        "package names to PATH, one per line."
+    ),
 )
 @click.option(
     "--no-oem",
