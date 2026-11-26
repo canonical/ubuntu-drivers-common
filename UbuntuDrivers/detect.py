@@ -395,6 +395,12 @@ def system_midrs(sys_path: Optional[str] = None) -> Dict[str, str]:
 def _check_video_abi_compat(apt_cache: apt_pkg.Cache, package: apt_pkg.Package) -> bool:
     xorg_video_abi = None
 
+    depcache = apt_pkg.DepCache(apt_cache)
+    candidate = depcache.get_candidate_ver(package)
+    if candidate is None:
+        logging.debug("No candidate version for driver %s. Skipping it", package.name)
+        return False
+
     if package.name.startswith("nvidia-driver-"):
         xorg_driver_name = package.name.replace(
             "nvidia-driver-", "xserver-xorg-video-nvidia-"
@@ -408,8 +414,10 @@ def _check_video_abi_compat(apt_cache: apt_pkg.Cache, package: apt_pkg.Package) 
             )
             return True
 
-    depcache = apt_pkg.DepCache(apt_cache)
-    candidate = depcache.get_candidate_ver(package)
+        candidate = depcache.get_candidate_ver(package)
+        if candidate is None:
+            logging.debug("No candidate version for %s. Cannot check ABI", package.name)
+            return True
 
     needs_video_abi = False
     try:
@@ -439,6 +447,9 @@ def _check_video_abi_compat(apt_cache: apt_pkg.Cache, package: apt_pkg.Package) 
         return True
 
     candidate = depcache.get_candidate_ver(xorg_core)
+    if candidate is None:
+        logging.debug("No candidate version for xserver-xorg-core. Cannot check ABI")
+        return True
 
     for provides_name, provides_ver, p_version in candidate.provides_list:
         if provides_name.startswith("xorg-video-abi-"):
