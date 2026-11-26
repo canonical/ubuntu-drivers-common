@@ -1,14 +1,30 @@
 #!/usr/bin/python3
 
-from setuptools import setup, find_packages
-
-import subprocess, glob, os.path
+import glob
 import os
 
+from setuptools import find_packages, setup
+from distutils.command.build import build
+from distutils.command.clean import clean
+
+
+class Build(build):
+    def run(self):
+        self.spawn(["make", "-C", "share/hybrid", "all"])
+        super().run()
+
+
+class Clean(clean):
+    def run(self):
+        self.spawn(["make", "-C", "share/hybrid", "clean"])
+        super().run()
+
+
+commands = {}
 extra_data = []
-# Build hybrid-detect on x86
+# Build and install gpu-manager on x86.
 if "86" in os.uname()[4]:
-    subprocess.check_call(["make", "-C", "share/hybrid", "all"])
+    commands = {"build": Build, "clean": Clean}
     extra_data.append(("/usr/bin/", ["share/hybrid/gpu-manager"]))
     extra_data.append(
         ("/usr/lib/systemd/system/", ["share/hybrid/gpu-manager.service"])
@@ -31,6 +47,7 @@ setup(
     url="http://www.albertomilone.com",
     license="gpl",
     description="Detect and install additional Ubuntu driver packages",
+    cmdclass=commands,
     packages=find_packages(include=["Quirks", "UbuntuDrivers", "UbuntuDrivers.*"]),
     data_files=[
         (
