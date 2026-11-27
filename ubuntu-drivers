@@ -234,6 +234,53 @@ def command_devices(args: Config) -> Optional[int]:
     return None
 
 
+def _kernel_modules_extra_to_add(cache, to_install):
+    """Kernel ``linux-modules-extra-<kver>`` packages that must be co-installed
+    with ``to_install``.
+
+    A pre-built, Secure Boot-signed ``linux-modules-nvidia-<ver>-<kver>``
+    *Depends* on ``linux-image-<kver>``, so installing a driver can pull in a
+    brand-new kernel ABI. apt brings in that kernel's core ``linux-modules`` but
+    NOT ``linux-modules-extra`` -- the latter is only a *Suggests* of
+    ``linux-image``. Yet ``-extra`` is where less common storage drivers live
+    (e.g. legacy PATA ``pata_atiixp`` for AMD SB7x0/8x0/9x0 IDE controllers). If
+    the root disk hangs off such a controller, the freshly pulled-in kernel
+    cannot find its root filesystem and drops to an initramfs shell on the next
+    boot -- while every package is still ``ii`` and the driver module builds
+    fine, so nothing looks wrong. Returning the matching ``-extra`` packages
+    here keeps every pulled-in kernel's module set complete. Best-effort: any
+    failure returns ``[]`` and never blocks the install.
+    """
+    try:
+        depcache = apt_pkg.DepCache(cache)
+        for name in to_install:
+            try:
+                depcache.mark_install(cache[name])
+            except KeyError:
+                pass
+        added = []
+        for pkg in cache.packages:
+            if not (pkg.name.startswith("linux-image-")
+                    and pkg.name.endswith("-generic")):
+                continue
+            if not depcache.marked_install(pkg):
+                continue
+            kver = pkg.name[len("linux-image-"):]
+            extra_name = "linux-modules-extra-" + kver
+            try:
+                extra_pkg = cache[extra_name]
+            except KeyError:
+                continue
+            if extra_pkg.current_ver is None and extra_name not in to_install:
+                added.append(extra_name)
+        return added
+    except Exception as exc:  # best-effort; never block an install over this
+        sys.stderr.write(
+            "ubuntu-drivers: could not compute kernel modules-extra: %s\n" % exc
+        )
+        return []
+
+
 def command_install(args: Config) -> Optional[int]:
     """Install drivers that are appropriate for your hardware."""
     apt_pkg.init_config()
@@ -276,6 +323,18 @@ def command_install(args: Config) -> Optional[int]:
 
     if is_nvidia:
         UbuntuDrivers.detect.nvidia_desktop_pre_installation_hook(to_install)
+
+    # If the selected driver drags in a new kernel ABI, make sure that kernel's
+    # modules-extra comes too -- otherwise the box can be left unbootable when
+    # its root-disk controller driver lives in -extra (see the helper docstring).
+    modules_extra = _kernel_modules_extra_to_add(cache, to_install)
+    if modules_extra:
+        print(
+            "ubuntu-drivers: this driver pulls in a new kernel; also installing "
+            "its modules-extra so boot-critical storage drivers are present: "
+            + " ".join(modules_extra)
+        )
+        to_install = to_install + modules_extra
 
     ret = subprocess.call(
         ["apt-get", "install", "-o", "DPkg::options::=--force-confnew", "-y"]
@@ -662,10 +721,14 @@ def install(config: Config, **kwargs: Any) -> None:
     if kwargs.get("driver"):
         config.driver_string = "".join(kwargs.get("driver"))  # type: ignore[arg-type]
 
+    # Propagate the underlying apt exit code: command_install()/install_gpgpu()
+    # return apt-get's status, but a click command otherwise always exits 0, so a
+    # failed transaction (e.g. a dpkg configure error) would be reported as
+    # success. sys.exit() lets click surface the real code to the caller.
     if config.gpgpu:
-        install_gpgpu(config)
+        sys.exit(install_gpgpu(config) or 0)
     else:
-        command_install(config)
+        sys.exit(command_install(config) or 0)
 
 
 @greet.command()
